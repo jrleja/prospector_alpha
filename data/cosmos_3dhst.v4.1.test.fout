@@ -1,0 +1,20 @@
+#    id         z      ltau     metal      lage        Av     lmass      lsfr     lssfr      la2t      chi2
+# FAST version: 0.9b
+# Photometric catalog file: cosmos_3dhst.v4.1.cat
+# Photometric redshift file: cosmos_3dhst.v4.1.zout
+# Template error function: TEMPLATE_ERROR.fast.v0.2
+# AB ZP:        25.00
+# Library:      Bruzual & Charlot (2003)
+# SFH:          Exponentially declining SFH: SFR ~ exp(-t/tau)
+# Stellar IMF:  Chabrier
+# metallicity:  0.020
+# log(tau/yr):  7.0    - 10.0, in steps of 0.20
+# log(age/yr):  7.6    - 10.1, in steps of 0.10
+# A_V:          0.0    -  4.0, in steps of 0.10
+# z:            0.0100 -  6.0000, in steps of 0.0100
+# Filters:     205  88  78  89  79 236  90  81  91  82 239  92  83 256 203 128 129 130 220 257 204 131 132 221 258 134 222 259  18  19  20  21 181 183 184 185 186 188 190 192 193 194 195 197
+# ltau: log[tau/yr], lage: log[age/yr], lmass: log[mass/Msol], lsfr: log[sfr/(Msol/yr)], lssfr: log[ssfr*yr], la2t: log[age/tau]
+# For sfr=0. lsfr is set to -99
+#    id         z      ltau     metal      lage        Av     lmass      lsfr     lssfr      la2t      chi2
+  32206    0.9100      8.00     0.020      9.20      0.40     10.74     -3.81    -14.55      1.20  1.02e+00
+  33686    0.7000      7.40     0.020      7.90      1.80     10.55      1.91     -8.63      0.50  9.33e-01
