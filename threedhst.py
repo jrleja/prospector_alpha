@@ -9,6 +9,9 @@ from bsfh.gp import GaussianProcess
 import bsfh.fitterutils as utils
 from bsfh import model_setup
 
+# fsps or sps_basis
+# fsps lives in python-fsps
+# sps-basis lives elsewhere, and relies on sedpy for filter projections
 sptype = model_setup.parse_args(sys.argv).get('sps_type', 'fsps')
     
 #SPS Model as global
@@ -20,7 +23,7 @@ elif sptype == 'fsps':
     import fsps
     sps = fsps.StellarPopulation()
     custom_filter_keys = model_setup.parse_args(sys.argv).get('custom_filter_keys', None)
-    if filterfile is not None:
+    if custom_filter_keys is not None:
         fsps.filters.FILTERS = model_setup.custom_filter_dict(custom_filter_keys)
         
 #GP instance as global
@@ -33,8 +36,9 @@ def lnprobfn(theta, mod):
     posterior.
     """
     lnp_prior = mod.prior_product(theta)
+
     if np.isfinite(lnp_prior):
-        
+
         # Generate mean model
         t1 = time.time()        
         mu, phot, x = mod.mean_model(theta, sps = sps)
@@ -75,6 +79,8 @@ def lnprobfn(theta, mod):
             fstring = 'lnp = {0}, lnp_spec = {1}, lnp_phot = {2}'
             values = [lnp_spec + lnp_phot + lnp_prior, lnp_spec, lnp_phot]
             print(fstring.format(*values))
+            print phot
+            print mod.obs[maggies]
         return lnp_prior + lnp_phot + lnp_spec
     else:
         return -np.infty
@@ -112,9 +118,9 @@ if __name__ == "__main__":
     #################
     #INITIAL GUESS(ES) USING POWELL MINIMIZATION
     #################
-    print(type(model))
-    print(type(sps))
-    
+    x= model.mean_model(initial_theta, sps=sps)[1]
+    print 1/0
+
     if rp['verbose']:
         print('Minimizing')
     ts = time.time()
@@ -126,7 +132,6 @@ if __name__ == "__main__":
     best = np.argmin([p.fun for p in powell_guesses])
     best_guess = powell_guesses[best]
     pdur = time.time() - ts
-    print model.mean_model(initial_theta, sps=sps)
     if rp['verbose']:
         print('done Powell in {0}s'.format(pdur))
 

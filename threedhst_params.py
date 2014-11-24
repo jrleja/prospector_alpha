@@ -14,20 +14,22 @@ def load_obs_3dhst(filename, objnum):
 		hdr = f.readline().split()
 	dat = np.loadtxt(filename, comments = '#',
 					 dtype = np.dtype([(n, np.float) for n in hdr[1:]]))
+	obj_ind = np.where(dat['id'] == int(objnum))[0][0]
 	
+	# extract fluxes+uncertainties for all objects and all filters
 	flux_fields = [f for f in dat.dtype.names if f[0:2] == 'f_']
 	unc_fields = [f for f in dat.dtype.names if f[0:2] == 'e_']
 	filters = [f[2:] for f in flux_fields]
 	
-	# extract fluxes from record array
-	flux = dat[flux_fields].view(float).reshape(len(dat),-1)
-	unc  = dat[unc_fields].view(float).reshape(len(dat),-1)
-    
-	obs['filters'] = [flux_field+'_'+fieldname for flux_field in flux_fields]
+	# extract fluxes for particular object, converting from record array to numpy array
+	flux = dat[flux_fields].view(float).reshape(len(dat),-1)[obj_ind]
+	unc  = dat[unc_fields].view(float).reshape(len(dat),-1)[obj_ind]
+
+	# build output dictionary
+	obs['filters'] = [filter.lower()+'_'+fieldname.lower() for filter in filters]
 	obs['phot_mask'] =  np.logical_or((flux != unc),(flux > 0))
 	obs['maggies'] = flux/(10**10)
 	obs['maggies_unc'] =  flux/(10**10)
-
 	obs['wavelength'] = None
 
 	return obs
@@ -70,7 +72,7 @@ param_template = {'name':'', 'N':1, 'isfree': False,
 ###### Distance ##########
 model_params.append({'name': 'zred', 'N': 1,
                         'isfree': False,
-                        'init': 0.7,
+                        'init': 0.91,
                         'units': '',
                         'prior_function_name': 'tophat',
                         'prior_args': {'mini':0.3, 'maxi':1.3}})
@@ -127,11 +129,6 @@ model_params.append({'name': 'fburst', 'N': 1,
                         'prior_args': {'mini':0.0, 'maxi':0.5}})
 
 ########    Dust ##############
-
-model_params.append({'name': 'dust_curve', 'N': 1,
-                        'isfree': False,
-                        'init': attenuation.cardelli,
-                        'units': None})
 
 model_params.append({'name': 'dust1', 'N': 1,
                         'isfree': False,
