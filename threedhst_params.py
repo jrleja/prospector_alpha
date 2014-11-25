@@ -44,7 +44,6 @@ def load_fast_3dhst(filename, objnum):
 	dat = np.loadtxt(filename, comments = '#',
 					 dtype = np.dtype([(n, np.float) for n in hdr[1:]]))
 	obj_ind = np.where(dat['id'] == int(objnum))[0][0]
-	print 1/0
 	
 	# extract values and field names
 	fields = [f for f in dat.dtype.names]
@@ -54,11 +53,11 @@ def load_fast_3dhst(filename, objnum):
 	output = {}
 	translate=[('z','zred'),('ltau','tau'),('lage','tage'),('Av','dust2'),('lmass','mass')]
 	
-	output[translate[0][1]] = values[translate[0][0]]
-	output[translate[1][1]] = 10**values[translate[1][1]]/(10**9)
-	output[translate[2][1]] = 10**values[translate[2][1]]/(10**9)
-	output[translate[3][1]] = values[translate[3][1]]
-	output[translate[4][1]] = 10**values[translate[4][1]]
+	output[translate[0][1]] = values[fields.index(translate[0][0])]
+	output[translate[1][1]] = 10**values[fields.index(translate[1][0])]/(10**9)
+	output[translate[2][1]] = 10**values[fields.index(translate[2][0])]/(10**9)
+	output[translate[3][1]] = values[fields.index(translate[3][0])]
+	output[translate[4][1]] = 10**values[fields.index(translate[4][0])]
 
 	return output
 
@@ -122,7 +121,7 @@ model_params.append({'name': 'mass', 'N': 1,
                         'prior_function_name': 'tophat',
                         'prior_args': {'mini':1e9, 'maxi':1e12}})
 
-model_params.append({'name': 'zmet', 'N': 1,
+model_params.append({'name': 'logzsol', 'N': 1,
                         'isfree': False,
                         'init': 0,
                         'units': r'$\log (Z/Z_\odot)$',
@@ -229,6 +228,6 @@ model_params.append({'name': 'phot_jitter', 'N': 1,
 fast_params = True
 if fast_params == True:
 	fparams = load_fast_3dhst(run_params['fastname'],run_params['objname'])
-	print 1/0
-
+	for key in fparams: (item for item in model_params if item["name"] == key).next()['init'] = fparams[key]
+	
 ####### ADD CHECK: ALL PARAMS WITHIN LIMITS #######
