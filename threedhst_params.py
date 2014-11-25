@@ -34,12 +34,40 @@ def load_obs_3dhst(filename, objnum):
 
 	return obs
 
+def load_fast_3dhst(filename, objnum):
+	"""Load a 3D-HST data file and choose a particular object.
+	"""
+
+	fieldname=filename.split('/')[-1].split('_')[0].upper()
+	with open(filename, 'r') as f:
+		hdr = f.readline().split()
+	dat = np.loadtxt(filename, comments = '#',
+					 dtype = np.dtype([(n, np.float) for n in hdr[1:]]))
+	obj_ind = np.where(dat['id'] == int(objnum))[0][0]
+	print 1/0
+	
+	# extract values and field names
+	fields = [f for f in dat.dtype.names]
+	values = dat[fields].view(float).reshape(len(dat),-1)[obj_ind]
+	
+	# translate
+	output = {}
+	translate=[('z','zred'),('ltau','tau'),('lage','tage'),('Av','dust2'),('lmass','mass')]
+	
+	output[translate[0][1]] = values[translate[0][0]]
+	output[translate[1][1]] = 10**values[translate[1][1]]/(10**9)
+	output[translate[2][1]] = 10**values[translate[2][1]]/(10**9)
+	output[translate[3][1]] = values[translate[3][1]]
+	output[translate[4][1]] = 10**values[translate[4][1]]
+
+	return output
+
 #############
 # RUN_PARAMS
 #############
 
 run_params = {'verbose':True,
-              'outfile':'results/mock_3dhst',
+              'outfile':'/Users/joel/code/python/threedhst_bsfh/results/threedhst',
               'ftol':0.5e-5, 'maxfev':500,
               'nwalkers':32,
               'nburn':[32, 64, 128], 'niter':256,
@@ -49,6 +77,7 @@ run_params = {'verbose':True,
               'logify_spectrum':True,
               'normalize_spectrum':True,
               'photname':'/Users/joel/code/python/threedhst_bsfh/data/cosmos_3dhst.v4.1.test.cat',
+              'fastname':'/Users/joel/code/python/threedhst_bsfh/data/cosmos_3dhst.v4.1.test.fout',
               'objname':'32206',
               'wlo':3750., 'whi':7200.
               }
@@ -75,7 +104,7 @@ model_params.append({'name': 'zred', 'N': 1,
                         'init': 0.91,
                         'units': '',
                         'prior_function_name': 'tophat',
-                        'prior_args': {'mini':0.3, 'maxi':1.3}})
+                        'prior_args': {'mini':0.0, 'maxi':4.0}})
 
 ###### SFH   ########
 
@@ -94,12 +123,12 @@ model_params.append({'name': 'mass', 'N': 1,
                         'prior_args': {'mini':1e9, 'maxi':1e12}})
 
 model_params.append({'name': 'zmet', 'N': 1,
-                        'isfree': True,
-                        'init': 20,
-                        'units': 'index',
-                        'prior_function_name': 'tophat',
-                        'prior_args': {'mini':1, 'maxi':5}})
-
+                        'isfree': False,
+                        'init': 0,
+                        'units': r'$\log (Z/Z_\odot)$',
+                        'prior_function': tophat,
+                        'prior_args': {'mini':-1, 'maxi':0.19}})
+                        
 model_params.append({'name': 'tau', 'N': 1,
                         'isfree': True,
                         'init': 1.0,
@@ -115,14 +144,14 @@ model_params.append({'name': 'tage', 'N': 1,
                         'prior_args': {'mini':0.1, 'maxi':10.0}})
 
 model_params.append({'name': 'tburst', 'N': 1,
-                        'isfree': True,
+                        'isfree': False,
                         'init': 0.0,
                         'units': '',
                         'prior_function_name': 'tophat',
-                        'prior_args': {'mini':0.3, 'maxi':1.3}})
+                        'prior_args': {'mini':0.0, 'maxi':1.3}})
 
 model_params.append({'name': 'fburst', 'N': 1,
-                        'isfree': True,
+                        'isfree': False,
                         'init': 0.0,
                         'units': '',
                         'prior_function_name': 'tophat',
@@ -195,3 +224,11 @@ model_params.append({'name': 'phot_jitter', 'N': 1,
                         'units': 'mags',
                         'prior_function_name': 'tophat',
                         'prior_args': {'mini':0.0, 'maxi':0.2}})
+
+####### FAST PARAMS ##########
+fast_params = True
+if fast_params == True:
+	fparams = load_fast_3dhst(run_params['fastname'],run_params['objname'])
+	print 1/0
+
+####### ADD CHECK: ALL PARAMS WITHIN LIMITS #######
