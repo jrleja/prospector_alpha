@@ -53,6 +53,14 @@ def read_threedhst_filters(filtnum):
 
 	return lam, res
 
+
+def calc_lameff(lam,res):
+
+	''' calculates effective lambda given input response curve'''
+	dellam = lam[1]-lam[0]
+	lam_sum_up = np.sqrt(np.sum(lam*res*dellam)/np.sum(res*dellam/lam))
+	return lam_sum_up
+
 def main(field=False):
 
 	''' TRANSLATES FAST FILTER DEFINITIONS TO FSPS '''
@@ -92,6 +100,12 @@ def main(field=False):
 	outfile='filter_keys_threedhst.txt'
 	with open(outfile, 'w') as f:
 		for jj in xrange(nfilters): f.write(str(jj+1).strip()+'\t'+filters[jj]['filt_name'].strip()+'\n')
-		
+	
+	''' WRITE OUT EFFECTIVE WAVELENGTHS '''
+	outfile='lameff_threedhst.txt'
+	with open(outfile,'w') as f:
+		for jj in xrange(nfilters):
+			lameff = calc_lameff(filters[jj]['lam'],filters[jj]['response'])
+			f.write("{0}\n".format(lameff))
 if __name__ == "__main__":
     main()

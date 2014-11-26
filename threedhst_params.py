@@ -5,7 +5,7 @@ from bsfh import priors, sedmodel, elines
 import bsfh.datautils as dutils
 tophat = priors.tophat
 
-def load_obs_3dhst(filename, objnum):
+def load_obs_3dhst(filename, objnum, pivwave):
 	"""Load a 3D-HST data file and choose a particular object.
 	"""
 	obs ={}
@@ -31,7 +31,8 @@ def load_obs_3dhst(filename, objnum):
 	obs['maggies'] = flux/(10**10)
 	obs['maggies_unc'] =  flux/(10**10)
 	obs['wavelength'] = None
-
+	obs['wave_effective'] = np.loadtxt(pivwave)
+	print obs['wave_effective']
 	return obs
 
 def load_fast_3dhst(filename, objnum):
@@ -69,7 +70,7 @@ run_params = {'verbose':True,
               'outfile':'/Users/joel/code/python/threedhst_bsfh/results/threedhst',
               'ftol':0.5e-5, 'maxfev':500,
               'nwalkers':32,
-              'nburn':[32, 64, 128], 'niter':256,
+              'nburn':[32, 64, 128], 'niter':4096,
               'initial_disp':0.1,
               'mock': False,
               'spec': False, 'phot':True,
@@ -77,6 +78,7 @@ run_params = {'verbose':True,
               'normalize_spectrum':True,
               'photname':'/Users/joel/code/python/threedhst_bsfh/data/cosmos_3dhst.v4.1.test.cat',
               'fastname':'/Users/joel/code/python/threedhst_bsfh/data/cosmos_3dhst.v4.1.test.fout',
+              'pivwave':'/Users/joel/code/python/threedhst_bsfh/filters/lameff_threedhst.txt',
               'objname':'32206',
               'wlo':3750., 'whi':7200.
               }
@@ -85,7 +87,7 @@ run_params = {'verbose':True,
 # OBS
 #############
 
-obs = load_obs_3dhst(run_params['photname'], run_params['objname'])
+obs = load_obs_3dhst(run_params['photname'], run_params['objname'], run_params['pivwave'])
 
 #############
 # MODEL_PARAMS
@@ -196,7 +198,9 @@ model_params.append({'name': 'dust_tesc', 'N': 1,
 model_params.append({'name': 'dust_type', 'N': 1,
                         'isfree': False,
                         'init': 0,
-                        'units': 'index'})
+                        'units': 'index',
+                        'prior_function_name': None,
+                        'prior_args': None})
 
 ###### Nebular Emission ###########
 
@@ -230,4 +234,3 @@ if fast_params == True:
 	fparams = load_fast_3dhst(run_params['fastname'],run_params['objname'])
 	for key in fparams: (item for item in model_params if item["name"] == key).next()['init'] = fparams[key]
 	
-####### ADD CHECK: ALL PARAMS WITHIN LIMITS #######
