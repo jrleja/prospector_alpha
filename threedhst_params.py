@@ -5,7 +5,23 @@ from bsfh import priors, sedmodel, elines
 import bsfh.datautils as dutils
 tophat = priors.tophat
 
-def load_obs_3dhst(filename, objnum, pivwave):
+def return_mwave_custom(filters):
+
+	loc = '/Users/joel/code/python/threedhst_bsfh/filters/'
+	key_str = 'filter_keys_threedhst.txt'
+	lameff_str = 'lameff_threedhst.txt'
+	
+	lameff = np.loadtxt(loc+lameff_str)
+	keys = np.loadtxt(loc+key_str, dtype='S20',usecols=[1])
+	keys = keys.tolist()
+	keys = np.array([keys.lower() for keys in keys], dtype='S20')
+	
+	lameff_return = [[lameff[keys == filters[i]]][0] for i in range(len(filters))]
+	lameff_return = [item for sublist in lameff_return for item in sublist]
+	
+	return lameff_return
+
+def load_obs_3dhst(filename, objnum):
 	"""Load a 3D-HST data file and choose a particular object.
 	"""
 	obs ={}
@@ -25,14 +41,25 @@ def load_obs_3dhst(filename, objnum, pivwave):
 	flux = dat[flux_fields].view(float).reshape(len(dat),-1)[obj_ind]
 	unc  = dat[unc_fields].view(float).reshape(len(dat),-1)[obj_ind]
 
+	# define all outputs
+	filters = [filter.lower()+'_'+fieldname.lower() for filter in filters]
+	wave_effective = np.array(return_mwave_custom(filters))
+	phot_mask = np.logical_or((flux != unc),(flux > 0))
+	maggies = flux/(10**10)
+	maggies_unc = unc/(10**10)
+	
+	# sort outputs based on effective wavelength
+	points = zip(wave_effective,filters,phot_mask,maggies,maggies_unc)
+	sorted_points = sorted(points)
+
 	# build output dictionary
-	obs['filters'] = [filter.lower()+'_'+fieldname.lower() for filter in filters]
-	obs['phot_mask'] =  np.logical_or((flux != unc),(flux > 0))
-	obs['maggies'] = flux/(10**10)
-	obs['maggies_unc'] =  flux/(10**10)
+	obs['wave_effective'] = np.array([point[0] for point in sorted_points])
+	obs['filters'] = np.array([point[1] for point in sorted_points])
+	obs['phot_mask'] =  np.array([point[2] for point in sorted_points])
+	obs['maggies'] = np.array([point[3] for point in sorted_points])
+	obs['maggies_unc'] =  np.array([point[4] for point in sorted_points])
 	obs['wavelength'] = None
-	obs['wave_effective'] = np.loadtxt(pivwave)
-	print obs['wave_effective']
+
 	return obs
 
 def load_fast_3dhst(filename, objnum):
@@ -70,7 +97,8 @@ run_params = {'verbose':True,
               'outfile':'/Users/joel/code/python/threedhst_bsfh/results/threedhst',
               'ftol':0.5e-5, 'maxfev':500,
               'nwalkers':32,
-              'nburn':[32, 64, 128], 'niter':4096,
+              #'nburn':[32, 64, 128], 'niter':512,
+              'nburn':[16, 32], 'niter':128,
               'initial_disp':0.1,
               'mock': False,
               'spec': False, 'phot':True,
@@ -78,7 +106,6 @@ run_params = {'verbose':True,
               'normalize_spectrum':True,
               'photname':'/Users/joel/code/python/threedhst_bsfh/data/cosmos_3dhst.v4.1.test.cat',
               'fastname':'/Users/joel/code/python/threedhst_bsfh/data/cosmos_3dhst.v4.1.test.fout',
-              'pivwave':'/Users/joel/code/python/threedhst_bsfh/filters/lameff_threedhst.txt',
               'objname':'32206',
               'wlo':3750., 'whi':7200.
               }
@@ -87,7 +114,7 @@ run_params = {'verbose':True,
 # OBS
 #############
 
-obs = load_obs_3dhst(run_params['photname'], run_params['objname'], run_params['pivwave'])
+obs = load_obs_3dhst(run_params['photname'], run_params['objname'])
 
 #############
 # MODEL_PARAMS
@@ -157,6 +184,14 @@ model_params.append({'name': 'fburst', 'N': 1,
                         'units': '',
                         'prior_function_name': 'tophat',
                         'prior_args': {'mini':0.0, 'maxi':0.5}})
+                        
+########    IMF  ##############
+model_params.append({'name': 'imf_type', 'N': 1,
+                        	 'isfree': False,
+                             'init': 1, #1 = chabrier
+                       		 'units': None,
+                       		 'prior_function_name': None,
+                        	 'prior_args': None})
 
 ########    Dust ##############
 
