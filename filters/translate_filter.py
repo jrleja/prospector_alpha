@@ -85,9 +85,19 @@ def main(field=False):
 			line_num = translate[2*jj][1][1:]
 			temp_filters[jj]['lam'], temp_filters[jj]['response'] = read_threedhst_filters(int(line_num))
 		filters = filters + temp_filters
-		
-	''' WRITE OUT FSPS FILTER DEFINITIONS '''
+	
+	''' SORT BY EFFECTIVE WAVELENGTHS '''
 	nfilters = len(filters)
+	lameff=np.array([])
+	for jj in xrange(nfilters):
+		lameff = np.append(lameff,calc_lameff(filters[jj]['lam'],filters[jj]['response']))
+	points = zip(lameff,filters)
+	points.sort(key=lambda tup: tup[0])	
+	
+	lameff = [point[0] for point in points]
+	filters = [point[1] for point in points]
+	
+	''' WRITE OUT FSPS FILTER DEFINITIONS '''
 	print('{0} total filters'.format(nfilters))
 	outfile="allfilters_threedhst.dat"
 	with open(outfile, 'w') as f:
@@ -104,8 +114,7 @@ def main(field=False):
 	''' WRITE OUT EFFECTIVE WAVELENGTHS '''
 	outfile='lameff_threedhst.txt'
 	with open(outfile,'w') as f:
-		for jj in xrange(nfilters):
-			lameff = calc_lameff(filters[jj]['lam'],filters[jj]['response'])
-			f.write("{0}\n".format(lameff))
+		for jj in xrange(nfilters): f.write("{0}\n".format(lameff[jj]))
+		
 if __name__ == "__main__":
     main()
