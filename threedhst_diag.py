@@ -99,7 +99,7 @@ def return_mwave_custom(filters):
 	return lameff_return
 
 def phot_figure(sample_results, alpha=0.3, samples = [-1],
-                start=0, thin=1, maxprob=0,
+                start=0, thin=1, maxprob=0, outname=None,
                 **kwargs):
 	"""
 	Plot the photometry for the model and data (with error bars). Then
@@ -111,13 +111,21 @@ def phot_figure(sample_results, alpha=0.3, samples = [-1],
 	custom_filter_keys = '/Users/joel/code/python/threedhst_bsfh/filters/filter_keys_threedhst.txt'
 	fsps.filters.FILTERS = model_setup.custom_filter_dict(custom_filter_keys)
 
+	# load custom model
+	model = model_setup.setup_model('/Users/joel/code/python/threedhst_bsfh/threedhst_params.py', sps=sps)
+	fast_mags, fast_lam = model.mean_model(model.initial_theta, sps=sps)[1], model.obs['wave_effective']
+
 	fig = plt.figure()
 	gs = gridspec.GridSpec(2,1, height_ratios=[3,1])
 	gs.update(hspace=0)
 
 	phot, res = plt.Subplot(fig, gs[0]), plt.Subplot(fig, gs[1])
 	res.set_ylabel( r'$\chi$')
-	phot.set_ylabel('maggies')
+	phot.set_ylabel('log(maggies)')
+	res.set_xlabel(r'log($\lambda_{obs}$) [$\AA$]')
+	phot.set_xlim(3.5,5.2)
+	res.set_xlim(3.5,5.2)
+	phot.set_xticklabels([])
     
 	# random posterior draws
 	# chain = chain[nwalkers,nsteps,ndim]
@@ -129,13 +137,17 @@ def phot_figure(sample_results, alpha=0.3, samples = [-1],
 	for vecs in specvecs:
 		vv = vecs[0], vecs[-1]
 
-		[ax.plot(np.log10(mwave), np.log10(v), color='grey', alpha=alpha, marker='o', label='random sample', **kwargs)
-		for ax, v in zip([phot, res], vv) ]
+		#[ax.plot(np.log10(mwave), np.log10(v), color='grey', alpha=alpha, marker='o', label='random sample', **kwargs)
+		#for ax, v in zip([phot, res], vv) ]
     
 	phot.errorbar(np.log10(mwave), np.log10(mospec), yerr=mounc,
                   color='black')
 	phot.plot(np.log10(mwave), np.log10(mospec), label = 'observed',
               color='black', marker='o', **kwargs)
+    
+	phot.plot(np.log10(fast_lam), np.log10(fast_mags), label = 'FAST fit',
+              color='blue', marker='o', **kwargs)
+	
 	
 	# max probability
 	if maxprob == 1:
@@ -147,45 +159,53 @@ def phot_figure(sample_results, alpha=0.3, samples = [-1],
 		mwave, mospec, mounc, specvecs = comp_samples(thetas, sample_results['model'], sps, photflag=1)
 		
 		for vecs in specvecs:
-			vv = vecs[0], vecs[-1]
-			[ax.plot(np.log10(mwave), np.log10(v), color='red', marker='o', label='max lnprob', **kwargs)
-			for ax, v in zip([phot, res], vv) ]
+			phot.plot(np.log10(mwave), np.log10(vecs[0]), color='red', marker='o', label='max lnprob', **kwargs)
+			res.plot(np.log10(mwave), vecs[-1], color='red', marker='o', label='max lnprob', **kwargs)
 	
 	phot.legend(loc=0)
 	res.axhline(0, linestyle=':', color='grey')
     
 	fig.add_subplot(phot)
 	fig.add_subplot(res)
-    
+	if outname is not None:
+		fig.savefig(outname, bbox_inches='tight', dpi=300)
+		import os
+		os.system("open "+outname)
+		plt.close()
 	return fig
 
 def main():
 
+	plt_phot_figure = True
+	plt_chain_figure = False
+	plt_triangle_plot = False
+
 	# define filename and load basics
-	file_base = 'threedhst_1417150026'
+	file_base = 'threedhst_1417337415'
 	filename="/Users/joel/code/python/threedhst_bsfh/results/"+file_base+"_mcmc"
 	model_filename="/Users/joel/code/python/threedhst_bsfh/results/"+file_base+"_model"
 	sample_results, powell_results, model = read_results.read_pickles(filename, model_file=model_filename,inmod=None)
-
+	
     # chain plot
-	#show_chain(sample_results, 
-	#		   outname='/Users/joel/code/python/threedhst_bsfh/results/'+file_base+"_chain.png",
-	#		   alpha=0.3)
+	if plt_chain_figure: show_chain(sample_results,
+	                 outname='/Users/joel/code/python/threedhst_bsfh/results/'+file_base+"_chain.png",
+			         alpha=0.3)
 
 	# triangle plot
-	#read_results.subtriangle(sample_results,
-	#						 outname='/Users/joel/code/python/threedhst_bsfh/results/'+file_base,
-	#						 showpars=None,start=0, thin=1, truths=sample_results['initial_theta'], show_titles=True)
+	if plt_triangle_plot: read_results.subtriangle(sample_results,
+							 outname='/Users/joel/code/python/threedhst_bsfh/results/'+file_base,
+							 showpars=None,start=0, thin=1, truths=sample_results['initial_theta'], show_titles=True)
 
-	# best-fit model plot
-	# sample
-	nsample = 5
-	ns = sample_results['chain'].shape[0] * sample_results['chain'].shape[1]
-	samples = np.random.uniform(0, 1, size=nsample)
-	sample = [int(s * ns) for s in samples]
+	if plt_phot_figure:
+		# best-fit model plot
+		# sample
+		nsample = 5
+		ns = sample_results['chain'].shape[0] * sample_results['chain'].shape[1]
+		samples = np.random.uniform(0, 1, size=nsample)
+		sample = [int(s * ns) for s in samples]
 
- 	# plot
- 	pfig = phot_figure(sample_results, samples=sample, maxprob=1)
- 	pfig.savefig('results/sed.png')
+ 		# plot
+ 		pfig = phot_figure(sample_results, samples=sample, maxprob=1, outname='results/'+file_base+'_sed.png')
+ 		
 
 	
