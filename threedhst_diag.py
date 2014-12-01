@@ -105,6 +105,8 @@ def phot_figure(sample_results, alpha=0.3, samples = [-1],
 	Plot the photometry for the model and data (with error bars). Then
 	plot residuals
 	"""
+	c = 3e8
+	
 	from matplotlib import gridspec
 	import fsps
 	sps = fsps.StellarPopulation(zcontinuous=True)
@@ -113,15 +115,18 @@ def phot_figure(sample_results, alpha=0.3, samples = [-1],
 
 	# load custom model
 	model = model_setup.setup_model('/Users/joel/code/python/threedhst_bsfh/threedhst_params.py', sps=sps)
-	fast_mags, fast_lam = model.mean_model(model.initial_theta, sps=sps)[1], model.obs['wave_effective']
-
+	observables = model.mean_model(model.initial_theta, sps=sps)
+	fast_spec, fast_mags = observables[0],observables[1]
+	w, spec_throwaway = sps.get_spectrum(tage=sps.params['tage'], peraa=False)
+	fast_lam = model.obs['wave_effective']
+	
 	fig = plt.figure()
 	gs = gridspec.GridSpec(2,1, height_ratios=[3,1])
 	gs.update(hspace=0)
 
 	phot, res = plt.Subplot(fig, gs[0]), plt.Subplot(fig, gs[1])
 	res.set_ylabel( r'$\chi$')
-	phot.set_ylabel('log(maggies)')
+	phot.set_ylabel(r'log($\nu f_{\nu}$)')
 	res.set_xlabel(r'log($\lambda_{obs}$) [$\AA$]')
 	phot.set_xlim(3.5,5.2)
 	res.set_xlim(3.5,5.2)
@@ -140,15 +145,20 @@ def phot_figure(sample_results, alpha=0.3, samples = [-1],
 		#[ax.plot(np.log10(mwave), np.log10(v), color='grey', alpha=alpha, marker='o', label='random sample', **kwargs)
 		#for ax, v in zip([phot, res], vv) ]
     
-	phot.errorbar(np.log10(mwave), np.log10(mospec), yerr=mounc,
+	phot.errorbar(np.log10(mwave), np.log10(mospec*(c/(mwave/1e10))), yerr=mounc,
                   color='black')
-	phot.plot(np.log10(mwave), np.log10(mospec), label = 'observed',
+	phot.plot(np.log10(mwave), np.log10(mospec*(c/(mwave/1e10))), label = 'observed',
               color='black', marker='o', **kwargs)
     
-	phot.plot(np.log10(fast_lam), np.log10(fast_mags), label = 'FAST fit',
+	phot.plot(np.log10(fast_lam), np.log10(fast_mags*(c/(fast_lam/1e10))), label = 'FAST fit (phot)', linestyle=' ',
               color='blue', marker='o', **kwargs)
-	
-	
+    
+	nz = fast_spec > 0
+	save_ylim = phot.get_ylim()
+	phot.plot(np.log10(w[nz]), np.log10(fast_spec[nz]*(c/(w[nz]/1e10))), label = 'FAST fit (spec)',
+              color='blue', **kwargs)
+	phot.set_ylim(save_ylim)
+
 	# max probability
 	if maxprob == 1:
 		thetas = sample_results['chain'][sample_results['lnprobability'] == np.max(sample_results['lnprobability']),:]
@@ -159,7 +169,7 @@ def phot_figure(sample_results, alpha=0.3, samples = [-1],
 		mwave, mospec, mounc, specvecs = comp_samples(thetas, sample_results['model'], sps, photflag=1)
 		
 		for vecs in specvecs:
-			phot.plot(np.log10(mwave), np.log10(vecs[0]), color='red', marker='o', label='max lnprob', **kwargs)
+			phot.plot(np.log10(mwave), np.log10(vecs[0]*(c/(mwave/1e10))), color='red', marker='o', label='max lnprob', **kwargs)
 			res.plot(np.log10(mwave), vecs[-1], color='red', marker='o', label='max lnprob', **kwargs)
 	
 	phot.legend(loc=0)
@@ -181,7 +191,7 @@ def main():
 	plt_triangle_plot = False
 
 	# define filename and load basics
-	file_base = 'threedhst_1417337415'
+	file_base = 'threedhst_1417374215'
 	filename="/Users/joel/code/python/threedhst_bsfh/results/"+file_base+"_mcmc"
 	model_filename="/Users/joel/code/python/threedhst_bsfh/results/"+file_base+"_model"
 	sample_results, powell_results, model = read_results.read_pickles(filename, model_file=model_filename,inmod=None)

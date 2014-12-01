@@ -12,8 +12,8 @@ tophat = priors.tophat
 run_params = {'verbose':True,
               'outfile':'/Users/joel/code/python/threedhst_bsfh/results/threedhst',
               'ftol':0.5e-5, 'maxfev':5000,
-              'nwalkers':128,
-              'nburn':[32, 32, 64], 'niter':128,
+              'nwalkers':64,
+              'nburn':[32, 64], 'niter':256,
               'initial_disp':0.1,
               'debug': False,
               'mock': False,
@@ -23,7 +23,6 @@ run_params = {'verbose':True,
               'photname':'/Users/joel/code/python/threedhst_bsfh/data/cosmos_3dhst.v4.1.test.cat',
               'fastname':'/Users/joel/code/python/threedhst_bsfh/data/cosmos_3dhst.v4.1.test.fout',
               'objname':'32206',
-              'wlo':3750., 'whi':7200.
               }
 
 def return_mwave_custom(filters):
@@ -57,7 +56,7 @@ def load_obs_3dhst(filename, objnum):
 	flux_fields = [f for f in dat.dtype.names if f[0:2] == 'f_']
 	unc_fields = [f for f in dat.dtype.names if f[0:2] == 'e_']
 	filters = [f[2:] for f in flux_fields]
-	
+
 	# extract fluxes for particular object, converting from record array to numpy array
 	flux = dat[flux_fields].view(float).reshape(len(dat),-1)[obj_ind]
 	unc  = dat[unc_fields].view(float).reshape(len(dat),-1)[obj_ind]
@@ -137,6 +136,20 @@ model_params.append({'name': 'zred', 'N': 1,
 model_params.append({'name': 'add_igm_absorption', 'N': 1,
                         'isfree': False,
                         'init': 1,
+                        'units': None,
+                        'prior_function': None,
+                        'prior_args': None})
+
+model_params.append({'name': 'add_dust_emission', 'N': 1,
+                        'isfree': False,
+                        'init': 0,
+                        'units': None,
+                        'prior_function': None,
+                        'prior_args': None})
+
+model_params.append({'name': 'add_agb_dust_model', 'N': 1,
+                        'isfree': False,
+                        'init': 0,
                         'units': None,
                         'prior_function': None,
                         'prior_args': None})
