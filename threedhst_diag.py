@@ -1,8 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import triangle
-import pickle
+import triangle, pickle, os
 from bsfh import read_results,model_setup
+from threedhst_params import return_mwave_custom
 
 
 def show_chain(sample_results,outname=None,alpha=0.6):
@@ -46,7 +46,6 @@ def show_chain(sample_results,outname=None,alpha=0.6):
 
 	if outname is not None:
 		plt.savefig(outname, bbox_inches='tight',dpi=300)
-		import os
 		os.system("open "+outname)
 		plt.close()
 
@@ -82,22 +81,6 @@ def comp_samples(thetas, model, sps, inlog=True, photflag=0):
             
     return wave, mospec, mounc, specvecs
 
-def return_mwave_custom(filters):
-
-	loc = '/Users/joel/code/python/threedhst_bsfh/filters/'
-	key_str = 'filter_keys_threedhst.txt'
-	lameff_str = 'lameff_threedhst.txt'
-	
-	lameff = np.loadtxt(loc+lameff_str)
-	keys = np.loadtxt(loc+key_str, dtype='S20',usecols=[1])
-	keys = keys.tolist()
-	keys = np.array([keys.lower() for keys in keys], dtype='S20')
-	
-	lameff_return = [[lameff[keys == filters[i]]][0] for i in range(len(filters))]
-	lameff_return = [item for sublist in lameff_return for item in sublist]
-	
-	return lameff_return
-
 def phot_figure(sample_results, alpha=0.3, samples = [-1],
                 start=0, thin=1, maxprob=0, outname=None,
                 **kwargs):
@@ -109,13 +92,14 @@ def phot_figure(sample_results, alpha=0.3, samples = [-1],
 	
 	from matplotlib import gridspec
 	import fsps
-	sps = fsps.StellarPopulation(zcontinuous=True)
-	custom_filter_keys = '/Users/joel/code/python/threedhst_bsfh/filters/filter_keys_threedhst.txt'
+	sps = fsps.StellarPopulation(zcontinuous=True, compute_vega_mags=False)
+	custom_filter_keys = '$APPS/threedhst_bsfh/filters/filter_keys_threedhst.txt'
 	fsps.filters.FILTERS = model_setup.custom_filter_dict(custom_filter_keys)
 
 	# load custom model
-	model = model_setup.setup_model('/Users/joel/code/python/threedhst_bsfh/threedhst_params.py', sps=sps)
-	observables = model.mean_model(model.initial_theta, sps=sps)
+	model = model_setup.setup_model('$APPS/threedhst_bsfh/threedhst_params.py', sps=sps)
+	observables = model.mean_model(sample_results['initial_theta'], sps=sps)
+	
 	fast_spec, fast_mags = observables[0],observables[1]
 	w, spec_throwaway = sps.get_spectrum(tage=sps.params['tage'], peraa=False)
 	fast_lam = model.obs['wave_effective']
@@ -125,13 +109,7 @@ def phot_figure(sample_results, alpha=0.3, samples = [-1],
 	gs.update(hspace=0)
 
 	phot, res = plt.Subplot(fig, gs[0]), plt.Subplot(fig, gs[1])
-	res.set_ylabel( r'$\chi$')
-	phot.set_ylabel(r'log($\nu f_{\nu}$)')
-	res.set_xlabel(r'log($\lambda_{obs}$) [$\AA$]')
-	phot.set_xlim(3.5,5.2)
-	res.set_xlim(3.5,5.2)
-	phot.set_xticklabels([])
-    
+
 	# random posterior draws
 	# chain = chain[nwalkers,nsteps,ndim]
 	flatchain = sample_results['chain'][:,start::thin,:]
@@ -150,15 +128,12 @@ def phot_figure(sample_results, alpha=0.3, samples = [-1],
 	phot.plot(np.log10(mwave), np.log10(mospec*(c/(mwave/1e10))), label = 'observed',
               color='black', marker='o', **kwargs)
     
-	phot.plot(np.log10(fast_lam), np.log10(fast_mags*(c/(fast_lam/1e10))), label = 'FAST fit (phot)', linestyle=' ',
-              color='blue', marker='o', **kwargs)
+	phot.plot(np.log10(fast_lam), np.log10(fast_mags*(c/(fast_lam/1e10))), label = 'FAST fit (phot)', linestyle=' ',color='blue', marker='o', **kwargs)
     
 	nz = fast_spec > 0
-	save_ylim = phot.get_ylim()
 	phot.plot(np.log10(w[nz]), np.log10(fast_spec[nz]*(c/(w[nz]/1e10))), label = 'FAST fit (spec)',
               color='blue', **kwargs)
-	phot.set_ylim(save_ylim)
-
+	
 	# max probability
 	if maxprob == 1:
 		thetas = sample_results['chain'][sample_results['lnprobability'] == np.max(sample_results['lnprobability']),:]
@@ -172,38 +147,125 @@ def phot_figure(sample_results, alpha=0.3, samples = [-1],
 			phot.plot(np.log10(mwave), np.log10(vecs[0]*(c/(mwave/1e10))), color='red', marker='o', label='max lnprob', **kwargs)
 			res.plot(np.log10(mwave), vecs[-1], color='red', marker='o', label='max lnprob', **kwargs)
 	
-	phot.legend(loc=0)
+	# legend and axes
+	phot.legend(loc=0, prop={'size':8},
+			    frameon=False)
 	res.axhline(0, linestyle=':', color='grey')
+    
+	res.set_ylabel( r'$\chi$')
+	phot.set_ylabel(r'log($\nu f_{\nu}$)')
+	res.set_xlabel(r'log($\lambda_{obs}$) [$\AA$]')
+	phot.set_xlim(3.5,5.2)
+	phot.set_ylim(4,6.5)
+	res.set_xlim(3.5,5.2)
+	phot.set_xticklabels([])
     
 	fig.add_subplot(phot)
 	fig.add_subplot(res)
 	if outname is not None:
 		fig.savefig(outname, bbox_inches='tight', dpi=300)
-		import os
 		os.system("open "+outname)
 		plt.close()
 	return fig
 
-def main():
+def sed_test_plot():
+	
+	"""
+	Plot the photometry+spectra for a variety of ages, etc
+	"""
+	
+	
+	import fsps
+	
+	c = 3e8
+	
+	sps = fsps.StellarPopulation(zcontinuous=True, compute_vega_mags=False)
+	custom_filter_keys = '$APPS/threedhst_bsfh/filters/filter_keys_threedhst.txt'
+	fsps.filters.FILTERS = model_setup.custom_filter_dict(custom_filter_keys)
+
+	# load custom model
+	model = model_setup.setup_model('$APPS/threedhst_bsfh/threedhst_params.py', sps=sps)
+	
+	# setup figure
+	fig, axarr = plt.subplots(2, 2, figsize = (8,8))
+	fig.subplots_adjust(wspace=0.000,hspace=0.000)
+	fast_lam = model.obs['wave_effective']
+	init_theta = np.array([10.5, 0, 0, 0.0])
+	
+	# generate colors
+	import pylab
+	NUM_COLORS = 10
+	cm = pylab.get_cmap('cool')
+	plt.rcParams['axes.color_cycle'] = [cm(1.*i/NUM_COLORS) for i in range(NUM_COLORS)] 
+	axlim=[3.0,5.5,3.0,8]
+	
+	# setup delta
+	delta = [np.linspace(init_theta[0]-1,init_theta[0]+1, NUM_COLORS),
+			 np.linspace(init_theta[1]-0.9,init_theta[1]+1, NUM_COLORS),
+			 np.linspace(init_theta[2]-0.9,init_theta[2]+1, NUM_COLORS),
+			 np.linspace(init_theta[3]-1,init_theta[3]+0.3, NUM_COLORS)]
+
+	for kk in range(4):
+		itone = kk % 2
+		ittwo = kk > 1
+	
+		for jj in range(len(delta[kk])):
+
+			# set model parms
+			model_params = np.copy(init_theta)
+			model_params[kk] = delta[kk][jj]
+
+			# load data
+			observables = model.mean_model(10**model_params, sps=sps)
+			fast_spec, fast_mags = observables[0],observables[1]
+			w, spec_throwaway = sps.get_spectrum(tage=sps.params['tage'], peraa=False)
+    
+			nz = fast_spec > 0
+			axarr[itone,ittwo].plot(np.log10(w[nz]), np.log10(fast_spec[nz]*(c/(w[nz]/1e10))),label = "{:10.2f}".format(model_params[kk]))
+	
+		# beautify
+		if itone == 1:
+			axarr[itone,ittwo].set_xlabel('log(lam)')
+		else:
+			axarr[itone,ittwo].set_xticklabels([])
+			axarr[itone,ittwo].yaxis.get_major_ticks()[0].label1On = False # turn off bottom ticklabel
+	
+		if ittwo == 0:
+			axarr[itone,ittwo].set_ylabel('log(nu*fnu)')
+		else:
+			axarr[itone,ittwo].set_yticklabels([])
+			axarr[itone,ittwo].xaxis.get_major_ticks()[0].label1On = False # turn off bottom ticklabel
+	
+		axarr[itone,ittwo].legend(loc=0,prop={'size':6},
+								  frameon=False,
+								  title='log('+str(model.theta_labels()[kk])+')')
+		axarr[itone,ittwo].get_legend().get_title().set_size(8)
+		axarr[itone,ittwo].axis(axlim)
+
+def make_all_plots(objname, folder='results/'):
 
 	plt_phot_figure = True
-	plt_chain_figure = False
-	plt_triangle_plot = False
+	plt_chain_figure = True
+	plt_triangle_plot = True
 
-	# define filename and load basics
-	file_base = 'threedhst_1417374215'
-	filename="/Users/joel/code/python/threedhst_bsfh/results/"+file_base+"_mcmc"
-	model_filename="/Users/joel/code/python/threedhst_bsfh/results/"+file_base+"_model"
+	# find most recent file
+	files = [ f for f in os.listdir(folder) if f[-4:] == 'mcmc' ]
+	times = [f.split('_')[2] for f in files if f.split('_')[1] == str(objname)]
+	file_base = 'threedhst_'+str(objname)+'_'+max(times)
+
+	# load results
+	filename=folder+file_base+"_mcmc"
+	model_filename=folder+file_base+"_model"
 	sample_results, powell_results, model = read_results.read_pickles(filename, model_file=model_filename,inmod=None)
 	
     # chain plot
 	if plt_chain_figure: show_chain(sample_results,
-	                 outname='/Users/joel/code/python/threedhst_bsfh/results/'+file_base+"_chain.png",
+	                 outname=folder+file_base+"_chain.png",
 			         alpha=0.3)
 
 	# triangle plot
 	if plt_triangle_plot: read_results.subtriangle(sample_results,
-							 outname='/Users/joel/code/python/threedhst_bsfh/results/'+file_base,
+							 outname=folder+file_base,
 							 showpars=None,start=0, thin=1, truths=sample_results['initial_theta'], show_titles=True)
 
 	if plt_phot_figure:
@@ -215,7 +277,7 @@ def main():
 		sample = [int(s * ns) for s in samples]
 
  		# plot
- 		pfig = phot_figure(sample_results, samples=sample, maxprob=1, outname='results/'+file_base+'_sed.png')
+ 		pfig = phot_figure(sample_results, samples=sample, maxprob=1, outname=folder+file_base+'_sed.png')
  		
 
 	

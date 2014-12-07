@@ -10,24 +10,32 @@ tophat = priors.tophat
 #############
 
 run_params = {'verbose':True,
-              'outfile':'/Users/joel/code/python/threedhst_bsfh/results/threedhst',
+              'outfile':'$APPS/threedhst_bsfh/results/threedhst',
               'ftol':0.5e-5, 'maxfev':5000,
-              'nwalkers':64,
-              'nburn':[32, 64], 'niter':256,
+              'nwalkers':128,
+              'nburn':[32, 32, 64], 'niter':512,
               'initial_disp':0.1,
               'debug': False,
               'mock': False,
               'logify_spectrum': False,
               'normalize_spectrum': False,
               'spec': False, 'phot':True,
-              'photname':'/Users/joel/code/python/threedhst_bsfh/data/cosmos_3dhst.v4.1.test.cat',
-              'fastname':'/Users/joel/code/python/threedhst_bsfh/data/cosmos_3dhst.v4.1.test.fout',
+              'photname':'$APPS/threedhst_bsfh/data/cosmos_3dhst.v4.1.test.cat',
+              'fastname':'$APPS/threedhst_bsfh/data/cosmos_3dhst.v4.1.test.fout',
               'objname':'32206',
+              #'objname':'33686',
+              #'objname':'8766',
               }
+run_params['outfile'] = run_params['outfile']+'_'+run_params['objname']
+
 
 def return_mwave_custom(filters):
 
-	loc = '/Users/joel/code/python/threedhst_bsfh/filters/'
+	"""
+	returns effective wavelength based on filter names
+	"""
+
+	loc = '$APPS/threedhst_bsfh/filters/'
 	key_str = 'filter_keys_threedhst.txt'
 	lameff_str = 'lameff_threedhst.txt'
 	
@@ -41,8 +49,11 @@ def return_mwave_custom(filters):
 	
 	return lameff_return
 
-def load_obs_3dhst(filename, objnum):
-	"""Load a 3D-HST data file and choose a particular object.
+def load_obs_3dhst(filename, objnum, min_error = None):
+	"""
+	Load 3D-HST photometry file, return photometry for a particular object.
+	min_error: set the minimum photometric uncertainty to be some fraction
+	of the flux. if not set, use default errors.
 	"""
 	obs ={}
 	fieldname=filename.split('/')[-1].split('_')[0].upper()
@@ -68,6 +79,10 @@ def load_obs_3dhst(filename, objnum):
 	maggies = flux/(10**10)
 	maggies_unc = unc/(10**10)
 	
+	if min_error is not None:
+		maggies_unc[maggies_unc < min_error*maggies] = min_error*maggies
+	
+	
 	# sort outputs based on effective wavelength
 	points = zip(wave_effective,filters,phot_mask,maggies,maggies_unc)
 	sorted_points = sorted(points)
@@ -87,15 +102,16 @@ def load_fast_3dhst(filename, objnum):
 	"""Load a 3D-HST data file and choose a particular object.
 	"""
 
+	# filter through header junk, load data
 	fieldname=filename.split('/')[-1].split('_')[0].upper()
 	with open(filename, 'r') as f:
-		hdr = f.readline().split()
-	dat = np.loadtxt(filename, comments = '#',
-					 dtype = np.dtype([(n, np.float) for n in hdr[1:]]))
-	obj_ind = np.where(dat['id'] == int(objnum))[0][0]
-	
-	# extract values and field names
+		for jj in range(18): hdr = f.readline().split()
+	dat = np.loadtxt(filename, comments = '#',dtype = np.dtype([(n, np.float) for n in hdr[1:]]))
+
+	# extract field names, search for ID, pull out object info
 	fields = [f for f in dat.dtype.names]
+	id_ind = fields.index('id')
+	obj_ind = [int(x[id_ind]) for x in dat].index(int(objnum))
 	values = dat[fields].view(float).reshape(len(dat),-1)[obj_ind]
 
 	# translate
@@ -159,20 +175,19 @@ model_params.append({'name': 'mass', 'N': 1,
                         'init': 1e10,
                         'units': r'M_\odot',
                         'prior_function': tophat,
-                        'prior_args': {'mini':1e9, 'maxi':1e12}})
+                        'prior_args': {'mini':1e8, 'maxi':1e12}})
 
 model_params.append({'name': 'logzsol', 'N': 1,
-                        'isfree': False,
+                        'isfree': True,
                         'init': 0,
                         'units': r'$\log (Z/Z_\odot)$',
                         'prior_function': tophat,
                         'prior_args': {'mini':-1, 'maxi':0.19}})
                         
 ###### SFH   ########
-
 model_params.append({'name': 'sfh', 'N': 1,
                         'isfree': False,
-                        'init': 1,
+                        'init': 4,
                         'units': 'type',
                         'prior_function_name': None,
                         'prior_args': None})
@@ -192,14 +207,14 @@ model_params.append({'name': 'tage', 'N': 1,
                         'prior_args': {'mini':0.1, 'maxi':10.0}})
 
 model_params.append({'name': 'tburst', 'N': 1,
-                        'isfree': False,
+                        'isfree': True,
                         'init': 0.0,
                         'units': '',
                         'prior_function': tophat,
                         'prior_args': {'mini':0.0, 'maxi':1.3}})
 
 model_params.append({'name': 'fburst', 'N': 1,
-                        'isfree': False,
+                        'isfree': True,
                         'init': 0.0,
                         'units': '',
                         'prior_function': tophat,
@@ -221,7 +236,6 @@ model_params.append({'name': 'imf_type', 'N': 1,
                         	 'prior_args': None})
 
 ########    Dust ##############
-
 model_params.append({'name': 'dust_type', 'N': 1,
                         'isfree': False,
                         'init': 2,
@@ -240,7 +254,7 @@ model_params.append({'name': 'dust2', 'N': 1,
                         'init': 0.35,
                         'units': '',
                         'prior_function': tophat,
-                        'prior_args': {'mini':0.0, 'maxi':1.0}})
+                        'prior_args': {'mini':0.0, 'maxi':2.0}})
 
 model_params.append({'name': 'dust_index', 'N': 1,
                         'isfree': False,
@@ -296,11 +310,18 @@ model_params.append({'name': 'phot_jitter', 'N': 1,
                         'prior_args': {'mini':0.0, 'maxi':0.2}})
 
 ####### FAST PARAMS ##########
-fast_params = True
+fast_params = False
 if fast_params == True:
 	fparams = load_fast_3dhst(run_params['fastname'],
-                              run_params['objname'])
+                              run_params['objname'],
+                              min_error=0.1)
 	for par in model_params:
 		if (par['name'] in fparams):
 			par['init'] = fparams[par['name']]
-	
+else:
+	import random
+	for ii in xrange(len(model_params)):
+		if model_params[ii]['isfree'] == True:
+			max = model_params[ii]['prior_args']['maxi']
+			min = model_params[ii]['prior_args']['mini']
+			model_params[ii]['init'] = random.random()*(max-min)+min
