@@ -4,7 +4,6 @@ import triangle, pickle, os
 from bsfh import read_results,model_setup
 from threedhst_params import return_mwave_custom
 
-
 def show_chain(sample_results,outname=None,alpha=0.6):
 	
 	'''
@@ -46,7 +45,6 @@ def show_chain(sample_results,outname=None,alpha=0.6):
 
 	if outname is not None:
 		plt.savefig(outname, bbox_inches='tight',dpi=300)
-		os.system("open "+outname)
 		plt.close()
 
 def comp_samples(thetas, model, sps, inlog=True, photflag=0):
@@ -93,11 +91,11 @@ def phot_figure(sample_results, alpha=0.3, samples = [-1],
 	from matplotlib import gridspec
 	import fsps
 	sps = fsps.StellarPopulation(zcontinuous=True, compute_vega_mags=False)
-	custom_filter_keys = '$APPS/threedhst_bsfh/filters/filter_keys_threedhst.txt'
+	custom_filter_keys = os.getenv('APPS')+'/threedhst_bsfh/filters/filter_keys_threedhst.txt'
 	fsps.filters.FILTERS = model_setup.custom_filter_dict(custom_filter_keys)
 
 	# load custom model
-	model = model_setup.setup_model('$APPS/threedhst_bsfh/threedhst_params.py', sps=sps)
+	model = model_setup.setup_model(os.getenv('APPS')+'/threedhst_bsfh/threedhst_params.py', sps=sps)
 	observables = model.mean_model(sample_results['initial_theta'], sps=sps)
 	
 	fast_spec, fast_mags = observables[0],observables[1]
@@ -117,24 +115,29 @@ def phot_figure(sample_results, alpha=0.3, samples = [-1],
 	thetas = [flatchain[s,:] for s in samples]
 	mwave, mospec, mounc, specvecs = comp_samples(thetas, sample_results['model'], sps, photflag=1)
 	
-	for vecs in specvecs:
-		vv = vecs[0], vecs[-1]
+	# plot random posterior draws
+	#for vecs in specvecs:
+		#vv = vecs[0], vecs[-1]
 
 		#[ax.plot(np.log10(mwave), np.log10(v), color='grey', alpha=alpha, marker='o', label='random sample', **kwargs)
 		#for ax, v in zip([phot, res], vv) ]
     
-	phot.errorbar(np.log10(mwave), np.log10(mospec*(c/(mwave/1e10))), yerr=mounc,
-                  color='black')
-	phot.plot(np.log10(mwave), np.log10(mospec*(c/(mwave/1e10))), label = 'observed',
-              color='black', marker='o', **kwargs)
+    # plot observations + errors
+	yplot = np.log10(mospec*(c/(mwave/1e10)))
+	yerr = [yplot - np.log10((mospec-mounc)*(c/(mwave/1e10))), np.log10((mospec+mounc)*(c/(mwave/1e10)))-yplot]
+	phot.errorbar(np.log10(mwave), yplot, yerr=yerr,
+                  color='black', marker='o', label='observed')
+	#phot.plot(np.log10(mwave), yplot, label = 'observed',
+	#          color='black', marker='o', **kwargs)
     
-	phot.plot(np.log10(fast_lam), np.log10(fast_mags*(c/(fast_lam/1e10))), label = 'FAST fit (phot)', linestyle=' ',color='blue', marker='o', **kwargs)
+    # plot initial parameters
+	phot.plot(np.log10(fast_lam), np.log10(fast_mags*(c/(fast_lam/1e10))), label = 'initial parms', linestyle=' ',color='blue', marker='o', **kwargs)
     
-	nz = fast_spec > 0
-	phot.plot(np.log10(w[nz]), np.log10(fast_spec[nz]*(c/(w[nz]/1e10))), label = 'FAST fit (spec)',
-              color='blue', **kwargs)
+	#nz = fast_spec > 0
+	#phot.plot(np.log10(w[nz]), np.log10(fast_spec[nz]*(c/(w[nz]/1e10))), label = 'init fit (spec)',
+    #          color='blue', **kwargs)
 	
-	# max probability
+	# plot max probability
 	if maxprob == 1:
 		thetas = sample_results['chain'][sample_results['lnprobability'] == np.max(sample_results['lnprobability']),:]
 		if thetas.ndim == 2:			# if multiple chains found the same peak, choose one arbitrarily
@@ -164,8 +167,6 @@ def phot_figure(sample_results, alpha=0.3, samples = [-1],
 	fig.add_subplot(res)
 	if outname is not None:
 		fig.savefig(outname, bbox_inches='tight', dpi=300)
-		os.system("open "+outname)
-		plt.close()
 	return fig
 
 def sed_test_plot():
@@ -180,11 +181,11 @@ def sed_test_plot():
 	c = 3e8
 	
 	sps = fsps.StellarPopulation(zcontinuous=True, compute_vega_mags=False)
-	custom_filter_keys = '$APPS/threedhst_bsfh/filters/filter_keys_threedhst.txt'
+	custom_filter_keys = os.getenv('APPS')+'/threedhst_bsfh/filters/filter_keys_threedhst.txt'
 	fsps.filters.FILTERS = model_setup.custom_filter_dict(custom_filter_keys)
 
 	# load custom model
-	model = model_setup.setup_model('$APPS/threedhst_bsfh/threedhst_params.py', sps=sps)
+	model = model_setup.setup_model(os.getenv('APPS')+'/threedhst_bsfh/threedhst_params.py', sps=sps)
 	
 	# setup figure
 	fig, axarr = plt.subplots(2, 2, figsize = (8,8))
