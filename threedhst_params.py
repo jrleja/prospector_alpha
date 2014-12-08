@@ -1,5 +1,5 @@
 import numpy as np
-import fsps
+import fsps,os
 from sedpy import attenuation
 from bsfh import priors, sedmodel, elines
 import bsfh.datautils as dutils
@@ -10,18 +10,19 @@ tophat = priors.tophat
 #############
 
 run_params = {'verbose':True,
-              'outfile':'$APPS/threedhst_bsfh/results/threedhst',
+              'outfile':os.getenv('APPS')+'/threedhst_bsfh/results/threedhst',
               'ftol':0.5e-5, 'maxfev':5000,
               'nwalkers':128,
-              'nburn':[32, 32, 64], 'niter':512,
+              'nburn':[32,64,64], 'niter': 2048,
               'initial_disp':0.1,
               'debug': False,
               'mock': False,
               'logify_spectrum': False,
               'normalize_spectrum': False,
+              'fast_init_params': False,
               'spec': False, 'phot':True,
-              'photname':'$APPS/threedhst_bsfh/data/cosmos_3dhst.v4.1.test.cat',
-              'fastname':'$APPS/threedhst_bsfh/data/cosmos_3dhst.v4.1.test.fout',
+              'photname':os.getenv('APPS')+'/threedhst_bsfh/data/cosmos_3dhst.v4.1.test.cat',
+              'fastname':os.getenv('APPS')+'/threedhst_bsfh/data/cosmos_3dhst.v4.1.test.fout',
               'objname':'32206',
               #'objname':'33686',
               #'objname':'8766',
@@ -35,7 +36,7 @@ def return_mwave_custom(filters):
 	returns effective wavelength based on filter names
 	"""
 
-	loc = '$APPS/threedhst_bsfh/filters/'
+	loc = os.getenv('APPS')+'/threedhst_bsfh/filters/'
 	key_str = 'filter_keys_threedhst.txt'
 	lameff_str = 'lameff_threedhst.txt'
 	
@@ -79,9 +80,9 @@ def load_obs_3dhst(filename, objnum, min_error = None):
 	maggies = flux/(10**10)
 	maggies_unc = unc/(10**10)
 	
+	# set minimum photometric error
 	if min_error is not None:
-		maggies_unc[maggies_unc < min_error*maggies] = min_error*maggies
-	
+		maggies_unc[maggies_unc < min_error*maggies] = min_error*maggies[maggies_unc < min_error*maggies]
 	
 	# sort outputs based on effective wavelength
 	points = zip(wave_effective,filters,phot_mask,maggies,maggies_unc)
@@ -99,7 +100,9 @@ def load_obs_3dhst(filename, objnum, min_error = None):
 	return obs
 
 def load_fast_3dhst(filename, objnum):
-	"""Load a 3D-HST data file and choose a particular object.
+	"""
+	Load FAST output for a particular object
+	Returns a dictionary of inputs for BSFH
 	"""
 
 	# filter through header junk, load data
@@ -129,7 +132,7 @@ def load_fast_3dhst(filename, objnum):
 # OBS
 #############
 
-obs = load_obs_3dhst(run_params['photname'], run_params['objname'])
+obs = load_obs_3dhst(run_params['photname'], run_params['objname'], min_error=0.1)
 
 #############
 # MODEL_PARAMS
@@ -309,12 +312,10 @@ model_params.append({'name': 'phot_jitter', 'N': 1,
                         'prior_function': tophat,
                         'prior_args': {'mini':0.0, 'maxi':0.2}})
 
-####### FAST PARAMS ##########
-fast_params = False
-if fast_params == True:
+####### SET INITIAL PARAMETERS ##########
+if run_params['fast_init_params']:
 	fparams = load_fast_3dhst(run_params['fastname'],
-                              run_params['objname'],
-                              min_error=0.1)
+                              run_params['objname'])
 	for par in model_params:
 		if (par['name'] in fparams):
 			par['init'] = fparams[par['name']]
