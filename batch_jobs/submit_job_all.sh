@@ -1,7 +1,9 @@
 #!/bin/bash
 ### Name of the job
-### Requested number of nodes
+### Requested number of cores
 #SBATCH -n 32
+### Requested number of nodes
+#SBATCH -N 32
 ### Requested computing time in minutes
 #SBATCH -t 60
 ### Partition or queue name
