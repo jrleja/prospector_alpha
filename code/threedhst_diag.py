@@ -2,7 +2,26 @@ import numpy as np
 import matplotlib.pyplot as plt
 import triangle, pickle, os, math
 from bsfh import read_results,model_setup
-from threedhst_params import return_mwave_custom
+
+def return_mwave_custom(filters):
+
+	"""
+	returns effective wavelength based on filter names
+	"""
+
+	loc = os.getenv('APPS')+'/threedhst_bsfh/filters/'
+	key_str = 'filter_keys_threedhst.txt'
+	lameff_str = 'lameff_threedhst.txt'
+	
+	lameff = np.loadtxt(loc+lameff_str)
+	keys = np.loadtxt(loc+key_str, dtype='S20',usecols=[1])
+	keys = keys.tolist()
+	keys = np.array([keys.lower() for keys in keys], dtype='S20')
+	
+	lameff_return = [[lameff[keys == filters[i]]][0] for i in range(len(filters))]
+	lameff_return = [item for sublist in lameff_return for item in sublist]
+	
+	return lameff_return
 
 def show_chain(sample_results,outname=None,alpha=0.6):
 	
@@ -210,7 +229,9 @@ def sed_figure(sample_results, alpha=0.3, samples = [-1],
 		fig.savefig(outname, bbox_inches='tight', dpi=300)
 		plt.close()
 
-def make_all_plots(objname, parm_file=None, folder=os.getenv('APPS')+'threedhst_bsfh/plots/'):
+def make_all_plots(objname, parm_file=None, 
+				   outfolder=os.getenv('APPS')+'threedhst_bsfh/plots/',
+				   infolder =os.getenv('APPS')+'threedhst_bsfh/results/'):
 
 	'''
 	Driver. Loads output, makes all plots.
@@ -222,23 +243,23 @@ def make_all_plots(objname, parm_file=None, folder=os.getenv('APPS')+'threedhst_
 
 	# find most recent output file
 	# with the objname
-	files = [ f for f in os.listdir(folder) if f[-4:] == 'mcmc' ]
+	files = [ f for f in os.listdir(infolder) if f[-4:] == 'mcmc' ]
 	times = [f.split('_')[2] for f in files if f.split('_')[1] == str(objname)]
 	file_base = 'threedhst_'+str(objname)+'_'+max(times)
 
 	# load results
-	filename=folder+file_base+"_mcmc"
-	model_filename=folder+file_base+"_model"
+	filename=infolder+file_base+"_mcmc"
+	model_filename=infolder+file_base+"_model"
 	sample_results, powell_results, model = read_results.read_pickles(filename, model_file=model_filename,inmod=None)
 	
     # chain plot
 	if plt_chain_figure: show_chain(sample_results,
-	                 outname=folder+file_base+"_chain.png",
+	                 outname=outfolder+file_base+"_chain.png",
 			         alpha=0.3)
 
 	# triangle plot
 	if plt_triangle_plot: read_results.subtriangle(sample_results,
-							 outname=folder+file_base,
+							 outname=outfolder+file_base,
 							 showpars=None,start=0, thin=1, truths=sample_results['initial_theta'],
 							 show_titles=True)
 
@@ -255,7 +276,7 @@ def make_all_plots(objname, parm_file=None, folder=os.getenv('APPS')+'threedhst_
  		pfig = sed_figure(sample_results, 
  						  samples=sample, 
  						  maxprob=1, 
- 						  outname=folder+file_base+'_sed.png',
+ 						  outname=outfolder+file_base+'_sed.png',
  						  parm_file=parm_file)
  		
 

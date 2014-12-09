@@ -24,8 +24,6 @@ run_params = {'verbose':True,
               'photname':os.getenv('APPS')+'/threedhst_bsfh/data/COSMOS_testsamp.cat',
               'fastname':os.getenv('APPS')+'/threedhst_bsfh/data/COSMOS_testsamp.fout',
               'objname':'9',
-              #'objname':'33686',
-              #'objname':'8766',
               }
 run_params['outfile'] = run_params['outfile']+'_'+run_params['objname']
 
@@ -288,6 +286,7 @@ model_params.append({'name': 'dust_type', 'N': 1,
                         'units': 'index',
                         'prior_function_name': None,
                         'prior_args': None})
+                        
 model_params.append({'name': 'dust1', 'N': 1,
                         'isfree': False,
                         'init': 0.0,
