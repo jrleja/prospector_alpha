@@ -94,7 +94,6 @@ def show_chain(sample_results,outname=None,alpha=0.6):
 
 	if outname is not None:
 		plt.savefig(outname, bbox_inches='tight',dpi=300)
-		os.system('open ' + outname)
 		plt.close()
 
 def comp_samples(thetas, model, sps, inlog=True, photflag=0):
@@ -156,7 +155,7 @@ def sed_figure(sample_results, alpha=0.3, samples = [-1],
 
 	# set up plot limits
 	phot.set_xlim(min(xplot)*0.96,max(xplot)*1.04)
-	phot.set_ylim(min(yplot)*0.96,max(yplot)*1.04)
+	phot.set_ylim(min(yplot[np.isfinite(yplot)])*0.96,max(yplot[np.isfinite(yplot)])*1.04)
 	res.set_xlim(min(xplot)*0.96,max(xplot)*1.04)
 
 	# PLOT RANDOM DRAWS
@@ -168,7 +167,7 @@ def sed_figure(sample_results, alpha=0.3, samples = [-1],
 	yerr = [yplot - np.log10((mospec-mounc)*(c/(mwave/1e10))), np.log10((mospec+mounc)*(c/(mwave/1e10)))-yplot]
 	phot.errorbar(xplot, yplot, yerr=yerr,
                   color='black', marker='o', label='observed')
-    
+
     # PLOT INITIAL PARAMETERS
 	if plot_init:
 		observables = model.mean_model(sample_results['initial_theta'], sps=sps)
@@ -253,18 +252,23 @@ def make_all_plots(objname, parm_file=None,
 	sample_results, powell_results, model = read_results.read_pickles(filename, model_file=model_filename,inmod=None)
 	
     # chain plot
-	if plt_chain_figure: show_chain(sample_results,
+	if plt_chain_figure: 
+		print 'MAKING CHAIN PLOT'
+		show_chain(sample_results,
 	                 outname=outfolder+file_base+"_chain.png",
 			         alpha=0.3)
 
 	# triangle plot
-	if plt_triangle_plot: read_results.subtriangle(sample_results,
+	if plt_triangle_plot: 
+		print 'MAKING TRIANGLE PLOT'
+		read_results.subtriangle(sample_results,
 							 outname=outfolder+file_base,
 							 showpars=None,start=0, thin=1, truths=sample_results['initial_theta'],
 							 show_titles=True)
 
 	# sed plot
 	if plt_sed_figure:
+		print 'MAKING SED PLOT'
 		# best-fit model plot
 		# sample
 		nsample = 5
