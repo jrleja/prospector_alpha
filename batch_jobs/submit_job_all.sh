@@ -11,7 +11,7 @@
 ### memory per cpu, in MB
 #SBATCH --mem-per-cpu=2000
 ### Job name
-#SBATCH -J '3D_run$SLURM_ARRAY_TASK_ID'
+#SBATCH -J '3Drun'
 ### output and error logs
 #SBATCH -o mpitest_$SLURM_ARRAY_TASK_ID.out
 #SBATCH -e mpitest_$SLURM_ARRAY_TASK_ID.err
