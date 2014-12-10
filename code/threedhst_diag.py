@@ -88,7 +88,10 @@ def show_chain(sample_results,outname=None,alpha=0.6):
 			axarr[jj+1,ii].set_yticklabels([])
 
 		testable = np.isfinite(sample_results['lnprobability'])
-		axarr[jj+1,ii].set_ylim(np.amin(sample_results['lnprobability'][testable]), np.amax(sample_results['lnprobability'][testable]))
+		max = np.amax(sample_results['lnprobability'][testable])
+		stddev = np.std(sample_results['lnprobability'][testable])
+		axarr[jj+1,ii].set_ylim(max-stddev, max)
+		
 		axarr[jj+1,ii].yaxis.get_major_ticks()[0].label1On = False # turn off bottom ticklabel
 
 
@@ -229,8 +232,8 @@ def sed_figure(sample_results, alpha=0.3, samples = [-1],
 		plt.close()
 
 def make_all_plots(objname, parm_file=None, 
-				   outfolder=os.getenv('APPS')+'threedhst_bsfh/plots/',
-				   infolder =os.getenv('APPS')+'threedhst_bsfh/results/'):
+				   outfolder=os.getenv('APPS')+'/threedhst_bsfh/plots/',
+				   infolder =os.getenv('APPS')+'/threedhst_bsfh/results/'):
 
 	'''
 	Driver. Loads output, makes all plots.
