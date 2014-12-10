@@ -286,7 +286,7 @@ model_params.append({'name': 'imf_type', 'N': 1,
 ########    Dust ##############
 model_params.append({'name': 'dust_type', 'N': 1,
                         'isfree': False,
-                        'init': 2,
+                        'init': 0,
                         'units': 'index',
                         'prior_function_name': None,
                         'prior_args': None})
