@@ -292,11 +292,11 @@ model_params.append({'name': 'dust_type', 'N': 1,
                         'prior_args': None})
                         
 model_params.append({'name': 'dust1', 'N': 1,
-                        'isfree': False,
+                        'isfree': True,
                         'init': 0.0,
                         'units': '',
                         'prior_function': tophat,
-                        'prior_args': {'mini':0.1, 'maxi':2.0}})
+                        'prior_args': {'mini':0.0, 'maxi':2.0}})
 
 model_params.append({'name': 'dust2', 'N': 1,
                         'isfree': True,
@@ -306,11 +306,11 @@ model_params.append({'name': 'dust2', 'N': 1,
                         'prior_args': {'mini':0.0, 'maxi':2.0}})
 
 model_params.append({'name': 'dust_index', 'N': 1,
-                        'isfree': False,
+                        'isfree': True,
                         'init': -0.7,
                         'units': '',
                         'prior_function': tophat,
-                        'prior_args': {'mini':-1.5, 'maxi':-0.5}})
+                        'prior_args': {'mini':-1.5, 'maxi': 0.0}})
 
 model_params.append({'name': 'dust1_index', 'N': 1,
                         'isfree': False,
