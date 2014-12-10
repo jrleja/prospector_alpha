@@ -13,7 +13,7 @@
 ### Job name
 #SBATCH -J '3Drun'
 ### output and error logs
-#SBATCH -o mpitest_$SLURM_ARRAY_TASK_ID.out
-#SBATCH -e mpitest_$SLURM_ARRAY_TASK_ID.err
+#SBATCH -o mpitest_%a.out
+#SBATCH -e mpitest_%a.err
 ### source activate pympi
 mpirun -n 32 python $APPS/bsfh/demo/prospectr.py --param_file=$APPS/threedhst_bsfh/parameter_files/threedhst_params_$SLURM_ARRAY_TASK_ID.py --sps=fsps --custom_filter_keys=$APPS/threedhst_bsfh/filters/filter_keys_threedhst.txt 

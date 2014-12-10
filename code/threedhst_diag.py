@@ -167,7 +167,9 @@ def sed_figure(sample_results, alpha=0.3, samples = [-1],
 		res.plot(np.log10(mwave), vecs[-1], color='grey', alpha=alpha, marker='o', **kwargs)
 		
     # PLOT OBSERVATIONS + ERRORS 
-	yerr = [yplot - np.log10((mospec-mounc)*(c/(mwave/1e10))), np.log10((mospec+mounc)*(c/(mwave/1e10)))-yplot]
+	linerr_down = np.clip(mospec-mounc, 1e-80, 1e80)*(c/(mwave/1e10))
+	linerr_up = np.clip(mospec+mounc, 1e-80, 1e80)*(c/(mwave/1e10))
+	yerr = [yplot - np.log10(linerr_down), np.log10(linerr_up)-yplot]
 	phot.errorbar(xplot, yplot, yerr=yerr,
                   color='black', marker='o', label='observed')
 
@@ -203,7 +205,30 @@ def sed_figure(sample_results, alpha=0.3, samples = [-1],
 				 fontsize=12, ha='right')
 		phot.text(textx, texty-deltay, r'avg acceptance='+"{:.2f}".format(np.mean(sample_results['acceptance'])),
 				 fontsize=12, ha='right')
-
+		
+		# load fast data
+		filename=model.run_params['fastname']
+		with open(filename, 'r') as f:
+			for jj in range(1): hdr = f.readline().split()
+		dat = np.loadtxt(filename, comments = '#',dtype = np.dtype([(n, np.float) for n in hdr[1:]]))
+		fields = [f for f in dat.dtype.names]
+		id_ind = fields.index('id')
+		uvj_ind = fields.index('uvj_flag')
+		sn_ind = fields.index('sn_F160W')
+		z_ind = fields.index('z')
+		z_txt = [f[z_ind] for f in dat if f[id_ind] == float(model.run_params['objname'])][0]
+		uvj_txt = [f[uvj_ind] for f in dat if f[id_ind] == float(model.run_params['objname'])][0]
+		sn_txt = [f[sn_ind] for f in dat if f[id_ind] == float(model.run_params['objname'])][0]
+		
+		# galaxy text
+		phot.text(textx, texty-2*deltay, 'z='+"{:.2f}".format(z_txt),
+				 fontsize=12, ha='right')
+		phot.text(textx, texty-3*deltay, 'uvj_flag='+str(uvj_txt),
+				 fontsize=12, ha='right')
+		phot.text(textx, texty-4*deltay, 'S/N(F160W)='+"{:.2f}".format(sn_txt),
+				 fontsize=12, ha='right')
+		
+		
 	# extra line
 	res.axhline(0, linestyle=':', color='grey')
 	
@@ -266,7 +291,7 @@ def make_all_plots(objname, parm_file=None,
 		print 'MAKING TRIANGLE PLOT'
 		read_results.subtriangle(sample_results,
 							 outname=outfolder+file_base,
-							 showpars=None,start=0, thin=1, truths=sample_results['initial_theta'],
+							 showpars=None,start=0, thin=2, truths=sample_results['initial_theta'],
 							 show_titles=True)
 
 	# sed plot

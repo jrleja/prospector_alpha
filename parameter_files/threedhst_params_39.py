@@ -15,7 +15,7 @@ run_params = {'verbose':True,
               'maxfev':5000,
               'nwalkers':128,
               'nburn':[32,64,64], 
-              'niter': 2048,
+              'niter': 4096,
               'initial_disp':0.1,
               'debug': False,
               'mock': False,
@@ -27,7 +27,7 @@ run_params = {'verbose':True,
               'phot':True,
               'photname':os.getenv('APPS')+'/threedhst_bsfh/data/COSMOS_testsamp.cat',
               'fastname':os.getenv('APPS')+'/threedhst_bsfh/data/COSMOS_testsamp.fout',
-              'objname':'14200',
+              'objname':'132',
               }
 run_params['outfile'] = run_params['outfile']+'_'+run_params['objname']
 
@@ -296,21 +296,21 @@ model_params.append({'name': 'dust1', 'N': 1,
                         'init': 0.0,
                         'units': '',
                         'prior_function': tophat,
-                        'prior_args': {'mini':0.0, 'maxi':2.0}})
+                        'prior_args': {'mini':0.0, 'maxi':3.0}})
 
 model_params.append({'name': 'dust2', 'N': 1,
                         'isfree': True,
                         'init': 0.35,
                         'units': '',
                         'prior_function': tophat,
-                        'prior_args': {'mini':0.0, 'maxi':2.0}})
+                        'prior_args': {'mini':0.0, 'maxi':3.0}})
 
 model_params.append({'name': 'dust_index', 'N': 1,
                         'isfree': True,
                         'init': -0.7,
                         'units': '',
                         'prior_function': tophat,
-                        'prior_args': {'mini':-1.5, 'maxi': 0.0}})
+                        'prior_args': {'mini':-3.0, 'maxi': -0.2}})
 
 model_params.append({'name': 'dust1_index', 'N': 1,
                         'isfree': False,

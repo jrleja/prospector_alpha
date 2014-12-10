@@ -26,7 +26,7 @@ def calc_uvj_flag(rf):
 	uvj_flag[sfing] = 1
 	
 	# dusty star-formers
-	dusty_sf = (uvj_flag == 1) & (u_v <= -1.2*v_j+3.2)
+	dusty_sf = (uvj_flag == 1) & (u_v >= -1.2*v_j+2.8)
 	uvj_flag[dusty_sf] = 2
 	
 	# outside box
@@ -35,6 +35,16 @@ def calc_uvj_flag(rf):
 	uvj_flag[outside_box] = 0
 	
 	return uvj_flag
+
+def print_info(id,ids,uvj_flag,sn_F160W,z):
+
+	index=list(ids).index(id)
+	
+	print 'UVJ flag: ' +"{:10.2f}".format(uvj_flag[index])
+	print 'S/N F160W: ' +"{:10.2f}".format(sn_F160W[index])
+	print 'redshift: ' +"{:10.2f}".format(z[index])
+	
+	return None
 
 def build_sample():
 
@@ -45,8 +55,8 @@ def build_sample():
 
 	# variables
 	n_per_bin = 3
-	sn_bins = ((3,10),(10,40),(40,1e5))
-	z_bins  = ((0.2,0.5),(0.5,1.0),(1.0,1.5),(1.5,2.0))
+	sn_bins = ((12,20),(20,100),(100,1e5))
+	z_bins  = ((0.2,0.6),(0.6,1.0),(1.0,1.5),(1.5,2.0))
 	uvj_bins = [1,2,3]  # 0 = outside box, 1 = sfing, 2 = dusty sf, 3 = quiescent
 
 	# output
@@ -70,7 +80,9 @@ def build_sample():
 	# define UVJ flag, S/N
 	uvj_flag = calc_uvj_flag(rf)
 	sn_F160W = phot['f_F160W']/phot['e_F160W']
-	
+	fast['uvj_flag'] = uvj_flag
+	fast['sn_F160W'] = sn_F160W
+			
 	# split into bins
 	fast_out = Table(names=fast.columns)
 	phot_out = Table(names=phot.columns)
@@ -81,7 +93,7 @@ def build_sample():
 				
 				if np.sum(selection) < n_per_bin:
 					print 'ERROR: Not enough galaxies in bin!'
-					break
+					print sn, z, uvj
 				fast_out = vstack([fast_out,fast[selection][:n_per_bin]])
 				phot_out = vstack([phot_out,phot[selection][:n_per_bin]])
 	
