@@ -3,7 +3,7 @@
 ### Requested number of cores
 #SBATCH -n 32
 ### Requested number of nodes
-#SBATCH -N 32
+#SBATCH -N 1
 ### Requested computing time in minutes
 #SBATCH -t 60
 ### Partition or queue name

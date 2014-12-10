@@ -11,16 +11,20 @@ tophat = priors.tophat
 
 run_params = {'verbose':True,
               'outfile':os.getenv('APPS')+'/threedhst_bsfh/results/threedhst',
-              'ftol':0.5e-5, 'maxfev':5000,
+              'ftol':0.5e-5, 
+              'maxfev':5000,
               'nwalkers':128,
-              'nburn':[32,64,64], 'niter': 2048,
+              'nburn':[32,64,64], 
+              'niter': 2048,
               'initial_disp':0.1,
               'debug': False,
               'mock': False,
               'logify_spectrum': False,
               'normalize_spectrum': False,
               'fast_init_params': False,
-              'spec': False, 'phot':True,
+              'min_error': None,
+              'spec': False, 
+              'phot':True,
               'photname':os.getenv('APPS')+'/threedhst_bsfh/data/COSMOS_testsamp.cat',
               'fastname':os.getenv('APPS')+'/threedhst_bsfh/data/COSMOS_testsamp.fout',
               'objname':'866',
@@ -130,7 +134,7 @@ def load_fast_3dhst(filename, objnum):
 # OBS
 #############
 
-obs = load_obs_3dhst(run_params['photname'], run_params['objname'], min_error=0.1)
+obs = load_obs_3dhst(run_params['photname'], run_params['objname'], min_error=run_params['min_error'])
 
 #############
 # MODEL_PARAMS
@@ -212,7 +216,7 @@ model_params.append({'name': 'mass', 'N': 1,
                         'init': 1e10,
                         'units': r'M_\odot',
                         'prior_function': tophat,
-                        'prior_args': {'mini':1e8, 'maxi':1e12}})
+                        'prior_args': {'mini':1e6, 'maxi':1e12}})
 
 model_params.append({'name': 'logzsol', 'N': 1,
                         'isfree': True,

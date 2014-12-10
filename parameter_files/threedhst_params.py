@@ -27,7 +27,7 @@ run_params = {'verbose':True,
               'phot':True,
               'photname':os.getenv('APPS')+'/threedhst_bsfh/data/COSMOS_testsamp.cat',
               'fastname':os.getenv('APPS')+'/threedhst_bsfh/data/COSMOS_testsamp.fout',
-              'objname':'728',
+              'objname':'9',
               }
 run_params['outfile'] = run_params['outfile']+'_'+run_params['objname']
 
