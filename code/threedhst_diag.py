@@ -268,7 +268,7 @@ def sed_figure(sample_results, alpha=0.3, samples = [-1],
 		fig.savefig(outname, bbox_inches='tight', dpi=300)
 		plt.close()
 
-def make_all_plots(objname, parm_file=None, 
+def make_all_plots(objname, filebase, parm_file=None, 
 				   outfolder=os.getenv('APPS')+'/threedhst_bsfh/plots/',
 				   infolder =os.getenv('APPS')+'/threedhst_bsfh/results/'):
 
@@ -288,18 +288,17 @@ def make_all_plots(objname, parm_file=None,
 	# with the objname
 	files = [ f for f in os.listdir(infolder) if f[-4:] == 'mcmc' ]
 	times = [f.split('_')[2] for f in files if f.split('_')[1] == str(objname)]
-	file_base = 'threedhst_'+str(objname)+'_'+max(times)
 
 	# load results
-	filename=infolder+file_base+"_mcmc"
-	model_filename=infolder+file_base+"_model"
+	filename=filebase+'_'+max(times)+"_mcmc"
+	model_filename=filebase+'_'+max(times)+"_model"
 	sample_results, powell_results, model = read_results.read_pickles(filename, model_file=model_filename,inmod=None)
 	
     # chain plot
 	if plt_chain_figure: 
 		print 'MAKING CHAIN PLOT'
 		show_chain(sample_results,
-	                 outname=outfolder+file_base+"_chain.png",
+	                 outname=filebase+"_chain.png",
 			         alpha=0.3)
 
 	# triangle plot
@@ -309,7 +308,7 @@ def make_all_plots(objname, parm_file=None,
 		chopped_sample_results['chain'] = sample_results['chain'][:,int(sample_results['chain'].shape[1]/chop_chain):,:]
 
 		read_results.subtriangle(chopped_sample_results,
-							 outname=outfolder+file_base,
+							 outname=filebase,
 							 showpars=None,start=0, thin=thin, #truths=sample_results['initial_theta'],
 							 show_titles=True)
 
@@ -319,7 +318,7 @@ def make_all_plots(objname, parm_file=None,
  		# plot
  		pfig = sed_figure(sample_results, 
  						  maxprob=1, 
- 						  outname=outfolder+file_base+'_sed.png',
+ 						  outname=filebase+'_sed.png',
  						  parm_file=parm_file,
  						  thin=thin,
  						  chop_chain=chop_chain)
