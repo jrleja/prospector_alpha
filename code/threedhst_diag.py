@@ -54,7 +54,7 @@ def show_chain(sample_results,outname=None,alpha=0.6):
 	# sample_results['chain']: nwalkers, nsteps, nparams
 	for ii in xrange(nx):
 		walkerstart = nwalkers_per_column*ii
-		walkerend   = nwalkers_per_column*(ii+1)
+		walkerend   = np.clip(nwalkers_per_column*(ii+1),0,sample_results['chain'].shape[0])
 		for jj in xrange(len(parnames)):
 			for kk in xrange(walkerstart,walkerend):
 				axarr[jj,ii].plot(sample_results['chain'][kk,:,jj],'-',
