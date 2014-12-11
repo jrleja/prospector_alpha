@@ -15,8 +15,8 @@ run_params = {'verbose':True,
               'ftol':0.5e-5, 
               'maxfev':5000,
               'nwalkers':124,
-              'nburn':[32,64,64], 
-              'niter': 4096,
+              'nburn':[32,64],#[32,64,64], 
+              'niter': 256#4096,
               'initial_disp':0.1,
               'debug': False,
               'mock': False,
@@ -382,3 +382,4 @@ model_params[parmlist.index('tage')]['init'] = 1.2*tuniv
 model_params[parmlist.index('sf_start')]['prior_args']['maxi'] = 0.5*tuniv
 model_params[parmlist.index('tburst')]['prior_args']['mini'] = 1.2*tuniv-1
 model_params[parmlist.index('tburst')]['prior_args']['maxi'] = 1.2*tuniv
+model_params[parmlist.index('tburst')]['init'] = 1.2*tuniv-0.5
