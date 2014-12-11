@@ -2,6 +2,7 @@ import numpy as np
 import fsps,os
 from sedpy import attenuation
 from bsfh import priors, sedmodel, elines
+from astropy.cosmology import WMAP9
 import bsfh.datautils as dutils
 tophat = priors.tophat
 
@@ -13,7 +14,7 @@ run_params = {'verbose':True,
               'outfile':os.getenv('APPS')+'/threedhst_bsfh/results/threedhst',
               'ftol':0.5e-5, 
               'maxfev':5000,
-              'nwalkers':128,
+              'nwalkers':124,
               'nburn':[32,64,64], 
               'niter': 4096,
               'initial_disp':0.1,
@@ -21,8 +22,8 @@ run_params = {'verbose':True,
               'mock': False,
               'logify_spectrum': False,
               'normalize_spectrum': False,
-              'fast_init_params': False,
-              'min_error': None,
+              'fast_init_params': False,  # DO NOT SET THIS TO TRUE SINCE TAGE == TUNIV*1.2
+              'min_error': 0.02,
               'spec': False, 
               'phot':True,
               'photname':os.getenv('APPS')+'/threedhst_bsfh/data/COSMOS_testsamp.cat',
@@ -30,7 +31,6 @@ run_params = {'verbose':True,
               'objname':'12920',
               }
 run_params['outfile'] = run_params['outfile']+'_'+run_params['objname']
-
 
 def return_mwave_custom(filters):
 
@@ -241,7 +241,7 @@ model_params.append({'name': 'tau', 'N': 1,
                         'prior_args': {'mini':0.1, 'maxi':100}})
 
 model_params.append({'name': 'tage', 'N': 1,
-                        'isfree': True,
+                        'isfree': False,
                         'init': 1.0,
                         'units': 'Gyr',
                         'prior_function': tophat,
@@ -259,7 +259,7 @@ model_params.append({'name': 'fburst', 'N': 1,
                         'init': 0.0,
                         'units': '',
                         'prior_function': tophat,
-                        'prior_args': {'mini':0.0, 'maxi':1.0}})
+                        'prior_args': {'mini':0.0, 'maxi':0.2}})
 
 model_params.append({'name': 'fconst', 'N': 1,
                         'isfree': False,
@@ -269,7 +269,7 @@ model_params.append({'name': 'fconst', 'N': 1,
                         'prior_args': {'mini':0.0, 'maxi':1.0}})
 
 model_params.append({'name': 'sf_start', 'N': 1,
-                        'isfree': False,
+                        'isfree': True,
                         'init': 0.0,
                         'units': 'Gyr',
                         'prior_function': tophat,
@@ -310,7 +310,7 @@ model_params.append({'name': 'dust_index', 'N': 1,
                         'init': -0.7,
                         'units': '',
                         'prior_function': tophat,
-                        'prior_args': {'mini':-3.0, 'maxi': -0.2}})
+                        'prior_args': {'mini':-3.0, 'maxi': -0.4}})
 
 model_params.append({'name': 'dust1_index', 'N': 1,
                         'isfree': False,
@@ -361,7 +361,8 @@ model_params.append({'name': 'phot_jitter', 'N': 1,
 ####### SET INITIAL PARAMETERS ##########
 fparams = load_fast_3dhst(run_params['fastname'],
                           run_params['objname'])
-model_params[0]['init'] = fparams['zred']
+parmlist = [p['name'] for p in model_params]
+model_params[parmlist.index('zred')]['init'] = fparams['zred']
 if run_params['fast_init_params']:
 	for par in model_params:
 		if (par['name'] in fparams):
@@ -373,3 +374,11 @@ else:
 			max = model_params[ii]['prior_args']['maxi']
 			min = model_params[ii]['prior_args']['mini']
 			model_params[ii]['init'] = random.random()*(max-min)+min
+			
+####### RESET AGE PRIORS TO MATCH AGE OF UNIVERSE ##########
+tuniv = WMAP9.age(model_params[0]['init']).value
+
+model_params[parmlist.index('tage')]['init'] = 1.2*tuniv
+model_params[parmlist.index('sf_start')]['prior_args']['maxi'] = 0.5*tuniv
+model_params[parmlist.index('tburst')]['prior_args']['mini'] = 1.2*tuniv-1
+model_params[parmlist.index('tburst')]['prior_args']['maxi'] = 1.2*tuniv

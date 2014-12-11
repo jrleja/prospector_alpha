@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import triangle, pickle, os, math
+import triangle, pickle, os, math, copy
 from bsfh import read_results,model_setup
 
 def return_mwave_custom(filters):
@@ -121,7 +121,7 @@ def comp_samples(thetas, model, sps, inlog=True, photflag=0):
 def sed_figure(sample_results, alpha=0.3, samples = [-1],
                 start=0, thin=1, maxprob=0, outname=None, plot_init = 0,
                 parm_file = os.getenv('APPS')+'/threedhst_bsfh/parameter_files/threedhst_params.py',
-                **kwargs):
+                chop_chain=1,**kwargs):
 	"""
 	Plot the photometry for the model and data (with error bars), and
 	plot residuals
@@ -145,14 +145,15 @@ def sed_figure(sample_results, alpha=0.3, samples = [-1],
 	gs.update(hspace=0)
 	phot, res = plt.Subplot(fig, gs[0]), plt.Subplot(fig, gs[1])
 
-	# FLATTEN THE CHAIN
+	# FLATTEN AND CHOP CHAIN
 	# chain = chain[nwalkers,nsteps,ndim]
-	flatchain = sample_results['chain'][:,start::thin,:]
+	chopped_chain = sample_results['chain'][:,int(sample_results['chain'].shape[1]/chop_chain):,:]
+	flatchain = chopped_chain[:,start::thin,:]
 	flatchain = flatchain.reshape(flatchain.shape[0] * flatchain.shape[1],flatchain.shape[2])
-	
+
 	# MAKE RANDOM POSTERIOR DRAWS
 	nsample = 5
-	ns = sample_results['chain'].shape[0] * sample_results['chain'].shape[1]
+	ns = flatchain.shape[0] * flatchain.shape[1]
 	samples = np.random.uniform(0, 1, size=nsample)
 	sample = [int(s * ns) for s in samples]
 		
@@ -195,8 +196,8 @@ def sed_figure(sample_results, alpha=0.3, samples = [-1],
 	maxprob = np.max(sample_results['lnprobability'])
 	probind = sample_results['lnprobability'] == maxprob
 	thetas = sample_results['chain'][probind,:]
+
 	print 'maxprob: ' + str(maxprob)
-	print 'prob of models with maxprob: ' + str(sample_results['lnprobability'][probind])
 
 	if thetas.ndim == 2:			# if multiple chains found the same peak, choose one arbitrarily
 		thetas=[thetas[0,:]]
@@ -249,7 +250,7 @@ def sed_figure(sample_results, alpha=0.3, samples = [-1],
 	handles, labels = phot.get_legend_handles_labels()
 	by_label = OrderedDict(zip(labels, handles))
 	phot.legend(by_label.values(), by_label.keys(), 
-				loc=0, prop={'size':8},
+				loc=1, prop={'size':8},
 			    frameon=False)
 			    
     # set labels
@@ -275,12 +276,13 @@ def make_all_plots(objname, parm_file=None,
 	Driver. Loads output, makes all plots.
 	'''
 
-	plt_chain_figure = 0
-	plt_triangle_plot = 0
+	plt_chain_figure = 1
+	plt_triangle_plot = 1
 	plt_sed_figure = 1
 	
-	# thin the chain?
+	# thin and chop the chain?
 	thin=2
+	chop_chain=2
 
 	# find most recent output file
 	# with the objname
@@ -303,7 +305,10 @@ def make_all_plots(objname, parm_file=None,
 	# triangle plot
 	if plt_triangle_plot: 
 		print 'MAKING TRIANGLE PLOT'
-		read_results.subtriangle(sample_results,
+		chopped_sample_results = copy.deepcopy(sample_results)
+		chopped_sample_results['chain'] = sample_results['chain'][:,int(sample_results['chain'].shape[1]/chop_chain):,:]
+
+		read_results.subtriangle(chopped_sample_results,
 							 outname=outfolder+file_base,
 							 showpars=None,start=0, thin=thin, #truths=sample_results['initial_theta'],
 							 show_titles=True)
@@ -316,7 +321,8 @@ def make_all_plots(objname, parm_file=None,
  						  maxprob=1, 
  						  outname=outfolder+file_base+'_sed.png',
  						  parm_file=parm_file,
- 						  thin=thin)
+ 						  thin=thin,
+ 						  chop_chain=chop_chain)
  		
 
 	
