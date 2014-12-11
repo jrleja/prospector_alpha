@@ -2,8 +2,8 @@
 # script to replicate parameter file
 # for multiple galaxy IDs
 # set location of ID file, base parameter file
-IDFILE=$APPS"threedhst_bsfh/data/COSMOS_testsamp.ids"
-PARAMFOLDER=$APPS"threedhst_bsfh/parameter_files/"
+IDFILE=$APPS"/threedhst_bsfh/data/COSMOS_testsamp.ids"
+PARAMFOLDER=$APPS"/threedhst_bsfh/parameter_files/"
 PARAMBASE="threedhst_params"
 PARAMEXT=".py"
 

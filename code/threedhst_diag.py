@@ -116,7 +116,7 @@ def comp_samples(thetas, model, sps, inlog=True, photflag=0):
 
         specvecs += [ [mu, cal, delta, mu,mospec/mu, (mospec-mu) / mounc] ]
             
-    return wave, mospec, mounc, specvecs
+    return wave, mospec, mounc, specvecs	
 
 def sed_figure(sample_results, alpha=0.3, samples = [-1],
                 start=0, thin=1, maxprob=0, outname=None, plot_init = 0,
@@ -145,16 +145,26 @@ def sed_figure(sample_results, alpha=0.3, samples = [-1],
 	gs.update(hspace=0)
 	phot, res = plt.Subplot(fig, gs[0]), plt.Subplot(fig, gs[1])
 
-	# MAKE RANDOM POSTERIOR DRAWS
+	# FLATTEN THE CHAIN
 	# chain = chain[nwalkers,nsteps,ndim]
 	flatchain = sample_results['chain'][:,start::thin,:]
-	flatchain = flatchain.reshape(flatchain.shape[0] * flatchain.shape[1],flatchain.shape[2])	
+	flatchain = flatchain.reshape(flatchain.shape[0] * flatchain.shape[1],flatchain.shape[2])
+	
+	# MAKE RANDOM POSTERIOR DRAWS
+	nsample = 5
+	ns = sample_results['chain'].shape[0] * sample_results['chain'].shape[1]
+	samples = np.random.uniform(0, 1, size=nsample)
+	sample = [int(s * ns) for s in samples]
+		
 	thetas = [flatchain[s,:] for s in samples]
 	mwave, mospec, mounc, specvecs = comp_samples(thetas, sample_results['model'], sps, photflag=1)
 
 	# define observations
 	xplot = np.log10(mwave)
 	yplot = np.log10(mospec*(c/(mwave/1e10)))
+	linerr_down = np.clip(mospec-mounc, 1e-80, 1e80)*(c/(mwave/1e10))
+	linerr_up = np.clip(mospec+mounc, 1e-80, 1e80)*(c/(mwave/1e10))
+	yerr = [yplot - np.log10(linerr_down), np.log10(linerr_up)-yplot]
 
 	# set up plot limits
 	phot.set_xlim(min(xplot)*0.96,max(xplot)*1.04)
@@ -167,9 +177,6 @@ def sed_figure(sample_results, alpha=0.3, samples = [-1],
 		res.plot(np.log10(mwave), vecs[-1], color='grey', alpha=alpha, marker='o', **kwargs)
 		
     # PLOT OBSERVATIONS + ERRORS 
-	linerr_down = np.clip(mospec-mounc, 1e-80, 1e80)*(c/(mwave/1e10))
-	linerr_up = np.clip(mospec+mounc, 1e-80, 1e80)*(c/(mwave/1e10))
-	yerr = [yplot - np.log10(linerr_down), np.log10(linerr_up)-yplot]
 	phot.errorbar(xplot, yplot, yerr=yerr,
                   color='black', marker='o', label='observed')
 
@@ -185,48 +192,52 @@ def sed_figure(sample_results, alpha=0.3, samples = [-1],
     	#          color='blue', **kwargs)
 	
 	# plot max probability
-	if maxprob == 1:
-		thetas = sample_results['chain'][sample_results['lnprobability'] == np.max(sample_results['lnprobability']),:]
-		if thetas.ndim == 2:			# if multiple chains found the same peak, choose one arbitrarily
-			thetas=[thetas[0,:]]
-		else:
-			thetas = [thetas]
-		mwave, mospec, mounc, specvecs = comp_samples(thetas, sample_results['model'], sps, photflag=1)
-		
-		phot.plot(np.log10(mwave), np.log10(specvecs[0][0]*(c/(mwave/1e10))), color='red', marker='o', label='max lnprob', **kwargs)
-		res.plot(np.log10(mwave), specvecs[0][-1], color='red', marker='o', label='max lnprob', **kwargs)
-		
-		# diagnostic text
-		textx = (phot.get_xlim()[1]-phot.get_xlim()[0])*0.975+phot.get_xlim()[0]
-		texty = (phot.get_ylim()[1]-phot.get_ylim()[0])*0.2+phot.get_ylim()[0]
-		deltay = (phot.get_ylim()[1]-phot.get_ylim()[0])*0.04
+	maxprob = np.max(sample_results['lnprobability'])
+	probind = sample_results['lnprobability'] == maxprob
+	thetas = sample_results['chain'][probind,:]
+	print 'maxprob: ' + str(maxprob)
+	print 'prob of models with maxprob: ' + str(sample_results['lnprobability'][probind])
 
-		phot.text(textx, texty, r'best-fit $\chi^2$='+"{:.2f}".format(np.sum(specvecs[0][-1]**2)),
-				 fontsize=12, ha='right')
-		phot.text(textx, texty-deltay, r'avg acceptance='+"{:.2f}".format(np.mean(sample_results['acceptance'])),
+	if thetas.ndim == 2:			# if multiple chains found the same peak, choose one arbitrarily
+		thetas=[thetas[0,:]]
+	else:
+		thetas = [thetas]
+	mwave, mospec, mounc, specvecs = comp_samples(thetas, sample_results['model'], sps, photflag=1)
+		
+	phot.plot(np.log10(mwave), np.log10(specvecs[0][0]*(c/(mwave/1e10))), color='red', marker='o', label='max lnprob', **kwargs)
+	res.plot(np.log10(mwave), specvecs[0][-1], color='red', marker='o', label='max lnprob', **kwargs)
+		
+	# diagnostic text
+	textx = (phot.get_xlim()[1]-phot.get_xlim()[0])*0.975+phot.get_xlim()[0]
+	texty = (phot.get_ylim()[1]-phot.get_ylim()[0])*0.2+phot.get_ylim()[0]
+	deltay = (phot.get_ylim()[1]-phot.get_ylim()[0])*0.04
+
+	phot.text(textx, texty, r'best-fit $\chi^2$='+"{:.2f}".format(np.sum(specvecs[0][-1]**2)),
+			  fontsize=12, ha='right')
+	phot.text(textx, texty-deltay, r'avg acceptance='+"{:.2f}".format(np.mean(sample_results['acceptance'])),
 				 fontsize=12, ha='right')
 		
-		# load fast data
-		filename=model.run_params['fastname']
-		with open(filename, 'r') as f:
-			for jj in range(1): hdr = f.readline().split()
-		dat = np.loadtxt(filename, comments = '#',dtype = np.dtype([(n, np.float) for n in hdr[1:]]))
-		fields = [f for f in dat.dtype.names]
-		id_ind = fields.index('id')
-		uvj_ind = fields.index('uvj_flag')
-		sn_ind = fields.index('sn_F160W')
-		z_ind = fields.index('z')
-		z_txt = [f[z_ind] for f in dat if f[id_ind] == float(model.run_params['objname'])][0]
-		uvj_txt = [f[uvj_ind] for f in dat if f[id_ind] == float(model.run_params['objname'])][0]
-		sn_txt = [f[sn_ind] for f in dat if f[id_ind] == float(model.run_params['objname'])][0]
+	# load fast data
+	filename=model.run_params['fastname']
+	with open(filename, 'r') as f:
+		for jj in range(1): hdr = f.readline().split()
+	dat = np.loadtxt(filename, comments = '#',dtype = np.dtype([(n, np.float) for n in hdr[1:]]))
+	fields = [f for f in dat.dtype.names]
+	id_ind = fields.index('id')
+	uvj_ind = fields.index('uvj_flag')
+	sn_ind = fields.index('sn_F160W')
+	z_ind = fields.index('z')
+	z_txt = [f[z_ind] for f in dat if f[id_ind] == float(model.run_params['objname'])][0]
+	uvj_txt = [f[uvj_ind] for f in dat if f[id_ind] == float(model.run_params['objname'])][0]
+	sn_txt = [f[sn_ind] for f in dat if f[id_ind] == float(model.run_params['objname'])][0]
 		
-		# galaxy text
-		phot.text(textx, texty-2*deltay, 'z='+"{:.2f}".format(z_txt),
-				 fontsize=12, ha='right')
-		phot.text(textx, texty-3*deltay, 'uvj_flag='+str(uvj_txt),
-				 fontsize=12, ha='right')
-		phot.text(textx, texty-4*deltay, 'S/N(F160W)='+"{:.2f}".format(sn_txt),
-				 fontsize=12, ha='right')
+	# galaxy text
+	phot.text(textx, texty-2*deltay, 'z='+"{:.2f}".format(z_txt),
+			  fontsize=12, ha='right')
+	phot.text(textx, texty-3*deltay, 'uvj_flag='+str(uvj_txt),
+			  fontsize=12, ha='right')
+	phot.text(textx, texty-4*deltay, 'S/N(F160W)='+"{:.2f}".format(sn_txt),
+			  fontsize=12, ha='right')
 		
 		
 	# extra line
@@ -264,9 +275,12 @@ def make_all_plots(objname, parm_file=None,
 	Driver. Loads output, makes all plots.
 	'''
 
-	plt_chain_figure = 1
-	plt_triangle_plot = 1
+	plt_chain_figure = 0
+	plt_triangle_plot = 0
 	plt_sed_figure = 1
+	
+	# thin the chain?
+	thin=2
 
 	# find most recent output file
 	# with the objname
@@ -291,25 +305,18 @@ def make_all_plots(objname, parm_file=None,
 		print 'MAKING TRIANGLE PLOT'
 		read_results.subtriangle(sample_results,
 							 outname=outfolder+file_base,
-							 showpars=None,start=0, thin=2, truths=sample_results['initial_theta'],
+							 showpars=None,start=0, thin=thin, #truths=sample_results['initial_theta'],
 							 show_titles=True)
 
 	# sed plot
 	if plt_sed_figure:
 		print 'MAKING SED PLOT'
-		# best-fit model plot
-		# sample
-		nsample = 5
-		ns = sample_results['chain'].shape[0] * sample_results['chain'].shape[1]
-		samples = np.random.uniform(0, 1, size=nsample)
-		sample = [int(s * ns) for s in samples]
-
  		# plot
  		pfig = sed_figure(sample_results, 
- 						  samples=sample, 
  						  maxprob=1, 
  						  outname=outfolder+file_base+'_sed.png',
- 						  parm_file=parm_file)
+ 						  parm_file=parm_file,
+ 						  thin=thin)
  		
 
 	
