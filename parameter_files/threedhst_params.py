@@ -1,5 +1,5 @@
 import numpy as np
-import fsps,os
+import fsps,os,threedhst_diag
 from sedpy import attenuation
 from bsfh import priors, sedmodel, elines
 from astropy.cosmology import WMAP9
@@ -11,7 +11,7 @@ tophat = priors.tophat
 #############
 
 run_params = {'verbose':True,
-              'outfile':os.getenv('APPS')+'/threedhst_bsfh/results/threedhst',
+              'outfile':os.getenv('APPS')+'/threedhst_bsfh/results/ha_selected',
               'ftol':0.5e-5, 
               'maxfev':5000,
               'nwalkers':124,
@@ -28,113 +28,16 @@ run_params = {'verbose':True,
               'phot':True,
               'photname':os.getenv('APPS')+'/threedhst_bsfh/data/COSMOS_testsamp.cat',
               'fastname':os.getenv('APPS')+'/threedhst_bsfh/data/COSMOS_testsamp.fout',
-              'objname':'9',
+              'ancilname':os.getenv('APPS')+'/threedhst_bsfh/data/COSMOS_testsamp.dat',
+              'objname':'15431',
               }
-run_params['outfile'] = run_params['outfile']+'_'+run_params['objname']
-
-def return_mwave_custom(filters):
-
-	"""
-	returns effective wavelength based on filter names
-	"""
-
-	loc = os.getenv('APPS')+'/threedhst_bsfh/filters/'
-	key_str = 'filter_keys_threedhst.txt'
-	lameff_str = 'lameff_threedhst.txt'
-	
-	lameff = np.loadtxt(loc+lameff_str)
-	keys = np.loadtxt(loc+key_str, dtype='S20',usecols=[1])
-	keys = keys.tolist()
-	keys = np.array([keys.lower() for keys in keys], dtype='S20')
-	
-	lameff_return = [[lameff[keys == filters[i]]][0] for i in range(len(filters))]
-	lameff_return = [item for sublist in lameff_return for item in sublist]
-	
-	return lameff_return
-
-def load_obs_3dhst(filename, objnum, min_error = None):
-	"""
-	Load 3D-HST photometry file, return photometry for a particular object.
-	min_error: set the minimum photometric uncertainty to be some fraction
-	of the flux. if not set, use default errors.
-	"""
-	obs ={}
-	fieldname=filename.split('/')[-1].split('_')[0].upper()
-	with open(filename, 'r') as f:
-		hdr = f.readline().split()
-	dat = np.loadtxt(filename, comments = '#',
-					 dtype = np.dtype([(n, np.float) for n in hdr[1:]]))
-	obj_ind = np.where(dat['id'] == int(objnum))[0][0]
-	
-	# extract fluxes+uncertainties for all objects and all filters
-	flux_fields = [f for f in dat.dtype.names if f[0:2] == 'f_']
-	unc_fields = [f for f in dat.dtype.names if f[0:2] == 'e_']
-	filters = [f[2:] for f in flux_fields]
-
-	# extract fluxes for particular object, converting from record array to numpy array
-	flux = dat[flux_fields].view(float).reshape(len(dat),-1)[obj_ind]
-	unc  = dat[unc_fields].view(float).reshape(len(dat),-1)[obj_ind]
-
-	# define all outputs
-	filters = [filter.lower()+'_'+fieldname.lower() for filter in filters]
-	wave_effective = np.array(return_mwave_custom(filters))
-	phot_mask = np.logical_or((flux != unc),(flux > 0))
-	maggies = flux/(10**10)
-	maggies_unc = unc/(10**10)
-	
-	# set minimum photometric error
-	if min_error is not None:
-		maggies_unc[maggies_unc < min_error*maggies] = min_error*maggies[maggies_unc < min_error*maggies]
-	
-	# sort outputs based on effective wavelength
-	points = zip(wave_effective,filters,phot_mask,maggies,maggies_unc)
-	sorted_points = sorted(points)
-
-	# build output dictionary
-	obs['wave_effective'] = np.array([point[0] for point in sorted_points])
-	obs['filters'] = np.array([point[1] for point in sorted_points])
-	obs['phot_mask'] =  np.array([point[2] for point in sorted_points])
-	obs['maggies'] = np.array([point[3] for point in sorted_points])
-	obs['maggies_unc'] =  np.array([point[4] for point in sorted_points])
-	obs['wavelength'] = None
-	obs['spectrum'] = None
-
-	return obs
-
-def load_fast_3dhst(filename, objnum):
-	"""
-	Load FAST output for a particular object
-	Returns a dictionary of inputs for BSFH
-	"""
-
-	# filter through header junk, load data
-	fieldname=filename.split('/')[-1].split('_')[0].upper()
-	with open(filename, 'r') as f:
-		for jj in range(1): hdr = f.readline().split()
-	dat = np.loadtxt(filename, comments = '#',dtype = np.dtype([(n, np.float) for n in hdr[1:]]))
-
-	# extract field names, search for ID, pull out object info
-	fields = [f for f in dat.dtype.names]
-	id_ind = fields.index('id')
-	obj_ind = [int(x[id_ind]) for x in dat].index(int(objnum))
-	values = dat[fields].view(float).reshape(len(dat),-1)[obj_ind]
-
-	# translate
-	output = {}
-	translate = {'zred': ('z', lambda x: x),
-                 'tau':  ('ltau', lambda x: (10**x)/1e9),
-                 'tage': ('lage', lambda x:  (10**x)/1e9),
-                 'dust2':('Av', lambda x: x),
-                 'mass': ('lmass', lambda x: (10**x))}
-	for k, v in translate.iteritems():		
-		output[k] = v[1](values[np.array(fields) == v[0]][0])
-	return output
 
 ############
 # OBS
 #############
 
-obs = load_obs_3dhst(run_params['photname'], run_params['objname'], min_error=run_params['min_error'])
+obs = threedhst_diag.load_obs_3dhst(run_params['photname'], 
+									run_params['objname'], min_error=run_params['min_error'])
 
 #############
 # MODEL_PARAMS
@@ -359,11 +262,22 @@ model_params.append({'name': 'phot_jitter', 'N': 1,
                         'prior_args': {'mini':0.0, 'maxi':0.2}})
 
 ####### SET INITIAL PARAMETERS ##########
-fparams = load_fast_3dhst(run_params['fastname'],
-                          run_params['objname'])
+fastvalues,fastfields = threedhst_diag.load_fast_3dhst(run_params['fastname'],
+                                                       run_params['objname'])
 parmlist = [p['name'] for p in model_params]
-model_params[parmlist.index('zred')]['init'] = fparams['zred']
+
 if run_params['fast_init_params']:
+
+	# translate
+	fparams = {}
+	translate = {#'zred': ('z', lambda x: x),
+                 'tau':  ('ltau', lambda x: (10**x)/1e9),
+                 #'tage': ('lage', lambda x:  (10**x)/1e9),
+                 'dust2':('Av', lambda x: x),
+                 'mass': ('lmass', lambda x: (10**x))}
+	for k, v in translate.iteritems():		
+		fparams[k] = v[1](fastvalues[np.array(fastfields) == v[0]][0])
+
 	for par in model_params:
 		if (par['name'] in fparams):
 			par['init'] = fparams[par['name']]
@@ -374,12 +288,23 @@ else:
 			max = model_params[ii]['prior_args']['maxi']
 			min = model_params[ii]['prior_args']['mini']
 			model_params[ii]['init'] = random.random()*(max-min)+min
+
+######## LOAD ANCILLARY INFORMATION ########
+# name outfiles based on halpha eqw
+ancilvals, ancilfields = threedhst_diag.load_ancil_data(run_params['ancilname'],run_params['objname'])
+halpha_eqw_txt = "%04d" % int(ancilvals[ancilfields.index('ha_eqw')])
+run_params['outfile'] = run_params['outfile']+'_'+halpha_eqw_txt+'_'+run_params['objname']
+
+# use zbest, not whatever's in the fast run
+zbest = ancilvals[ancilfields.index('z')]
+model_params[parmlist.index('zred')]['init'] = zbest
 			
 ####### RESET AGE PRIORS TO MATCH AGE OF UNIVERSE ##########
 tuniv = WMAP9.age(model_params[0]['init']).value
 
+# initialize tage, set max on sf_start, initialize and bound tburst
 model_params[parmlist.index('tage')]['init'] = 1.2*tuniv
 model_params[parmlist.index('sf_start')]['prior_args']['maxi'] = 0.5*tuniv
+model_params[parmlist.index('tburst')]['init'] = 1.2*tuniv-0.5
 model_params[parmlist.index('tburst')]['prior_args']['mini'] = 1.2*tuniv-1
 model_params[parmlist.index('tburst')]['prior_args']['maxi'] = 1.2*tuniv
-model_params[parmlist.index('tburst')]['init'] = 1.2*tuniv-0.5

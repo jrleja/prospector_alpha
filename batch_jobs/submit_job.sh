@@ -3,11 +3,11 @@
 ### Requested number of cores
 #SBATCH -n 32
 ### Requested computing time in minutes
-#SBATCH -t 60
+#SBATCH -t 120
 ### Partition or queue name
-#SBATCH -p conroy
+#SBATCH -p conroy,general
 ### memory per cpu, in MB
-#SBATCH --mem-per-cpu=2000
+#SBATCH --mem-per-cpu=500
 ### Job name
 #SBATCH -J '3D_run1'
 ### output and error logs
