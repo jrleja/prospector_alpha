@@ -29,7 +29,7 @@ run_params = {'verbose':True,
               'photname':os.getenv('APPS')+'/threedhst_bsfh/data/COSMOS_testsamp.cat',
               'fastname':os.getenv('APPS')+'/threedhst_bsfh/data/COSMOS_testsamp.fout',
               'ancilname':os.getenv('APPS')+'/threedhst_bsfh/data/COSMOS_testsamp.dat',
-              'objname':'15431',
+              'objname':'11569',
               }
 
 ############
