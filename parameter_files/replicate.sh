@@ -4,11 +4,11 @@
 # set location of ID file, base parameter file
 IDFILE=$APPS"/threedhst_bsfh/data/COSMOS_testsamp.ids"
 PARAMFOLDER=$APPS"/threedhst_bsfh/parameter_files/"
-PARAMBASE="threedhst_params"
+PARAMBASE="halpha_selected_params_nebon"
 PARAMEXT=".py"
 
 echo 'ID file:'$IDFILE
-echo 'Base parameter file:'$IDFILE
+echo 'Base parameter file:'$PARAMBASE
 
 # get number of IDs
 NIDS=$(wc -l < "$IDFILE")
@@ -25,6 +25,6 @@ do
   echo $LINE
   
   # find line with "'objname': '9'", replace 9 with $i
-  sed -ie "s/\'objname\':\'9\'/\'objname\':\'$LINE\'/g" $PARAMFOLDER$PARAMBASE"_$i"$PARAMEXT
+  sed -ie "s/\'objname\':\'15431\'/\'objname\':\'$LINE\'/g" $PARAMFOLDER$PARAMBASE"_$i"$PARAMEXT
   rm $PARAMFOLDER$PARAMBASE"_$i"$PARAMEXT"e"
 done
