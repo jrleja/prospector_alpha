@@ -4,80 +4,69 @@ from astropy.table import Table, vstack
 from astropy.io import ascii
 random.seed(25001)
 
-def load_linelist():
+def load_linelist(field='COSMOS'):
 	
+	'''
+	uses pieter's zbest catalog to determine objects with spectra
+	returns all line information, zgris, and use flag
+	note that equivalent widths are in observed frame, convert by dividing by (1+z)
+	'''
 	filename='/Users/joel/data/3d_hst/master.zbest.dat'
 	with open(filename, 'r') as f:
 		for jj in range(1): hdr = f.readline().split()
 
 	dat = np.loadtxt(filename, comments = '#',
 	                 dtype = {'names':([n for n in hdr[1:]]),
-	                          'formats':('S40', 'f10','f10','S40','f10','f10','f16','f16','f16','f16')})
+	                          'formats':('S40','f10','f10','S40','f10','f10','f16','f16','f16','f16')})
 	
-	fields = [f for f in dat.dtype.names]
-	spec_ind = fields.index('spec_id')
-
-	specnames = [x[spec_ind] for x in dat]
-	in_field = [x[0] == 'COSMOS' for x in dat]
-	spec_flag = [x[5] for x in dat if x[0] == 'COSMOS']
-	id = [x[2] for x in dat if x[0] == 'COSMOS']
-
-	halpha_eqw = np.empty(0)
-	halpha_eqw_err = np.empty(0)
-	zgris = np.empty(0)
+	# cut down master catalog to only in-field objects
+	in_field = dat['field'] == field
+	dat      = dat[in_field]
 	
-	for jj in xrange(len(specnames)):
-		if dat[jj][0] != 'COSMOS':
+	# build output
+	t = Table([dat['id'],[-99.0]*len(dat),dat['use_grism1']],
+	          names=('id','zgris','use_grism1'))
+	for jj in xrange(len(dat)):
+		
+		# no spectrum
+		if dat['spec_id'][jj] == '00000':
 			pass
-		else:
-			if dat[jj][spec_ind] == '00000':
-				zgris = np.append(zgris,-99)
-				halpha_eqw = np.append(halpha_eqw,-99)
-				halpha_eqw_err = np.append(halpha_eqw_err,-99)
-			else:
-				fieldno = dat[jj][spec_ind].split('-')[1]
-				filename='/Users/joel/data/3d_hst/spectra/cosmos-wfc3-spectra_v4.1.4/cosmos-'+ fieldno+'/LINE/DAT/'+dat[jj][spec_ind]+'.linefit.dat'
-				
-				# if there's no line detected, there's no line file
-				try:
-					with open(filename, 'r') as f:
-						hdr = f.readline().split()
-						zgris_new = float(f.readline().split('=')[1].strip())
-					linedat = np.loadtxt(filename, comments='#',
+		else: # let's get to work
+			fieldno = dat['spec_id'][jj].split('-')[1]
+			filename='/Users/joel/data/3d_hst/spectra/cosmos-wfc3-spectra_v4.1.4/cosmos-'+ fieldno+'/LINE/DAT/'+dat['spec_id'][jj]+'.linefit.dat'
+			
+			# if the line file doesn't exist, abandon all hope (WHY DO SOME NOT EXIST?!?!?!)
+			# some don't exist, others are empty
+			# empty ones just don't enter the value assigning loop
+			# may be difference in version between pieter's master catalog and current line catalog
+			try:
+				with open(filename, 'r') as f:
+					hdr = f.readline().split()
+					t['zgris'][jj] = float(f.readline().split('=')[1].strip())
+			except:
+				print filename+" doesn't exist"
+				continue
+			
+			linedat = np.loadtxt(filename, comments='#',
 			                     dtype = {'names':([n for n in hdr[1:]]),
 	                                      'formats':('S40', 'f16','f16','f16','f16','f16')})
-					#linefields = [f for f in linedat.dtype.names]
-				
-					# pull out data
-					heqw = [x[4] for x in linedat if x[0] == 'Ha']
-					heqw_err = [x[5] for x in linedat if x[0] == 'Ha']
-					zgris = np.append(zgris,zgris_new)
-				except:
-					heqw = []
-					heqw_err =[]
-					zgris = np.append(zgris,-99)
-				
-				# write data
-				if len(heqw) != 0:
-					halpha_eqw = np.append(halpha_eqw,heqw)
-					halpha_eqw_err = np.append(halpha_eqw_err,heqw_err)
-				else:
-					halpha_eqw = np.append(halpha_eqw,-99)
-					halpha_eqw_err = np.append(halpha_eqw_err,-99)
-				if len(zgris) != len(halpha_eqw):
-					print 1/0
-	
-	
-	# convert from observed EQW to intrinsic EQW
-	halpha_eqw = halpha_eqw/(1+zgris)
-	halpha_eqw_err = halpha_eqw_err/(1+zgris)
-	lineinfo = Table([np.array(id),
-	                  np.array(halpha_eqw),
-	                  np.array(halpha_eqw_err),
-	                  np.array(zgris),
-	                  np.array(spec_flag)],
-	                  names=['id','ha_eqw','ha_eqw_err','zgris','spec_flag'])
-	return lineinfo
+			
+			# if there's only one line, loadtxt returns a different thing
+			if linedat.size == 1:
+				linedat=np.array(linedat.reshape(1),dtype=linedat.dtype)
+	        
+			for kk in xrange(linedat.size): #for each line
+				if linedat['line'][kk]+'_flux' not in t.keys(): #check for existing column names
+					for name in linedat.dtype.names[1:]: t[linedat['line'][kk]+'_'+name] = [-99.0]*len(t)
+				for name in linedat.dtype.names[1:]: t[jj][linedat['line'][kk]+'_'+name] = linedat[name][kk]
+
+	# convert to rest-frame eqw
+	for key in t.keys():
+		if 'EQW' in key:
+			detection = t[key] != -99
+			t[key][detection] = t[key][detection]/(1+t['zgris'][detection])
+
+	return t
 				
 	
 # calculate a UVJ flag
@@ -113,16 +102,6 @@ def calc_uvj_flag(rf):
 	
 	return uvj_flag
 
-def print_info(id,ids,uvj_flag,sn_F160W,z):
-
-	index=list(ids).index(id)
-	
-	print 'UVJ flag: ' +"{:10.2f}".format(uvj_flag[index])
-	print 'S/N F160W: ' +"{:10.2f}".format(sn_F160W[index])
-	print 'redshift: ' +"{:10.2f}".format(z[index])
-	
-	return None
-
 def build_sample():
 
 	'''
@@ -138,7 +117,7 @@ def build_sample():
 	id_str_out   = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_testsamp.ids'
 
 	# load data
-	# use grism redshifts
+	# use grism redshift
 	phot = read_sextractor.load_phot_v41(field)
 	fast = read_sextractor.load_fast_v41(field)
 	rf = read_sextractor.load_rf_v41(field)
@@ -146,7 +125,10 @@ def build_sample():
 	
 	# remove junk
 	# 153, 155, 161 are U, V, J
-	good = (phot['use_phot'] == 1) & (rf['L153'] > 0) & (rf['L155'] > 0) & (rf['L161'] > 0) & (phot['f_IRAC4'] < 1e7) & (phot['f_IRAC3'] < 1e7) & (phot['f_IRAC2'] < 1e7) & (phot['f_IRAC1'] < 1e7) & (lineinfo['spec_flag'] == 1) & (lineinfo['ha_eqw']/lineinfo['ha_eqw_err'] > 2)
+	good = (phot['use_phot'] == 1) & \
+	       (rf['L153'] > 0) & (rf['L155'] > 0) & (rf['L161'] > 0) & \
+	       (phot['f_IRAC4'] < 1e7) & (phot['f_IRAC3'] < 1e7) & (phot['f_IRAC2'] < 1e7) & (phot['f_IRAC1'] < 1e7) & \
+	       (lineinfo['use_grism1'] == 1) & (lineinfo['Ha_EQW_obs']/lineinfo['Ha_EQW_obs_err'] > 2)
 
 	phot = phot[good]
 	fast = fast[good]
@@ -156,17 +138,17 @@ def build_sample():
 	# define UVJ flag, S/N, HA EQW
 	uvj_flag = calc_uvj_flag(rf)
 	sn_F160W = phot['f_F160W']/phot['e_F160W']
-	ha_eqw = lineinfo['ha_eqw']
+	Ha_EQW_obs = lineinfo['Ha_EQW_obs']
 	fast['z'] = lineinfo['zgris']
-	fast['ha_eqw']   = ha_eqw
-	fast['uvj_flag'] = uvj_flag
-	fast['sn_F160W'] = sn_F160W
+	lineinfo.rename_column('zgris' , 'z')
+	lineinfo['uvj_flag'] = uvj_flag
+	lineinfo['sn_F160W'] = sn_F160W
 	
 	# split into bins
-	lowlim = np.percentile(ha_eqw,65)
-	highlim = np.percentile(ha_eqw,95)
+	lowlim = np.percentile(Ha_EQW_obs,65)
+	highlim = np.percentile(Ha_EQW_obs,95)
 	
-	selection = (ha_eqw > lowlim) & (ha_eqw < highlim)
+	selection = (Ha_EQW_obs > lowlim) & (Ha_EQW_obs < highlim)
 	random_index = random.sample(xrange(np.sum(selection)), 108)
 	fast_out = fast[selection][random_index]
 	phot_out = phot[selection][random_index]
@@ -204,8 +186,7 @@ def build_sample():
 	ascii.write(fast_out, output=fast_str_out, 
 	            delimiter=' ', format='commented_header',
 	            include_names=fast.keys()[:11])
-	ascii.write(fast_out, output=ancil_str_out, 
-	            delimiter=' ', format='commented_header',
-	            include_names=[fast.keys()[0]]+['z']+fast.keys()[11:])
+	ascii.write(lineinfo, output=ancil_str_out, 
+	            delimiter=' ', format='commented_header')
 	ascii.write([np.array(phot_out['id'],dtype='int')], output=id_str_out, Writer=ascii.NoHeader)
 	
