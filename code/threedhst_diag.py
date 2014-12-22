@@ -1,28 +1,14 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import triangle, pickle, os, math, copy
-from bsfh import read_results,model_setup
+import triangle, pickle, os, math, copy, threed_dutils
+from bsfh import model_setup, read_results
 import matplotlib.image as mpimg
 from astropy.cosmology import WMAP9
 import fsps
 
-def integrate_sfh(t1,t2,tage,tau,sf_start,tburst,fburst):
-	
-	if t2 < sf_start:
-		return 0.0
-	elif t2 > tage:
-		return 1.0
-	else:
-		intsfr = (np.exp(-t1/tau)*(1+t1/tau) - 
-		          np.exp(-t2/tau)*(1+t2/tau))
-		norm=(1.0-fburst)/(np.exp(-sf_start/tau)*(sf_start/tau+1)-
-				  np.exp(-tage    /tau)*(tage    /tau+1))
-		intsfr=intsfr*norm
-		
-	if t2 > tburst:
-		intsfr=intsfr+fburst
-
-	return intsfr
+plt_chain_figure = 0
+plt_triangle_plot = 0
+plt_sed_figure = 1
 
 def plot_sfh(sfh_parms):
 
@@ -44,7 +30,8 @@ def plot_sfh(sfh_parms):
 	# dropped normalization in eqn
 	# re-normalize at end
 	intsfr = np.zeros(len(t))
-	for jj in xrange(len(t)): intsfr[jj] = integrate_sfh(sf_start,t[jj],tage,tau,sf_start,tburst,fburst)
+	for jj in xrange(len(t)): intsfr[jj] = threed_dutils.integrate_sfh(sf_start,t[jj],
+	                                                                   tage,tau,sf_start,tburst,fburst)
 
 	return t, intsfr
 
@@ -118,122 +105,14 @@ def return_extent(sample_results):
 			extent = (priors['mini'],priors['maxi'])
 		else:
 			extend = (extent[1]-extent[0])*0.12
-			if np.abs((priors['mini']-extent[0])/priors['mini']) < 1e-4:
+			if np.abs(0.5*(priors['mini']-extent[0])/(priors['mini']+extent[0])) < 1e-4:
 				extent[0]=extent[0]-extend
-			if np.abs((priors['maxi']-extent[1])/priors['maxi']) < 1e-4:
+			if np.abs(0.5*(priors['maxi']-extent[1])/(priors['maxi']+extent[1])) < 1e-4:
 				extent[1]=extent[1]+extend
     	
 		extents.append((extent[0],extent[1]))
 	
 	return extents
-
-def return_mwave_custom(filters):
-
-	"""
-	returns effective wavelength based on filter names
-	"""
-
-	loc = os.getenv('APPS')+'/threedhst_bsfh/filters/'
-	key_str = 'filter_keys_threedhst.txt'
-	lameff_str = 'lameff_threedhst.txt'
-	
-	lameff = np.loadtxt(loc+lameff_str)
-	keys = np.loadtxt(loc+key_str, dtype='S20',usecols=[1])
-	keys = keys.tolist()
-	keys = np.array([keys.lower() for keys in keys], dtype='S20')
-	
-	lameff_return = [[lameff[keys == filters[i]]][0] for i in range(len(filters))]
-	lameff_return = [item for sublist in lameff_return for item in sublist]
-	
-	return lameff_return
-
-def load_ancil_data(filename,objnum):
-
-	'''
-	loads ancillary plotting information
-	'''
-	
-	with open(filename, 'r') as f:
-		for jj in range(1): hdr = f.readline().split()
-	dat = np.loadtxt(filename, comments = '#',dtype = np.dtype([(n, np.float) for n in hdr[1:]]))
-	fields = [f for f in dat.dtype.names]
-	id_ind = fields.index('id')
-
-	# search for ID, pull out object info
-	obj_ind = [int(x[id_ind]) for x in dat].index(int(objnum))
-	values = dat[fields].view(float).reshape(len(dat),-1)[obj_ind]
-
-	return values, fields
-
-def load_obs_3dhst(filename, objnum, min_error = None):
-	"""
-	Load 3D-HST photometry file, return photometry for a particular object.
-	min_error: set the minimum photometric uncertainty to be some fraction
-	of the flux. if not set, use default errors.
-	"""
-	obs ={}
-	fieldname=filename.split('/')[-1].split('_')[0].upper()
-	with open(filename, 'r') as f:
-		hdr = f.readline().split()
-	dat = np.loadtxt(filename, comments = '#',
-					 dtype = np.dtype([(n, np.float) for n in hdr[1:]]))
-	obj_ind = np.where(dat['id'] == int(objnum))[0][0]
-	
-	# extract fluxes+uncertainties for all objects and all filters
-	flux_fields = [f for f in dat.dtype.names if f[0:2] == 'f_']
-	unc_fields = [f for f in dat.dtype.names if f[0:2] == 'e_']
-	filters = [f[2:] for f in flux_fields]
-
-	# extract fluxes for particular object, converting from record array to numpy array
-	flux = dat[flux_fields].view(float).reshape(len(dat),-1)[obj_ind]
-	unc  = dat[unc_fields].view(float).reshape(len(dat),-1)[obj_ind]
-
-	# define all outputs
-	filters = [filter.lower()+'_'+fieldname.lower() for filter in filters]
-	wave_effective = np.array(return_mwave_custom(filters))
-	phot_mask = np.logical_or(np.logical_or((flux != unc),(flux > 0)),flux != -99.0)
-	maggies = flux/(10**10)
-	maggies_unc = unc/(10**10)
-	
-	# set minimum photometric error
-	if min_error is not None:
-		under = maggies_unc < min_error*maggies
-		maggies_unc[under] = min_error*maggies[under]
-	
-	# sort outputs based on effective wavelength
-	points = zip(wave_effective,filters,phot_mask,maggies,maggies_unc)
-	sorted_points = sorted(points)
-
-	# build output dictionary
-	obs['wave_effective'] = np.array([point[0] for point in sorted_points])
-	obs['filters'] = np.array([point[1] for point in sorted_points])
-	obs['phot_mask'] =  np.array([point[2] for point in sorted_points])
-	obs['maggies'] = np.array([point[3] for point in sorted_points])
-	obs['maggies_unc'] =  np.array([point[4] for point in sorted_points])
-	obs['wavelength'] = None
-	obs['spectrum'] = None
-
-	return obs
-
-def load_fast_3dhst(filename, objnum):
-	"""
-	Load FAST output for a particular object
-	Returns a dictionary of inputs for BSFH
-	"""
-
-	# filter through header junk, load data
-	fieldname=filename.split('/')[-1].split('_')[0].upper()
-	with open(filename, 'r') as f:
-		for jj in range(1): hdr = f.readline().split()
-	dat = np.loadtxt(filename, comments = '#',dtype = np.dtype([(n, np.float) for n in hdr[1:]]))
-
-	# extract field names, search for ID, pull out object info
-	fields = [f for f in dat.dtype.names]
-	id_ind = fields.index('id')
-	obj_ind = [int(x[id_ind]) for x in dat].index(int(objnum))
-	values = dat[fields].view(float).reshape(len(dat),-1)[obj_ind]
-
-	return values, fields
 
 def show_chain(sample_results,outname=None,alpha=0.6):
 	
@@ -327,7 +206,11 @@ def comp_samples(thetas, model, sps, inlog=True, photflag=0):
                                            inlog=True, photflag=1)
 
         specvecs += [ [mu, cal, delta, mu,mospec/mu, (mospec-mu) / mounc] ]
-            
+    
+    # wave = effective wavelength of photometric bands
+    # mospec LOOKS like the observed spectrum, but if phot_flag=1, it's the observed maggies
+    # mounc is the observed photometric uncertainty
+    # specvecs is: model maggies, nothing, nothing, model maggies, observed maggies/model maggies, observed maggies-model maggies / uncertainties
     return wave, mospec, mounc, specvecs	
 
 def sed_figure(sample_results, sps, model,
@@ -340,6 +223,8 @@ def sed_figure(sample_results, sps, model,
 	plot residuals
 	"""
 	c = 3e8
+	ms = 5
+	alpha = 0.8
 	
 	from matplotlib import gridspec
 
@@ -374,43 +259,46 @@ def sed_figure(sample_results, sps, model,
 	# set up plot limits
 	phot.set_xlim(min(xplot)*0.9,max(xplot)*1.04)
 	phot.set_ylim(min(yplot[np.isfinite(yplot)])*0.7,max(yplot[np.isfinite(yplot)])*1.04)
-	res.set_xlim(min(xplot)*0.96,max(xplot)*1.04)
+	res.set_xlim(min(xplot)*0.9,max(xplot)*1.04)
 
 	# PLOT RANDOM DRAWS
-	for vecs in specvecs:		
-		phot.plot(np.log10(mwave), np.log10(vecs[0]*(c/(mwave/1e10))), color='grey', alpha=alpha, marker='o', label='posterior sample', **kwargs)
-		res.plot(np.log10(mwave), vecs[-1], color='grey', alpha=alpha, marker='o', **kwargs)
-		
-    # PLOT OBSERVATIONS + ERRORS 
-	phot.errorbar(xplot, yplot, yerr=yerr,
-                  color='black', marker='o', label='observed')
+	#for vecs in specvecs:		
+	#	phot.plot(np.log10(mwave), np.log10(vecs[0]*(c/(mwave/1e10))), color='grey', alpha=alpha, marker='o', label='posterior sample', **kwargs)
+	#	res.plot(np.log10(mwave), vecs[-1], color='grey', alpha=alpha, marker='o', **kwargs)
 
     # PLOT INITIAL PARAMETERS
 	if plot_init:
 		observables = model.mean_model(sample_results['initial_theta'], sps=sps)
 		fast_spec, fast_mags = observables[0],observables[1]
 		fast_lam = model.obs['wave_effective']
-		phot.plot(np.log10(fast_lam), np.log10(fast_mags*(c/(fast_lam/1e10))), label = 'initial parms', linestyle=' ',color='blue', marker='o', **kwargs)
-    
-		#nz = fast_spec > 0
-		#phot.plot(np.log10(w[nz]), np.log10(fast_spec[nz]*(c/(w[nz]/1e10))), label = 'init fit (spec)',
-    	#          color='blue', **kwargs)
+		phot.plot(np.log10(fast_lam), np.log10(fast_mags*(c/(fast_lam/1e10))), label = 'initial parms', linestyle=' ',color='blue', marker='o', ms=ms, **kwargs)
 	
-	# plot max probability
+	# plot max probability model
 	maxprob = np.max(sample_results['lnprobability'])
 	probind = sample_results['lnprobability'] == maxprob
-	thetas = sample_results['chain'][probind,:]
+	theta_maxln = sample_results['chain'][probind,:]
 
 	print 'maxprob: ' + str(maxprob)
 
-	if thetas.ndim == 2:			# if multiple chains found the same peak, choose one arbitrarily
-		thetas=[thetas[0,:]]
+	if theta_maxln.ndim == 2:			# if multiple chains found the same peak, choose one arbitrarily
+		theta_maxln=[theta_maxln[0,:]]
 	else:
-		thetas = [thetas]
-	mwave, mospec, mounc, specvecs = comp_samples(thetas, sample_results['model'], sps, photflag=1)
+		theta_maxln = [theta_maxln]
+	mwave, mospec, mounc, specvecs = comp_samples(theta_maxln, sample_results['model'], sps, photflag=1)
 		
-	phot.plot(np.log10(mwave), np.log10(specvecs[0][0]*(c/(mwave/1e10))), color='red', marker='o', label='max lnprob', **kwargs)
-	res.plot(np.log10(mwave), specvecs[0][-1], color='red', marker='o', label='max lnprob', **kwargs)
+	phot.plot(np.log10(mwave), np.log10(specvecs[0][0]*(c/(mwave/1e10))), color='#e60000', marker='o', ms=ms, linestyle=' ', label='max lnprob', alpha=alpha, markeredgewidth=0.7,**kwargs)
+	res.plot(np.log10(mwave), specvecs[0][-1], color='#e60000', marker='o', linestyle=' ', label='max lnprob', ms=ms,alpha=alpha,markeredgewidth=0.7,**kwargs)
+	
+	# add most likely spectrum
+	spec,_,w = model.mean_model(theta_maxln[0], sps=sps)
+	nz = spec > 0
+
+	phot.plot(np.log10(w[nz]), np.log10(spec[nz]*(c/(w[nz]/1e10))), linestyle='-',
+              color='red', alpha=0.6,**kwargs)
+
+    # PLOT OBSERVATIONS + ERRORS 
+	phot.errorbar(xplot, yplot, yerr=yerr,
+                  color='#545454', marker='o', label='observed', alpha=alpha, linestyle=' ',ms=ms)
 	
 	# add SFH plot
 	str_sfh_parms = ['tau','tburst','fburst','sf_start']
@@ -421,7 +309,7 @@ def sed_figure(sample_results, sps, model,
 	axfontsize=4
 	ax_inset=fig.add_axes([0.17,0.36,0.12,0.14],zorder=32)
 	ax_inset.axis([np.min(t),np.max(t)+0.08*(np.max(t)-np.min(t)),0,1.05])
-	ax_inset.plot(t, intsfh,'-')
+	ax_inset.plot(t, intsfh,'-',color='black')
 	ax_inset.set_ylabel('cum SFH',fontsize=axfontsize,weight='bold')
 	ax_inset.set_xlabel('t [Gyr]',fontsize=axfontsize,weight='bold')
 	ax_inset.tick_params(labelsize=axfontsize)
@@ -441,15 +329,14 @@ def sed_figure(sample_results, sps, model,
 	
 	# calculate reduced chi-squared
 	chisq=np.sum(specvecs[0][-1]**2)
-	degoffreedom = len(yplot)-len(model.theta_labels())-1
-	reduced_chisq = chisq/degoffreedom
+	reduced_chisq = chisq/(model.ndof-1)
 	
 	# diagnostic text
 	textx = (phot.get_xlim()[1]-phot.get_xlim()[0])*0.975+phot.get_xlim()[0]
 	texty = (phot.get_ylim()[1]-phot.get_ylim()[0])*0.2+phot.get_ylim()[0]
 	deltay = (phot.get_ylim()[1]-phot.get_ylim()[0])*0.038
 
-	phot.text(textx, texty, r'best-fit $\chi^2$='+"{:.2f}".format(reduced_chisq),
+	phot.text(textx, texty, r'best-fit $\chi^2_n$='+"{:.2f}".format(reduced_chisq),
 			  fontsize=10, ha='right')
 	phot.text(textx, texty-deltay, r'avg acceptance='+"{:.2f}".format(np.mean(sample_results['acceptance'])),
 				 fontsize=10, ha='right')
@@ -457,10 +344,10 @@ def sed_figure(sample_results, sps, model,
 	# load ancil data
 	if 'ancilname' not in model.run_params.keys():
 		model.run_params['ancilname'] = os.getenv('APPS')+'/threedhst_bsfh/data/COSMOS_testsamp.dat'
-	ancilvals,ancilfields = load_ancil_data(model.run_params['ancilname'],model.run_params['objname'])
-	sn_txt = ancilvals[ancilfields.index('sn_F160W')]
-	uvj_txt = ancilvals[ancilfields.index('uvj_flag')]
-	z_txt = ancilvals[ancilfields.index('z')]
+	ancildat = threed_dutils.load_ancil_data(model.run_params['ancilname'],model.run_params['objname'])
+	sn_txt = ancildat['sn_F160W']
+	uvj_txt = ancildat['uvj_flag']
+	z_txt = ancildat['z']
 		
 	# galaxy text
 	phot.text(textx, texty-2*deltay, 'z='+"{:.2f}".format(z_txt),
@@ -514,10 +401,6 @@ def make_all_plots(filebase, parm_file=None,
 	'''
 	Driver. Loads output, makes all plots for a given galaxy.
 	'''
-
-	plt_chain_figure = 1
-	plt_triangle_plot = 1
-	plt_sed_figure = 1
 	
 	# thin and chop the chain?
 	thin=2
@@ -532,7 +415,7 @@ def make_all_plots(filebase, parm_file=None,
 
 	# if we found no files, skip this object
 	if len(times) == 0:
-		print 'Failed to open '+ mcmc_filename +','+model_filename
+		print 'Failed to find any files to extract times from'
 		return 0
 
 	# load results
@@ -594,98 +477,16 @@ def plot_all_driver():
 	'''
 
 	id_list = os.getenv('APPS')+"/threedhst_bsfh/data/COSMOS_testsamp.ids"
-	basename = "threedhst_nebon"
-	basename = "threedhst"
-	parm_basename = "threedhst_params_nebon"
-	parm_basename = "threedhst_params"
+	basename = "ha_selected"
+	parm_basename = "halpha_selected_params"
 	ids = np.loadtxt(id_list, dtype='|S20')
 	
 	for jj in xrange(len(ids)):
-		filebase = os.getenv('APPS')+"/threedhst_bsfh/results/"+basename+'_'+ids[jj]
+		ancildat = threed_dutils.load_ancil_data(os.getenv('APPS')+
+		                           '/threedhst_bsfh/data/COSMOS_testsamp.dat',
+		                           ids[jj])
+		heqw_txt = "%04d" % int(ancildat['ha_eqw']) 
+		filebase = os.getenv('APPS')+"/threedhst_bsfh/results/"+basename+'_'+heqw_txt+'_'+ids[jj]
 		make_all_plots(filebase, 
 		parm_file=os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+parm_basename+'_'+str(jj+1)+'.py')
 	
-	
-	
-	
-	
-	
-	
-
-
-
-
-
-''' TEST PLOT PLEASE IGNORE '''
-def sed_test_plot():
-	
-	"""
-	Plot the photometry+spectra for a variety of ages, etc
-	"""
-	
-	import fsps
-	
-	c = 3e8
-	
-	sps = fsps.StellarPopulation(zcontinuous=True, compute_vega_mags=False)
-	custom_filter_keys = os.getenv('APPS')+'/threedhst_bsfh/filters/filter_keys_threedhst.txt'
-	fsps.filters.FILTERS = model_setup.custom_filter_dict(custom_filter_keys)
-
-	# load custom model
-	model = model_setup.setup_model(os.getenv('APPS')+'/threedhst_bsfh/threedhst_params.py', sps=sps)
-	
-	# setup figure
-	fig, axarr = plt.subplots(2, 2, figsize = (8,8))
-	fig.subplots_adjust(wspace=0.000,hspace=0.000)
-	fast_lam = model.obs['wave_effective']
-	init_theta = np.array([10.5, 0, 0, 0.0])
-	
-	# generate colors
-	import pylab
-	NUM_COLORS = 10
-	cm = pylab.get_cmap('cool')
-	plt.rcParams['axes.color_cycle'] = [cm(1.*i/NUM_COLORS) for i in range(NUM_COLORS)] 
-	axlim=[3.0,5.5,3.0,8]
-	
-	# setup delta
-	delta = [np.linspace(init_theta[0]-1,init_theta[0]+1, NUM_COLORS),
-			 np.linspace(init_theta[1]-0.9,init_theta[1]+1, NUM_COLORS),
-			 np.linspace(init_theta[2]-0.9,init_theta[2]+1, NUM_COLORS),
-			 np.linspace(init_theta[3]-1,init_theta[3]+0.3, NUM_COLORS)]
-
-	for kk in range(4):
-		itone = kk % 2
-		ittwo = kk > 1
-	
-		for jj in range(len(delta[kk])):
-
-			# set model parms
-			model_params = np.copy(init_theta)
-			model_params[kk] = delta[kk][jj]
-
-			# load data
-			observables = model.mean_model(10**model_params, sps=sps)
-			fast_spec, fast_mags = observables[0],observables[1]
-			w, spec_throwaway = sps.get_spectrum(tage=sps.params['tage'], peraa=False)
-    
-			nz = fast_spec > 0
-			axarr[itone,ittwo].plot(np.log10(w[nz]), np.log10(fast_spec[nz]*(c/(w[nz]/1e10))),label = "{:10.2f}".format(model_params[kk]))
-	
-		# beautify
-		if itone == 1:
-			axarr[itone,ittwo].set_xlabel('log(lam)')
-		else:
-			axarr[itone,ittwo].set_xticklabels([])
-			axarr[itone,ittwo].yaxis.get_major_ticks()[0].label1On = False # turn off bottom ticklabel
-	
-		if ittwo == 0:
-			axarr[itone,ittwo].set_ylabel('log(nu*fnu)')
-		else:
-			axarr[itone,ittwo].set_yticklabels([])
-			axarr[itone,ittwo].xaxis.get_major_ticks()[0].label1On = False # turn off bottom ticklabel
-	
-		axarr[itone,ittwo].legend(loc=0,prop={'size':6},
-								  frameon=False,
-								  title='log('+str(model.theta_labels()[kk])+')')
-		axarr[itone,ittwo].get_legend().get_title().set_size(8)
-		axarr[itone,ittwo].axis(axlim)
