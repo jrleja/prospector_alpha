@@ -13,8 +13,8 @@
 ### Job name
 #SBATCH -J '3Drun'
 ### output and error logs
-#SBATCH -o mpitest_%a.out
-#SBATCH -e mpitest_%a.err
+#SBATCH -o nebon_%a.out
+#SBATCH -e nebon_%a.err
 ### mail
 #SBATCH --mail-type=ALL 
 #SBATCH --mail-user=joel.leja@gmail.com

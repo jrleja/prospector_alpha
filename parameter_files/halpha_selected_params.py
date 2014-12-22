@@ -1,9 +1,8 @@
 import numpy as np
-import fsps,os,threedhst_diag
-from sedpy import attenuation
-from bsfh import priors, sedmodel, elines
+import os
+import load_3d_data
+from bsfh import priors, sedmodel
 from astropy.cosmology import WMAP9
-import bsfh.datautils as dutils
 tophat = priors.tophat
 
 #############
@@ -36,7 +35,7 @@ run_params = {'verbose':True,
 # OBS
 #############
 
-obs = threedhst_diag.load_obs_3dhst(run_params['photname'], 
+obs = load_3d_data.load_obs_3dhst(run_params['photname'], 
 									run_params['objname'], min_error=run_params['min_error'])
 
 #############
@@ -262,7 +261,7 @@ model_params.append({'name': 'phot_jitter', 'N': 1,
                         'prior_args': {'mini':0.0, 'maxi':0.2}})
 
 ####### SET INITIAL PARAMETERS ##########
-fastvalues,fastfields = threedhst_diag.load_fast_3dhst(run_params['fastname'],
+fastvalues,fastfields = load_3d_data.load_fast_3dhst(run_params['fastname'],
                                                        run_params['objname'])
 parmlist = [p['name'] for p in model_params]
 
@@ -291,7 +290,7 @@ else:
 
 ######## LOAD ANCILLARY INFORMATION ########
 # name outfiles based on halpha eqw
-ancilvals, ancilfields = threedhst_diag.load_ancil_data(run_params['ancilname'],run_params['objname'])
+ancilvals, ancilfields = load_3d_data.load_ancil_data(run_params['ancilname'],run_params['objname'])
 halpha_eqw_txt = "%04d" % int(ancilvals[ancilfields.index('ha_eqw')])
 run_params['outfile'] = run_params['outfile']+'_'+halpha_eqw_txt+'_'+run_params['objname']
 
