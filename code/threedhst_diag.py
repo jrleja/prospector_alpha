@@ -6,8 +6,8 @@ import matplotlib.image as mpimg
 from astropy.cosmology import WMAP9
 import fsps
 
-plt_chain_figure = 0
-plt_triangle_plot = 0
+plt_chain_figure = 1
+plt_triangle_plot = 1
 plt_sed_figure = 1
 
 def plot_sfh(sfh_parms):
@@ -345,9 +345,9 @@ def sed_figure(sample_results, sps, model,
 	if 'ancilname' not in model.run_params.keys():
 		model.run_params['ancilname'] = os.getenv('APPS')+'/threedhst_bsfh/data/COSMOS_testsamp.dat'
 	ancildat = threed_dutils.load_ancil_data(model.run_params['ancilname'],model.run_params['objname'])
-	sn_txt = ancildat['sn_F160W']
-	uvj_txt = ancildat['uvj_flag']
-	z_txt = ancildat['z']
+	sn_txt = ancildat['sn_F160W'][0]
+	uvj_txt = ancildat['uvj_flag'][0]
+	z_txt = ancildat['z'][0]
 		
 	# galaxy text
 	phot.text(textx, texty-2*deltay, 'z='+"{:.2f}".format(z_txt),
@@ -485,7 +485,7 @@ def plot_all_driver():
 		ancildat = threed_dutils.load_ancil_data(os.getenv('APPS')+
 		                           '/threedhst_bsfh/data/COSMOS_testsamp.dat',
 		                           ids[jj])
-		heqw_txt = "%04d" % int(ancildat['ha_eqw']) 
+		heqw_txt = "%04d" % int(ancildat['Ha_EQW_obs']) 
 		filebase = os.getenv('APPS')+"/threedhst_bsfh/results/"+basename+'_'+heqw_txt+'_'+ids[jj]
 		make_all_plots(filebase, 
 		parm_file=os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+parm_basename+'_'+str(jj+1)+'.py')

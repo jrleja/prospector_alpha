@@ -5,16 +5,16 @@
 ### Requested number of nodes
 #SBATCH -N 1
 ### Requested computing time in minutes
-#SBATCH -t 360
+#SBATCH -t 150
 ### Partition or queue name
 #SBATCH -p conroy,general
 ### memory per cpu, in MB
-#SBATCH --mem-per-cpu=600
+#SBATCH --mem-per-cpu=1000
 ### Job name
 #SBATCH -J '3Drun'
 ### output and error logs
-#SBATCH -o mpitest_%a.out
-#SBATCH -e mpitest_%a.err
+#SBATCH -o neboff_%a.out
+#SBATCH -e neboff_%a.err
 ### mail
 #SBATCH --mail-type=ALL 
 #SBATCH --mail-user=joel.leja@gmail.com

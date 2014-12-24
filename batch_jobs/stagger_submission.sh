@@ -5,7 +5,7 @@
 NJOBS=108
 JOBS_PER_BATCH=18
 NBATCH=$(($NJOBS/$JOBS_PER_BATCH))
-DELTAT='150m'
+DELTAT='90m'
 
 echo 'Submitting '$NJOBS' jobs, with '$JOBS_PER_BATCH' jobs per batch in '$NBATCH' batches.'
 echo 'Waiting '$DELTAT' between submissions'
