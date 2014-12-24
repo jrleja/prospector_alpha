@@ -15,7 +15,7 @@ run_params = {'verbose':True,
               'ftol':0.5e-5, 
               'maxfev':5000,
               'nwalkers':124,
-              'nburn':[32,64,64], 
+              'nburn':[32,64,128], 
               'niter': 4096,
               'initial_disp':0.1,
               'debug': False,
@@ -121,6 +121,13 @@ model_params.append({'name': 'logzsol', 'N': 1,
                         'units': r'$\log (Z/Z_\odot)$',
                         'prior_function': tophat,
                         'prior_args': {'mini':-1, 'maxi':0.19}})
+
+model_params.append({'name': 'pmetals', 'N': 1,
+                        'isfree': False,
+                        'init': 2,
+                        'units': '',
+                        'prior_function': None
+                        'prior_args': {'mini':-3, 'maxi':-1}})
                         
 ###### SFH   ########
 model_params.append({'name': 'sfh', 'N': 1,
@@ -246,7 +253,7 @@ model_params.append({'name': 'duste_umin', 'N': 1,
                         'prior_args': {'mini':0.1, 'maxi':25.0}})
 
 model_params.append({'name': 'duste_qpah', 'N': 1,
-                        'isfree': False,
+                        'isfree': True,
                         'init': 3.0,
                         'units': 'percent',
                         'prior_function': tophat,
@@ -286,7 +293,7 @@ model_params.append({'name': 'phot_jitter', 'N': 1,
 
 ####### SET INITIAL PARAMETERS ##########
 fastvalues,fastfields = threed_dutils.load_fast_3dhst(run_params['fastname'],
-                                                       run_params['objname'])
+                                                      run_params['objname'])
 parmlist = [p['name'] for p in model_params]
 
 if run_params['set_init_params'] == 'fast':
@@ -315,7 +322,7 @@ if run_params['set_init_params'] == 'random':
 ######## LOAD ANCILLARY INFORMATION ########
 # name outfiles based on halpha eqw
 ancildat = threed_dutils.load_ancil_data(run_params['ancilname'],run_params['objname'])
-halpha_eqw_txt = "%04d" % int(ancildat['ha_eqw'])
+halpha_eqw_txt = "%04d" % int(ancildat['Ha_EQW_obs'])
 run_params['outfile'] = run_params['outfile']+'_'+halpha_eqw_txt+'_'+run_params['objname']
 
 # use zbest, not whatever's in the fast run

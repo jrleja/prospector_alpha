@@ -1,5 +1,5 @@
 import numpy as np
-import fsps,os,threedhst_diag
+import fsps,os,threed_dutils
 from sedpy import attenuation
 from bsfh import priors, sedmodel, elines
 from astropy.cosmology import WMAP9
@@ -16,19 +16,20 @@ run_params = {'verbose':True,
               'maxfev':5000,
               'nwalkers':124,
               'nburn':[32,64,128], 
-              'niter': 2048,
+              'niter': 4096,
               'initial_disp':0.1,
               'debug': False,
               'mock': False,
               'logify_spectrum': False,
               'normalize_spectrum': False,
-              'fast_init_params': False,  # DO NOT SET THIS TO TRUE SINCE TAGE == TUNIV*1.2
+              'set_init_params': None,  # DO NOT SET THIS TO TRUE SINCE TAGE == TUNIV*1.2 (fast,random)
               'min_error': 0.02,
               'spec': False, 
               'phot':True,
               'photname':os.getenv('APPS')+'/threedhst_bsfh/data/COSMOS_testsamp.cat',
               'fastname':os.getenv('APPS')+'/threedhst_bsfh/data/COSMOS_testsamp.fout',
               'ancilname':os.getenv('APPS')+'/threedhst_bsfh/data/COSMOS_testsamp.dat',
+              'mipsname':os.getenv('APPS')+'/threedhst_bsfh/data/MIPS/cosmos_3dhst.v4.1.4.sfr',
               'objname':'16176',
               }
 
@@ -36,8 +37,8 @@ run_params = {'verbose':True,
 # OBS
 #############
 
-obs = threedhst_diag.load_obs_3dhst(run_params['photname'], 
-									run_params['objname'], min_error=run_params['min_error'])
+obs = threed_dutils.load_obs_3dhst(run_params['photname'], run_params['objname'],
+									mips=run_params['mipsname'], min_error=run_params['min_error'])
 
 #############
 # MODEL_PARAMS
@@ -100,13 +101,6 @@ model_params.append({'name': 'add_igm_absorption', 'N': 1,
                         'prior_function': None,
                         'prior_args': None})
 
-model_params.append({'name': 'add_dust_emission', 'N': 1,
-                        'isfree': False,
-                        'init': 0,
-                        'units': None,
-                        'prior_function': None,
-                        'prior_args': None})
-
 model_params.append({'name': 'add_agb_dust_model', 'N': 1,
                         'isfree': False,
                         'init': 0,
@@ -127,6 +121,13 @@ model_params.append({'name': 'logzsol', 'N': 1,
                         'units': r'$\log (Z/Z_\odot)$',
                         'prior_function': tophat,
                         'prior_args': {'mini':-1, 'maxi':0.19}})
+
+model_params.append({'name': 'pmetals', 'N': 1,
+                        'isfree': False,
+                        'init': 2,
+                        'units': '',
+                        'prior_function': None
+                        'prior_args': {'mini':-3, 'maxi':-1}})
                         
 ###### SFH   ########
 model_params.append({'name': 'sfh', 'N': 1,
@@ -186,7 +187,7 @@ model_params.append({'name': 'imf_type', 'N': 1,
                        		 'prior_function_name': None,
                         	 'prior_args': None})
 
-########    Dust ##############
+######## Dust Absorption ##############
 model_params.append({'name': 'dust_type', 'N': 1,
                         'isfree': False,
                         'init': 0,
@@ -229,6 +230,35 @@ model_params.append({'name': 'dust_tesc', 'N': 1,
                         'prior_function_name': None,
                         'prior_args': None})
 
+###### Dust Emission ##############
+model_params.append({'name': 'add_dust_emission', 'N': 1,
+                        'isfree': False,
+                        'init': 1,
+                        'units': None,
+                        'prior_function': None,
+                        'prior_args': None})
+
+model_params.append({'name': 'duste_gamma', 'N': 1,
+                        'isfree': False,
+                        'init': 0.01,
+                        'units': None,
+                        'prior_function': tophat,
+                        'prior_args': {'mini':0.0, 'maxi':1.0}})
+
+model_params.append({'name': 'duste_umin', 'N': 1,
+                        'isfree': False,
+                        'init': 1.0,
+                        'units': None,
+                        'prior_function': tophat,
+                        'prior_args': {'mini':0.1, 'maxi':25.0}})
+
+model_params.append({'name': 'duste_qpah', 'N': 1,
+                        'isfree': True,
+                        'init': 3.0,
+                        'units': 'percent',
+                        'prior_function': tophat,
+                        'prior_args': {'mini':0.0, 'maxi':10.0}})
+
 ###### Nebular Emission ###########
 model_params.append({'name': 'add_neb_emission', 'N': 1,
                         'isfree': False,
@@ -262,11 +292,11 @@ model_params.append({'name': 'phot_jitter', 'N': 1,
                         'prior_args': {'mini':0.0, 'maxi':0.2}})
 
 ####### SET INITIAL PARAMETERS ##########
-fastvalues,fastfields = threedhst_diag.load_fast_3dhst(run_params['fastname'],
-                                                       run_params['objname'])
+fastvalues,fastfields = threed_dutils.load_fast_3dhst(run_params['fastname'],
+                                                      run_params['objname'])
 parmlist = [p['name'] for p in model_params]
 
-if run_params['fast_init_params']:
+if run_params['set_init_params'] == 'fast':
 
 	# translate
 	fparams = {}
@@ -281,7 +311,7 @@ if run_params['fast_init_params']:
 	for par in model_params:
 		if (par['name'] in fparams):
 			par['init'] = fparams[par['name']]
-else:
+if run_params['set_init_params'] == 'random':
 	import random
 	for ii in xrange(len(model_params)):
 		if model_params[ii]['isfree'] == True:
@@ -291,12 +321,12 @@ else:
 
 ######## LOAD ANCILLARY INFORMATION ########
 # name outfiles based on halpha eqw
-ancilvals, ancilfields = threedhst_diag.load_ancil_data(run_params['ancilname'],run_params['objname'])
-halpha_eqw_txt = "%04d" % int(ancilvals[ancilfields.index('ha_eqw')])
+ancildat = threed_dutils.load_ancil_data(run_params['ancilname'],run_params['objname'])
+halpha_eqw_txt = "%04d" % int(ancildat['Ha_EQW_obs'])
 run_params['outfile'] = run_params['outfile']+'_'+halpha_eqw_txt+'_'+run_params['objname']
 
 # use zbest, not whatever's in the fast run
-zbest = ancilvals[ancilfields.index('z')]
+zbest = ancildat['z']
 model_params[parmlist.index('zred')]['init'] = zbest
 			
 ####### RESET AGE PRIORS TO MATCH AGE OF UNIVERSE ##########
