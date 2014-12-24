@@ -61,7 +61,7 @@ def load_obs_3dhst(filename, objnum, mips=None, min_error = None):
 	flux_fields = [f for f in dat.dtype.names if f[0:2] == 'f_']
 	unc_fields = [f for f in dat.dtype.names if f[0:2] == 'e_']
 	filters = [f[2:] for f in flux_fields]
-	print 1/0
+
 	# extract fluxes for particular object, converting from record array to numpy array
 	flux = dat[flux_fields].view(float).reshape(len(dat),-1)[obj_ind]
 	unc  = dat[unc_fields].view(float).reshape(len(dat),-1)[obj_ind]
