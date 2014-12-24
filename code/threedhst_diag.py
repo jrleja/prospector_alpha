@@ -290,7 +290,7 @@ def sed_figure(sample_results, sps, model,
 	res.plot(np.log10(mwave), specvecs[0][-1], color='#e60000', marker='o', linestyle=' ', label='max lnprob', ms=ms,alpha=alpha,markeredgewidth=0.7,**kwargs)
 	
 	# add most likely spectrum
-	spec,_,w = model.mean_model(theta_maxln[0], sps=sps)
+	spec,_,w = model.mean_model(theta_maxln[0], sps=sps, norm_spec=1)
 	nz = spec > 0
 
 	phot.plot(np.log10(w[nz]), np.log10(spec[nz]*(c/(w[nz]/1e10))), linestyle='-',
@@ -434,7 +434,7 @@ def make_all_plots(filebase, parm_file=None,
 	sample_results['extents'] = return_extent(sample_results)
 	
 	# load stellar population, set up custom filters
-	sps = fsps.StellarPopulation(zcontinuous=True, compute_vega_mags=False)
+	sps = fsps.StellarPopulation(zcontinuous=2, compute_vega_mags=False)
 	custom_filter_keys = os.getenv('APPS')+'/threedhst_bsfh/filters/filter_keys_threedhst.txt'
 	fsps.filters.FILTERS = model_setup.custom_filter_dict(custom_filter_keys)
 
