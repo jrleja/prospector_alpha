@@ -126,7 +126,7 @@ model_params.append({'name': 'pmetals', 'N': 1,
                         'isfree': False,
                         'init': 2,
                         'units': '',
-                        'prior_function': None
+                        'prior_function': None,
                         'prior_args': {'mini':-3, 'maxi':-1}})
                         
 ###### SFH   ########
