@@ -4,7 +4,7 @@
 # set location of ID file, base parameter file
 IDFILE=$APPS"/threedhst_bsfh/data/COSMOS_testsamp.ids"
 PARAMFOLDER=$APPS"/threedhst_bsfh/parameter_files/"
-PARAMBASE="halpha_selected_params"
+PARAMBASE="halpha_selected_nebon_params"
 PARAMEXT=".py"
 
 echo 'ID file:'$IDFILE
