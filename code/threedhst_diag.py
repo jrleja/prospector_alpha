@@ -216,7 +216,6 @@ def comp_samples(thetas, model, sps, inlog=True, photflag=0):
 def sed_figure(sample_results, sps, model,
                 alpha=0.3, samples = [-1],
                 start=0, thin=1, maxprob=0, outname=None, plot_init = 0,
-                #parm_file = os.getenv('APPS')+'/threedhst_bsfh/parameter_files/threedhst_params.py',
                 chop_chain=1,**kwargs):
 	"""
 	Plot the photometry for the model and data (with error bars), and
@@ -437,9 +436,6 @@ def make_all_plots(filebase, parm_file=None,
 	sps = fsps.StellarPopulation(zcontinuous=2, compute_vega_mags=False)
 	custom_filter_keys = os.getenv('APPS')+'/threedhst_bsfh/filters/filter_keys_threedhst.txt'
 	fsps.filters.FILTERS = model_setup.custom_filter_dict(custom_filter_keys)
-
-	# load parameter file
-	model = model_setup.setup_model(parm_file, sps=sps)
 	
     # chain plot
 	if plt_chain_figure: 

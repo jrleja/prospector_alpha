@@ -18,7 +18,8 @@ def return_mwave_custom(filters):
 	
 	lameff_return = [[lameff[keys == filters[i]]][0] for i in range(len(filters))]
 	lameff_return = [item for sublist in lameff_return for item in sublist]
-	
+	assert len(filters) == len(lameff_return), "Filter name is incorrect"
+
 	return lameff_return
 
 def load_ancil_data(filename,objnum):
@@ -71,7 +72,7 @@ def load_obs_3dhst(filename, objnum, mips=None, min_error = None):
 		mips_dat = load_mips_data(mips,objnum)
 		flux=np.append(flux,mips_dat['f24tot'])
 		unc=np.append(unc,mips_dat['ef24tot'])
-		filters.append('MIPS24')
+		filters.append('MIPS_24um')
 
 	# define all outputs
 	filters = [filter.lower()+'_'+fieldname.lower() for filter in filters]
@@ -79,7 +80,7 @@ def load_obs_3dhst(filename, objnum, mips=None, min_error = None):
 	phot_mask = np.logical_or(np.logical_or((flux != unc),(flux > 0)),flux != -99.0)
 	maggies = flux/(10**10)
 	maggies_unc = unc/(10**10)
-	
+
 	# set minimum photometric error
 	if min_error is not None:
 		under = maggies_unc < min_error*maggies
