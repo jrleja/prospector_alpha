@@ -69,8 +69,8 @@ def load_obs_3dhst(filename, objnum, mips=None, min_error = None):
 	# add mips
 	if mips:
 		mips_dat = load_mips_data(mips,objnum)
-		np.append(flux,mips_dat['f24tot'])
-		np.append(unc,mips_dat['ef24tot'])
+		flux=np.append(flux,mips_dat['f24tot'])
+		unc=np.append(unc,mips_dat['ef24tot'])
 		filters.append('MIPS24')
 
 	# define all outputs

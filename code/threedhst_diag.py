@@ -290,7 +290,7 @@ def sed_figure(sample_results, sps, model,
 	res.plot(np.log10(mwave), specvecs[0][-1], color='#e60000', marker='o', linestyle=' ', label='max lnprob', ms=ms,alpha=alpha,markeredgewidth=0.7,**kwargs)
 	
 	# add most likely spectrum
-	spec,_,w = model.mean_model(theta_maxln[0], sps=sps, norm_spec=1)
+	spec,_,w = model.mean_model(theta_maxln[0], sps=sps, norm_spec=True)
 	nz = spec > 0
 
 	phot.plot(np.log10(w[nz]), np.log10(spec[nz]*(c/(w[nz]/1e10))), linestyle='-',
