@@ -10,7 +10,7 @@ tophat = priors.tophat
 # RUN_PARAMS
 #############
 
-run_params = {'verbose':True,
+run_params = {'verbose':False,
               'outfile':os.getenv('APPS')+'/threedhst_bsfh/results/ha_selected',
               'ftol':0.5e-5, 
               'maxfev':5000,
