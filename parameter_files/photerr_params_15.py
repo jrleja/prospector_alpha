@@ -23,7 +23,7 @@ run_params = {'verbose':False,
               'logify_spectrum': False,
               'normalize_spectrum': False,
               'set_init_params': None,  # DO NOT SET THIS TO TRUE SINCE TAGE == TUNIV*1.2 (fast,random)
-              'min_error': 0.38,
+              'min_error': 0.37,
               'spec': False, 
               'phot':True,
               'photname':os.getenv('APPS')+'/threedhst_bsfh/data/COSMOS_testsamp.cat',
@@ -323,7 +323,7 @@ if run_params['set_init_params'] == 'random':
 # name outfiles based on halpha eqw
 ancildat = threed_dutils.load_ancil_data(run_params['ancilname'],run_params['objname'])
 halpha_eqw_txt = "%04d" % int(ancildat['Ha_EQW_obs'])
-run_params['outfile'] = run_params['outfile']+'_'+str(run_params['min_err'])+'_'+run_params['objname']
+run_params['outfile'] = run_params['outfile']+'_'+str(run_params['min_error'])+'_'+run_params['objname']
 
 # use zbest, not whatever's in the fast run
 zbest = ancildat['z']
