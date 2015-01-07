@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import triangle, pickle, os, math, copy, threed_dutils
+import triangle, os, math, copy, threed_dutils
 from bsfh import model_setup, read_results
 import matplotlib.image as mpimg
 from astropy.cosmology import WMAP9
@@ -215,8 +215,8 @@ def comp_samples(thetas, model, sps, inlog=True, photflag=0):
 
 def sed_figure(sample_results, sps, model,
                 alpha=0.3, samples = [-1],
-                start=0, thin=1, maxprob=0, outname=None, plot_init = 0,
-                chop_chain=1,**kwargs):
+                maxprob=0, outname=None, plot_init = 0,
+                **kwargs):
 	"""
 	Plot the photometry for the model and data (with error bars), and
 	plot residuals
@@ -235,9 +235,7 @@ def sed_figure(sample_results, sps, model,
 
 	# FLATTEN AND CHOP CHAIN
 	# chain = chain[nwalkers,nsteps,ndim]
-	chopped_chain = sample_results['chain'][:,int(sample_results['chain'].shape[1]/chop_chain):,:]
-	flatchain = chopped_chain[:,start::thin,:]
-	flatchain = flatchain.reshape(flatchain.shape[0] * flatchain.shape[1],flatchain.shape[2])
+	flatchain = threed_dutils.chop_chain(sample_results)
 
 	# MAKE RANDOM POSTERIOR DRAWS
 	nsample = 5
@@ -402,8 +400,8 @@ def make_all_plots(filebase, parm_file=None,
 	'''
 	
 	# thin and chop the chain?
-	thin=2
-	chop_chain=2
+	thin=1
+	chop_chain=1.666
 
 	# find most recent output file
 	# with the objname
@@ -463,8 +461,7 @@ def make_all_plots(filebase, parm_file=None,
  		pfig = sed_figure(sample_results, sps, model,
  						  maxprob=1, 
  						  outname=outfolder+filename+'_'+max(times)+'.sed.png',
- 						  thin=thin,
- 						  chop_chain=chop_chain)
+ 						  thin=thin)
  		
 def plot_all_driver():
 

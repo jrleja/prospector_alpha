@@ -1,6 +1,21 @@
 import numpy as np
 import os
 
+def chop_chain(sample_results):
+	'''
+	simple placeholder
+	will someday replace with a test for convergence to determine where to chop
+	JRL 1/5/14
+	'''
+	nchop=1.66
+
+	flatchain = sample_results['chain'][:,int(sample_results['chain'].shape[1]/nchop):,:]
+	flatchain = flatchain.reshape(flatchain.shape[0] * flatchain.shape[1],
+                                  flatchain.shape[2])
+
+	return flatchain
+
+
 def return_mwave_custom(filters):
 
 	"""
