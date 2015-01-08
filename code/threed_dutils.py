@@ -1,6 +1,56 @@
 import numpy as np
 import os
 
+def generate_basenames(runname):
+
+	filebase=[]
+	parm_basename=[]
+	if runname == 'nebon':
+
+		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/COSMOS_testsamp.ids"
+		ids = np.loadtxt(id_list, dtype='|S20')
+		ngals = len(ids)
+
+		basename = "ha_selected_nebon"
+		parm_basename = "halpha_selected_nebon_params"
+		
+		for jj in xrange(ngals):
+			ancildat = load_ancil_data(os.getenv('APPS')+
+			                           '/threedhst_bsfh/data/COSMOS_testsamp.dat',
+			                           ids[jj])
+			heqw_txt = "%04d" % int(ancildat['Ha_EQW_obs']) 
+			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+basename+'_'+heqw_txt+'_'+ids[jj])
+			parm_basename.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+parm_basename+'_'+str(jj+1)+'.py')
+
+	if runname == 'neboff':
+
+		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/COSMOS_testsamp.ids"
+		ids = np.loadtxt(id_list, dtype='|S20')
+		ngals = len(ids)
+
+		basename = "ha_selected"
+		parm_basename = "halpha_selected_params"
+
+		for jj in xrange(ngals):
+			ancildat = load_ancil_data(os.getenv('APPS')+
+			                           '/threedhst_bsfh/data/COSMOS_testsamp.dat',
+			                           ids[jj])
+			heqw_txt = "%04d" % int(ancildat['Ha_EQW_obs']) 
+			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+basename+'_'+heqw_txt+'_'+ids[jj])
+			parm_basename.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+parm_basename+'_'+str(jj+1)+'.py')
+
+	if runname == 'photerr':
+		
+		id = '15431'
+		basename = 'photerr/photerr'
+		errnames = np.loadtxt(os.getenv('APPS')+'/threedhst_bsfh/parameter_files/photerr/photerr.txt')
+		            ]
+		for jj in xrange(len(errnames)): 
+			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+basename+'_'+errnames[jj]+'_'+id)
+			parm_basename.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/photerr/photerr_params_"+str(jj+1)+'.py')
+
+	return filebase
+
 def chop_chain(sample_results):
 	'''
 	simple placeholder
@@ -59,7 +109,7 @@ def load_mips_data(filename,objnum):
 	
 	return objdat
 
-def load_obs_3dhst(filename, objnum, mips=None, min_error = None):
+def load_obs_3dhst(filename, objnum, mips=None, min_error = None, abs_error=False):
 	"""
 	Load 3D-HST photometry file, return photometry for a particular object.
 	min_error: set the minimum photometric uncertainty to be some fraction
@@ -98,8 +148,11 @@ def load_obs_3dhst(filename, objnum, mips=None, min_error = None):
 
 	# set minimum photometric error
 	if min_error is not None:
-		under = maggies_unc < min_error*maggies
-		maggies_unc[under] = min_error*maggies[under]
+		if abs_error:
+			maggies_unc = min_error*maggies
+		else:
+			under = maggies_unc < min_error*maggies
+			maggies_unc[under] = min_error*maggies[under]
 	
 	# sort outputs based on effective wavelength
 	points = zip(wave_effective,filters,phot_mask,maggies,maggies_unc)

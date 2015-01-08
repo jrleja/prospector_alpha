@@ -341,7 +341,7 @@ def sed_figure(sample_results, sps, model,
 	# load ancil data
 	if 'ancilname' not in model.run_params.keys():
 		model.run_params['ancilname'] = os.getenv('APPS')+'/threedhst_bsfh/data/COSMOS_testsamp.dat'
-	ancildat = threed_dutils.load_ancil_data(model.run_params['ancilname'],model.run_params['objname'])
+	ancildat = threed_dutils.load_ancil_data(os.getenv('APPS')+'/threedh'+model.run_params['ancilname'].split('/threedh')[1],model.run_params['objname'])
 	sn_txt = ancildat['sn_F160W'][0]
 	uvj_txt = ancildat['uvj_flag'][0]
 	z_txt = ancildat['z'][0]
@@ -460,8 +460,7 @@ def make_all_plots(filebase, parm_file=None,
  		# plot
  		pfig = sed_figure(sample_results, sps, model,
  						  maxprob=1, 
- 						  outname=outfolder+filename+'_'+max(times)+'.sed.png',
- 						  thin=thin)
+ 						  outname=outfolder+filename+'_'+max(times)+'.sed.png')
  		
 def plot_all_driver():
 
@@ -469,17 +468,14 @@ def plot_all_driver():
 	for a list of galaxies, make all plots
 	'''
 
-	id_list = os.getenv('APPS')+"/threedhst_bsfh/data/COSMOS_testsamp.ids"
-	basename = "ha_selected"
-	parm_basename = "halpha_selected_params"
-	ids = np.loadtxt(id_list, dtype='|S20')
+	runname = "neboff"
 	
-	for jj in xrange(len(ids)):
-		ancildat = threed_dutils.load_ancil_data(os.getenv('APPS')+
-		                           '/threedhst_bsfh/data/COSMOS_testsamp.dat',
-		                           ids[jj])
-		heqw_txt = "%04d" % int(ancildat['Ha_EQW_obs']) 
-		filebase = os.getenv('APPS')+"/threedhst_bsfh/results/"+basename+'_'+heqw_txt+'_'+ids[jj]
-		make_all_plots(filebase, 
-		parm_file=os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+parm_basename+'_'+str(jj+1)+'.py')
+	runname = "photerr"
+	parm_basename = "photerr_params"
+
+	filebase, parm_basename=threed_dutils.generate_basenames(runname)
+	for jj in xrange(len(filebase)):
+		make_all_plots(filebase[jj], 
+		               parm_file=parm_basename[jj],
+		               outfolder=os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/')
 	
