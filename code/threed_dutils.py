@@ -44,12 +44,12 @@ def generate_basenames(runname):
 		id = '15431'
 		basename = 'photerr/photerr'
 		errnames = np.loadtxt(os.getenv('APPS')+'/threedhst_bsfh/parameter_files/photerr/photerr.txt')
-		            ]
+
 		for jj in xrange(len(errnames)): 
-			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+basename+'_'+errnames[jj]+'_'+id)
+			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+basename+'_'+str(errnames[jj])+'_'+id)
 			parm_basename.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/photerr/photerr_params_"+str(jj+1)+'.py')
 
-	return filebase
+	return filebase,parm_basename
 
 def chop_chain(sample_results):
 	'''

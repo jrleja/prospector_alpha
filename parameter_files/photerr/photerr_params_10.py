@@ -31,7 +31,7 @@ run_params = {'verbose':False,
               'fastname':os.getenv('APPS')+'/threedhst_bsfh/data/COSMOS_testsamp.fout',
               'ancilname':os.getenv('APPS')+'/threedhst_bsfh/data/COSMOS_testsamp.dat',
               'mipsname':os.getenv('APPS')+'/threedhst_bsfh/data/MIPS/cosmos_3dhst.v4.1.4.sfr',
-              'objname':'15431',
+              'objname':'19723',
               }
 
 ############
