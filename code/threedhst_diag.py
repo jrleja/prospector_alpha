@@ -128,7 +128,7 @@ def show_chain(sample_results,outname=None,alpha=0.6):
 	
 	# plot geometry
 	ndim = len(parnames)
-	nwalkers_per_column = 32
+	nwalkers_per_column = 64
 	nx = int(math.ceil(nwalkers/float(nwalkers_per_column)))
 	ny = ndim+1
 	sz = np.array([nx,ny])
