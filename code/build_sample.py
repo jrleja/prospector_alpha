@@ -1,4 +1,4 @@
-import read_sextractor, read_data, random
+import read_sextractor, read_data, random, os, threed_dutils
 import numpy as np
 from astropy.table import Table, vstack
 from astropy.io import ascii
@@ -122,6 +122,7 @@ def build_sample():
 	fast = read_sextractor.load_fast_v41(field)
 	rf = read_sextractor.load_rf_v41(field)
 	lineinfo = load_linelist()
+	mips = threed_dutils.load_mips_data(os.getenv('APPS')+'/threedhst_bsfh/data/MIPS/cosmos_3dhst.v4.1.4.sfr')
 	
 	# remove junk
 	# 153, 155, 161 are U, V, J
@@ -134,6 +135,7 @@ def build_sample():
 	fast = fast[good]
 	rf = rf[good]
 	lineinfo = lineinfo[good]
+	mips = mips[good]
 	
 	# define UVJ flag, S/N, HA EQW
 	uvj_flag = calc_uvj_flag(rf)
@@ -143,6 +145,8 @@ def build_sample():
 	lineinfo.rename_column('zgris' , 'z')
 	lineinfo['uvj_flag'] = uvj_flag
 	lineinfo['sn_F160W'] = sn_F160W
+	lineinfo['sfr'] = mips['sfr']
+	lineinfo['z_sfr'] = mips['z_best']
 	
 	# split into bins
 	lowlim = np.percentile(Ha_EQW_obs,65)

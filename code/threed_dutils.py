@@ -41,7 +41,7 @@ def generate_basenames(runname):
 
 	if runname == 'photerr':
 		
-		id = '15431'
+		id = '19723'
 		basename = 'photerr/photerr'
 		errnames = np.loadtxt(os.getenv('APPS')+'/threedhst_bsfh/parameter_files/photerr/photerr.txt')
 
@@ -96,18 +96,24 @@ def load_ancil_data(filename,objnum):
 	with open(filename, 'r') as f:
 		for jj in range(1): hdr = f.readline().split()
 	dat = np.loadtxt(filename, comments = '#',dtype = np.dtype([(n, np.float) for n in hdr[1:]]))
-	objdat = dat[dat['id'] == float(objnum)]
+	
+	if objnum:
+		objdat = dat[dat['id'] == float(objnum)]
+		return objdat
 
-	return objdat
+	return dat
 
-def load_mips_data(filename,objnum):
+def load_mips_data(filename,objnum=None):
 	
 	with open(filename, 'r') as f:
 		for jj in range(1): hdr = f.readline().split()
 	dat = np.loadtxt(filename, comments = '#',dtype = np.dtype([(n, np.float) for n in hdr[1:]]))
-	objdat = dat[dat['id'] == float(objnum)]
 	
-	return objdat
+	if objnum is not None:
+		objdat = dat[dat['id'] == float(objnum)]
+		return objdat
+
+	return dat
 
 def load_obs_3dhst(filename, objnum, mips=None, min_error = None, abs_error=False):
 	"""
@@ -134,7 +140,7 @@ def load_obs_3dhst(filename, objnum, mips=None, min_error = None, abs_error=Fals
 
 	# add mips
 	if mips:
-		mips_dat = load_mips_data(mips,objnum)
+		mips_dat = load_mips_data(mips,objnum=objnum)
 		flux=np.append(flux,mips_dat['f24tot'])
 		unc=np.append(unc,mips_dat['ef24tot'])
 		filters.append('MIPS_24um')
