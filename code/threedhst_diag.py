@@ -190,9 +190,9 @@ def show_chain(sample_results,outname=None,alpha=0.6):
 		plt.savefig(outname, bbox_inches='tight',dpi=300)
 		plt.close()
 
-def comp_samples(thetas, model, sps, inlog=True, photflag=0):
+def comp_samples(thetas, sample_results, sps, inlog=True, photflag=0):
     specvecs =[]
-    obs, _, marker = read_results.obsdict(model.obs, photflag)
+    obs, _, marker = read_results.obsdict(sample_results['obs'], photflag)
     wave, ospec, mask = obs['wave_effective'], obs['spectrum'], obs['mask']
     mwave, mospec = wave[mask], ospec[mask]
     mounc = obs['maggies_unc'][mask]
@@ -202,8 +202,8 @@ def comp_samples(thetas, model, sps, inlog=True, photflag=0):
          mounc *= mospec
 
     for theta in thetas:
-        mu, cal, delta, mask, wave = read_results.model_comp(theta, model, sps,
-                                           inlog=True, photflag=1)
+        mu, cal, delta, mask, wave = read_results.model_comp(theta, sample_results, sps,
+                                           					 photflag=1)
 
         specvecs += [ [mu, cal, delta, mu,mospec/mu, (mospec-mu) / mounc] ]
     
@@ -244,7 +244,7 @@ def sed_figure(sample_results, sps, model,
 	sample = [int(s * ns) for s in samples]
 		
 	thetas = [flatchain[s,:] for s in samples]
-	mwave, mospec, mounc, specvecs = comp_samples(thetas, sample_results['model'], sps, photflag=1)
+	mwave, mospec, mounc, specvecs = comp_samples(thetas, sample_results, sps, photflag=1)
 
 	# define observations
 	xplot = np.log10(mwave)
@@ -265,9 +265,9 @@ def sed_figure(sample_results, sps, model,
 
     # PLOT INITIAL PARAMETERS
 	if plot_init:
-		observables = model.mean_model(sample_results['initial_theta'], sps=sps)
+		observables = model.mean_model(sample_results['initial_theta'], sample_results['obs'], sps=sps)
 		fast_spec, fast_mags = observables[0],observables[1]
-		fast_lam = model.obs['wave_effective']
+		fast_lam = sample_results['obs']['wave_effective']
 		phot.plot(np.log10(fast_lam), np.log10(fast_mags*(c/(fast_lam/1e10))), label = 'initial parms', linestyle=' ',color='blue', marker='o', ms=ms, **kwargs)
 	
 	# plot max probability model
@@ -281,13 +281,13 @@ def sed_figure(sample_results, sps, model,
 		theta_maxln=[theta_maxln[0,:]]
 	else:
 		theta_maxln = [theta_maxln]
-	mwave, mospec, mounc, specvecs = comp_samples(theta_maxln, sample_results['model'], sps, photflag=1)
+	mwave, mospec, mounc, specvecs = comp_samples(theta_maxln, sample_results, sps, photflag=1)
 		
 	phot.plot(np.log10(mwave), np.log10(specvecs[0][0]*(c/(mwave/1e10))), color='#e60000', marker='o', ms=ms, linestyle=' ', label='max lnprob', alpha=alpha, markeredgewidth=0.7,**kwargs)
 	res.plot(np.log10(mwave), specvecs[0][-1], color='#e60000', marker='o', linestyle=' ', label='max lnprob', ms=ms,alpha=alpha,markeredgewidth=0.7,**kwargs)
 	
 	# add most likely spectrum
-	spec,_,w = model.mean_model(theta_maxln[0], sps=sps, norm_spec=True)
+	spec,_,w = model.mean_model(theta_maxln[0], sample_results['obs'], sps=sps, norm_spec=True)
 	nz = spec > 0
 
 	phot.plot(np.log10(w[nz]), np.log10(spec[nz]*(c/(w[nz]/1e10))), linestyle='-',
@@ -326,7 +326,8 @@ def sed_figure(sample_results, sps, model,
 	
 	# calculate reduced chi-squared
 	chisq=np.sum(specvecs[0][-1]**2)
-	reduced_chisq = chisq/(model.ndof-1)
+	ndof = np.sum(sample_results['obs']['phot_mask']) - len(sample_results['model'].free_params)-1
+	reduced_chisq = chisq/(ndof-1)
 	
 	# diagnostic text
 	textx = (phot.get_xlim()[1]-phot.get_xlim()[0])*0.975+phot.get_xlim()[0]
@@ -339,9 +340,9 @@ def sed_figure(sample_results, sps, model,
 				 fontsize=10, ha='right')
 		
 	# load ancil data
-	if 'ancilname' not in model.run_params.keys():
-		model.run_params['ancilname'] = os.getenv('APPS')+'/threedhst_bsfh/data/COSMOS_testsamp.dat'
-	ancildat = threed_dutils.load_ancil_data(os.getenv('APPS')+'/threedh'+model.run_params['ancilname'].split('/threedh')[1],model.run_params['objname'])
+	if 'ancilname' not in sample_results['run_params'].keys():
+		sample_results['run_params']['ancilname'] = os.getenv('APPS')+'/threedhst_bsfh/data/COSMOS_testsamp.dat'
+	ancildat = threed_dutils.load_ancil_data(os.getenv('APPS')+'/threedh'+sample_results['run_params']['ancilname'].split('/threedh')[1],sample_results['run_params']['objname'])
 	sn_txt = ancildat['sn_F160W'][0]
 	uvj_txt = ancildat['uvj_flag'][0]
 	z_txt = ancildat['z'][0]
@@ -412,7 +413,7 @@ def make_all_plots(filebase, parm_file=None,
 
 	# if we found no files, skip this object
 	if len(times) == 0:
-		print 'Failed to find any files to extract times from'
+		print 'Failed to find any files to extract times in ' + folder + ' of form ' + filename
 		return 0
 
 	# load results
