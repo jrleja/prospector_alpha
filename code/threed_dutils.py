@@ -4,7 +4,7 @@ import os
 def generate_basenames(runname):
 
 	filebase=[]
-	parm_basename=[]
+	parm=[]
 	if runname == 'nebon':
 
 		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/COSMOS_testsamp.ids"
@@ -20,7 +20,7 @@ def generate_basenames(runname):
 			                           ids[jj])
 			heqw_txt = "%04d" % int(ancildat['Ha_EQW_obs']) 
 			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+basename+'_'+heqw_txt+'_'+ids[jj])
-			parm_basename.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+parm_basename+'_'+str(jj+1)+'.py')
+			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+parm_basename+'_'+str(jj+1)+'.py')
 
 	if runname == 'neboff':
 
@@ -37,7 +37,7 @@ def generate_basenames(runname):
 			                           ids[jj])
 			heqw_txt = "%04d" % int(ancildat['Ha_EQW_obs']) 
 			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+basename+'_'+heqw_txt+'_'+ids[jj])
-			parm_basename.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+parm_basename+'_'+str(jj+1)+'.py')
+			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+parm_basename+'_'+str(jj+1)+'.py')
 
 	if runname == 'photerr':
 		
@@ -47,9 +47,9 @@ def generate_basenames(runname):
 
 		for jj in xrange(len(errnames)): 
 			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+basename+'_'+str(errnames[jj])+'_'+id)
-			parm_basename.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/photerr/photerr_params_"+str(jj+1)+'.py')
+			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/photerr/photerr_params_"+str(jj+1)+'.py')
 
-	return filebase,parm_basename
+	return filebase,parm
 
 def chop_chain(sample_results):
 	'''

@@ -113,10 +113,10 @@ def collate_output(runname,outname):
 
 	pickle.dump(output,open(outname, "wb"))
 		
-def plot_driver():
+def plot_driver(runname):
 	
-	runname = "neboff"
-	runname = 'photerr'
+	#runname = "neboff"
+	#runname = 'photerr'
 
 	outname = os.getenv('APPS')+'/threedhst_bsfh/results/'+runname+'/'+runname+'_ensemble.pickle'
 
@@ -152,6 +152,7 @@ def plot_driver():
 	          np.log10(ensemble['q50'][ensemble['parname'] == 'mass'][0]),\
 	          np.log10(ensemble['q50'][ensemble['parname'] == 'ssfr'][0]),\
 	          np.log10(sfr_obs),\
+	          np.log10(sfr_obs/ensemble['q50'][ensemble['parname'] == 'mass'][0]),\
 	          ]
 
 	x_err  = [asym_errors(ensemble['q50'][ensemble['parname'] == 'mass'][0],ensemble['q84'][ensemble['parname'] == 'mass'][0], ensemble['q16'][ensemble['parname'] == 'mass'][0],log=True),\
@@ -163,6 +164,7 @@ def plot_driver():
 			  asym_errors(ensemble['q50'][ensemble['parname'] == 'sfr'][0],ensemble['q84'][ensemble['parname'] == 'sfr'][0],ensemble['q16'][ensemble['parname'] == 'sfr'][0],log=True),\
 			  asym_errors(ensemble['q50'][ensemble['parname'] == 'mass'][0],ensemble['q84'][ensemble['parname'] == 'mass'][0],ensemble['q16'][ensemble['parname'] == 'mass'][0],log=True),\
 			  asym_errors(ensemble['q50'][ensemble['parname'] == 'ssfr'][0],ensemble['q84'][ensemble['parname'] == 'ssfr'][0],ensemble['q16'][ensemble['parname'] == 'sfr'][0],log=True),\
+			  None,\
 			  None,\
 			 ]
 
@@ -176,6 +178,7 @@ def plot_driver():
 	            r'log(M) [M$_{\odot}$]',
 	            r'log(sSFR) [yr$^{-1}$]',
 	            r'log(SFR$_{obs}$) [M$_{\odot}$/yr]',
+	            r'log(sSFR$_{obs}$) [yr$^{-1}$]',
 	            ]
 
 	y_data = [ensemble['q50'][ensemble['parname'] == 'logzsol'][0],\
@@ -188,6 +191,7 @@ def plot_driver():
 	          np.log10(ensemble['q50'][ensemble['parname'] == 'sfr'][0]),\
 	          ensemble['q84'][ensemble['parname'] == 'half_time'][0]-ensemble['q16'][ensemble['parname'] == 'half_time'][0],\
 	          np.log10(ensemble['q50'][ensemble['parname'] == 'sfr'][0,valid_comp]),\
+	          np.log10(ensemble['q50'][ensemble['parname'] == 'ssfr'][0]**-1),\
 	          ]
 
 	y_err  = [asym_errors(ensemble['q50'][ensemble['parname'] == 'logzsol'][0],ensemble['q84'][ensemble['parname'] == 'logzsol'][0],ensemble['q16'][ensemble['parname'] == 'logzsol'][0]),\
@@ -200,6 +204,7 @@ def plot_driver():
 			  asym_errors(ensemble['q50'][ensemble['parname'] == 'sfr'][0],ensemble['q84'][ensemble['parname'] == 'sfr'][0],ensemble['q16'][ensemble['parname'] == 'sfr'][0],log=True),\
 			  None,\
 			  asym_errors(ensemble['q50'][ensemble['parname'] == 'sfr'][0,valid_comp],ensemble['q84'][ensemble['parname'] == 'sfr'][0,valid_comp],ensemble['q16'][ensemble['parname'] == 'sfr'][0,valid_comp],log=True),\
+			  asym_errors(ensemble['q50'][ensemble['parname'] == 'ssfr'][0]**-1,ensemble['q84'][ensemble['parname'] == 'ssfr'][0]**-1,ensemble['q16'][ensemble['parname'] == 'sfr'][0]**-1,log=True),\
 			 ]
 
 	y_labels = [r'log(Z$_{\odot}$)',
@@ -212,6 +217,7 @@ def plot_driver():
 	            r'log(SFR) [M$_{\odot}$/yr]',
 	            r'$\sigma$ (t$_{half}$) [Gyr]',
 	            r'log(SFR$_{mcmc}$) [M$_{\odot}$/yr]',
+	            r'log(sSFR$_{mcmc}$) [yr$^{-1}$]',
 	            ]
 
 	plotname = ['mass_metallicity',
@@ -223,21 +229,17 @@ def plot_driver():
 				'sfr_deltadust1',
 				'mass_sfr',
 				'ssfr_deltahalftime',
-				'sfrobs_sfrmcmc']
+				'sfrobs_sfrmcmc',
+				'ssfrobs_ssfrmcmc']
 
 	assert len(plotname) == len(y_labels) == len(y_err) == len(y_data), 'improper number of y data'
 	assert len(plotname) == len(x_labels) == len(x_err) == len(x_data), 'improper number of x data'
 
 	for jj in xrange(len(x_data)):
-		outname = os.getenv('APPS') + '/threedhst_bsfh/plots/ensemble_plots/'+plotname[jj]+'.png'
+		outname = os.getenv('APPS') + '/threedhst_bsfh/plots/ensemble_plots/'+runname+'/'+plotname[jj]+'.png'
 		
 		fig = plt.figure()
 		ax = fig.add_subplot(111)
-
-		try:
-			print len(x_data[jj]),len(y_data[jj]), len(x_err[jj]), len(y_err[jj])
-		except:
-			print 'None type'
 		
 		ax.errorbar(x_data[jj],y_data[jj], 
 			        fmt='bo', linestyle=' ', alpha=0.7)
@@ -259,8 +261,75 @@ def plot_driver():
 			     np.nanmax(y_data[jj])+dyny,
 			    ))
 
-		plt.savefig(outname, dpi=300)
+		# make sure comparison plot is 1:1
+		if x_labels[jj] == r'log(SFR$_{obs}$) [M$_{\odot}$/yr]' or x_labels[jj] == r'log(sSFR$_{obs}$) [yr$^{-1}$]':
+			if np.nanmin(x_data[jj])-dynx > np.nanmin(y_data[jj])-dyny:
+				min = np.nanmin(y_data[jj])-dyny*3
+			else:
+				min = np.nanmin(x_data[jj])-dynx*3
+			if np.nanmax(x_data[jj])+dynx > np.nanmax(y_data[jj])+dyny:
+				max = np.nanmax(x_data[jj])+dynx*3
+			else:
+				max = np.nanmax(y_data[jj])+dyny*3
+
+			ax.axis((min,max,min,max))
+			ax.errorbar([-1e3,1e3],[-1e3,1e3],linestyle='--',color='0.1',alpha=0.8)
+
+		print 'saving '+outname
+ 		plt.savefig(outname, dpi=300)
 		plt.close()
 
+def photerr_plot(runname, scale=False):
 
+	inname = os.getenv('APPS')+'/threedhst_bsfh/results/'+runname+'/'+runname+'_ensemble.pickle'
+	outname = os.getenv('APPS') + '/threedhst_bsfh/plots/ensemble_plots/'+runname+'/photerr'
+
+	# if the save file doesn't exist, make it
+	if not os.path.isfile(inname):
+		collate_output(runname,inname)
+
+	with open(inname, "rb") as f:
+		ensemble=pickle.load(f)
+
+	# number of parameters
+	nparam = len(ensemble['parname'])
+
+	# pull out photometric errors
+	photerrs = np.array([float(x.split('_')[-2]) for x in ensemble['outname']])
+
+	# initialize colors
+	import pylab
+	NUM_COLORS = nparam
+	cm = pylab.get_cmap('gist_ncar')
+	plt.rcParams['axes.color_cycle'] = [cm(1.*i/NUM_COLORS) for i in range(NUM_COLORS)] 
+	axlim=[3.0,5.5,3.0,8] 
+
+	# initialize plot
+	fig = plt.figure()
+	ax = fig.add_subplot(111)
+
+	for jj in xrange(nparam):
+		
+		x_data = np.log10(photerrs*100)
+		y_data = np.abs(ensemble['q50'][jj,0] / (ensemble['q84'][jj,:]-ensemble['q16'][jj,:]))[::-1]
+		#y_data = y_data*(1.0/y_data[0])
+		y_data = np.log10(y_data)
+		ax.plot(x_data, y_data, 'o', linestyle='-', alpha=0.7, label = ensemble['parname'][jj])
+
+		ax.set_ylabel('log(relative parameter error)')
+		ax.set_xlabel('log(photometric error) [%]')
+
+		dynx = (np.nanmax(x_data)-np.nanmin(x_data))*0.05
+
+		ax.set_xlim([np.nanmin(x_data)-dynx,np.nanmax(x_data)+dynx])
+		if scale:
+			ax.set_ylim(-2,2)
+
+	ax.legend(loc=0,prop={'size':6},
+			  frameon=False)
+
+	if scale:
+		outname = outname+'_scale'
+	plt.savefig(outname+'.png', dpi=300)
+	plt.close()
 	
