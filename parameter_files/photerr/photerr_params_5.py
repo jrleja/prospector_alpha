@@ -88,6 +88,11 @@ param_template = {'name':'', 'N':1, 'isfree': False,
                   'init':0.0, 'units':'', 'label':'',
                   'prior_function_name': None, 'prior_args': None}
 
+
+param_template = {'name':'', 'N':1, 'isfree': False,
+                  'init':0.0, 'units':'', 'label':'',
+                  'prior_function_name': None, 'prior_args': None}
+
 ###### BASIC PARAMETERS ##########
 model_params.append({'name': 'zred', 'N': 1,
                         'isfree': False,
@@ -113,6 +118,7 @@ model_params.append({'name': 'add_agb_dust_model', 'N': 1,
 model_params.append({'name': 'mass', 'N': 1,
                         'isfree': True,
                         'init': 1e10,
+                        'reinit': False,
                         'units': r'M_\odot',
                         'prior_function': tophat,
                         'prior_args': {'mini':1e6, 'maxi':1e12}})
@@ -120,6 +126,7 @@ model_params.append({'name': 'mass', 'N': 1,
 model_params.append({'name': 'logzsol', 'N': 1,
                         'isfree': True,
                         'init': 0,
+                        'init_disp': 0.5,
                         'units': r'$\log (Z/Z_\odot)$',
                         'prior_function': tophat,
                         'prior_args': {'mini':-1, 'maxi':0.19}})
@@ -142,6 +149,7 @@ model_params.append({'name': 'sfh', 'N': 1,
 model_params.append({'name': 'tau', 'N': 1,
                         'isfree': True,
                         'init': 1.0,
+                        'reinit': False,
                         'units': 'Gyr',
                         'prior_function':tophat,
                         'prior_args': {'mini':0.1, 'maxi':100}})
@@ -156,6 +164,7 @@ model_params.append({'name': 'tage', 'N': 1,
 model_params.append({'name': 'tburst', 'N': 1,
                         'isfree': True,
                         'init': 0.0,
+                        'init_disp': 0.5,
                         'units': '',
                         'prior_function': tophat,
                         'prior_args': {'mini':0.0, 'maxi':10.0}})
@@ -163,6 +172,7 @@ model_params.append({'name': 'tburst', 'N': 1,
 model_params.append({'name': 'fburst', 'N': 1,
                         'isfree': True,
                         'init': 0.0,
+                        'init_disp': 0.5,
                         'units': '',
                         'prior_function': tophat,
                         'prior_args': {'mini':0.0, 'maxi':0.2}})
@@ -177,17 +187,18 @@ model_params.append({'name': 'fconst', 'N': 1,
 model_params.append({'name': 'sf_start', 'N': 1,
                         'isfree': True,
                         'init': 0.0,
+                        'init_disp': 0.5,
                         'units': 'Gyr',
                         'prior_function': tophat,
                         'prior_args': {'mini':0.0, 'maxi':0.5}})
                         
 ########    IMF  ##############
 model_params.append({'name': 'imf_type', 'N': 1,
-                        	 'isfree': False,
+                             'isfree': False,
                              'init': 1, #1 = chabrier
-                       		 'units': None,
-                       		 'prior_function_name': None,
-                        	 'prior_args': None})
+                             'units': None,
+                             'prior_function_name': None,
+                             'prior_args': None})
 
 ######## Dust Absorption ##############
 model_params.append({'name': 'dust_type', 'N': 1,
@@ -200,6 +211,7 @@ model_params.append({'name': 'dust_type', 'N': 1,
 model_params.append({'name': 'dust1', 'N': 1,
                         'isfree': True,
                         'init': 0.0,
+                        'init_disp': 0.5,
                         'units': '',
                         'prior_function': tophat,
                         'prior_args': {'mini':0.0, 'maxi':3.0}})
@@ -207,6 +219,7 @@ model_params.append({'name': 'dust1', 'N': 1,
 model_params.append({'name': 'dust2', 'N': 1,
                         'isfree': True,
                         'init': 0.35,
+                        'init_disp': 0.5,
                         'units': '',
                         'prior_function': tophat,
                         'prior_args': {'mini':0.0, 'maxi':3.0}})
@@ -257,6 +270,7 @@ model_params.append({'name': 'duste_umin', 'N': 1,
 model_params.append({'name': 'duste_qpah', 'N': 1,
                         'isfree': True,
                         'init': 3.0,
+                        'init_disp': 0.5,
                         'units': 'percent',
                         'prior_function': tophat,
                         'prior_args': {'mini':0.0, 'maxi':10.0}})
@@ -292,6 +306,7 @@ model_params.append({'name': 'phot_jitter', 'N': 1,
                         'units': 'mags',
                         'prior_function': tophat,
                         'prior_args': {'mini':0.0, 'maxi':0.2}})
+
 
 ####### SET INITIAL PARAMETERS ##########
 fastvalues,fastfields = threed_dutils.load_fast_3dhst(run_params['fastname'],
