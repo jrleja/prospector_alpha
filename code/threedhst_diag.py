@@ -258,11 +258,6 @@ def sed_figure(sample_results, sps, model,
 	phot.set_ylim(min(yplot[np.isfinite(yplot)])*0.7,max(yplot[np.isfinite(yplot)])*1.04)
 	res.set_xlim(min(xplot)*0.9,max(xplot)*1.04)
 
-	# PLOT RANDOM DRAWS
-	#for vecs in specvecs:		
-	#	phot.plot(np.log10(mwave), np.log10(vecs[0]*(c/(mwave/1e10))), color='grey', alpha=alpha, marker='o', label='posterior sample', **kwargs)
-	#	res.plot(np.log10(mwave), vecs[-1], color='grey', alpha=alpha, marker='o', **kwargs)
-
     # PLOT INITIAL PARAMETERS
 	if plot_init:
 		observables = model.mean_model(sample_results['initial_theta'], sample_results['obs'], sps=sps)
@@ -283,8 +278,13 @@ def sed_figure(sample_results, sps, model,
 		theta_maxln = [theta_maxln]
 	mwave, mospec, mounc, specvecs = comp_samples(theta_maxln, sample_results, sps, photflag=1)
 		
-	phot.plot(np.log10(mwave), np.log10(specvecs[0][0]*(c/(mwave/1e10))), color='#e60000', marker='o', ms=ms, linestyle=' ', label='max lnprob', alpha=alpha, markeredgewidth=0.7,**kwargs)
-	res.plot(np.log10(mwave), specvecs[0][-1], color='#e60000', marker='o', linestyle=' ', label='max lnprob', ms=ms,alpha=alpha,markeredgewidth=0.7,**kwargs)
+	phot.plot(np.log10(mwave), np.log10(specvecs[0][0]*(c/(mwave/1e10))), 
+		      color='#e60000', marker='o', ms=ms, linestyle=' ', label='max lnprob', 
+		      alpha=alpha, markeredgewidth=0.7,**kwargs)
+	
+	res.plot(np.log10(mwave), specvecs[0][-1], 
+		     color='#e60000', marker='o', linestyle=' ', label='max lnprob', 
+		     ms=ms,alpha=alpha,markeredgewidth=0.7,**kwargs)
 	
 	# add most likely spectrum
 	spec,_,w = model.mean_model(theta_maxln[0], sample_results['obs'], sps=sps, norm_spec=True)
