@@ -394,7 +394,7 @@ def sed_figure(sample_results, sps, model,
 		plt.close()
 
 def make_all_plots(filebase, parm_file=None, 
-				   outfolder=os.getenv('APPS')+'/threedhst_bsfh/plots/'):
+				   outfolder=None):
 
 	'''
 	Driver. Loads output, makes all plots for a given galaxy.
@@ -425,7 +425,7 @@ def make_all_plots(filebase, parm_file=None,
 	except:
 		print 'Failed to open '+ mcmc_filename +','+model_filename
 		return 0
-	print 'MAKING PLOTS FOR ' + filename
+	print 'MAKING PLOTS FOR ' + filename + ' in ' + outfolder
 	
 	# define nice plotting quantities
 	sample_results = create_plotquant(sample_results)
@@ -472,7 +472,6 @@ def plot_all_driver():
 	runname = "neboff"
 	
 	runname = "photerr"
-	parm_basename = "photerr_params"
 
 	filebase, parm_basename=threed_dutils.generate_basenames(runname)
 	for jj in xrange(len(filebase)):
