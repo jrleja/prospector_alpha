@@ -2,6 +2,7 @@ import os, threed_dutils, triangle, pickle
 from bsfh import read_results
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
 
 def asym_errors(center, up, down, log=False):
 
@@ -152,7 +153,7 @@ def plot_driver(runname):
 	          np.log10(ensemble['q50'][ensemble['parname'] == 'mass'][0]),\
 	          np.log10(ensemble['q50'][ensemble['parname'] == 'ssfr'][0]),\
 	          np.log10(sfr_obs),\
-	          np.log10(sfr_obs/ensemble['q50'][ensemble['parname'] == 'mass'][0]),\
+	          np.log10(sfr_obs/ensemble['q50'][ensemble['parname'] == 'mass'][0,valid_comp]),\
 	          ]
 
 	x_err  = [asym_errors(ensemble['q50'][ensemble['parname'] == 'mass'][0],ensemble['q84'][ensemble['parname'] == 'mass'][0], ensemble['q16'][ensemble['parname'] == 'mass'][0],log=True),\
@@ -191,7 +192,7 @@ def plot_driver(runname):
 	          np.log10(ensemble['q50'][ensemble['parname'] == 'sfr'][0]),\
 	          ensemble['q84'][ensemble['parname'] == 'half_time'][0]-ensemble['q16'][ensemble['parname'] == 'half_time'][0],\
 	          np.log10(ensemble['q50'][ensemble['parname'] == 'sfr'][0,valid_comp]),\
-	          np.log10(ensemble['q50'][ensemble['parname'] == 'ssfr'][0]**-1),\
+	          np.log10(ensemble['q50'][ensemble['parname'] == 'ssfr'][0,valid_comp]**-1),\
 	          ]
 
 	y_err  = [asym_errors(ensemble['q50'][ensemble['parname'] == 'logzsol'][0],ensemble['q84'][ensemble['parname'] == 'logzsol'][0],ensemble['q16'][ensemble['parname'] == 'logzsol'][0]),\
@@ -204,7 +205,7 @@ def plot_driver(runname):
 			  asym_errors(ensemble['q50'][ensemble['parname'] == 'sfr'][0],ensemble['q84'][ensemble['parname'] == 'sfr'][0],ensemble['q16'][ensemble['parname'] == 'sfr'][0],log=True),\
 			  None,\
 			  asym_errors(ensemble['q50'][ensemble['parname'] == 'sfr'][0,valid_comp],ensemble['q84'][ensemble['parname'] == 'sfr'][0,valid_comp],ensemble['q16'][ensemble['parname'] == 'sfr'][0,valid_comp],log=True),\
-			  asym_errors(ensemble['q50'][ensemble['parname'] == 'ssfr'][0]**-1,ensemble['q84'][ensemble['parname'] == 'ssfr'][0]**-1,ensemble['q16'][ensemble['parname'] == 'sfr'][0]**-1,log=True),\
+			  asym_errors(ensemble['q50'][ensemble['parname'] == 'ssfr'][0,valid_comp]**-1,ensemble['q84'][ensemble['parname'] == 'ssfr'][0,valid_comp]**-1,ensemble['q16'][ensemble['parname'] == 'sfr'][0,valid_comp]**-1,log=True),\
 			 ]
 
 	y_labels = [r'log(Z$_{\odot}$)',
@@ -282,7 +283,8 @@ def plot_driver(runname):
 def photerr_plot(runname, scale=False):
 
 	inname = os.getenv('APPS')+'/threedhst_bsfh/results/'+runname+'/'+runname+'_ensemble.pickle'
-	outname = os.getenv('APPS') + '/threedhst_bsfh/plots/ensemble_plots/'+runname+'/photerr'
+	outname_errs = os.getenv('APPS') + '/threedhst_bsfh/plots/ensemble_plots/'+runname+'/photerr'
+	outname_cent = os.getenv('APPS') + '/threedhst_bsfh/plots/ensemble_plots/'+runname+'/central_values'
 
 	# if the save file doesn't exist, make it
 	if not os.path.isfile(inname):
@@ -307,14 +309,15 @@ def photerr_plot(runname, scale=False):
 	# initialize plot
 	fig = plt.figure()
 	ax = fig.add_subplot(111)
+	x_data = np.log10(photerrs*100)
 
 	for jj in xrange(nparam):
 		
-		x_data = np.log10(photerrs*100)
 		y_data = np.abs(ensemble['q50'][jj,0] / (ensemble['q84'][jj,:]-ensemble['q16'][jj,:]))[::-1]
 		#y_data = y_data*(1.0/y_data[0])
 		y_data = np.log10(y_data)
-		ax.plot(x_data, y_data, 'o', linestyle='-', alpha=0.7, label = ensemble['parname'][jj])
+
+		ax.plot(x_data, y_data[np.isnan(y_data) == 0], 'o', linestyle='-', alpha=0.7, label = ensemble['parname'][jj])
 
 		ax.set_ylabel('log(relative parameter error)')
 		ax.set_xlabel('log(photometric error) [%]')
@@ -329,7 +332,36 @@ def photerr_plot(runname, scale=False):
 			  frameon=False)
 
 	if scale:
-		outname = outname+'_scale'
-	plt.savefig(outname+'.png', dpi=300)
+		outname_errs = outname_errs+'_scale'
+	plt.savefig(outname_errs+'.png', dpi=300)
 	plt.close()
+
+	# next plot
+	gs = gridspec.GridSpec(3,nparam/3+1)
+	fig = plt.figure(figsize = (16.5,9))
+	gs.update(wspace=0.35, hspace=0.35)
+	fs = 11
+	for jj in xrange(nparam):
+
+		is_data = np.isnan(ensemble['q50'][jj,:]) == 0
+		y_data = np.abs(ensemble['q50'][jj,is_data])[::-1]
+		
+		y_err = asym_errors(ensemble['q50'][jj,is_data],ensemble['q84'][jj,is_data],ensemble['q16'][jj,is_data])
+		ax = plt.subplot(gs[jj])
+
+		ax.errorbar(x_data,y_data, 
+			        fmt='bo', ecolor='0.20', alpha=0.8,
+			        yerr=y_err,linestyle='-')
+		for tick in ax.xaxis.get_major_ticks(): tick.label.set_fontsize(fs) 
+		for tick in ax.yaxis.get_major_ticks(): tick.label.set_fontsize(fs) 
+		ax.set_ylabel(ensemble['parname'][jj],fontsize=fs)
+		ax.set_xlabel('log(photometric error) [%]',fontsize=fs)
+
+	ax.legend(loc=0,prop={'size':6},
+			  frameon=False)
+
+	plt.savefig(outname_cent+'.png', dpi=300)
+	plt.close()
+
+
 	

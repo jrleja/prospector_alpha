@@ -394,7 +394,7 @@ def sed_figure(sample_results, sps, model,
 		plt.close()
 
 def make_all_plots(filebase, parm_file=None, 
-				   outfolder=None):
+				   outfolder=outfolder):
 
 	'''
 	Driver. Loads output, makes all plots for a given galaxy.
