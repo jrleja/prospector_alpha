@@ -9,7 +9,7 @@
 ### Partition or queue name
 #SBATCH -p conroy,general
 ### memory per cpu, in MB
-#SBATCH --mem-per-cpu=600
+#SBATCH --mem-per-cpu=2000
 ### Job name
 #SBATCH -J 'secondary'
 ### output and error logs
