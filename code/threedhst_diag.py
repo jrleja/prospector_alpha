@@ -6,6 +6,8 @@ import matplotlib.image as mpimg
 from astropy.cosmology import WMAP9
 import fsps
 
+tiny_number = 1e-90
+big_number = 1e90
 plt_chain_figure = 1
 plt_triangle_plot = 1
 plt_sed_figure = 1
@@ -56,10 +58,10 @@ def create_plotquant(sample_results, logplot = ['mass', 'tau', 'tage', 'tburst',
 
     	min = priors['mini']
     	max = priors['maxi']
-    	priors['mini'] = np.clip(tuniv-max,1e-10,1e80)
+    	priors['mini'] = np.clip(tuniv-max,tiny_number,big_number)
     	priors['maxi'] = tuniv-min
 
-    	plotchain[:,:,list(parnames).index(par)] = tuniv - plotchain[:,:,list(parnames).index(par)]
+    	plotchain[:,:,list(parnames).index(par)] = np.clip(tuniv - plotchain[:,:,list(parnames).index(par)],tiny_number,big_number)
 
 	# define plot quantities and plot names
 	# primarily converting to log or not
@@ -97,12 +99,12 @@ def return_extent(sample_results):
 		
 		# set min/max
 		extent = [np.min(sample_results['plotchain'][:,:,ii]),np.max(sample_results['plotchain'][:,:,ii])]
-		
+
 		# is the chain stuck at one point? if so, set the range equal to the prior range
 		# else check if we butting up against the prior? if so, extend by 10%
 		priors = [f['prior_args'] for f in sample_results['model'].config_list if f['name'] == parnames[ii]][0]
 		if extent[0] == extent[1]:
-			extent = (priors['mini'],priors['maxi'])
+			extent = (priors['mini'][0],priors['maxi'][0])
 		else:
 			extend = (extent[1]-extent[0])*0.12
 			if np.abs(0.5*(priors['mini']-extent[0])/(priors['mini']+extent[0])) < 1e-4:
@@ -235,7 +237,7 @@ def sed_figure(sample_results, sps, model,
 
 	# FLATTEN AND CHOP CHAIN
 	# chain = chain[nwalkers,nsteps,ndim]
-	flatchain = threed_dutils.chop_chain(sample_results)
+	flatchain = sample_results['flatchain']
 
 	# MAKE RANDOM POSTERIOR DRAWS
 	nsample = 5
@@ -258,25 +260,8 @@ def sed_figure(sample_results, sps, model,
 	phot.set_ylim(min(yplot[np.isfinite(yplot)])*0.7,max(yplot[np.isfinite(yplot)])*1.04)
 	res.set_xlim(min(xplot)*0.9,max(xplot)*1.04)
 
-    # PLOT INITIAL PARAMETERS
-	if plot_init:
-		observables = model.mean_model(sample_results['initial_theta'], sample_results['obs'], sps=sps)
-		fast_spec, fast_mags = observables[0],observables[1]
-		fast_lam = sample_results['obs']['wave_effective']
-		phot.plot(np.log10(fast_lam), np.log10(fast_mags*(c/(fast_lam/1e10))), label = 'initial parms', linestyle=' ',color='blue', marker='o', ms=ms, **kwargs)
-	
 	# plot max probability model
-	maxprob = np.max(sample_results['lnprobability'])
-	probind = sample_results['lnprobability'] == maxprob
-	theta_maxln = sample_results['chain'][probind,:]
-
-	print 'maxprob: ' + str(maxprob)
-
-	if theta_maxln.ndim == 2:			# if multiple chains found the same peak, choose one arbitrarily
-		theta_maxln=[theta_maxln[0,:]]
-	else:
-		theta_maxln = [theta_maxln]
-	mwave, mospec, mounc, specvecs = comp_samples(theta_maxln, sample_results, sps, photflag=1)
+	mwave, mospec, mounc, specvecs = comp_samples([sample_results['quantiles']['maxprob_params']], sample_results, sps, photflag=1)
 		
 	phot.plot(np.log10(mwave), np.log10(specvecs[0][0]*(c/(mwave/1e10))), 
 		      color='#e60000', marker='o', ms=ms, linestyle=' ', label='max lnprob', 
@@ -287,7 +272,7 @@ def sed_figure(sample_results, sps, model,
 		     ms=ms,alpha=alpha,markeredgewidth=0.7,**kwargs)
 	
 	# add most likely spectrum
-	spec,_,w = model.mean_model(theta_maxln[0], sample_results['obs'], sps=sps, norm_spec=True)
+	spec,_,w = model.mean_model(sample_results['quantiles']['maxprob_params'], sample_results['obs'], sps=sps, norm_spec=True)
 	nz = spec > 0
 
 	phot.plot(np.log10(w[nz]), np.log10(spec[nz]*(c/(w[nz]/1e10))), linestyle='-',
@@ -393,17 +378,24 @@ def sed_figure(sample_results, sps, model,
 		fig.savefig(outname, bbox_inches='tight', dpi=300)
 		plt.close()
 
-def make_all_plots(filebase, parm_file=None, 
-				   outfolder=outfolder):
+def make_all_plots(filebase=None, parm_file=None, 
+				   outfolder=os.getenv('APPS')+'/threedhst_bsfh/plots/',
+				   sample_results=None,
+				   sps=None):
 
 	'''
 	Driver. Loads output, makes all plots for a given galaxy.
 	'''
 	
 	# thin and chop the chain?
-	thin=1
-	chop_chain=1.666
+	#thin=1
+	#chop_chain=1.666
 
+	# make sure the output folder exists
+	if not os.path.isdir(outfolder):
+		os.makedirs(outfolder)
+
+	
 	# find most recent output file
 	# with the objname
 	folder = "/".join(filebase.split('/')[:-1])
@@ -411,31 +403,34 @@ def make_all_plots(filebase, parm_file=None,
 	files = [f for f in os.listdir(folder) if "_".join(f.split('_')[:-2]) == filename]	
 	times = [f.split('_')[-2] for f in files]
 
-	# if we found no files, skip this object
-	if len(times) == 0:
-		print 'Failed to find any files to extract times in ' + folder + ' of form ' + filename
-		return 0
+	if not sample_results:
+		# if we found no files, skip this object
+		if len(times) == 0:
+			print 'Failed to find any files to extract times in ' + folder + ' of form ' + filename
+			return 0
 
-	# load results
-	mcmc_filename=filebase+'_'+max(times)+"_mcmc"
-	model_filename=filebase+'_'+max(times)+"_model"
+		# load results
+		mcmc_filename=filebase+'_'+max(times)+"_mcmc"
+		model_filename=filebase+'_'+max(times)+"_model"
+		
+		try:
+			sample_results, powell_results, model = read_results.read_pickles(mcmc_filename, model_file=model_filename,inmod=None)
+		except:
+			print 'Failed to open '+ mcmc_filename +','+model_filename
+			return 0
+
 	
-	try:
-		sample_results, powell_results, model = read_results.read_pickles(mcmc_filename, model_file=model_filename,inmod=None)
-	except:
-		print 'Failed to open '+ mcmc_filename +','+model_filename
-		return 0
+	if not sps:
+	# load stellar population, set up custom filters
+		sps = threed_dutils.setup_sps()
+
+	# BEGIN PLOT ROUTINE
 	print 'MAKING PLOTS FOR ' + filename + ' in ' + outfolder
 	
 	# define nice plotting quantities
 	sample_results = create_plotquant(sample_results)
 	sample_results['extents'] = return_extent(sample_results)
-	
-	# load stellar population, set up custom filters
-	sps = fsps.StellarPopulation(zcontinuous=2, compute_vega_mags=False)
-	custom_filter_keys = os.getenv('APPS')+'/threedhst_bsfh/filters/filter_keys_threedhst.txt'
-	fsps.filters.FILTERS = model_setup.custom_filter_dict(custom_filter_keys)
-	
+
     # chain plot
 	if plt_chain_figure: 
 		print 'MAKING CHAIN PLOT'
@@ -447,19 +442,20 @@ def make_all_plots(filebase, parm_file=None,
 	if plt_triangle_plot: 
 		print 'MAKING TRIANGLE PLOT'
 		chopped_sample_results = copy.deepcopy(sample_results)
-		chopped_sample_results['plotchain'] = sample_results['plotchain'][:,int(sample_results['plotchain'].shape[1]/chop_chain):,:]
-		chopped_sample_results['chain'] = sample_results['chain'][:,int(sample_results['chain'].shape[1]/chop_chain):,:]
+		#chopped_sample_results['plotchain'] = threed_dutils.chop_chain(sample_results['plotchain'])
+		#chopped_sample_results['chain'] = threed_dutils.chop_chain(sample_results['chain'])
 
-		read_results.subtriangle(chopped_sample_results, sps, model,
+		read_results.subtriangle(sample_results, sps, copy.deepcopy(sample_results['model']),
 							 outname=outfolder+filename+'_'+max(times),
-							 showpars=None,start=0, thin=thin, #truths=sample_results['initial_theta'],
+							 showpars=None,start=0,
 							 show_titles=True)
 
 	# sed plot
+	# MANY UNNECESSARY CALCULATIONS
 	if plt_sed_figure:
 		print 'MAKING SED PLOT'
  		# plot
- 		pfig = sed_figure(sample_results, sps, model,
+ 		pfig = sed_figure(sample_results, sps, copy.deepcopy(sample_results['model']),
  						  maxprob=1, 
  						  outname=outfolder+filename+'_'+max(times)+'.sed.png')
  		
@@ -475,7 +471,7 @@ def plot_all_driver():
 
 	filebase, parm_basename=threed_dutils.generate_basenames(runname)
 	for jj in xrange(len(filebase)):
-		make_all_plots(filebase[jj], 
-		               parm_file=parm_basename[jj],
+		make_all_plots(filebase=filebase[jj],\
+		               parm_file=parm_basename[jj],\
 		               outfolder=os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/')
 	
