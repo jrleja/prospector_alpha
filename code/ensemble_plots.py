@@ -63,27 +63,17 @@ def collate_output(runname,outname):
 			continue
 
 		# initialize output arrays if necessary
-		nnew = 3
-		ntheta = len(sample_results['initial_theta'])+nnew
+		ntheta = len(sample_results['initial_theta'])+len(sample_results['extras']['parnames'])
 		if jj == 0:
 			q_16, q_50, q_84, thetamax = (np.zeros(shape=(ntheta,ngals))+np.nan for i in range(4))
 			z, mips_sn = (np.zeros(ngals) for i in range(2))
 			output_name = np.empty(0,dtype='object')
-
-		# chop and thin the chain
-		flatchain = threed_dutils.chop_chain(sample_results)
-
-		# calculate extra quantities, add to chain
-		half_time,sfr_100 = read_results.calc_extra_quantities(sample_results,flatchain)
-		ssfr_100 = np.array([x/sfr_100[nn] for nn,x in enumerate(flatchain[:,np.array(sample_results['model'].theta_labels()) == 'mass'])])
-		chainlen = flatchain.shape[0]
-		flatchain = np.concatenate((flatchain,
-			                        half_time.reshape(chainlen,1),
-			                        sfr_100.reshape(chainlen,1),
-									ssfr_100), axis=1)
+			obs,model_emline,ancildat = [],[],[]
 
 		# insert percentiles
-		for kk in xrange(ntheta): q_16[kk,jj], q_50[kk,jj], q_84[kk,jj] = triangle.quantile(flatchain[:,kk], [0.16, 0.5, 0.84])
+		q_16[:,jj], q_50[:,jj], q_84[:,jj] = np.concatenate((sample_results['quantiles']['q16'],sample_results['extras']['q16'])),
+		              						 np.concatenate((sample_results['quantiles']['q50'],sample_results['extras']['q50'])),
+		              						 np.concatenate((sample_results['quantiles']['q84'],sample_results['extras']['q84']))
 		
 		# miscellaneous output
 		z[jj] = sample_results['model_params'][0]['init'][0]
@@ -91,16 +81,15 @@ def collate_output(runname,outname):
 		output_name=np.append(output_name,filename)
 
 		# grab best-fitting model
-		maxprob = np.max(sample_results['lnprobability'])
-		probind = sample_results['lnprobability'] == maxprob
-		thetas = sample_results['chain'][probind,:]
+		thetamax[:,jj] = np.concatenate((sample_results['quantiles']['maxprob_params'],
+			 							 sample_results['extras']['maxprob_params']))
 
-		# find maximum probability model in old chain
-		# search for match in new chain
-		maxhalf_time,maxsfr_100 = read_results.calc_extra_quantities(sample_results,thetas[0,:].reshape(1,ntheta-nnew))
-		maxssfr_100 = thetas[0,np.array(sample_results['model'].theta_labels()) == 'mass']/maxsfr_100
-		thetamax[:,jj] = np.concatenate((thetas[0,:],maxhalf_time,maxsfr_100,maxssfr_100))
-
+		# save dictionary lists
+		obs.append(sample_results['obs'])
+		model_emline.append(sample_results['model_emline'])
+		ancildat.append(threed_dutils.load_ancil_data(os.getenv('APPS')+'/threedhst_bsfh/data/COSMOS_testsamp.dat',
+			                       outname.split('_')[-1]))
+	
 		print jj
 
 	print 'total galaxies: {0}, successful loads: {1}'.format(ngals,ngals-nfail)
@@ -113,7 +102,10 @@ def collate_output(runname,outname):
 		      'q84': q_84,\
 		      'maxprob': thetamax,\
 		      'mips_sn': mips_sn,\
-		      'z':z}
+		      'z':z,
+		      'obs':obs,
+		      'model_emline':model_emline,
+		      'ancildat':ancildat}
 
 	pickle.dump(output,open(outname, "wb"))
 		
@@ -132,15 +124,8 @@ def plot_driver(runname):
 		ensemble=pickle.load(f)
 	
 	# get SFR_observed
-	ngals = len(ensemble['outname'])
-	sfr_obs = np.zeros(ngals)
-	z_sfr = np.zeros(ngals)
-	for jj in xrange(ngals):
-		ancildat = threed_dutils.load_ancil_data(os.getenv('APPS')+
-			                       '/threedhst_bsfh/data/COSMOS_testsamp.dat',
-			                       ensemble['outname'][jj].split('_')[-1])
-		sfr_obs[jj] = ancildat['sfr']
-		z_sfr[jj] = ancildat['z_sfr']
+	sfr_obs = ensemble['ancildat']['sfr']
+	z_sfr = ensemble['ancildat']['z_sfr']
 	valid_comp = ensemble['z'] > 0
 
 	if np.sum(z_sfr-ensemble['z'][valid_comp]) != 0:
@@ -366,5 +351,13 @@ def photerr_plot(runname, scale=False):
 	plt.savefig(outname_cent+'.png', dpi=300)
 	plt.close()
 
+def nebcomp(runname)
+	inname = os.getenv('APPS')+'/threedhst_bsfh/results/'+runname+'/'+runname+'_ensemble.pickle'
+	outname_errs = os.getenv('APPS') + '/threedhst_bsfh/plots/ensemble_plots/'+runname+'/photerr'
 
-	
+	# if the save file doesn't exist, make it
+	if not os.path.isfile(inname):
+		collate_output(runname,inname)
+
+	with open(inname, "rb") as f:
+		ensemble=pickle.load(f)

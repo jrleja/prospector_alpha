@@ -6,5 +6,6 @@ JOBNUM=$3
 
 for ((  i = 1 ;  i <= $NARRAY;  i++  ))
 do
-  sbatch --dependency=afterany:$JOBNUM_$NARRAY --array=$i-$i $RUNNAME_secondary.sh
+  cmd='sbatch --dependency=afterany:'$JOBNUM'_'$i' --array='$i'-'$i' '$RUNNAME'_secondary.sh'
+  $cmd
 done
