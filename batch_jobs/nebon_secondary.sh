@@ -11,12 +11,12 @@
 ### memory per cpu, in MB
 #SBATCH --mem-per-cpu=2000
 ### Job name
-#SBATCH -J 'secondary'
+#SBATCH -J 'nebon_sec_%a'
 ### output and error logs
-#SBATCH -o secondary_%a.out
-#SBATCH -e secondary_%a.err
+#SBATCH -o nebon_sec_%a.out
+#SBATCH -e nebon_sec_%a.err
 ### mail
 #SBATCH --mail-type=END
 #SBATCH --mail-user=joel.leja@gmail.com
 ### source activate pympi
-python $APPS/threedhst_bsfh/code/extra_output.py $APPS/threedhst_bsfh/parameter_files/nebon/halpha_selected_nebon_params_1.py 
+python $APPS/threedhst_bsfh/code/extra_output.py $APPS/threedhst_bsfh/parameter_files/nebon/halpha_selected_nebon_params_$SLURM_ARRAY_TASK_ID.py 

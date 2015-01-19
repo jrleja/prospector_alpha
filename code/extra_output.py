@@ -228,7 +228,7 @@ def post_processing(param_name, add_extra=True):
 	threedhst_diag.make_all_plots(sample_results=sample_results,filebase=outname)
 
 if __name__ == "__main__":
-	post_processing(sys.argv[1:])
+	post_processing(sys.argv[1])
 
 
 
