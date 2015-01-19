@@ -343,7 +343,9 @@ model_params[parmlist.index('zred')]['init'] = zbest
 ####### RESET AGE PRIORS TO MATCH AGE OF UNIVERSE ##########
 tuniv = WMAP9.age(model_params[0]['init']).value
 
-# initialize tage, set max on sf_start, initialize and bound tburst
+# set tage
+# set max on sf_start
+# initialize and bound tburst
 model_params[parmlist.index('tage')]['init'] = 1.2*tuniv
 model_params[parmlist.index('sf_start')]['prior_args']['maxi'] = 0.5*tuniv
 model_params[parmlist.index('tburst')]['init'] = 1.2*tuniv-0.5

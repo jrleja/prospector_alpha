@@ -1,5 +1,19 @@
 import numpy as np
-import os
+import os, fsps
+from bsfh import model_setup
+
+def setup_sps():
+
+	'''
+	easy way to define an SPS
+	'''
+
+	# load stellar population, set up custom filters
+	sps = fsps.StellarPopulation(zcontinuous=2, compute_vega_mags=False)
+	custom_filter_keys = os.getenv('APPS')+'/threedhst_bsfh/filters/filter_keys_threedhst.txt'
+	fsps.filters.FILTERS = model_setup.custom_filter_dict(custom_filter_keys)
+
+	return sps
 
 def generate_basenames(runname):
 
@@ -51,7 +65,7 @@ def generate_basenames(runname):
 
 	return filebase,parm
 
-def chop_chain(sample_results):
+def chop_chain(chain):
 	'''
 	simple placeholder
 	will someday replace with a test for convergence to determine where to chop
@@ -59,7 +73,7 @@ def chop_chain(sample_results):
 	'''
 	nchop=1.66
 
-	flatchain = sample_results['chain'][:,int(sample_results['chain'].shape[1]/nchop):,:]
+	flatchain = chain[:,int(chain.shape[1]/nchop):,:]
 	flatchain = flatchain.reshape(flatchain.shape[0] * flatchain.shape[1],
                                   flatchain.shape[2])
 
