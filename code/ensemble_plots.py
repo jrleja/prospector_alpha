@@ -28,6 +28,9 @@ def collate_output(runname,outname):
 	pri[0].x = min([p.fun for p in pr])   <--- if this is true, then the minimization process chose the processor with initial conditions
 	np.array([p.x for p in pr])
 	'''
+	'''
+	THIS WHOLE THING NEEDS TO BE REWRITTEN
+	'''
 
 	filebase,params=threed_dutils.generate_basenames(runname)
 	ngals = len(filebase)
