@@ -1,4 +1,4 @@
-import os, threed_dutils, triangle, pickle
+import os, threed_dutils, triangle, pickle, extra_output
 from bsfh import read_results
 import numpy as np
 import matplotlib.pyplot as plt
@@ -27,9 +27,6 @@ def collate_output(runname,outname):
 	also output information about the powell minimization process
 	pri[0].x = min([p.fun for p in pr])   <--- if this is true, then the minimization process chose the processor with initial conditions
 	np.array([p.x for p in pr])
-	'''
-	'''
-	THIS WHOLE THING NEEDS TO BE REWRITTEN
 	'''
 
 	filebase,params=threed_dutils.generate_basenames(runname)
@@ -62,17 +59,27 @@ def collate_output(runname,outname):
 			nfail+=1
 			continue
 
+		# check for existence of extra information
+		try:
+			sample_results['quantiles']
+		except:
+			print 'Generating extra information for '+mcmc_filename+', '+model_filename
+			extra_output.post_processing(params[jj])
+			sample_results, powell_results, model = read_results.read_pickles(mcmc_filename, model_file=model_filename,inmod=None)
+
 		# initialize output arrays if necessary
 		ntheta = len(sample_results['initial_theta'])+len(sample_results['extras']['parnames'])
-		if jj == 0:
+		try:
+			q_16
+		except:
 			q_16, q_50, q_84, thetamax = (np.zeros(shape=(ntheta,ngals))+np.nan for i in range(4))
 			z, mips_sn = (np.zeros(ngals) for i in range(2))
 			output_name = np.empty(0,dtype='object')
 			obs,model_emline,ancildat = [],[],[]
 
 		# insert percentiles
-		q_16[:,jj], q_50[:,jj], q_84[:,jj] = np.concatenate((sample_results['quantiles']['q16'],sample_results['extras']['q16'])),
-		              						 np.concatenate((sample_results['quantiles']['q50'],sample_results['extras']['q50'])),
+		q_16[:,jj], q_50[:,jj], q_84[:,jj] = np.concatenate((sample_results['quantiles']['q16'],sample_results['extras']['q16'])),\
+		              						 np.concatenate((sample_results['quantiles']['q50'],sample_results['extras']['q50'])),\
 		              						 np.concatenate((sample_results['quantiles']['q84'],sample_results['extras']['q84']))
 		
 		# miscellaneous output
@@ -82,13 +89,13 @@ def collate_output(runname,outname):
 
 		# grab best-fitting model
 		thetamax[:,jj] = np.concatenate((sample_results['quantiles']['maxprob_params'],
-			 							 sample_results['extras']['maxprob_params']))
+			 							 sample_results['extras']['maxprob']))
 
 		# save dictionary lists
 		obs.append(sample_results['obs'])
 		model_emline.append(sample_results['model_emline'])
 		ancildat.append(threed_dutils.load_ancil_data(os.getenv('APPS')+'/threedhst_bsfh/data/COSMOS_testsamp.dat',
-			                       outname.split('_')[-1]))
+			            							  sample_results['run_params']['objname']))
 	
 		print jj
 
@@ -124,8 +131,8 @@ def plot_driver(runname):
 		ensemble=pickle.load(f)
 	
 	# get SFR_observed
-	sfr_obs = ensemble['ancildat']['sfr']
-	z_sfr = ensemble['ancildat']['z_sfr']
+	sfr_obs = np.clip(np.array([x['sfr'][0] for x in ensemble['ancildat']]),1e-2,1e4)
+	z_sfr = np.array([x['z_sfr'] for x in ensemble['ancildat']])
 	valid_comp = ensemble['z'] > 0
 
 	if np.sum(z_sfr-ensemble['z'][valid_comp]) != 0:
@@ -301,7 +308,7 @@ def photerr_plot(runname, scale=False):
 
 	for jj in xrange(nparam):
 		
-		y_data = np.abs(ensemble['q50'][jj,0] / (ensemble['q84'][jj,:]-ensemble['q16'][jj,:]))[::-1]
+		y_data = np.abs(ensemble['q50'][jj,:] / (ensemble['q84'][jj,:]-ensemble['q16'][jj,:]))[::-1]
 		#y_data = y_data*(1.0/y_data[0])
 		y_data = np.log10(y_data)
 
@@ -351,9 +358,12 @@ def photerr_plot(runname, scale=False):
 	plt.savefig(outname_cent+'.png', dpi=300)
 	plt.close()
 
-def nebcomp(runname)
+def nebcomp(runname):
 	inname = os.getenv('APPS')+'/threedhst_bsfh/results/'+runname+'/'+runname+'_ensemble.pickle'
-	outname_errs = os.getenv('APPS') + '/threedhst_bsfh/plots/ensemble_plots/'+runname+'/photerr'
+	outname_errs = os.getenv('APPS') + '/threedhst_bsfh/plots/ensemble_plots/'+runname+'/emline_comp'
+
+	# minimum flux: no model emission line has strength of 0!
+	minmodel_flux = 1e-15
 
 	# if the save file doesn't exist, make it
 	if not os.path.isfile(inname):
@@ -361,3 +371,61 @@ def nebcomp(runname)
 
 	with open(inname, "rb") as f:
 		ensemble=pickle.load(f)
+
+	# extract model
+	# in maggies
+	halpha_q50 = np.clip(np.array([x['q50'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50)
+	halpha_q16 = np.clip(np.array([x['q16'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50)
+	halpha_q84 = np.clip(np.array([x['q84'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50)
+	ha_lam = np.array([x['lam'][x['name'].index('Halpha')] for x in ensemble['model_emline']])[0]
+	halpha_errs = asym_errors(halpha_q50,halpha_q84,halpha_q16,log=True)
+	halpha_q50 = np.log10(halpha_q50)
+
+	# extract observations
+	# flux: 10**-17 ergs / s / cm**2
+	jansky_cgs=1e-23
+	to_flux_density = (2.99e8/(ha_lam*1e-10))
+	conv_factor = (10**(-17))/(jansky_cgs*3631*to_flux_density)
+
+	obs_ha = np.log10(np.array([x['Ha_flux'][0] for x in ensemble['ancildat']])*conv_factor)
+	obs_ha_err = np.array([x['Ha_error'][0] for x in ensemble['ancildat']])*conv_factor
+	
+	fig = plt.figure()
+	ax  = fig.add_subplot(111)
+
+	###### HERE'S THE BIG PLOT ######
+	ax.errorbar(obs_ha,halpha_q50, 
+			    fmt='bo', ecolor='0.20', alpha=0.8,
+			    yerr=halpha_errs,xerr=obs_ha_err,linestyle=' ')
+
+
+	#### formatting ####
+	ax.set_xlabel('observed Ha flux')
+	ax.set_ylabel('model Ha flux')
+
+	# set plot limits to be slightly outside max values
+	dynx, dyny = (np.nanmax(obs_ha)-np.nanmin(obs_ha))*0.05,\
+		         (np.nanmax(halpha_q50)-np.nanmin(halpha_q50))*0.05
+		
+	ax.axis((np.nanmin(obs_ha)-dynx,
+			 np.nanmax(obs_ha)+dynx,
+			 np.nanmin(halpha_q50)-dyny,
+			 np.nanmax(halpha_q50)+dyny,
+			 ))
+	if np.nanmin(obs_ha)-dynx > np.nanmin(halpha_q50)-dyny:
+		min = np.nanmin(halpha_q50)-dyny*3
+	else:
+		min = np.nanmin(obs_ha)-dynx*3
+	if np.nanmax(obs_ha)+dynx > np.nanmax(halpha_q50)+dyny:
+		max = np.nanmax(obs_ha)+dynx*3
+	else:
+		max = np.nanmax(halpha_q50)+dyny*3
+
+	ax.plot([-1e3,1e3],[-1e3,1e3],linestyle='--',color='0.1',alpha=0.8)
+	ax.axis((min,max,min,max))
+
+	plt.savefig(outname_errs+'.png',dpi=300)
+	plt.close()
+
+
+
