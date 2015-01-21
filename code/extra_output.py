@@ -1,6 +1,7 @@
 from bsfh import model_setup,read_results
 import os, threed_dutils, triangle, threedhst_diag, pickle, sys
 import numpy as np
+import matplotlib.pyplot as plt
 from astropy.cosmology import WMAP9
 from scipy.optimize import brentq
 from copy import copy
@@ -27,7 +28,7 @@ def halfmass_assembly_time(tage,tau,sf_start,tburst,fburst,tuniv):
         print 1/0
     return tuniv-half_time
 
-def measure_emline_flux(w,spec,z,emline,wavelength,sideband):
+def measure_emline_flux(w,spec,z,emline,wavelength,sideband,saveplot=False):
 	
 	'''
 	takes spec(on)-spec(off) to measure emission line flux
@@ -40,13 +41,26 @@ def measure_emline_flux(w,spec,z,emline,wavelength,sideband):
 	emline_flux = np.zeros(len(wavelength))
 	
 	for jj in xrange(len(wavelength)):
-		center = np.abs(w-wavelength[jj]) == np.min(np.abs(w-wavelength[jj]))
-		wings = spec[center.nonzero()[0][0]-sideband[jj]:center.nonzero()[0][0]+sideband[jj]]
+		center = (np.abs(w-wavelength[jj]) == np.min(np.abs(w-wavelength[jj]))).nonzero()[0][0]
+		wings = spec[center-sideband[jj]:center+sideband[jj]+1]
 		emline_flux[jj] = np.sum(wings[wings>0.01*spec[center]])
 
+		if saveplot and jj==4:
+			plt.plot(w,spec,'ro',linestyle='-')
+			plt.plot(w[center-sideband[jj]:center+sideband[jj]+1], spec[center-sideband[jj]:center+sideband[jj]+1], 'bo',linestyle=' ')
+			plt.xlim(wavelength[jj]-800,wavelength[jj]+800)
+			plt.ylim(-spec[center]*0.2,spec[center]*1.2)
+			
+			plotlines=['[SIII]','[NII]','Halpha','[SII]']
+			plotlam  =np.array([6312,6583,6563,6725])*(1+z)
+			for kk in xrange(len(plotlam)):
+				plt.vlines(plotlam[kk],plt.ylim()[0],plt.ylim()[1],color='0.5',linestyle='--')
+				plt.text(plotlam[kk],(plt.ylim()[0]+plt.ylim()[1])/2.*(1.0-kk/6.0),plotlines[kk])
+			plt.savefig(os.getenv('APPS')+'/threedhst_bsfh/plots/testem/emline_'+str(saveplot)+'.png',dpi=300)
+			plt.close()
 	return emline_flux
 
-def calc_extra_quantities(sample_results, nsamp_mc=20):
+def calc_extra_quantities(sample_results, nsamp_mc=1000):
 
     # transform SFH values in chain to half-mass assembly time, SFR
     # write analytical expression, based on tau, tage, etc
@@ -86,7 +100,7 @@ def calc_extra_quantities(sample_results, nsamp_mc=20):
 	                                                     sf_start,tburst,fburst)*sample_results['chain'][jj,kk,parnames.index('mass')]/deltat/1e9
 
 			ssfr_100[jj,kk] = sfr_100[jj,kk] / sample_results['chain'][jj,kk,sample_results['model'].theta_labels() == 'mass']
-     
+	     
 	# CALCULATE Q16,Q50,Q84 FOR VARIABLE PARAMETERS
 	ntheta = len(sample_results['initial_theta'])
 	q_16, q_50, q_84 = (np.zeros(ntheta)+np.nan for i in range(3))
@@ -122,7 +136,14 @@ def calc_extra_quantities(sample_results, nsamp_mc=20):
 		spec,mags,w = sample_results['model'].mean_model(thetas, sample_results['obs'], sps=sps, norm_spec=True)
 		sample_results['model'].params['add_neb_emission'] = np.array(False)
 		spec_neboff,mags_neboff,w = sample_results['model'].mean_model(thetas, sample_results['obs'], sps=sps, norm_spec=True)
-		lineflux[jj]= measure_emline_flux(w,spec-spec_neboff,z,emline,wavelength,sideband)
+
+		# randomly save emline fig
+		if jj == 5:
+			saveplot=sample_results['run_params']['objname']
+		else:
+			saveplot=False
+
+		lineflux[jj]= measure_emline_flux(w,spec-spec_neboff,z,emline,wavelength,sideband,saveplot=saveplot)
 
 	##### MAXIMUM PROBABILITY
 	# grab best-fitting model
@@ -143,8 +164,7 @@ def calc_extra_quantities(sample_results, nsamp_mc=20):
 	##### FORMAT EMLINE OUTPUT #####
 	q_16em, q_50em, q_84em, thetamaxem = (np.zeros(nline)+np.nan for i in range(4))
 	for kk in xrange(nline): q_16em[kk], q_50em[kk], q_84em[kk] = triangle.quantile(lineflux[:,kk], [0.16, 0.5, 0.84])
-	emline_info = {'name':emline,
-	               'lam':wavelength,
+	emline_info = {'name':emline,'lam':wavelength,
 	               'fluxchain':lineflux,
 	               'q16':q_16em,
 	               'q50':q_50em,
@@ -175,7 +195,7 @@ def calc_extra_quantities(sample_results, nsamp_mc=20):
 
 	return sample_results
 
-def post_processing(param_name, add_extra=True):
+def post_processing(param_name, add_extra=True, nsamp_mc=1000):
 
 	'''
 	Driver. Loads output, makes all plots for a given galaxy.
@@ -219,7 +239,7 @@ def post_processing(param_name, add_extra=True):
 	if add_extra:
 		print 'ADDING EXTRA OUTPUT FOR ' + filename + ' in ' + outfolder
 		sample_results['flatchain'] = threed_dutils.chop_chain(sample_results['chain'])
-		sample_results = calc_extra_quantities(sample_results)
+		sample_results = calc_extra_quantities(sample_results,nsamp_mc=nsamp_mc)
 	
 		### SAVE OUTPUT HERE
 		pickle.dump(sample_results,open(mcmc_filename, "wb"))
