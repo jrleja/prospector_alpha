@@ -208,20 +208,52 @@ def load_fast_3dhst(filename, objnum):
 
 	return values, fields
 
-def integrate_sfh(t1,t2,tage,tau,sf_start,tburst,fburst):
+def integrate_sfh(t1,t2,mass,tage,tau,sf_start,tburst,fburst):
 	
-	if t2 < sf_start:
-		return 0.0
-	elif t2 > tage:
-		return 1.0
+	'''
+	integrate a delayed tau SFH between t1 and t2
+	'''
+	
+	# double or single tau model?
+	# does NOT currently accept different tages
+	# INCOMPLETE EDIT
+	if np.array(mass).size > 1:
+		
+		# if we're outside of the boundaries, return boundary values
+		totmass = np.sum(mass)
+		norm=(mass/totmass)*(1.0-fburst)
+		tot = np.zeros(len(mass))-99
+		
+		tot[t2<sf_start] = 0.0
+		if t2 > tage:
+			return 1.0
+
+		need2calc = (tot == -99)
+		if np.sum(need2calc) > 0:
+			intsfr = (np.exp(-t1/tau[need2calc])*(1+t1/tau[need2calc]) - 
+			          np.exp(-t2/tau[need2calc])*(1+t2/tau[need2calc]))
+
+			tot[need2calc]=intsfr[need2calc]*norm[need2calc]/(np.exp(-sf_start[need2calc]/tau[need2calc])*(sf_start[need2calc]/tau[need2calc]+1)-
+					                               np.exp(-tage    /tau[need2calc])*(tage    /tau[need2calc]+1))
+		if t2 > tburst:
+			tot = tot+fburst
+		intsfr = np.sum(tot)
+		print t2/tage,intsfr
 	else:
+		
+		# if we're outside of the boundaries, return boundary values
+		if t2 < sf_start:
+			return 0.0
+		elif t2 > tage:
+			return 1.0
+
 		intsfr = (np.exp(-t1/tau)*(1+t1/tau) - 
 		          np.exp(-t2/tau)*(1+t2/tau))
 		norm=(1.0-fburst)/(np.exp(-sf_start/tau)*(sf_start/tau+1)-
 				  np.exp(-tage    /tau)*(tage    /tau+1))
 		intsfr=intsfr*norm
-		
-	if t2 > tburst:
-		intsfr=intsfr+fburst
+			
+		if t2 > tburst:
+			intsfr=intsfr+fburst
 
 	return intsfr

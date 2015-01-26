@@ -272,7 +272,7 @@ def sed_figure(sample_results, sps, model,
 		     ms=ms,alpha=alpha,markeredgewidth=0.7,**kwargs)
 	
 	# add most likely spectrum
-	spec,_,w = model.mean_model(sample_results['quantiles']['maxprob_params'], sample_results['obs'], sps=sps, norm_spec=True)
+	spec,_,w = model.mean_model(sample_results['quantiles']['maxprob_params'], sample_results['obs'], sps=sps)
 	nz = spec > 0
 
 	phot.plot(np.log10(w[nz]), np.log10(spec[nz]*(c/(w[nz]/1e10))), linestyle='-',

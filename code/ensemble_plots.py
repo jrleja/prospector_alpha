@@ -3,6 +3,10 @@ from bsfh import read_results
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
+from astropy.cosmology import WMAP9
+
+# minimum flux: no model emission line has strength of 0!
+minmodel_flux = 1e-15
 
 def asym_errors(center, up, down, log=False):
 
@@ -135,6 +139,9 @@ def plot_driver(runname):
 	z_sfr = np.array([x['z_sfr'] for x in ensemble['ancildat']])
 	valid_comp = ensemble['z'] > 0
 
+	# calculate tuniv
+	tuniv=WMAP9.age(ensemble['z'][valid_comp]).value*1.2
+
 	if np.sum(z_sfr-ensemble['z'][valid_comp]) != 0:
 		print "you got some redshift mismatches yo"
 
@@ -149,6 +156,8 @@ def plot_driver(runname):
 	          np.log10(ensemble['q50'][ensemble['parname'] == 'ssfr'][0]),\
 	          np.log10(sfr_obs),\
 	          np.log10(sfr_obs/ensemble['q50'][ensemble['parname'] == 'mass'][0,valid_comp]),\
+	          np.log10(np.clip(np.array([x['q50'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50)),
+	          np.log10(np.clip(np.array([x['q50'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50))
 	          ]
 
 	x_err  = [asym_errors(ensemble['q50'][ensemble['parname'] == 'mass'][0],ensemble['q84'][ensemble['parname'] == 'mass'][0], ensemble['q16'][ensemble['parname'] == 'mass'][0],log=True),\
@@ -162,6 +171,8 @@ def plot_driver(runname):
 			  asym_errors(ensemble['q50'][ensemble['parname'] == 'ssfr'][0],ensemble['q84'][ensemble['parname'] == 'ssfr'][0],ensemble['q16'][ensemble['parname'] == 'sfr'][0],log=True),\
 			  None,\
 			  None,\
+			  asym_errors(np.clip(np.array([x['q50'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50),np.clip(np.array([x['q84'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50),np.clip(np.array([x['q16'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50),log=True),\
+			  asym_errors(np.clip(np.array([x['q50'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50),np.clip(np.array([x['q84'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50),np.clip(np.array([x['q16'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50),log=True)\
 			 ]
 
 	x_labels = [r'log(M) [M$_{\odot}$]',
@@ -175,6 +186,8 @@ def plot_driver(runname):
 	            r'log(sSFR) [yr$^{-1}$]',
 	            r'log(SFR$_{obs}$) [M$_{\odot}$/yr]',
 	            r'log(sSFR$_{obs}$) [yr$^{-1}$]',
+	            r'log(H$\alpha$ flux) [model]',
+	            r'log(H$\alpha$ flux) [model]'
 	            ]
 
 	y_data = [ensemble['q50'][ensemble['parname'] == 'logzsol'][0],\
@@ -188,6 +201,8 @@ def plot_driver(runname):
 	          ensemble['q84'][ensemble['parname'] == 'half_time'][0]-ensemble['q16'][ensemble['parname'] == 'half_time'][0],\
 	          np.log10(ensemble['q50'][ensemble['parname'] == 'sfr'][0,valid_comp]),\
 	          np.log10(ensemble['q50'][ensemble['parname'] == 'ssfr'][0,valid_comp]**-1),\
+	          np.log10(np.clip(tuniv-ensemble['q50'][ensemble['parname'] == 'tburst'][0,valid_comp],1e-2,1e50)),\
+	          np.log10(np.clip(tuniv-ensemble['q50'][ensemble['parname'] == 'tau'][0,valid_comp],1e-2,1e50)),\
 	          ]
 
 	y_err  = [asym_errors(ensemble['q50'][ensemble['parname'] == 'logzsol'][0],ensemble['q84'][ensemble['parname'] == 'logzsol'][0],ensemble['q16'][ensemble['parname'] == 'logzsol'][0]),\
@@ -201,6 +216,8 @@ def plot_driver(runname):
 			  None,\
 			  asym_errors(ensemble['q50'][ensemble['parname'] == 'sfr'][0,valid_comp],ensemble['q84'][ensemble['parname'] == 'sfr'][0,valid_comp],ensemble['q16'][ensemble['parname'] == 'sfr'][0,valid_comp],log=True),\
 			  asym_errors(ensemble['q50'][ensemble['parname'] == 'ssfr'][0,valid_comp]**-1,ensemble['q84'][ensemble['parname'] == 'ssfr'][0,valid_comp]**-1,ensemble['q16'][ensemble['parname'] == 'sfr'][0,valid_comp]**-1,log=True),\
+			  asym_errors(np.clip(tuniv-ensemble['q50'][ensemble['parname'] == 'tburst'][0,valid_comp],1e-4,1e50),np.clip(tuniv-ensemble['q84'][ensemble['parname'] == 'tburst'][0,valid_comp],1e-4,1e50),np.clip(tuniv-ensemble['q16'][ensemble['parname'] == 'tburst'][0,valid_comp],1e-4,1e50),log=True),\
+			  asym_errors(np.clip(tuniv-ensemble['q50'][ensemble['parname'] == 'tau'][0,valid_comp],1e-4,1e50),np.clip(tuniv-ensemble['q84'][ensemble['parname'] == 'tau'][0,valid_comp],1e-4,1e50),np.clip(tuniv-ensemble['q16'][ensemble['parname'] == 'tau'][0,valid_comp],1e-4,1e50),log=True)
 			 ]
 
 	y_labels = [r'log(Z$_{\odot}$)',
@@ -214,6 +231,8 @@ def plot_driver(runname):
 	            r'$\sigma$ (t$_{half}$) [Gyr]',
 	            r'log(SFR$_{mcmc}$) [M$_{\odot}$/yr]',
 	            r'log(sSFR$_{mcmc}$) [yr$^{-1}$]',
+	            r'log(t$_{burst}$/Gyr)',
+	            r'log($\tau$/Gyr)'
 	            ]
 
 	plotname = ['mass_metallicity',
@@ -226,7 +245,9 @@ def plot_driver(runname):
 				'mass_sfr',
 				'ssfr_deltahalftime',
 				'sfrobs_sfrmcmc',
-				'ssfrobs_ssfrmcmc']
+				'ssfrobs_ssfrmcmc',
+				'modelemline_tburst',
+				'modelemline_tau']
 
 	assert len(plotname) == len(y_labels) == len(y_err) == len(y_data), 'improper number of y data'
 	assert len(plotname) == len(x_labels) == len(x_err) == len(x_data), 'improper number of x data'
@@ -362,9 +383,6 @@ def nebcomp(runname):
 	inname = os.getenv('APPS')+'/threedhst_bsfh/results/'+runname+'/'+runname+'_ensemble.pickle'
 	outname_errs = os.getenv('APPS') + '/threedhst_bsfh/plots/ensemble_plots/'+runname+'/emline_comp'
 
-	# minimum flux: no model emission line has strength of 0!
-	minmodel_flux = 1e-15
-
 	# if the save file doesn't exist, make it
 	if not os.path.isfile(inname):
 		collate_output(runname,inname)
@@ -427,5 +445,75 @@ def nebcomp(runname):
 	plt.savefig(outname_errs+'.png',dpi=300)
 	plt.close()
 
+def malpha_from_sfr(runname, add_dust=True):
+	inname = os.getenv('APPS')+'/threedhst_bsfh/results/'+runname+'/'+runname+'_ensemble.pickle'
+	outname_errs = os.getenv('APPS') + '/threedhst_bsfh/plots/ensemble_plots/'+runname+'/emline_comp_kscalc'
+	if not add_dust:
+		outname_errs = outname_errs+'_nodust'
 
+	# if the save file doesn't exist, make it
+	if not os.path.isfile(inname):
+		collate_output(runname,inname)
+
+	with open(inname, "rb") as f:
+		ensemble=pickle.load(f)
+
+	# calculate halpha flux based on
+	# eqn 2 in Kennicutt 1998, sfr [100 Myr], and redshift
+	pc2cm = 3.08567758e18
+	imf_fac = 1.7
+	valid_comp = ensemble['z'] > 0
+	l_halpha = 1.26e41*(ensemble['q50'][ensemble['parname'] == 'sfr']*imf_fac)[0,valid_comp]
+	distances = WMAP9.luminosity_distance(ensemble['z'][valid_comp]).value*1e6*pc2cm
+	f_halpha = l_halpha/(4*np.pi*distances**2)/1e-17
+
+	# add in dust dimming
+	# note that should really calculate this in chain to do it properly
+	if add_dust:
+		halpha_lam = 6562.0
+		tau2 = ((halpha_lam/5500.)**ensemble['q50'][ensemble['parname'] == 'dust_index'][0,valid_comp])*ensemble['q50'][ensemble['parname'] == 'dust2'][0,valid_comp]
+		tau1 = ((halpha_lam/5500.)**ensemble['q50'][ensemble['parname'] == 'dust_index'][0,valid_comp])*ensemble['q50'][ensemble['parname'] == 'dust1'][0,valid_comp]
+		tautot = tau2+tau1
+		f_halpha = f_halpha*np.exp(-tautot)
+
+	# pull out observed flux
+	# flux: 10**-17 ergs / s / cm**2
+	obs_ha = np.array([x['Ha_flux'][0] for x in ensemble['ancildat']])
+	obs_ha_err = np.array([x['Ha_error'][0] for x in ensemble['ancildat']])
+
+	# plot
+	fig = plt.figure()
+	ax  = fig.add_subplot(111)
+	obs_ha = np.log10(obs_ha)
+	f_halpha = np.log10(f_halpha)
+	ax.errorbar(obs_ha,f_halpha, 
+			    fmt='bo', ecolor='0.20', alpha=0.8,
+			    linestyle=' ')
+	
+	ax.set_xlabel(r'log(H$\alpha$ flux) [observed]')
+	ax.set_ylabel(r'log(H$\alpha$ flux) [KS-model]')
+
+	# set plot limits to be slightly outside max values
+	dynx, dyny = (np.nanmax(obs_ha)-np.nanmin(obs_ha))*0.05,\
+		         (np.nanmax(f_halpha)-np.nanmin(f_halpha))*0.05
+		
+	ax.axis((np.nanmin(obs_ha)-dynx,
+			 np.nanmax(obs_ha)+dynx,
+			 np.nanmin(f_halpha)-dyny,
+			 np.nanmax(f_halpha)+dyny,
+			 ))
+	if np.nanmin(obs_ha)-dynx > np.nanmin(f_halpha)-dyny:
+		min = np.nanmin(f_halpha)-dyny*3
+	else:
+		min = np.nanmin(obs_ha)-dynx*3
+	if np.nanmax(obs_ha)+dynx > np.nanmax(f_halpha)+dyny:
+		max = np.nanmax(obs_ha)+dynx*3
+	else:
+		max = np.nanmax(f_halpha)+dyny*3
+
+	ax.plot([-1e3,1e3],[-1e3,1e3],linestyle='--',color='0.1',alpha=0.8)
+	ax.axis((min,max,min,max))
+
+	plt.savefig(outname_errs+'.png',dpi=300)
+	plt.close()
 

@@ -6,26 +6,33 @@ from astropy.cosmology import WMAP9
 from scipy.optimize import brentq
 from copy import copy
 
-def sfh_half_time(x,tage,tau,sf_start,tburst,fburst,c):
-	 return threed_dutils.integrate_sfh(sf_start,x,tage,tau,sf_start,tburst,fburst)-c
+def test_csfr_model(model):
 
-def halfmass_assembly_time(tage,tau,sf_start,tburst,fburst,tuniv):
+	# step 1: create model [DONE]
+	# step 2: give it constant SFR [long tau], no dust, put it at z=0
+	# step 3: calculate SFR from SFH parms
+	# step 4: convert SFR to KS-flux
+	# step 5: measure nebon/neboff flux
+	# step 6: plot
+
+	# tau = 100 Gyr
+	# 'fburst', 'sf_start', 'dust1', 'dust2' = 0
+	model.theta[2] = 100
+	model.theta[4:8] = 0
+	model.params['tage']=6
+	model.params['zred']=0
+
+def sfh_half_time(x,mass,tage,tau,sf_start,tburst,fburst,c):
+	 return threed_dutils.integrate_sfh(sf_start,x,mass,tage,tau,sf_start,tburst,fburst)-c
+
+def halfmass_assembly_time(mass,tage,tau,sf_start,tburst,fburst,tuniv):
 
     # calculate half-mass assembly time
     # c = 0.5 if half-mass assembly time occurs before burst
     half_time = brentq(sfh_half_time, 0,14,
-                   args=(tage,tau,sf_start,tburst,fburst,0.5),
-                   rtol=1.48e-08, maxiter=100)
-    if half_time > tburst:
-        
-        # if this triggers, make sure to check that 
-        # brentq properly found the zero
-        c = 0.5+fburst
-        
-        half_time = brentq(sfh_half_time, 0,20,
-                   args=(tage,tau,sf_start,tburst,fburst,c),
-                   rtol=1.48e-08, maxiter=100)
-        print 1/0
+                       args=(mass,tage,tau,sf_start,tburst,fburst,0.5),
+                       rtol=1.48e-08, maxiter=100)
+
     return tuniv-half_time
 
 def measure_emline_flux(w,spec,z,emline,wavelength,sideband,saveplot=False):
@@ -34,8 +41,6 @@ def measure_emline_flux(w,spec,z,emline,wavelength,sideband,saveplot=False):
 	takes spec(on)-spec(off) to measure emission line flux
 	sideband is defined for each emission line after visually 
 	inspecting the spectral sampling density around each line
-
-	I've noticed the [SII] line at 6732.71 can be monstrous!
 	'''
 
 	emline_flux = np.zeros(len(wavelength))
@@ -43,13 +48,15 @@ def measure_emline_flux(w,spec,z,emline,wavelength,sideband,saveplot=False):
 	for jj in xrange(len(wavelength)):
 		center = (np.abs(w-wavelength[jj]) == np.min(np.abs(w-wavelength[jj]))).nonzero()[0][0]
 		wings = spec[center-sideband[jj]:center+sideband[jj]+1]
-		emline_flux[jj] = np.sum(wings[wings>0.01*spec[center]])
+		emline_flux[jj] = np.sum(wings)
+		#factor = 3e18 / wavegrid ** 2
+		#emline_flux[jj] = np.trapz(wings*factor,w[wings])
 
 		if saveplot and jj==4:
 			plt.plot(w,spec,'ro',linestyle='-')
 			plt.plot(w[center-sideband[jj]:center+sideband[jj]+1], spec[center-sideband[jj]:center+sideband[jj]+1], 'bo',linestyle=' ')
 			plt.xlim(wavelength[jj]-800,wavelength[jj]+800)
-			plt.ylim(-spec[center]*0.2,spec[center]*1.2)
+			plt.ylim(-np.max(wings)*0.2,np.max(wings)*1.2)
 			
 			plotlines=['[SIII]','[NII]','Halpha','[SII]']
 			plotlam  =np.array([6312,6583,6563,6725])*(1+z)
@@ -62,17 +69,22 @@ def measure_emline_flux(w,spec,z,emline,wavelength,sideband,saveplot=False):
 
 def calc_extra_quantities(sample_results, nsamp_mc=1000):
 
-    # transform SFH values in chain to half-mass assembly time, SFR
-    # write analytical expression, based on tau, tage, etc
-    # that returns SFR (== int from tage-(DELTAT_SF) to tage)
-    # and half-mass assembly time (== t such that int from zero to t gives int = 0.5, do analytically)
+	'''' 
+	CALCULATED QUANTITIES
+	model nebular emission line strength
+	model star formation history parameters (ssfr,sfr,half-mass time)
+	'''
     
     # save nebon/neboff status
 	nebstatus = sample_results['model'].params['add_neb_emission']
 
     # setup parameter background
-	str_sfh_parms = ['tau','tburst','fburst','sf_start']
+	str_sfh_parms = ['mass','tau','tburst','fburst','sf_start']
 	parnames = sample_results['model'].theta_labels()
+	indexes = []
+	for string in str_sfh_parms:
+		indexes.append(np.char.find(parnames,string) > -1)
+	indexes = np.array(indexes,dtype='bool')
 
     # initialize output arrays for SFH parameters
 	nwalkers,niter = sample_results['chain'].shape[:2]
@@ -81,25 +93,31 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
     # get constants for SFH calculation [MODEL DEPENDENT]
 	tage = sample_results['model'].params['tage'][0]
 	z = sample_results['model'].params['zred'][0]
-	tuniv = WMAP9.age(z).value*1.2
+	tuniv = WMAP9.age(z).value
 	deltat=0.1 # in Gyr
     
     ######## SFH parameters #########
-	for jj in xrange(nwalkers):
-		for kk in xrange(niter):
-        
-			# extract sfh parameters
-			sfh_parms = [sample_results['chain'][jj,kk,i] for i in xrange(len(parnames)) if parnames[i] in str_sfh_parms]
-			tau,tburst,fburst,sf_start = sfh_parms
+	if 1 == 0:
+		for jj in xrange(nwalkers):
+			for kk in xrange(niter):
 	        
-			# calculate half-mass assembly time, sfr
-			half_time[jj,kk] = halfmass_assembly_time(tage,tau,sf_start,tburst,fburst,tuniv)
-	        
-			# calculate sfr
-			sfr_100[jj,kk] = threed_dutils.integrate_sfh(tage-deltat,tage,tage,tau,
-	                                                     sf_start,tburst,fburst)*sample_results['chain'][jj,kk,parnames.index('mass')]/deltat/1e9
+				# extract sfh parameters
+				sfh_parms = []
+				for ll in xrange(len(str_sfh_parms)):
+					if np.sum(indexes[ll]) > 0:
+						sfh_parms.append(sample_results['chain'][jj,kk,indexes[ll]])
+					else:
+						sfh_parms.append(np.array([x['init'] for x in sample_results['model'].config_list if x['name'] == str_sfh_parms[ll]]))
+				mass,tau,tburst,fburst,sf_start = sfh_parms
+		        
+				# calculate half-mass assembly time, sfr
+				half_time[jj,kk] = halfmass_assembly_time(mass,tage,tau,sf_start,tburst,fburst,tuniv)
+		        
+				# calculate sfr
+				sfr_100[jj,kk] = threed_dutils.integrate_sfh(mass,tage-deltat,tage,tage,tau,
+		                                                     sf_start,tburst,fburst)*np.sum(mass)/(deltat*1e9)
 
-			ssfr_100[jj,kk] = sfr_100[jj,kk] / sample_results['chain'][jj,kk,sample_results['model'].theta_labels() == 'mass']
+				ssfr_100[jj,kk] = sfr_100[jj,kk] / np.sum(mass)
 	     
 	# CALCULATE Q16,Q50,Q84 FOR VARIABLE PARAMETERS
 	ntheta = len(sample_results['initial_theta'])
@@ -133,10 +151,11 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 	for jj in xrange(nsamp_mc):
 		thetas = flatchain[jj,:]
 		sample_results['model'].params['add_neb_emission'] = np.array(True)
-		spec,mags,w = sample_results['model'].mean_model(thetas, sample_results['obs'], sps=sps, norm_spec=True)
+		spec,mags,w = sample_results['model'].mean_model(thetas, sample_results['obs'], sps=sps)
 		sample_results['model'].params['add_neb_emission'] = np.array(False)
-		spec_neboff,mags_neboff,w = sample_results['model'].mean_model(thetas, sample_results['obs'], sps=sps, norm_spec=True)
+		spec_neboff,mags_neboff,w = sample_results['model'].mean_model(thetas, sample_results['obs'], sps=sps)
 
+		print 1/0
 		# randomly save emline fig
 		if jj == 5:
 			saveplot=sample_results['run_params']['objname']
@@ -156,9 +175,9 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 
 	# grab most likely emlines
 	sample_results['model'].params['add_neb_emission'] = np.array(True)
-	spec,mags,w = sample_results['model'].mean_model(thetas, sample_results['obs'], sps=sps, norm_spec=True)
+	spec,mags,w = sample_results['model'].mean_model(thetas, sample_results['obs'], sps=sps)
 	sample_results['model'].params['add_neb_emission'] = np.array(False)
-	spec_neboff,mags_neboff,w = sample_results['model'].mean_model(thetas, sample_results['obs'], sps=sps, norm_spec=True)
+	spec_neboff,mags_neboff,w = sample_results['model'].mean_model(thetas, sample_results['obs'], sps=sps)
 	lineflux_maxprob = measure_emline_flux(w,spec-spec_neboff,z,emline,wavelength,sideband)
 
 	##### FORMAT EMLINE OUTPUT #####
@@ -231,11 +250,17 @@ def post_processing(param_name, add_extra=True, nsamp_mc=1000):
 	
 	try:
 		sample_results, powell_results, model = read_results.read_pickles(mcmc_filename, model_file=model_filename,inmod=None)
-	except:
-		print 'Failed to open '+ mcmc_filename +','+model_filename
+	except ValueError:
+		print mcmc_filename + ' failed during output writing'
+		return 0
+	except IOError:
+		print mcmc_filename + ' does not exist!'
 		return 0
 	
-	
+	#test_csfr_model(sample_results['model'])
+	#print 1/0
+
+
 	if add_extra:
 		print 'ADDING EXTRA OUTPUT FOR ' + filename + ' in ' + outfolder
 		sample_results['flatchain'] = threed_dutils.chop_chain(sample_results['chain'])
