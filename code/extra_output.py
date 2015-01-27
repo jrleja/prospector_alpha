@@ -117,7 +117,7 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 			half_time[jj,kk] = halfmass_assembly_time(mass,tage,tau,sf_start,tburst,fburst,tuniv)
 
 			# calculate sfr
-			sfr_100[jj,kk] = threed_dutils.integrate_sfh(mass,tage-deltat,tage,tage,tau,
+			sfr_100[jj,kk] = threed_dutils.integrate_sfh(tage-deltat,tage,mass,tage,tau,
 	                                                     sf_start,tburst,fburst)*np.sum(mass)/(deltat*1e9)
 
 			ssfr_100[jj,kk] = sfr_100[jj,kk] / np.sum(mass)

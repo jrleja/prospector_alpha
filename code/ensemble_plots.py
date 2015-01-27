@@ -391,7 +391,7 @@ def nebcomp(runname):
 		ensemble=pickle.load(f)
 
 	# extract model
-	# in maggies
+	# 'luminosity' in cgs
 	halpha_q50 = np.clip(np.array([x['q50'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50)
 	halpha_q16 = np.clip(np.array([x['q16'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50)
 	halpha_q84 = np.clip(np.array([x['q84'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50)
