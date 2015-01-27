@@ -50,8 +50,9 @@ def measure_emline_flux(w,spec,z,emline,wavelength,sideband,saveplot=False):
 		center = (np.abs(w-wavelength[jj]) == np.min(np.abs(w-wavelength[jj]))).nonzero()[0][0]
 		bot,top = center-sideband[jj],center+sideband[jj]+1
 		
-		# comes out in cgs
-		factor = 3e18 * constants.L_sun.cgs.value / w**2
+		# comes out in lsun
+		jansky_cgs = 3631*1e-23
+		factor = 3e18 * jansky_cgs / w**2
 		wings = spec[bot:top]*factor[bot:top]
 		emline_flux[jj] = np.trapz(wings, w[bot:top])
 
