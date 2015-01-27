@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from astropy.cosmology import WMAP9
 from scipy.optimize import brentq
 from copy import copy
+from astropy import constants
 
 def test_csfr_model(model):
 
@@ -47,14 +48,16 @@ def measure_emline_flux(w,spec,z,emline,wavelength,sideband,saveplot=False):
 	
 	for jj in xrange(len(wavelength)):
 		center = (np.abs(w-wavelength[jj]) == np.min(np.abs(w-wavelength[jj]))).nonzero()[0][0]
-		wings = spec[center-sideband[jj]:center+sideband[jj]+1]
-		emline_flux[jj] = np.sum(wings)
-		#factor = 3e18 / wavegrid ** 2
-		#emline_flux[jj] = np.trapz(wings*factor,w[wings])
+		bot,top = center-sideband[jj],center+sideband[jj]+1
+		
+		# comes out in cgs
+		factor = 3e18 * constants.L_sun.cgs.value / w**2
+		wings = spec[bot:top]*factor[bot:top]
+		emline_flux[jj] = np.trapz(wings, w[bot:top])
 
 		if saveplot and jj==4:
-			plt.plot(w,spec,'ro',linestyle='-')
-			plt.plot(w[center-sideband[jj]:center+sideband[jj]+1], spec[center-sideband[jj]:center+sideband[jj]+1], 'bo',linestyle=' ')
+			plt.plot(w,spec*factor,'ro',linestyle='-')
+			plt.plot(w[bot:top], wings, 'bo',linestyle=' ')
 			plt.xlim(wavelength[jj]-800,wavelength[jj]+800)
 			plt.ylim(-np.max(wings)*0.2,np.max(wings)*1.2)
 			
@@ -97,27 +100,26 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 	deltat=0.1 # in Gyr
     
     ######## SFH parameters #########
-	if 1 == 0:
-		for jj in xrange(nwalkers):
-			for kk in xrange(niter):
+	for jj in xrange(nwalkers):
+		for kk in xrange(niter):
+	    
+			# extract sfh parameters
+			sfh_parms = []
+			for ll in xrange(len(str_sfh_parms)):
+				if np.sum(indexes[ll]) > 0:
+					sfh_parms.append(sample_results['chain'][jj,kk,indexes[ll]])
+				else:
+					sfh_parms.append(np.array([x['init'] for x in sample_results['model'].config_list if x['name'] == str_sfh_parms[ll]]))
+			mass,tau,tburst,fburst,sf_start = sfh_parms
 	        
-				# extract sfh parameters
-				sfh_parms = []
-				for ll in xrange(len(str_sfh_parms)):
-					if np.sum(indexes[ll]) > 0:
-						sfh_parms.append(sample_results['chain'][jj,kk,indexes[ll]])
-					else:
-						sfh_parms.append(np.array([x['init'] for x in sample_results['model'].config_list if x['name'] == str_sfh_parms[ll]]))
-				mass,tau,tburst,fburst,sf_start = sfh_parms
-		        
-				# calculate half-mass assembly time, sfr
-				half_time[jj,kk] = halfmass_assembly_time(mass,tage,tau,sf_start,tburst,fburst,tuniv)
-		        
-				# calculate sfr
-				sfr_100[jj,kk] = threed_dutils.integrate_sfh(mass,tage-deltat,tage,tage,tau,
-		                                                     sf_start,tburst,fburst)*np.sum(mass)/(deltat*1e9)
+			# calculate half-mass assembly time, sfr
+			half_time[jj,kk] = halfmass_assembly_time(mass,tage,tau,sf_start,tburst,fburst,tuniv)
 
-				ssfr_100[jj,kk] = sfr_100[jj,kk] / np.sum(mass)
+			# calculate sfr
+			sfr_100[jj,kk] = threed_dutils.integrate_sfh(mass,tage-deltat,tage,tage,tau,
+	                                                     sf_start,tburst,fburst)*np.sum(mass)/(deltat*1e9)
+
+			ssfr_100[jj,kk] = sfr_100[jj,kk] / np.sum(mass)
 	     
 	# CALCULATE Q16,Q50,Q84 FOR VARIABLE PARAMETERS
 	ntheta = len(sample_results['initial_theta'])
@@ -155,7 +157,6 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 		sample_results['model'].params['add_neb_emission'] = np.array(False)
 		spec_neboff,mags_neboff,w = sample_results['model'].mean_model(thetas, sample_results['obs'], sps=sps)
 
-		print 1/0
 		# randomly save emline fig
 		if jj == 5:
 			saveplot=sample_results['run_params']['objname']
@@ -256,10 +257,6 @@ def post_processing(param_name, add_extra=True, nsamp_mc=1000):
 	except IOError:
 		print mcmc_filename + ' does not exist!'
 		return 0
-	
-	#test_csfr_model(sample_results['model'])
-	#print 1/0
-
 
 	if add_extra:
 		print 'ADDING EXTRA OUTPUT FOR ' + filename + ' in ' + outfolder
