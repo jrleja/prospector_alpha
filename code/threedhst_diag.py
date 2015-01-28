@@ -12,30 +12,53 @@ plt_chain_figure = 1
 plt_triangle_plot = 1
 plt_sed_figure = 1
 
-def plot_sfh(sfh_parms):
+def plot_sfh(sample_results,nsamp=1000):
 
 	'''
 	create sfh for plotting purposes
 	input: str_sfh_parms = ['tage','tau','tburst','fburst','sf_start']
 	'''
-	tage = sfh_parms[0]
-	tau = sfh_parms[1]
-	tburst = sfh_parms[2]
-	fburst = sfh_parms[3]
-	sf_start = sfh_parms[4]
 
-	#tage = 1.2*tuniv
-	# evenly spaced times for output
+	# find SFH parameters that are variables in the chain
+    # save their indexes for future use
+	str_sfh_parms = ['mass','tau','tburst','fburst','sf_start','tage']
+	parnames = sample_results['model'].theta_labels()
+	indexes = []
+	for string in str_sfh_parms:
+		indexes.append(np.char.find(parnames,string) > -1)
+	indexes = np.array(indexes,dtype='bool')
+
+	# sample randomly from SFH
+	import copy
+	flatchain = copy.copy(sample_results['flatchain'])
+	lineflux = np.empty(shape=(nsamp_mc,nline))
+	np.random.shuffle(flatchain)
+
+	# initialize output variables
 	t=np.linspace(0,tage,num=50)
-	
-	# integrated te^-t/tau, with t = t-tstart
-	# dropped normalization in eqn
-	# re-normalize at end
-	intsfr = np.zeros(len(t))
-	for jj in xrange(len(t)): intsfr[jj] = threed_dutils.integrate_sfh(sf_start,t[jj],
-	                                                                   tage,tau,sf_start,tburst,fburst)
+	intsfr = np.zeros(nsamp,len(t))
 
-	return t, intsfr
+	for mm in xrange(nsamp):
+
+		# combine into an SFH vector that includes non-parameter values
+		sfh_parms = []
+		for ll in xrange(len(str_sfh_parms)):
+			if np.sum(indexes[ll]) > 0:
+				sfh_parms.append(flatchain[mm,indexes[ll])
+			else:
+				_ = [x['init'] for x in sample_results['model'].config_list if x['name'] == str_sfh_parms[ll]][0]
+				if len(_) != np.sum(indexes[0]):
+					_ = np.zeros(np.sum(indexes[0]))+_
+				sfh_parms.append(_)
+		mass,tau,tburst,fburst,sf_start,tage = sfh_parms
+
+		for jj in xrange(len(t)): intsfr[mm,jj] = threed_dutils.integrate_sfh(sf_start,t[jj],mass,
+		                                                                      tage,tau,sf_start,tburst,fburst)
+
+	q = np.zeros(len(t),3)
+	for jj in xrange(len(t)): q[jj,:] = np.percentile(intsfr[:,jj],[16.0,50.0,84.0])
+
+	return t, q
 
 def create_plotquant(sample_results, logplot = ['mass', 'tau', 'tage', 'tburst', 'sf_start']):
     
@@ -283,15 +306,14 @@ def sed_figure(sample_results, sps, model,
                   color='#545454', marker='o', label='observed', alpha=alpha, linestyle=' ',ms=ms)
 	
 	# add SFH plot
-	str_sfh_parms = ['tau','tburst','fburst','sf_start']
-	sfh_parms = [thetas[0][i] for i in xrange(len(thetas[0])) if model.theta_labels()[i] in str_sfh_parms]
-	sfh_parms = [model.params['tage'][0]]+sfh_parms
-	t, intsfh = plot_sfh(sfh_parms)
+	t, q = plot_sfh(sample_results)
 
 	axfontsize=4
 	ax_inset=fig.add_axes([0.17,0.36,0.12,0.14],zorder=32)
-	ax_inset.axis([np.min(t),np.max(t)+0.08*(np.max(t)-np.min(t)),0,1.05])
-	ax_inset.plot(t, intsfh,'-',color='black')
+	axlim_sfh=[np.min(t),np.max(t)+0.08*(np.max(t)-np.min(t)),0,1.05]
+	ax_inset.axis(axlim_sfh)
+	ax_inset.plot(t, q[:,1],'-',color='black')
+	ax_inset.fill_between(axlim_sfh[:2], q[:,0], q[:,2], color='0.75')
 	ax_inset.set_ylabel('cum SFH',fontsize=axfontsize,weight='bold')
 	ax_inset.set_xlabel('t [Gyr]',fontsize=axfontsize,weight='bold')
 	ax_inset.tick_params(labelsize=axfontsize)

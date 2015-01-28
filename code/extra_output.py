@@ -28,13 +28,13 @@ def sfh_half_time(x,mass,tage,tau,sf_start,tburst,fburst,c):
 
 def halfmass_assembly_time(mass,tage,tau,sf_start,tburst,fburst,tuniv):
 
-    # calculate half-mass assembly time
-    # c = 0.5 if half-mass assembly time occurs before burst
-    half_time = brentq(sfh_half_time, 0,14,
+	# calculate half-mass assembly time
+	# c = 0.5 if half-mass assembly time occurs before burst
+	half_time = brentq(sfh_half_time, 0,14,
                        args=(mass,tage,tau,sf_start,tburst,fburst,0.5),
                        rtol=1.48e-08, maxiter=100)
 
-    return tuniv-half_time
+	return tuniv-half_time
 
 def measure_emline_lum(w,spec,emline,wavelength,sideband,saveplot=False):
 	
@@ -83,8 +83,9 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
     # save nebon/neboff status
 	nebstatus = sample_results['model'].params['add_neb_emission']
 
-    # setup parameter background
-	str_sfh_parms = ['mass','tau','tburst','fburst','sf_start']
+    # find SFH parameters that are variables in the chain
+    # save their indexes for future use
+	str_sfh_parms = ['mass','tau','tburst','fburst','sf_start','tage']
 	parnames = sample_results['model'].theta_labels()
 	indexes = []
 	for string in str_sfh_parms:
@@ -96,7 +97,6 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 	half_time,sfr_100,ssfr_100 = [np.zeros(shape=(nwalkers,niter)) for i in range(3)]
 
     # get constants for SFH calculation [MODEL DEPENDENT]
-	tage = sample_results['model'].params['tage'][0]
 	z = sample_results['model'].params['zred'][0]
 	tuniv = WMAP9.age(z).value
 	deltat=0.1 # in Gyr
@@ -106,14 +106,18 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 		for kk in xrange(niter):
 	    
 			# extract sfh parameters
+			# the ELSE finds SFH parameters that are NOT part of the chain
 			sfh_parms = []
 			for ll in xrange(len(str_sfh_parms)):
 				if np.sum(indexes[ll]) > 0:
 					sfh_parms.append(sample_results['chain'][jj,kk,indexes[ll]])
 				else:
-					sfh_parms.append(np.array([x['init'] for x in sample_results['model'].config_list if x['name'] == str_sfh_parms[ll]]))
-			mass,tau,tburst,fburst,sf_start = sfh_parms
-	        
+					_ = [x['init'] for x in sample_results['model'].config_list if x['name'] == str_sfh_parms[ll]][0]
+					if len(_) != np.sum(indexes[0]):
+						_ = np.zeros(np.sum(indexes[0]))+_
+					sfh_parms.append(_)
+			mass,tau,tburst,fburst,sf_start,tage = sfh_parms
+
 			# calculate half-mass assembly time, sfr
 			half_time[jj,kk] = halfmass_assembly_time(mass,tage,tau,sf_start,tburst,fburst,tuniv)
 
