@@ -6,7 +6,7 @@ import matplotlib.gridspec as gridspec
 from astropy.cosmology import WMAP9
 
 # minimum flux: no model emission line has strength of 0!
-minmodel_flux = 1e-15
+minmodel_flux = 1e-22
 
 def asym_errors(center, up, down, log=False):
 
@@ -258,21 +258,21 @@ def plot_driver(runname):
 		fig = plt.figure()
 		ax = fig.add_subplot(111)
 		
-		ax.errorbar(x_data[jj],y_data[jj], 
+		ax[kk].errorbar(x_data[jj],y_data[jj], 
 			        fmt='bo', linestyle=' ', alpha=0.7)
-		ax.errorbar(x_data[jj],y_data[jj], 
+		ax[kk].errorbar(x_data[jj],y_data[jj], 
 			        fmt=' ', ecolor='0.75', alpha=0.5,
 			        yerr=y_err[jj], xerr=x_err[jj],linestyle=' ',
 			        zorder=-32)
 
-		ax.set_xlabel(x_labels[jj])
-		ax.set_ylabel(y_labels[jj])
+		ax[kk].set_xlabel(x_labels[jj])
+		ax[kk].set_ylabel(y_labels[jj])
 
 		# set plot limits to be slightly outside max values
 		dynx, dyny = (np.nanmax(x_data[jj])-np.nanmin(x_data[jj]))*0.05,\
 		             (np.nanmax(y_data[jj])-np.nanmin(y_data[jj]))*0.05
 		
-		ax.axis((np.nanmin(x_data[jj])-dynx,
+		ax[kk].axis((np.nanmin(x_data[jj])-dynx,
 			     np.nanmax(x_data[jj])+dynx,
 			     np.nanmin(y_data[jj])-dyny,
 			     np.nanmax(y_data[jj])+dyny,
@@ -289,8 +289,8 @@ def plot_driver(runname):
 			else:
 				max = np.nanmax(y_data[jj])+dyny*3
 
-			ax.axis((min,max,min,max))
-			ax.errorbar([-1e3,1e3],[-1e3,1e3],linestyle='--',color='0.1',alpha=0.8)
+			ax[kk].axis((min,max,min,max))
+			ax[kk].errorbar([-1e3,1e3],[-1e3,1e3],linestyle='--',color='0.1',alpha=0.8)
 
 		print 'saving '+outname
  		plt.savefig(outname, dpi=300)
@@ -333,18 +333,18 @@ def photerr_plot(runname, scale=False):
 		#y_data = y_data*(1.0/y_data[0])
 		y_data = np.log10(y_data)
 
-		ax.plot(x_data, y_data[np.isnan(y_data) == 0], 'o', linestyle='-', alpha=0.7, label = ensemble['parname'][jj])
+		ax[kk].plot(x_data, y_data[np.isnan(y_data) == 0], 'o', linestyle='-', alpha=0.7, label = ensemble['parname'][jj])
 
-		ax.set_ylabel('log(relative parameter error)')
-		ax.set_xlabel('log(photometric error) [%]')
+		ax[kk].set_ylabel('log(relative parameter error)')
+		ax[kk].set_xlabel('log(photometric error) [%]')
 
 		dynx = (np.nanmax(x_data)-np.nanmin(x_data))*0.05
 
-		ax.set_xlim([np.nanmin(x_data)-dynx,np.nanmax(x_data)+dynx])
+		ax[kk].set_xlim([np.nanmin(x_data)-dynx,np.nanmax(x_data)+dynx])
 		if scale:
-			ax.set_ylim(-2,2)
+			ax[kk].set_ylim(-2,2)
 
-	ax.legend(loc=0,prop={'size':6},
+	ax[kk].legend(loc=0,prop={'size':6},
 			  frameon=False)
 
 	if scale:
@@ -365,15 +365,15 @@ def photerr_plot(runname, scale=False):
 		y_err = asym_errors(ensemble['q50'][jj,is_data],ensemble['q84'][jj,is_data],ensemble['q16'][jj,is_data])
 		ax = plt.subplot(gs[jj])
 
-		ax.errorbar(x_data,y_data, 
+		ax[kk].errorbar(x_data,y_data, 
 			        fmt='bo', ecolor='0.20', alpha=0.8,
 			        yerr=y_err,linestyle='-')
-		for tick in ax.xaxis.get_major_ticks(): tick.label.set_fontsize(fs) 
-		for tick in ax.yaxis.get_major_ticks(): tick.label.set_fontsize(fs) 
-		ax.set_ylabel(ensemble['parname'][jj],fontsize=fs)
-		ax.set_xlabel('log(photometric error) [%]',fontsize=fs)
+		for tick in ax[kk].xaxis.get_major_ticks(): tick.label.set_fontsize(fs) 
+		for tick in ax[kk].yaxis.get_major_ticks(): tick.label.set_fontsize(fs) 
+		ax[kk].set_ylabel(ensemble['parname'][jj],fontsize=fs)
+		ax[kk].set_xlabel('log(photometric error) [%]',fontsize=fs)
 
-	ax.legend(loc=0,prop={'size':6},
+	ax[kk].legend(loc=0,prop={'size':6},
 			  frameon=False)
 
 	plt.savefig(outname_cent+'.png', dpi=300)
@@ -404,6 +404,7 @@ def nebcomp(runname):
 	jansky_cgs=1e-23
 	to_flux_density = (2.99e8/(ha_lam*1e-10))
 	conv_factor = (10**(-17))/(jansky_cgs*3631*to_flux_density)
+	conv_factor = 1e-17
 
 	obs_ha = np.log10(np.array([x['Ha_flux'][0] for x in ensemble['ancildat']])*conv_factor)
 	obs_ha_err = np.array([x['Ha_error'][0] for x in ensemble['ancildat']])*conv_factor
@@ -412,20 +413,20 @@ def nebcomp(runname):
 	ax  = fig.add_subplot(111)
 
 	###### HERE'S THE BIG PLOT ######
-	ax.errorbar(obs_ha,halpha_q50, 
+	ax[kk].errorbar(obs_ha,halpha_q50, 
 			    fmt='bo', ecolor='0.20', alpha=0.8,
 			    yerr=halpha_errs,xerr=obs_ha_err,linestyle=' ')
 
 
 	#### formatting ####
-	ax.set_xlabel('observed Ha flux')
-	ax.set_ylabel('model Ha flux')
+	ax[kk].set_xlabel('observed Ha flux')
+	ax[kk].set_ylabel('model Ha flux')
 
 	# set plot limits to be slightly outside max values
 	dynx, dyny = (np.nanmax(obs_ha)-np.nanmin(obs_ha))*0.05,\
 		         (np.nanmax(halpha_q50)-np.nanmin(halpha_q50))*0.05
 		
-	ax.axis((np.nanmin(obs_ha)-dynx,
+	ax[kk].axis((np.nanmin(obs_ha)-dynx,
 			 np.nanmax(obs_ha)+dynx,
 			 np.nanmin(halpha_q50)-dyny,
 			 np.nanmax(halpha_q50)+dyny,
@@ -439,8 +440,8 @@ def nebcomp(runname):
 	else:
 		max = np.nanmax(halpha_q50)+dyny*3
 
-	ax.plot([-1e3,1e3],[-1e3,1e3],linestyle='--',color='0.1',alpha=0.8)
-	ax.axis((min,max,min,max))
+	ax[kk].plot([-1e3,1e3],[-1e3,1e3],linestyle='--',color='0.1',alpha=0.8)
+	ax[kk].axis((min,max,min,max))
 
 	plt.savefig(outname_errs+'.png',dpi=300)
 	plt.close()
@@ -458,7 +459,8 @@ def malpha_from_sfr(runname, add_dust=True):
 	with open(inname, "rb") as f:
 		ensemble=pickle.load(f)
 
-	# calculate halpha flux based on
+	# CALCULATE EXPECTED HALPHA FLUX FROM SFH
+	# ADD IN DUST DIMMING
 	# eqn 2 in Kennicutt 1998, sfr [100 Myr], and redshift
 	pc2cm = 3.08567758e18
 	imf_fac = 1.7
@@ -467,8 +469,6 @@ def malpha_from_sfr(runname, add_dust=True):
 	distances = WMAP9.luminosity_distance(ensemble['z'][valid_comp]).value*1e6*pc2cm
 	f_halpha = l_halpha/(4*np.pi*distances**2)/1e-17
 
-	# add in dust dimming
-	# note that should really calculate this in chain to do it properly
 	if add_dust:
 		halpha_lam = 6562.0
 		tau2 = ((halpha_lam/5500.)**ensemble['q50'][ensemble['parname'] == 'dust_index'][0,valid_comp])*ensemble['q50'][ensemble['parname'] == 'dust2'][0,valid_comp]
@@ -476,44 +476,77 @@ def malpha_from_sfr(runname, add_dust=True):
 		tautot = tau2+tau1
 		f_halpha = f_halpha*np.exp(-tautot)
 
-	# pull out observed flux
+	# EXTRACT MODEL HALPHA FLUX
+	# 'luminosity' in cgs
+	halpha_q50 = np.clip(np.array([x['q50'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50)/1e-17
+	halpha_q16 = np.clip(np.array([x['q16'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50)/1e-17
+	halpha_q84 = np.clip(np.array([x['q84'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50)/1e-17
+	ha_lam = np.array([x['lam'][x['name'].index('Halpha')] for x in ensemble['model_emline']])[0]
+	halpha_errs = asym_errors(halpha_q50,halpha_q84,halpha_q16,log=True)
+
+	# EXTRACT OBSERVED HALPHA FLUX
 	# flux: 10**-17 ergs / s / cm**2
 	obs_ha = np.array([x['Ha_flux'][0] for x in ensemble['ancildat']])
 	obs_ha_err = np.array([x['Ha_error'][0] for x in ensemble['ancildat']])
 
-	# plot
-	fig = plt.figure()
-	ax  = fig.add_subplot(111)
-	obs_ha = np.log10(obs_ha)
-	f_halpha = np.log10(f_halpha)
-	ax.errorbar(obs_ha,f_halpha, 
-			    fmt='bo', ecolor='0.20', alpha=0.8,
-			    linestyle=' ')
+	# SET UP PLOTTING QUANTITIES
+	x_data = [np.log10(obs_ha),
+			  np.log10(obs_ha),
+			  np.log10(halpha_q50)
+			  ]
+
+	x_labels = [r'log(H$\alpha$ flux) [observed]',
+				r'log(H$\alpha$ flux) [observed]',
+				r'log(H$\alpha$ flux) [cloudy]',
+				]
+
+	y_data = [np.log10(halpha_q50),
+			  np.log10(f_halpha),
+			  np.log10(f_halpha)
+			  ]
+
+	y_labels = [r'log(H$\alpha$ flux) [cloudy]',
+				r'log(H$\alpha$ flux) [ks]',
+				r'log(H$\alpha$ flux) [ks]',
+				]
+
+	fig, ax = plt.subplots(1, 3, figsize = (18, 5))
+	for kk in xrange(len(x_data)):
 	
-	ax.set_xlabel(r'log(H$\alpha$ flux) [observed]')
-	ax.set_ylabel(r'log(H$\alpha$ flux) [KS-model]')
+		ax[kk].errorbar(x_data[kk],y_data[kk], 
+			        fmt='bo', ecolor='0.20', alpha=0.8,
+			        linestyle=' ')
 
-	# set plot limits to be slightly outside max values
-	dynx, dyny = (np.nanmax(obs_ha)-np.nanmin(obs_ha))*0.05,\
-		         (np.nanmax(f_halpha)-np.nanmin(f_halpha))*0.05
+		ax[kk].set_xlabel(x_labels[kk])
+		ax[kk].set_ylabel(y_labels[kk])
+
+		# set plot limits to be slightly outside max values
+		dynx, dyny = (np.nanmax(x_data[kk])-np.nanmin(x_data[kk]))*0.05,\
+		         	 (np.nanmax(y_data[kk])-np.nanmin(y_data[kk]))*0.05
 		
-	ax.axis((np.nanmin(obs_ha)-dynx,
-			 np.nanmax(obs_ha)+dynx,
-			 np.nanmin(f_halpha)-dyny,
-			 np.nanmax(f_halpha)+dyny,
-			 ))
-	if np.nanmin(obs_ha)-dynx > np.nanmin(f_halpha)-dyny:
-		min = np.nanmin(f_halpha)-dyny*3
-	else:
-		min = np.nanmin(obs_ha)-dynx*3
-	if np.nanmax(obs_ha)+dynx > np.nanmax(f_halpha)+dyny:
-		max = np.nanmax(obs_ha)+dynx*3
-	else:
-		max = np.nanmax(f_halpha)+dyny*3
+		ax[kk].axis((np.nanmin(x_data[kk])-dynx,
+				 np.nanmax(x_data[kk])+dynx,
+				 np.nanmin(y_data[kk])-dyny,
+				 np.nanmax(y_data[kk])+dyny,
+				 ))
+		if np.nanmin(x_data[kk])-dynx > np.nanmin(y_data[kk])-dyny:
+			min = np.nanmin(y_data[kk])-dyny*3
+		else:
+			min = np.nanmin(x_data[kk])-dynx*3
+		if np.nanmax(x_data[kk])+dynx > np.nanmax(y_data[kk])+dyny:
+			max = np.nanmax(x_data[kk])+dynx*3
+		else:
+			max = np.nanmax(y_data[kk])+dyny*3
 
-	ax.plot([-1e3,1e3],[-1e3,1e3],linestyle='--',color='0.1',alpha=0.8)
-	ax.axis((min,max,min,max))
+		ax[kk].plot([-1e3,1e3],[-1e3,1e3],linestyle='--',color='0.1',alpha=0.8)
+		ax[kk].axis((min,max,min,max))
 
+		ratio = (10**x_data[kk])/(10**y_data[kk])
+		ax[kk].text(min+(max-min)*0.05,min+(max-min)*0.95, 'std(x/y)={0}'.format(ratio.std()))
+		ax[kk].text(min+(max-min)*0.05,min+(max-min)*0.90, 'mean(x/y)={0}'.format(ratio.mean()))
+
+
+	fig.subplots_adjust(wspace=0.30,hspace=0.0)
 	plt.savefig(outname_errs+'.png',dpi=300)
 	plt.close()
 

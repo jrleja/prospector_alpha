@@ -36,10 +36,10 @@ def halfmass_assembly_time(mass,tage,tau,sf_start,tburst,fburst,tuniv):
 
     return tuniv-half_time
 
-def measure_emline_flux(w,spec,z,emline,wavelength,sideband,saveplot=False):
+def measure_emline_lum(w,spec,emline,wavelength,sideband,saveplot=False):
 	
 	'''
-	takes spec(on)-spec(off) to measure emission line flux
+	takes spec(on)-spec(off) to measure emission line luminosity
 	sideband is defined for each emission line after visually 
 	inspecting the spectral sampling density around each line
 	'''
@@ -50,9 +50,10 @@ def measure_emline_flux(w,spec,z,emline,wavelength,sideband,saveplot=False):
 		center = (np.abs(w-wavelength[jj]) == np.min(np.abs(w-wavelength[jj]))).nonzero()[0][0]
 		bot,top = center-sideband[jj],center+sideband[jj]+1
 		
-		# comes out in lsun
-		jansky_cgs = 3631*1e-23
-		factor = 3e18 * jansky_cgs / w**2
+		# spectral units on arrival are flux density (maggies)
+		# we convert first to flux density in fnu, in cgs
+		# then integrate to get the line flux
+		factor = 3e18 / w**2
 		wings = spec[bot:top]*factor[bot:top]
 		emline_flux[jj] = np.trapz(wings, w[bot:top])
 
@@ -63,7 +64,7 @@ def measure_emline_flux(w,spec,z,emline,wavelength,sideband,saveplot=False):
 			plt.ylim(-np.max(wings)*0.2,np.max(wings)*1.2)
 			
 			plotlines=['[SIII]','[NII]','Halpha','[SII]']
-			plotlam  =np.array([6312,6583,6563,6725])*(1+z)
+			plotlam  =np.array([6312,6583,6563,6725])
 			for kk in xrange(len(plotlam)):
 				plt.vlines(plotlam[kk],plt.ylim()[0],plt.ylim()[1],color='0.5',linestyle='--')
 				plt.text(plotlam[kk],(plt.ylim()[0]+plt.ylim()[1])/2.*(1.0-kk/6.0),plotlines[kk])
@@ -101,26 +102,27 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 	deltat=0.1 # in Gyr
     
     ######## SFH parameters #########
-	for jj in xrange(nwalkers):
-		for kk in xrange(niter):
-	    
-			# extract sfh parameters
-			sfh_parms = []
-			for ll in xrange(len(str_sfh_parms)):
-				if np.sum(indexes[ll]) > 0:
-					sfh_parms.append(sample_results['chain'][jj,kk,indexes[ll]])
-				else:
-					sfh_parms.append(np.array([x['init'] for x in sample_results['model'].config_list if x['name'] == str_sfh_parms[ll]]))
-			mass,tau,tburst,fburst,sf_start = sfh_parms
-	        
-			# calculate half-mass assembly time, sfr
-			half_time[jj,kk] = halfmass_assembly_time(mass,tage,tau,sf_start,tburst,fburst,tuniv)
+	if 11 == 00:
+		for jj in xrange(nwalkers):
+			for kk in xrange(niter):
+		    
+				# extract sfh parameters
+				sfh_parms = []
+				for ll in xrange(len(str_sfh_parms)):
+					if np.sum(indexes[ll]) > 0:
+						sfh_parms.append(sample_results['chain'][jj,kk,indexes[ll]])
+					else:
+						sfh_parms.append(np.array([x['init'] for x in sample_results['model'].config_list if x['name'] == str_sfh_parms[ll]]))
+				mass,tau,tburst,fburst,sf_start = sfh_parms
+		        
+				# calculate half-mass assembly time, sfr
+				half_time[jj,kk] = halfmass_assembly_time(mass,tage,tau,sf_start,tburst,fburst,tuniv)
 
-			# calculate sfr
-			sfr_100[jj,kk] = threed_dutils.integrate_sfh(tage-deltat,tage,mass,tage,tau,
-	                                                     sf_start,tburst,fburst)*np.sum(mass)/(deltat*1e9)
+				# calculate sfr
+				sfr_100[jj,kk] = threed_dutils.integrate_sfh(tage-deltat,tage,mass,tage,tau,
+		                                                     sf_start,tburst,fburst)*np.sum(mass)/(deltat*1e9)
 
-			ssfr_100[jj,kk] = sfr_100[jj,kk] / np.sum(mass)
+				ssfr_100[jj,kk] = sfr_100[jj,kk] / np.sum(mass)
 	     
 	# CALCULATE Q16,Q50,Q84 FOR VARIABLE PARAMETERS
 	ntheta = len(sample_results['initial_theta'])
@@ -139,7 +141,7 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
     ######## MODEL CALL PARAMETERS ########
     # measure emission lines
 	emline = ['[OII]','Hbeta','[OIII]1','[OIII]2','Halpha','[SII]']
-	wavelength = np.array([3728,4861.33,4959,5007,6562,6732.71])*(1+z)
+	wavelength = np.array([3728,4861.33,4959,5007,6562,6732.71])
 	sideband   = np.array([20,1,1,1,2,1])
 	nline = len(emline)
 
@@ -164,7 +166,7 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 		else:
 			saveplot=False
 
-		lineflux[jj]= measure_emline_flux(w,spec-spec_neboff,z,emline,wavelength,sideband,saveplot=saveplot)
+		lineflux[jj]= measure_emline_lum(w/(1+z),spec-spec_neboff,emline,wavelength,sideband,saveplot=saveplot)
 
 	##### MAXIMUM PROBABILITY
 	# grab best-fitting model
