@@ -7,7 +7,7 @@ from astropy.cosmology import WMAP9
 from astropy import constants
 
 # minimum flux: no model emission line has strength of 0!
-minmodel_flux = 1e-22
+minmodel_flux = 1e-2
 
 def asym_errors(center, up, down, log=False):
 
@@ -259,21 +259,21 @@ def plot_driver(runname):
 		fig = plt.figure()
 		ax = fig.add_subplot(111)
 		
-		ax[kk].errorbar(x_data[jj],y_data[jj], 
+		ax.errorbar(x_data[jj],y_data[jj], 
 			        fmt='bo', linestyle=' ', alpha=0.7)
-		ax[kk].errorbar(x_data[jj],y_data[jj], 
+		ax.errorbar(x_data[jj],y_data[jj], 
 			        fmt=' ', ecolor='0.75', alpha=0.5,
 			        yerr=y_err[jj], xerr=x_err[jj],linestyle=' ',
 			        zorder=-32)
 
-		ax[kk].set_xlabel(x_labels[jj])
-		ax[kk].set_ylabel(y_labels[jj])
+		ax.set_xlabel(x_labels[jj])
+		ax.set_ylabel(y_labels[jj])
 
 		# set plot limits to be slightly outside max values
 		dynx, dyny = (np.nanmax(x_data[jj])-np.nanmin(x_data[jj]))*0.05,\
 		             (np.nanmax(y_data[jj])-np.nanmin(y_data[jj]))*0.05
 		
-		ax[kk].axis((np.nanmin(x_data[jj])-dynx,
+		ax.axis((np.nanmin(x_data[jj])-dynx,
 			     np.nanmax(x_data[jj])+dynx,
 			     np.nanmin(y_data[jj])-dyny,
 			     np.nanmax(y_data[jj])+dyny,
@@ -290,8 +290,8 @@ def plot_driver(runname):
 			else:
 				max = np.nanmax(y_data[jj])+dyny*3
 
-			ax[kk].axis((min,max,min,max))
-			ax[kk].errorbar([-1e3,1e3],[-1e3,1e3],linestyle='--',color='0.1',alpha=0.8)
+			ax.axis((min,max,min,max))
+			ax.errorbar([-1e3,1e3],[-1e3,1e3],linestyle='--',color='0.1',alpha=0.8)
 
 		print 'saving '+outname
  		plt.savefig(outname, dpi=300)

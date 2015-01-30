@@ -35,7 +35,7 @@ def plot_sfh(sample_results,nsamp=1000):
 
 	# initialize output variables
 	nt = 50
-	intsfr = np.zeros(nsamp,len(nt))
+	intsfr = np.zeros(nsamp,nt)
 
 	for mm in xrange(nsamp):
 
