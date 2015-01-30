@@ -236,9 +236,10 @@ def integrate_sfh(t1,t2,mass,tage,tau,sf_start,tburst,fburst):
 		tot[need2calc]=intsfr[need2calc]*norm[need2calc]/(np.exp(-sf_start[need2calc]/tau[need2calc])*(sf_start[need2calc]/tau[need2calc]+1)-
 				                               np.exp(-tage    /tau[need2calc])*(tage    /tau[need2calc]+1))
 	# add burst
-	tot[t2 > tburst] = tot[t2 > tburst] + fburst
+	need_burst = (t2 > tburst) & (t1 < tburst)
+	tot[need_burst] = tot[need_burst] + fburst
 	intsfr = np.sum(tot)
-	print t2/tage,intsfr
+
 	if intsfr > 1.0:
 		print 1/0
 	return intsfr

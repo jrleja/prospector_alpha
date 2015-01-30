@@ -31,12 +31,11 @@ def plot_sfh(sample_results,nsamp=1000):
 	# sample randomly from SFH
 	import copy
 	flatchain = copy.copy(sample_results['flatchain'])
-	lineflux = np.empty(shape=(nsamp_mc,nline))
 	np.random.shuffle(flatchain)
 
 	# initialize output variables
-	t=np.linspace(0,tage,num=50)
-	intsfr = np.zeros(nsamp,len(t))
+	nt = 50
+	intsfr = np.zeros(nsamp,len(nt))
 
 	for mm in xrange(nsamp):
 
@@ -44,7 +43,7 @@ def plot_sfh(sample_results,nsamp=1000):
 		sfh_parms = []
 		for ll in xrange(len(str_sfh_parms)):
 			if np.sum(indexes[ll]) > 0:
-				sfh_parms.append(flatchain[mm,indexes[ll])
+				sfh_parms.append(flatchain[mm,indexes[ll]])
 			else:
 				_ = [x['init'] for x in sample_results['model'].config_list if x['name'] == str_sfh_parms[ll]][0]
 				if len(_) != np.sum(indexes[0]):
@@ -52,11 +51,14 @@ def plot_sfh(sample_results,nsamp=1000):
 				sfh_parms.append(_)
 		mass,tau,tburst,fburst,sf_start,tage = sfh_parms
 
-		for jj in xrange(len(t)): intsfr[mm,jj] = threed_dutils.integrate_sfh(sf_start,t[jj],mass,
+		if mm == 0:
+			t=np.linspace(0,np.max(tage),num=50)
+
+		for jj in xrange(nt): intsfr[mm,jj] = threed_dutils.integrate_sfh(sf_start,t[jj],mass,
 		                                                                      tage,tau,sf_start,tburst,fburst)
 
-	q = np.zeros(len(t),3)
-	for jj in xrange(len(t)): q[jj,:] = np.percentile(intsfr[:,jj],[16.0,50.0,84.0])
+	q = np.zeros(nt,3)
+	for jj in xrange(nt): q[jj,:] = np.percentile(intsfr[:,jj],[16.0,50.0,84.0])
 
 	return t, q
 

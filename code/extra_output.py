@@ -159,9 +159,9 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 	for jj in xrange(nsamp_mc):
 		thetas = flatchain[jj,:]
 		sample_results['model'].params['add_neb_emission'] = np.array(True)
-		spec,mags,w = sample_results['model'].mean_model(thetas, sample_results['obs'], sps=sps)
+		spec,mags,w = sample_results['model'].mean_model(thetas, sample_results['obs'], sps=sps,norm_spec=False)
 		sample_results['model'].params['add_neb_emission'] = np.array(False)
-		spec_neboff,mags_neboff,w = sample_results['model'].mean_model(thetas, sample_results['obs'], sps=sps)
+		spec_neboff,mags_neboff,w = sample_results['model'].mean_model(thetas, sample_results['obs'], sps=sps,norm_spec=False)
 
 		# randomly save emline fig
 		if jj == 5:
@@ -185,7 +185,7 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 	spec,mags,w = sample_results['model'].mean_model(thetas, sample_results['obs'], sps=sps)
 	sample_results['model'].params['add_neb_emission'] = np.array(False)
 	spec_neboff,mags_neboff,w = sample_results['model'].mean_model(thetas, sample_results['obs'], sps=sps)
-	lineflux_maxprob = measure_emline_flux(w,spec-spec_neboff,z,emline,wavelength,sideband)
+	lineflux_maxprob = measure_emline_lum(w,spec-spec_neboff,emline,wavelength,sideband)
 
 	##### FORMAT EMLINE OUTPUT #####
 	q_16em, q_50em, q_84em, thetamaxem = (np.zeros(nline)+np.nan for i in range(4))

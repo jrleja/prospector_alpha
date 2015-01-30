@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from astropy.cosmology import WMAP9
+from astropy import constants
 
 # minimum flux: no model emission line has strength of 0!
 minmodel_flux = 1e-22
@@ -478,9 +479,10 @@ def malpha_from_sfr(runname, add_dust=True):
 
 	# EXTRACT MODEL HALPHA FLUX
 	# 'luminosity' in cgs
-	halpha_q50 = np.clip(np.array([x['q50'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50)/1e-17
-	halpha_q16 = np.clip(np.array([x['q16'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50)/1e-17
-	halpha_q84 = np.clip(np.array([x['q84'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50)/1e-17
+	factor = (constants.L_sun.cgs.value)/(1e-17)/(4*np.pi*distances**2)
+	halpha_q50 = np.clip(np.array([x['q50'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50)*factor
+	halpha_q16 = np.clip(np.array([x['q16'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50)*factor
+	halpha_q84 = np.clip(np.array([x['q84'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50)*factor
 	ha_lam = np.array([x['lam'][x['name'].index('Halpha')] for x in ensemble['model_emline']])[0]
 	halpha_errs = asym_errors(halpha_q50,halpha_q84,halpha_q16,log=True)
 
@@ -544,7 +546,6 @@ def malpha_from_sfr(runname, add_dust=True):
 		ratio = (10**x_data[kk])/(10**y_data[kk])
 		ax[kk].text(min+(max-min)*0.05,min+(max-min)*0.95, 'std(x/y)={0}'.format(ratio.std()))
 		ax[kk].text(min+(max-min)*0.05,min+(max-min)*0.90, 'mean(x/y)={0}'.format(ratio.mean()))
-
 
 	fig.subplots_adjust(wspace=0.30,hspace=0.0)
 	plt.savefig(outname_errs+'.png',dpi=300)
