@@ -111,10 +111,10 @@ def build_sample():
 
 	# output
 	field = 'COSMOS'
-	fast_str_out = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_testsamp.fout'
-	ancil_str_out = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_testsamp.dat'
-	phot_str_out = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_testsamp.cat'
-	id_str_out   = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_testsamp.ids'
+	fast_str_out = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_oiii_em.fout'
+	ancil_str_out = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_oiii_em.dat'
+	phot_str_out = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_oiii_em.cat'
+	id_str_out   = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_oiii_em.ids'
 
 	# load data
 	# use grism redshift
@@ -129,7 +129,7 @@ def build_sample():
 	good = (phot['use_phot'] == 1) & \
 	       (rf['L153'] > 0) & (rf['L155'] > 0) & (rf['L161'] > 0) & \
 	       (phot['f_IRAC4'] < 1e7) & (phot['f_IRAC3'] < 1e7) & (phot['f_IRAC2'] < 1e7) & (phot['f_IRAC1'] < 1e7) & \
-	       (lineinfo['use_grism1'] == 1) & (lineinfo['Ha_EQW_obs']/lineinfo['Ha_EQW_obs_err'] > 2)
+	       (lineinfo['use_grism1'] == 1) & (lineinfo['OIII_EQW_obs']/lineinfo['OIII_EQW_obs_err'] > 2)
 
 	phot = phot[good]
 	fast = fast[good]
@@ -140,7 +140,6 @@ def build_sample():
 	# define UVJ flag, S/N, HA EQW
 	uvj_flag = calc_uvj_flag(rf)
 	sn_F160W = phot['f_F160W']/phot['e_F160W']
-	Ha_EQW_obs = lineinfo['Ha_EQW_obs']
 	fast['z'] = lineinfo['zgris']
 	lineinfo.rename_column('zgris' , 'z')
 	lineinfo['uvj_flag'] = uvj_flag
@@ -149,8 +148,9 @@ def build_sample():
 	lineinfo['z_sfr'] = mips['z_best']
 	
 	# split into bins
-	lowlim = np.percentile(Ha_EQW_obs,65)
-	highlim = np.percentile(Ha_EQW_obs,95)
+	Ha_EQW_obs = lineinfo['OIII_EQW_obs']
+	lowlim = np.percentile(Ha_EQW_obs,35)
+	highlim = np.percentile(Ha_EQW_obs,85)
 	
 	selection = (Ha_EQW_obs > lowlim) & (Ha_EQW_obs < highlim)
 	random_index = random.sample(xrange(np.sum(selection)), 108)

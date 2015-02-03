@@ -108,7 +108,7 @@ def collate_output(runname,outname):
 	print 'saving in {0}'.format(outname)
 
 	output = {'outname': output_name,\
-			  'parname': np.array(sample_results['model'].theta_labels() + ['half_time','sfr','ssfr']),\
+			  'parname': np.array(sample_results['model'].theta_labels() + ['half_time','sfr_10','sfr_100','sfr_1000','ssfr_100']),\
 		      'q16': q_16,\
 		      'q50': q_50,\
 		      'q84': q_84,\
@@ -146,49 +146,65 @@ def plot_driver(runname):
 	if np.sum(z_sfr-ensemble['z'][valid_comp]) != 0:
 		print "you got some redshift mismatches yo"
 
+	# get observed emission line strength
+	obs_ha = np.array([x['Ha_flux'][0] for x in ensemble['ancildat']])
+	obs_ha_err = np.array([x['Ha_error'][0] for x in ensemble['ancildat']])
+
+	# convert to luminosity
+	pc2cm = 3.08567758e18
+	distances = WMAP9.luminosity_distance(ensemble['z'][valid_comp]).value*1e6*pc2cm
+	lobs_halpha = obs_ha*(4*np.pi*distances**2)*1e-17
+	lobs_halpha_err = obs_ha_err*(4*np.pi*distances**2)*1e-17
+
 	x_data = [np.log10(ensemble['q50'][ensemble['parname'] == 'mass'][0]),\
 	          ensemble['q84'][ensemble['parname'] == 'dust_index'][0]-ensemble['q16'][ensemble['parname'] == 'dust_index'][0],\
 	          ensemble['q84'][ensemble['parname'] == 'dust_index'][0]-ensemble['q16'][ensemble['parname'] == 'dust_index'][0],\
 	          ensemble['mips_sn'],\
-	          np.log10(ensemble['q50'][ensemble['parname'] == 'sfr'][0]),\
-	          np.log10(ensemble['q50'][ensemble['parname'] == 'sfr'][0]),\
-	          np.log10(ensemble['q50'][ensemble['parname'] == 'sfr'][0]),\
+	          np.log10(ensemble['q50'][ensemble['parname'] == 'sfr_100'][0]),\
+	          np.log10(ensemble['q50'][ensemble['parname'] == 'sfr_100'][0]),\
+	          np.log10(ensemble['q50'][ensemble['parname'] == 'sfr_100'][0]),\
 	          np.log10(ensemble['q50'][ensemble['parname'] == 'mass'][0]),\
-	          np.log10(ensemble['q50'][ensemble['parname'] == 'ssfr'][0]),\
+	          np.log10(ensemble['q50'][ensemble['parname'] == 'ssfr_100'][0]),\
+	          np.log10(sfr_obs),\
 	          np.log10(sfr_obs),\
 	          np.log10(sfr_obs/ensemble['q50'][ensemble['parname'] == 'mass'][0,valid_comp]),\
 	          np.log10(np.clip(np.array([x['q50'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50)),
-	          np.log10(np.clip(np.array([x['q50'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50))
+	          np.log10(np.clip(np.array([x['q50'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50)),
+	          np.log10(lobs_halpha)
 	          ]
 
 	x_err  = [asym_errors(ensemble['q50'][ensemble['parname'] == 'mass'][0],ensemble['q84'][ensemble['parname'] == 'mass'][0], ensemble['q16'][ensemble['parname'] == 'mass'][0],log=True),\
 			  None,\
 			  None,\
 			  None,\
-			  asym_errors(ensemble['q50'][ensemble['parname'] == 'sfr'][0],ensemble['q84'][ensemble['parname'] == 'sfr'][0],ensemble['q16'][ensemble['parname'] == 'sfr'][0],log=True),\
-			  asym_errors(ensemble['q50'][ensemble['parname'] == 'sfr'][0],ensemble['q84'][ensemble['parname'] == 'sfr'][0],ensemble['q16'][ensemble['parname'] == 'sfr'][0],log=True),\
-			  asym_errors(ensemble['q50'][ensemble['parname'] == 'sfr'][0],ensemble['q84'][ensemble['parname'] == 'sfr'][0],ensemble['q16'][ensemble['parname'] == 'sfr'][0],log=True),\
+			  asym_errors(ensemble['q50'][ensemble['parname'] == 'sfr_100'][0],ensemble['q84'][ensemble['parname'] == 'sfr_100'][0],ensemble['q16'][ensemble['parname'] == 'sfr_100'][0],log=True),\
+			  asym_errors(ensemble['q50'][ensemble['parname'] == 'sfr_100'][0],ensemble['q84'][ensemble['parname'] == 'sfr_100'][0],ensemble['q16'][ensemble['parname'] == 'sfr_100'][0],log=True),\
+			  asym_errors(ensemble['q50'][ensemble['parname'] == 'sfr_100'][0],ensemble['q84'][ensemble['parname'] == 'sfr_100'][0],ensemble['q16'][ensemble['parname'] == 'sfr_100'][0],log=True),\
 			  asym_errors(ensemble['q50'][ensemble['parname'] == 'mass'][0],ensemble['q84'][ensemble['parname'] == 'mass'][0],ensemble['q16'][ensemble['parname'] == 'mass'][0],log=True),\
-			  asym_errors(ensemble['q50'][ensemble['parname'] == 'ssfr'][0],ensemble['q84'][ensemble['parname'] == 'ssfr'][0],ensemble['q16'][ensemble['parname'] == 'sfr'][0],log=True),\
+			  asym_errors(ensemble['q50'][ensemble['parname'] == 'ssfr_100'][0],ensemble['q84'][ensemble['parname'] == 'ssfr_100'][0],ensemble['q16'][ensemble['parname'] == 'sfr_100'][0],log=True),\
+			  None,\
 			  None,\
 			  None,\
 			  asym_errors(np.clip(np.array([x['q50'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50),np.clip(np.array([x['q84'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50),np.clip(np.array([x['q16'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50),log=True),\
-			  asym_errors(np.clip(np.array([x['q50'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50),np.clip(np.array([x['q84'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50),np.clip(np.array([x['q16'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50),log=True)\
+			  asym_errors(np.clip(np.array([x['q50'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50),np.clip(np.array([x['q84'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50),np.clip(np.array([x['q16'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50),log=True),\
+			  asym_errors(lobs_halpha,lobs_halpha+lobs_halpha_err,lobs_halpha-lobs_halpha_err,log=True)\
 			 ]
 
 	x_labels = [r'log(M) [M$_{\odot}$]',
 	            r'$\sigma$ (dust index)',
 	            r'$\sigma$ (dust index)',
 	            'MIPS S/N',
-	            r'log(SFR) [M$_{\odot}$/yr]',
-	            r'log(SFR) [M$_{\odot}$/yr]',
-	            r'log(SFR) [M$_{\odot}$/yr]',
+	            r'log(SFR_{100}) [M$_{\odot}$/yr]',
+	            r'log(SFR_{100}) [M$_{\odot}$/yr]',
+	            r'log(SFR_{100}) [M$_{\odot}$/yr]',
 	            r'log(M) [M$_{\odot}$]',
-	            r'log(sSFR) [yr$^{-1}$]',
+	            r'log(sSFR_{100}) [yr$^{-1}$]',
+	            r'log(SFR$_{obs}$) [M$_{\odot}$/yr]',
 	            r'log(SFR$_{obs}$) [M$_{\odot}$/yr]',
 	            r'log(sSFR$_{obs}$) [yr$^{-1}$]',
 	            r'log(H$\alpha$ flux) [model]',
-	            r'log(H$\alpha$ flux) [model]'
+	            r'log(H$\alpha$ flux) [model]',
+	            r'log(H$\alpha$ lum) [obs]'
 	            ]
 
 	y_data = [ensemble['q50'][ensemble['parname'] == 'logzsol'][0],\
@@ -198,12 +214,14 @@ def plot_driver(runname):
 	          ensemble['q84'][ensemble['parname'] == 'half_time'][0]-ensemble['q16'][ensemble['parname'] == 'half_time'][0],\
 	          ensemble['q50'][ensemble['parname'] == 'half_time'][0],\
 	          ensemble['q84'][ensemble['parname'] == 'dust1'][0]-ensemble['q16'][ensemble['parname'] == 'dust1'][0],\
-	          np.log10(ensemble['q50'][ensemble['parname'] == 'sfr'][0]),\
+	          np.log10(ensemble['q50'][ensemble['parname'] == 'sfr_100'][0]),\
 	          ensemble['q84'][ensemble['parname'] == 'half_time'][0]-ensemble['q16'][ensemble['parname'] == 'half_time'][0],\
-	          np.log10(ensemble['q50'][ensemble['parname'] == 'sfr'][0,valid_comp]),\
-	          np.log10(ensemble['q50'][ensemble['parname'] == 'ssfr'][0,valid_comp]**-1),\
+	          np.log10(ensemble['q50'][ensemble['parname'] == 'sfr_100'][0,valid_comp]),\
+	          np.log10(ensemble['q50'][ensemble['parname'] == 'sfr_1000'][0,valid_comp]),\
+	          np.log10(ensemble['q50'][ensemble['parname'] == 'ssfr_100'][0,valid_comp]**-1),\
 	          np.log10(np.clip(tuniv-ensemble['q50'][ensemble['parname'] == 'tburst'][0,valid_comp],1e-2,1e50)),\
 	          np.log10(np.clip(tuniv-ensemble['q50'][ensemble['parname'] == 'tau'][0,valid_comp],1e-2,1e50)),\
+	          np.log10(sfr_obs)\
 	          ]
 
 	y_err  = [asym_errors(ensemble['q50'][ensemble['parname'] == 'logzsol'][0],ensemble['q84'][ensemble['parname'] == 'logzsol'][0],ensemble['q16'][ensemble['parname'] == 'logzsol'][0]),\
@@ -213,12 +231,14 @@ def plot_driver(runname):
 			  None,\
 			  asym_errors(ensemble['q50'][ensemble['parname'] == 'half_time'][0],ensemble['q84'][ensemble['parname'] == 'half_time'][0],ensemble['q16'][ensemble['parname'] == 'half_time'][0]),\
 			  None,\
-			  asym_errors(ensemble['q50'][ensemble['parname'] == 'sfr'][0],ensemble['q84'][ensemble['parname'] == 'sfr'][0],ensemble['q16'][ensemble['parname'] == 'sfr'][0],log=True),\
+			  asym_errors(ensemble['q50'][ensemble['parname'] == 'sfr_100'][0],ensemble['q84'][ensemble['parname'] == 'sfr_100'][0],ensemble['q16'][ensemble['parname'] == 'sfr_100'][0],log=True),\
 			  None,\
-			  asym_errors(ensemble['q50'][ensemble['parname'] == 'sfr'][0,valid_comp],ensemble['q84'][ensemble['parname'] == 'sfr'][0,valid_comp],ensemble['q16'][ensemble['parname'] == 'sfr'][0,valid_comp],log=True),\
-			  asym_errors(ensemble['q50'][ensemble['parname'] == 'ssfr'][0,valid_comp]**-1,ensemble['q84'][ensemble['parname'] == 'ssfr'][0,valid_comp]**-1,ensemble['q16'][ensemble['parname'] == 'sfr'][0,valid_comp]**-1,log=True),\
+			  asym_errors(ensemble['q50'][ensemble['parname'] == 'sfr_100'][0,valid_comp],ensemble['q84'][ensemble['parname'] == 'sfr_100'][0,valid_comp],ensemble['q16'][ensemble['parname'] == 'sfr_100'][0,valid_comp],log=True),\
+			  asym_errors(ensemble['q50'][ensemble['parname'] == 'sfr_1000'][0,valid_comp],ensemble['q84'][ensemble['parname'] == 'sfr_1000'][0,valid_comp],ensemble['q16'][ensemble['parname'] == 'sfr_1000'][0,valid_comp],log=True),\
+			  asym_errors(ensemble['q50'][ensemble['parname'] == 'ssfr_100'][0,valid_comp]**-1,ensemble['q84'][ensemble['parname'] == 'ssfr_100'][0,valid_comp]**-1,ensemble['q16'][ensemble['parname'] == 'sfr_100'][0,valid_comp]**-1,log=True),\
 			  asym_errors(np.clip(tuniv-ensemble['q50'][ensemble['parname'] == 'tburst'][0,valid_comp],1e-4,1e50),np.clip(tuniv-ensemble['q84'][ensemble['parname'] == 'tburst'][0,valid_comp],1e-4,1e50),np.clip(tuniv-ensemble['q16'][ensemble['parname'] == 'tburst'][0,valid_comp],1e-4,1e50),log=True),\
-			  asym_errors(np.clip(tuniv-ensemble['q50'][ensemble['parname'] == 'tau'][0,valid_comp],1e-4,1e50),np.clip(tuniv-ensemble['q84'][ensemble['parname'] == 'tau'][0,valid_comp],1e-4,1e50),np.clip(tuniv-ensemble['q16'][ensemble['parname'] == 'tau'][0,valid_comp],1e-4,1e50),log=True)
+			  asym_errors(np.clip(tuniv-ensemble['q50'][ensemble['parname'] == 'tau'][0,valid_comp],1e-4,1e50),np.clip(tuniv-ensemble['q84'][ensemble['parname'] == 'tau'][0,valid_comp],1e-4,1e50),np.clip(tuniv-ensemble['q16'][ensemble['parname'] == 'tau'][0,valid_comp],1e-4,1e50),log=True),\
+			  None\
 			 ]
 
 	y_labels = [r'log(Z$_{\odot}$)',
@@ -228,27 +248,32 @@ def plot_driver(runname):
 	            r'$\sigma$ (t$_{half}$) [Gyr]',
 	            r't$_{half}$ [Gyr]',
 	            r'$\sigma$ (dust1)',
-	            r'log(SFR) [M$_{\odot}$/yr]',
+	            r'log(SFR_{100}) [M$_{\odot}$/yr]',
 	            r'$\sigma$ (t$_{half}$) [Gyr]',
-	            r'log(SFR$_{mcmc}$) [M$_{\odot}$/yr]',
-	            r'log(sSFR$_{mcmc}$) [yr$^{-1}$]',
+	            r'log(SFR$_{mcmc,100}$) [M$_{\odot}$/yr]',
+	            r'log(SFR$_{mcmc,1000}$) [M$_{\odot}$/yr]',
+	            r'log(sSFR$_{mcmc,100}$) [yr$^{-1}$]',
 	            r'log(t$_{burst}$/Gyr)',
-	            r'log($\tau$/Gyr)'
+	            r'log($\tau$/Gyr)',
+	            r'log(SFR$_{obs}$) [M$_{\odot}$/yr]',
 	            ]
 
 	plotname = ['mass_metallicity',
 				'deltadustindex_deltadust1',
 				'deltadustindex_deltadust2',
 				'mipssn_deltaqpah',
-				'sfr_deltahalftime',
-				'sfr_halftime',
-				'sfr_deltadust1',
-				'mass_sfr',
+				'sfr100_deltahalftime',
+				'sfr100_halftime',
+				'sfr100_deltadust1',
+				'mass_sfr100',
 				'ssfr_deltahalftime',
-				'sfrobs_sfrmcmc',
-				'ssfrobs_ssfrmcmc',
+				'sfrobs_sfrmcmc100',
+				'sfrobs_sfrmcmc1000',
+				'ssfrobs_ssfrmcmc100',
 				'modelemline_tburst',
-				'modelemline_tau']
+				'modelemline_tau',
+				'obsemline_sfrobs'
+				]
 
 	assert len(plotname) == len(y_labels) == len(y_err) == len(y_data), 'improper number of y data'
 	assert len(plotname) == len(x_labels) == len(x_err) == len(x_data), 'improper number of x data'
@@ -451,7 +476,7 @@ def malpha_from_sfr(runname, add_dust=True):
 	inname = os.getenv('APPS')+'/threedhst_bsfh/results/'+runname+'/'+runname+'_ensemble.pickle'
 	outname_errs = os.getenv('APPS') + '/threedhst_bsfh/plots/ensemble_plots/'+runname+'/emline_comp_kscalc'
 	if not add_dust:
-		outname_errs = outname_errs+'_nodust'
+		outname_errs = outname_errs+'_nodust_'
 
 	# if the save file doesn't exist, make it
 	if not os.path.isfile(inname):
@@ -460,94 +485,97 @@ def malpha_from_sfr(runname, add_dust=True):
 	with open(inname, "rb") as f:
 		ensemble=pickle.load(f)
 
-	# CALCULATE EXPECTED HALPHA FLUX FROM SFH
-	# ADD IN DUST DIMMING
-	# eqn 2 in Kennicutt 1998, sfr [100 Myr], and redshift
-	pc2cm = 3.08567758e18
-	imf_fac = 1.7
-	valid_comp = ensemble['z'] > 0
-	l_halpha = 1.26e41*(ensemble['q50'][ensemble['parname'] == 'sfr']*imf_fac)[0,valid_comp]
-	distances = WMAP9.luminosity_distance(ensemble['z'][valid_comp]).value*1e6*pc2cm
-	f_halpha = l_halpha/(4*np.pi*distances**2)/1e-17
+	sfr_str = ['10','100','1000']
+	for bobo in xrange(len(sfr_str)):
 
-	if add_dust:
-		halpha_lam = 6562.0
-		tau2 = ((halpha_lam/5500.)**ensemble['q50'][ensemble['parname'] == 'dust_index'][0,valid_comp])*ensemble['q50'][ensemble['parname'] == 'dust2'][0,valid_comp]
-		tau1 = ((halpha_lam/5500.)**ensemble['q50'][ensemble['parname'] == 'dust_index'][0,valid_comp])*ensemble['q50'][ensemble['parname'] == 'dust1'][0,valid_comp]
-		tautot = tau2+tau1
-		f_halpha = f_halpha*np.exp(-tautot)
+		# CALCULATE EXPECTED HALPHA FLUX FROM SFH
+		# ADD IN DUST DIMMING
+		# eqn 2 in Kennicutt 1998, sfr [100 Myr], and redshift
+		pc2cm = 3.08567758e18
+		imf_fac = 1.7
+		valid_comp = ensemble['z'] > 0
+		l_halpha = 1.26e41*(ensemble['q50'][ensemble['parname'] == 'sfr_'+sfr_str[bobo]]*imf_fac)[0,valid_comp]
+		distances = WMAP9.luminosity_distance(ensemble['z'][valid_comp]).value*1e6*pc2cm
+		f_halpha = l_halpha/(4*np.pi*distances**2)/1e-17
 
-	# EXTRACT MODEL HALPHA FLUX
-	# 'luminosity' in cgs
-	factor = (constants.L_sun.cgs.value)/(1e-17)/(4*np.pi*distances**2)
-	halpha_q50 = np.clip(np.array([x['q50'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50)*factor
-	halpha_q16 = np.clip(np.array([x['q16'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50)*factor
-	halpha_q84 = np.clip(np.array([x['q84'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50)*factor
-	ha_lam = np.array([x['lam'][x['name'].index('Halpha')] for x in ensemble['model_emline']])[0]
-	halpha_errs = asym_errors(halpha_q50,halpha_q84,halpha_q16,log=True)
+		if add_dust:
+			halpha_lam = 6562.0
+			tau2 = ((halpha_lam/5500.)**ensemble['q50'][ensemble['parname'] == 'dust_index'][0,valid_comp])*ensemble['q50'][ensemble['parname'] == 'dust2'][0,valid_comp]
+			tau1 = ((halpha_lam/5500.)**ensemble['q50'][ensemble['parname'] == 'dust_index'][0,valid_comp])*ensemble['q50'][ensemble['parname'] == 'dust1'][0,valid_comp]
+			tautot = tau2#+tau1
+			f_halpha = f_halpha*np.exp(-tautot)
 
-	# EXTRACT OBSERVED HALPHA FLUX
-	# flux: 10**-17 ergs / s / cm**2
-	obs_ha = np.array([x['Ha_flux'][0] for x in ensemble['ancildat']])
-	obs_ha_err = np.array([x['Ha_error'][0] for x in ensemble['ancildat']])
+		# EXTRACT MODEL HALPHA FLUX
+		# 'luminosity' in cgs
+		factor = (constants.L_sun.cgs.value)/(1e-17)/(4*np.pi*distances**2)
+		halpha_q50 = np.clip(np.array([x['q50'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50)*factor
+		halpha_q16 = np.clip(np.array([x['q16'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50)*factor
+		halpha_q84 = np.clip(np.array([x['q84'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50)*factor
+		ha_lam = np.array([x['lam'][x['name'].index('Halpha')] for x in ensemble['model_emline']])[0]
+		halpha_errs = asym_errors(halpha_q50,halpha_q84,halpha_q16,log=True)
 
-	# SET UP PLOTTING QUANTITIES
-	x_data = [np.log10(obs_ha),
-			  np.log10(obs_ha),
-			  np.log10(halpha_q50)
-			  ]
+		# EXTRACT OBSERVED HALPHA FLUX
+		# flux: 10**-17 ergs / s / cm**2
+		obs_ha = np.array([x['Ha_flux'][0] for x in ensemble['ancildat']])
+		obs_ha_err = np.array([x['Ha_error'][0] for x in ensemble['ancildat']])
 
-	x_labels = [r'log(H$\alpha$ flux) [observed]',
-				r'log(H$\alpha$ flux) [observed]',
-				r'log(H$\alpha$ flux) [cloudy]',
-				]
+		# SET UP PLOTTING QUANTITIES
+		x_data = [np.log10(obs_ha),
+				  np.log10(obs_ha),
+				  np.log10(halpha_q50)
+				  ]
 
-	y_data = [np.log10(halpha_q50),
-			  np.log10(f_halpha),
-			  np.log10(f_halpha)
-			  ]
+		x_labels = [r'log(H$\alpha$ flux) [observed]',
+					r'log(H$\alpha$ flux) [observed]',
+					r'log(H$\alpha$ flux) [cloudy]',
+					]
 
-	y_labels = [r'log(H$\alpha$ flux) [cloudy]',
-				r'log(H$\alpha$ flux) [ks]',
-				r'log(H$\alpha$ flux) [ks]',
-				]
+		y_data = [np.log10(halpha_q50),
+				  np.log10(f_halpha),
+				  np.log10(f_halpha)
+				  ]
 
-	fig, ax = plt.subplots(1, 3, figsize = (18, 5))
-	for kk in xrange(len(x_data)):
-	
-		ax[kk].errorbar(x_data[kk],y_data[kk], 
-			        fmt='bo', ecolor='0.20', alpha=0.8,
-			        linestyle=' ')
+		y_labels = [r'log(H$\alpha$ flux) [cloudy]',
+					r'log(H$\alpha$ flux) [ks]',
+					r'log(H$\alpha$ flux) [ks]',
+					]
 
-		ax[kk].set_xlabel(x_labels[kk])
-		ax[kk].set_ylabel(y_labels[kk])
-
-		# set plot limits to be slightly outside max values
-		dynx, dyny = (np.nanmax(x_data[kk])-np.nanmin(x_data[kk]))*0.05,\
-		         	 (np.nanmax(y_data[kk])-np.nanmin(y_data[kk]))*0.05
+		fig, ax = plt.subplots(1, 3, figsize = (18, 5))
+		for kk in xrange(len(x_data)):
 		
-		ax[kk].axis((np.nanmin(x_data[kk])-dynx,
-				 np.nanmax(x_data[kk])+dynx,
-				 np.nanmin(y_data[kk])-dyny,
-				 np.nanmax(y_data[kk])+dyny,
-				 ))
-		if np.nanmin(x_data[kk])-dynx > np.nanmin(y_data[kk])-dyny:
-			min = np.nanmin(y_data[kk])-dyny*3
-		else:
-			min = np.nanmin(x_data[kk])-dynx*3
-		if np.nanmax(x_data[kk])+dynx > np.nanmax(y_data[kk])+dyny:
-			max = np.nanmax(x_data[kk])+dynx*3
-		else:
-			max = np.nanmax(y_data[kk])+dyny*3
+			ax[kk].errorbar(x_data[kk],y_data[kk], 
+				        fmt='bo', ecolor='0.20', alpha=0.8,
+				        linestyle=' ')
 
-		ax[kk].plot([-1e3,1e3],[-1e3,1e3],linestyle='--',color='0.1',alpha=0.8)
-		ax[kk].axis((min,max,min,max))
+			ax[kk].set_xlabel(x_labels[kk])
+			ax[kk].set_ylabel(y_labels[kk])
 
-		ratio = (10**x_data[kk])/(10**y_data[kk])
-		ax[kk].text(min+(max-min)*0.05,min+(max-min)*0.95, 'std(x/y)={0}'.format(ratio.std()))
-		ax[kk].text(min+(max-min)*0.05,min+(max-min)*0.90, 'mean(x/y)={0}'.format(ratio.mean()))
+			# set plot limits to be slightly outside max values
+			dynx, dyny = (np.nanmax(x_data[kk])-np.nanmin(x_data[kk]))*0.05,\
+			         	 (np.nanmax(y_data[kk])-np.nanmin(y_data[kk]))*0.05
+			
+			ax[kk].axis((np.nanmin(x_data[kk])-dynx,
+					 np.nanmax(x_data[kk])+dynx,
+					 np.nanmin(y_data[kk])-dyny,
+					 np.nanmax(y_data[kk])+dyny,
+					 ))
+			if np.nanmin(x_data[kk])-dynx > np.nanmin(y_data[kk])-dyny:
+				min = np.nanmin(y_data[kk])-dyny*3
+			else:
+				min = np.nanmin(x_data[kk])-dynx*3
+			if np.nanmax(x_data[kk])+dynx > np.nanmax(y_data[kk])+dyny:
+				max = np.nanmax(x_data[kk])+dynx*3
+			else:
+				max = np.nanmax(y_data[kk])+dyny*3
 
-	fig.subplots_adjust(wspace=0.30,hspace=0.0)
-	plt.savefig(outname_errs+'.png',dpi=300)
-	plt.close()
+			ax[kk].plot([-1e3,1e3],[-1e3,1e3],linestyle='--',color='0.1',alpha=0.8)
+			ax[kk].axis((min,max,min,max))
+
+			ratio = (10**x_data[kk])/(10**y_data[kk])
+			#ax[kk].text(min+(max-min)*0.05,min+(max-min)*0.95, 'std(x/y)={0}'.format(ratio.std()))
+			#ax[kk].text(min+(max-min)*0.05,min+(max-min)*0.90, 'mean(x/y)={0}'.format(ratio.mean()))
+
+		fig.subplots_adjust(wspace=0.30,hspace=0.0)
+		plt.savefig(outname_errs+'sfr'+sfr_str[bobo]+'.png',dpi=300)
+		plt.close()
 
