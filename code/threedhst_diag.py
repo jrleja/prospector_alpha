@@ -35,7 +35,7 @@ def plot_sfh(sample_results,nsamp=1000):
 
 	# initialize output variables
 	nt = 50
-	intsfr = np.zeros(nsamp,nt)
+	intsfr = np.zeros(shape=(nsamp,nt))
 
 	for mm in xrange(nsamp):
 
@@ -57,7 +57,7 @@ def plot_sfh(sample_results,nsamp=1000):
 		for jj in xrange(nt): intsfr[mm,jj] = threed_dutils.integrate_sfh(sf_start,t[jj],mass,
 		                                                                      tage,tau,sf_start,tburst,fburst)
 
-	q = np.zeros(nt,3)
+	q = np.zeros(shape=(nt,3))
 	for jj in xrange(nt): q[jj,:] = np.percentile(intsfr[:,jj],[16.0,50.0,84.0])
 
 	return t, q
@@ -129,7 +129,7 @@ def return_extent(sample_results):
 		# else check if we butting up against the prior? if so, extend by 10%
 		priors = [f['prior_args'] for f in sample_results['model'].config_list if f['name'] == parnames[ii]][0]
 		if extent[0] == extent[1]:
-			extent = (priors['mini'][0],priors['maxi'][0])
+			extent = (priors['mini'],priors['maxi'])
 		else:
 			extend = (extent[1]-extent[0])*0.12
 			if np.abs(0.5*(priors['mini']-extent[0])/(priors['mini']+extent[0])) < 1e-4:

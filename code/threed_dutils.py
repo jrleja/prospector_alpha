@@ -15,10 +15,101 @@ def setup_sps():
 
 	return sps
 
+def synthetic_emlines(mass,sfr,dust1,dust2,dust_index):
+
+	'''
+	SFR in Msun/yr
+	mass in Msun
+	'''
+
+	# wavelength in angstroms
+	emlines = np.array(['Halpha','Hbeta','Hgamma','[OIII]', '[NII]','[OII]'])
+	lam     = np.array([6563,4861,4341,5007,6583,3727])
+	flux    = np.zeros(shape=(len(lam),len(mass)))
+
+	# calculate SFR
+	#deltat = 0.3 # in Gyr
+	#sfr = integrate_sfh(sps.params['tage']-deltat,
+	#                    sps.params['tage'],
+	#                    [np.array(1.0)],
+	#                    sps.params['tage'],
+	#                    sps.params['tau'],
+	#                    sps.params['sf_start'],
+	#                    sps.params['tburst'],
+	#                    sps.params['fburst'])
+	#sfr = sfr / (1e9*deltat)
+    
+	# calculate Halpha luminosity from KS relationship
+	# comes out in units of [ergs/s]
+	# correct from Chabrier to Salpeter with a factor of 1.7
+	flux[0,:] = 1.26e41 * (sfr*1.7)
+
+	# Halpha: Hbeta: Hgamma = 2.8:1.0:0.47 (Miller 1974)
+	flux[1,:] = flux[0,:]/2.8
+	flux[2,:] = flux[1,:]*0.47
+
+	# [OIII] from Fig 8, http://arxiv.org/pdf/1401.5490v2.pdf
+	# assume [OIII] is a singlet for now
+	# this calculates [5007], add 4959 manually
+	y_ratio=np.array([0.3,0.35,0.5,0.8,1.0,1.3,1.6,2.0,2.7,\
+	       3.0,4.10,4.9,4.9,6.2,6.2])
+	x_ssfr=np.array([1e-10,2e-10,3e-10,4e-10,5e-10,6e-10,7e-10,9e-10,1.2e-9,\
+	       2e-9,3e-9,5e-9,8e-9,1e-8,2e-8])
+	ratio=np.interp(1.0/sfr,x_ssfr,y_ratio)
+
+	# 5007/4959 = 2.88
+	flux[3,:] = ratio*flux[1,:]*(1+1/2.88)
+
+	# from Leja et al. 2013
+	# log[NII/Ha] = -5.36+0.44log(M)
+	lnii_ha = -5.36+0.44*np.log10(mass)
+	flux[4,:] = (10**lnii_ha)*flux[0,:]
+
+	# [Ha / [OII]] vs [NII] / Ha from Hayashi et al. 2013, fig 6
+	# evidence in discussion suggests should add reddening
+	# corresponding to extinction of A(Ha) = 0.35
+	# also should change with metallicity, oh well
+	nii_ha_x = np.array([0.13,0.2,0.3,0.4,0.5])
+	ha_oii_y = np.array([1.1,1.3,2.0,2.9,3.6])
+	ratio = np.interp(flux[4,:]/flux[0,:],nii_ha_x,ha_oii_y)
+	flux[5,:] = (1.0/ratio)*flux[0,:]
+
+	# correct for dust
+	tau2 = ((lam.reshape(len(lam),1)/5500.)**dust_index)*dust2
+	tau1 = ((lam.reshape(len(lam),1)/5500.)**dust_index)*dust1
+	tautot = tau2+tau1
+	flux = flux*np.exp(-tautot)
+
+	# comes out in ergs/s
+	output = {'name': emlines,
+	          'lam': lam,
+	          'flux': flux}
+	return output
+
 def generate_basenames(runname):
 
 	filebase=[]
 	parm=[]
+	ancilname='COSMOS_testsamp.dat'
+
+	if runname == 'neboff_oiii':
+
+		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/COSMOS_oiii_em.ids"
+		ids = np.loadtxt(id_list, dtype='|S20')
+		ngals = len(ids)
+
+		basename = "neboff_oiii"
+		parm_basename = "neboff_oiii_params"
+		ancilname='COSMOS_oiii_em.dat'
+
+		for jj in xrange(ngals):
+			ancildat = load_ancil_data(os.getenv('APPS')+
+			                           '/threedhst_bsfh/data/COSMOS_oiii_em.dat',
+			                           ids[jj])
+			heqw_txt = "%04d" % int(ancildat['Ha_EQW_obs']) 
+			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+basename+'_'+heqw_txt+'_'+ids[jj])
+			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')		
+
 	if runname == 'nebon':
 
 		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/COSMOS_testsamp.ids"
@@ -63,7 +154,7 @@ def generate_basenames(runname):
 			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+basename+'_'+str(errnames[jj])+'_'+id)
 			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/photerr/photerr_params_"+str(jj+1)+'.py')
 
-	return filebase,parm
+	return filebase,parm,ancilname
 
 def chop_chain(chain):
 	'''
@@ -241,5 +332,5 @@ def integrate_sfh(t1,t2,mass,tage,tau,sf_start,tburst,fburst):
 	intsfr = np.sum(tot)
 
 	if intsfr > 1.0:
-		print 1/0
+		print str(intsfr)+' should not be greater than zero!'
 	return intsfr

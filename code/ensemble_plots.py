@@ -34,7 +34,7 @@ def collate_output(runname,outname):
 	np.array([p.x for p in pr])
 	'''
 
-	filebase,params=threed_dutils.generate_basenames(runname)
+	filebase,params,ancilname=threed_dutils.generate_basenames(runname)
 	ngals = len(filebase)
 
 	nfail = 0
@@ -59,9 +59,11 @@ def collate_output(runname,outname):
 
 		try:
 			sample_results, powell_results, model = read_results.read_pickles(mcmc_filename, model_file=model_filename,inmod=None)
-		except:
-			print 'Failed to open '+ mcmc_filename +','+model_filename
-			nfail+=1
+		except (ValueError,EOFError):
+			print mcmc_filename + ' failed during output writing'
+			continue
+		except IOError:
+			print mcmc_filename + ' does not exist!'
 			continue
 
 		# check for existence of extra information
@@ -99,7 +101,7 @@ def collate_output(runname,outname):
 		# save dictionary lists
 		obs.append(sample_results['obs'])
 		model_emline.append(sample_results['model_emline'])
-		ancildat.append(threed_dutils.load_ancil_data(os.getenv('APPS')+'/threedhst_bsfh/data/COSMOS_testsamp.dat',
+		ancildat.append(threed_dutils.load_ancil_data(os.getenv('APPS')+'/threedhst_bsfh/data/'+ancilname,
 			            							  sample_results['run_params']['objname']))
 	
 		print jj
@@ -472,11 +474,9 @@ def nebcomp(runname):
 	plt.savefig(outname_errs+'.png',dpi=300)
 	plt.close()
 
-def malpha_from_sfr(runname, add_dust=True):
+def emline_comparison(runname,emline_base='Halpha'):
 	inname = os.getenv('APPS')+'/threedhst_bsfh/results/'+runname+'/'+runname+'_ensemble.pickle'
-	outname_errs = os.getenv('APPS') + '/threedhst_bsfh/plots/ensemble_plots/'+runname+'/emline_comp_kscalc'
-	if not add_dust:
-		outname_errs = outname_errs+'_nodust_'
+	outname_errs = os.getenv('APPS') + '/threedhst_bsfh/plots/ensemble_plots/'+runname+'/emline_comp_kscalc_'+emline_base+'_'
 
 	# if the save file doesn't exist, make it
 	if not os.path.isfile(inname):
@@ -485,59 +485,67 @@ def malpha_from_sfr(runname, add_dust=True):
 	with open(inname, "rb") as f:
 		ensemble=pickle.load(f)
 
+	if emline_base == 'Halpha':
+		obsname='Ha' # name of emission line in ancildat
+		axislabel=r'H$\alpha$' # plot axis name
+		cloudyname='Halpha' # name in CLOUDY data
+
+	if emline_base == '[OIII]':
+		obsname='OIII' # name of emission line in ancildat
+		axislabel='[OIII]' # plot axis name
+		cloudyname='[OIII]1' # name in CLOUDY data
+
+	# make plots for all three timescales
 	sfr_str = ['10','100','1000']
 	for bobo in xrange(len(sfr_str)):
 
 		# CALCULATE EXPECTED HALPHA FLUX FROM SFH
-		# ADD IN DUST DIMMING
-		# eqn 2 in Kennicutt 1998, sfr [100 Myr], and redshift
 		pc2cm = 3.08567758e18
-		imf_fac = 1.7
 		valid_comp = ensemble['z'] > 0
-		l_halpha = 1.26e41*(ensemble['q50'][ensemble['parname'] == 'sfr_'+sfr_str[bobo]]*imf_fac)[0,valid_comp]
 		distances = WMAP9.luminosity_distance(ensemble['z'][valid_comp]).value*1e6*pc2cm
-		f_halpha = l_halpha/(4*np.pi*distances**2)/1e-17
 
-		if add_dust:
-			halpha_lam = 6562.0
-			tau2 = ((halpha_lam/5500.)**ensemble['q50'][ensemble['parname'] == 'dust_index'][0,valid_comp])*ensemble['q50'][ensemble['parname'] == 'dust2'][0,valid_comp]
-			tau1 = ((halpha_lam/5500.)**ensemble['q50'][ensemble['parname'] == 'dust_index'][0,valid_comp])*ensemble['q50'][ensemble['parname'] == 'dust1'][0,valid_comp]
-			tautot = tau2#+tau1
-			f_halpha = f_halpha*np.exp(-tautot)
+		####### NEW WAY (TO COMPARE WITH OLD WAY) #########
+		x=threed_dutils.synthetic_emlines(ensemble['q50'][ensemble['parname'] == 'mass'][0,valid_comp],
+			                              ensemble['q50'][ensemble['parname'] == 'sfr_'+sfr_str[bobo]][0,valid_comp],
+			                              ensemble['q50'][ensemble['parname'] == 'dust1'][0,valid_comp],
+			                              ensemble['q50'][ensemble['parname'] == 'dust2'][0,valid_comp],
+			                              ensemble['q50'][ensemble['parname'] == 'dust_index'][0,valid_comp])
+		x['flux'] = x['flux']/(4*np.pi*distances**2)/1e-17
+		f_emline = x['flux'][x['name'] == emline_base].reshape(np.sum(valid_comp))
 
-		# EXTRACT MODEL HALPHA FLUX
+		# EXTRACT EMISSION LINE FLUX FROM CLOUDY
 		# 'luminosity' in cgs
 		factor = (constants.L_sun.cgs.value)/(1e-17)/(4*np.pi*distances**2)
-		halpha_q50 = np.clip(np.array([x['q50'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50)*factor
-		halpha_q16 = np.clip(np.array([x['q16'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50)*factor
-		halpha_q84 = np.clip(np.array([x['q84'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50)*factor
-		ha_lam = np.array([x['lam'][x['name'].index('Halpha')] for x in ensemble['model_emline']])[0]
-		halpha_errs = asym_errors(halpha_q50,halpha_q84,halpha_q16,log=True)
+		emline_q50 = np.clip(np.array([x['q50'][x['name'].index(cloudyname)] for x in ensemble['model_emline']]),minmodel_flux,1e50)*factor
+		emline_q16 = np.clip(np.array([x['q16'][x['name'].index(cloudyname)] for x in ensemble['model_emline']]),minmodel_flux,1e50)*factor
+		emline_q84 = np.clip(np.array([x['q84'][x['name'].index(cloudyname)] for x in ensemble['model_emline']]),minmodel_flux,1e50)*factor
+		emline_lam = np.array([x['lam'][x['name'].index(cloudyname)] for x in ensemble['model_emline']])[0]
+		emline_errs = asym_errors(emline_q50,emline_q84,emline_q16,log=True)
 
-		# EXTRACT OBSERVED HALPHA FLUX
+		# EXTRACT OBSERVED EMISSION LINE FLUX
 		# flux: 10**-17 ergs / s / cm**2
-		obs_ha = np.array([x['Ha_flux'][0] for x in ensemble['ancildat']])
-		obs_ha_err = np.array([x['Ha_error'][0] for x in ensemble['ancildat']])
+		obs_emline = np.array([x[obsname+'_flux'][0] for x in ensemble['ancildat']])
+		obs_emline_err = np.array([x[obsname+'_error'][0] for x in ensemble['ancildat']])
 
 		# SET UP PLOTTING QUANTITIES
-		x_data = [np.log10(obs_ha),
-				  np.log10(obs_ha),
-				  np.log10(halpha_q50)
+		x_data = [np.log10(obs_emline),
+				  np.log10(obs_emline),
+				  np.log10(emline_q50)
 				  ]
 
-		x_labels = [r'log(H$\alpha$ flux) [observed]',
-					r'log(H$\alpha$ flux) [observed]',
-					r'log(H$\alpha$ flux) [cloudy]',
+		x_labels = [r'log('+axislabel+' flux) [observed]',
+					r'log('+axislabel+' flux) [observed]',
+					r'log('+axislabel+' flux) [cloudy]',
 					]
 
-		y_data = [np.log10(halpha_q50),
-				  np.log10(f_halpha),
-				  np.log10(f_halpha)
+		y_data = [np.log10(emline_q50),
+				  np.log10(f_emline),
+				  np.log10(f_emline)
 				  ]
 
-		y_labels = [r'log(H$\alpha$ flux) [cloudy]',
-					r'log(H$\alpha$ flux) [ks]',
-					r'log(H$\alpha$ flux) [ks]',
+		y_labels = [r'log('+axislabel+' flux) [cloudy]',
+					r'log('+axislabel+' flux) [ks]',
+					r'log('+axislabel+' flux) [ks]',
 					]
 
 		fig, ax = plt.subplots(1, 3, figsize = (18, 5))
