@@ -307,13 +307,17 @@ def integrate_sfh(t1,t2,mass,tage,tau,sf_start,tburst,fburst):
 	
 	# double or single tau model?
 	# does NOT currently accept different tages
-	# INCOMPLETE EDIT
+	# double t2 if not doubled:
+	if len(np.atleast_1d(t2)) == 1:
+		t2 = np.zeros(len(t1))+t2
+
 		
 	totmass = np.sum(mass)
 	norm=(mass/totmass)*(1.0-fburst)
 	tot = np.zeros(len(mass))-99
 	
 	# if we're outside of the boundaries, return boundary values
+	tot[t1<sf_start] = 0.0
 	tot[t2<sf_start] = 0.0
 	tot[t2>tage]     = norm[t2>tage]
 
@@ -321,16 +325,21 @@ def integrate_sfh(t1,t2,mass,tage,tau,sf_start,tburst,fburst):
 	# add tau model
 	need2calc = (tot == -99)
 	if np.sum(need2calc) > 0:
-		intsfr = (np.exp(-t1/tau[need2calc])*(1+t1/tau[need2calc]) - 
-		          np.exp(-t2/tau[need2calc])*(1+t2/tau[need2calc]))
+		intsfr = (np.exp(-t1[need2calc]/tau[need2calc])*(1+t1[need2calc]/tau[need2calc]) - 
+		          np.exp(-t2[need2calc]/tau[need2calc])*(1+t2[need2calc]/tau[need2calc]))
 
-		tot[need2calc]=intsfr[need2calc]*norm[need2calc]/(np.exp(-sf_start[need2calc]/tau[need2calc])*(sf_start[need2calc]/tau[need2calc]+1)-
-				                               np.exp(-tage    /tau[need2calc])*(tage    /tau[need2calc]+1))
+		tot[need2calc]=intsfr*norm[need2calc]/(np.exp(-sf_start[need2calc]/tau[need2calc])*(sf_start[need2calc]/tau[need2calc]+1)-
+				                               np.exp(-tage[need2calc]    /tau[need2calc])*(tage[need2calc]    /tau[need2calc]+1))
 	# add burst
 	need_burst = (t2 > tburst) & (t1 < tburst)
-	tot[need_burst] = tot[need_burst] + fburst
+	tot[need_burst] = tot[need_burst] + fburst[need_burst]
 	intsfr = np.sum(tot)
 
-	if intsfr > 1.0:
-		print str(intsfr)+' should not be greater than zero!'
+	if intsfr > 1.00000001:
+		print intsfr
+		print 'intsfr should not be greater than 1.0!'
+		print 1/0
+	if intsfr < -0.0000001:
+		print intsfr
+		print 1/0
 	return intsfr

@@ -8,9 +8,9 @@ import fsps
 
 tiny_number = 1e-90
 big_number = 1e90
-plt_chain_figure = 1
+plt_chain_figure = 0
 plt_triangle_plot = 1
-plt_sed_figure = 1
+plt_sed_figure = 0
 
 def plot_sfh(sample_results,nsamp=1000):
 
@@ -46,7 +46,7 @@ def plot_sfh(sample_results,nsamp=1000):
 				sfh_parms.append(flatchain[mm,indexes[ll]])
 			else:
 				_ = [x['init'] for x in sample_results['model'].config_list if x['name'] == str_sfh_parms[ll]][0]
-				if len(_) != np.sum(indexes[0]):
+				if len(np.atleast_1d(_)) != np.sum(indexes[0]):
 					_ = np.zeros(np.sum(indexes[0]))+_
 				sfh_parms.append(_)
 		mass,tau,tburst,fburst,sf_start,tage = sfh_parms
@@ -59,7 +59,6 @@ def plot_sfh(sample_results,nsamp=1000):
 
 	q = np.zeros(shape=(nt,3))
 	for jj in xrange(nt): q[jj,:] = np.percentile(intsfr[:,jj],[16.0,50.0,84.0])
-
 	return t, q
 
 def create_plotquant(sample_results, logplot = ['mass', 'tau', 'tage', 'tburst', 'sf_start']):
@@ -78,15 +77,15 @@ def create_plotquant(sample_results, logplot = ['mass', 'tau', 'tage', 'tburst',
     tuniv = WMAP9.age(sample_results['model'].config_list[0]['init']).value*1.2
     redefine = ['tburst','sf_start']
     for par in redefine:
+    	if par in parnames:
+	    	priors = [f['prior_args'] for f in sample_results['model'].config_list if f['name'] == par][0]
 
-    	priors = [f['prior_args'] for f in sample_results['model'].config_list if f['name'] == par][0]
+	    	min = priors['mini']
+	    	max = priors['maxi']
+	    	priors['mini'] = np.clip(tuniv-max,tiny_number,big_number)
+	    	priors['maxi'] = tuniv-min
 
-    	min = priors['mini']
-    	max = priors['maxi']
-    	priors['mini'] = np.clip(tuniv-max,tiny_number,big_number)
-    	priors['maxi'] = tuniv-min
-
-    	plotchain[:,:,list(parnames).index(par)] = np.clip(tuniv - plotchain[:,:,list(parnames).index(par)],tiny_number,big_number)
+	    	plotchain[:,:,list(parnames).index(par)] = np.clip(tuniv - plotchain[:,:,list(parnames).index(par)],tiny_number,big_number)
 
 	# define plot quantities and plot names
 	# primarily converting to log or not
@@ -96,13 +95,20 @@ def create_plotquant(sample_results, logplot = ['mass', 'tau', 'tage', 'tburst',
     	# change the plotname, chain values, and priors
     	plotnames=[]
     	for ii in xrange(len(parnames)): 
-    		if parnames[ii] in logplot: 
-    			plotnames.append('log'+parnames[ii])
-    			plotchain[:,:,ii] = np.log10(plotchain[:,:,ii])
-    			priors = [f['prior_args'] for f in sample_results['model'].config_list if f['name'] == parnames[ii]][0]
-    			for k,v in priors.iteritems(): priors[k]=np.log10(v)
-    		else:
-    			plotnames.append(parnames[ii])
+    		
+    		# check for multiple stellar populations
+			if (parnames[ii] in logplot): 
+				plotnames.append('log('+parnames[ii]+')')
+				plotchain[:,:,ii] = np.log10(plotchain[:,:,ii])
+				priors = [f['prior_args'] for f in sample_results['model'].config_list if f['name'] == parnames[ii]][0]
+				for k,v in priors.iteritems(): priors[k]=np.log10(v)
+			elif (parnames[ii][:-2] in logplot):
+				plotnames.append('log('+parnames[ii]+')')
+				plotchain[:,:,ii] = np.log10(plotchain[:,:,ii])
+				priors = [f['prior_args'] for f in sample_results['model'].config_list if f['name'] == parnames[ii][:-2]][0]
+				for k,v in priors.iteritems(): priors[k]=np.log10(v)
+			else:
+				plotnames.append(parnames[ii])
     else:
     	plotnames = [f for f in parnames]
     
@@ -127,14 +133,32 @@ def return_extent(sample_results):
 
 		# is the chain stuck at one point? if so, set the range equal to the prior range
 		# else check if we butting up against the prior? if so, extend by 10%
-		priors = [f['prior_args'] for f in sample_results['model'].config_list if f['name'] == parnames[ii]][0]
+		priors = [f['prior_args'] for f in sample_results['model'].config_list if f['name'] == parnames[ii]]
+
+		# check for multiple stellar populations
+		if len(priors) == 0:
+			priors = [f['prior_args'] for f in sample_results['model'].config_list if f['name'] == parnames[ii][:-2]][0]
+			
+			# separate priors for each component?
+			if len(np.atleast_1d(priors['mini'])) > 1:
+				mini = priors['mini'][int(parnames[ii][-1])-1]
+				maxi = priors['maxi'][int(parnames[ii][-1])-1]
+			else:
+				mini = priors['mini']
+				maxi = priors['maxi']
+		
+		elif len(priors) == 1:
+			priors = priors[0]
+			mini = priors['mini']
+			maxi = priors['maxi']
+
 		if extent[0] == extent[1]:
-			extent = (priors['mini'],priors['maxi'])
+			extent = (mini,maxi)
 		else:
 			extend = (extent[1]-extent[0])*0.12
-			if np.abs(0.5*(priors['mini']-extent[0])/(priors['mini']+extent[0])) < 1e-4:
+			if np.abs(0.5*(mini-extent[0])/(mini+extent[0])) < 1e-4:
 				extent[0]=extent[0]-extend
-			if np.abs(0.5*(priors['maxi']-extent[1])/(priors['maxi']+extent[1])) < 1e-4:
+			if np.abs(0.5*(maxi-extent[1])/(maxi+extent[1])) < 1e-4:
 				extent[1]=extent[1]+extend
     	
 		extents.append((extent[0],extent[1]))
@@ -308,14 +332,13 @@ def sed_figure(sample_results, sps, model,
                   color='#545454', marker='o', label='observed', alpha=alpha, linestyle=' ',ms=ms)
 	
 	# add SFH plot
-	t, q = plot_sfh(sample_results)
-
+	t, perc = plot_sfh(sample_results)
 	axfontsize=4
 	ax_inset=fig.add_axes([0.17,0.36,0.12,0.14],zorder=32)
 	axlim_sfh=[np.min(t),np.max(t)+0.08*(np.max(t)-np.min(t)),0,1.05]
 	ax_inset.axis(axlim_sfh)
-	ax_inset.plot(t, q[:,1],'-',color='black')
-	ax_inset.fill_between(axlim_sfh[:2], q[:,0], q[:,2], color='0.75')
+	ax_inset.plot(t, perc[:,1],'-',color='black')
+	ax_inset.fill_between(t, perc[:,0], perc[:,2], color='0.75')
 	ax_inset.set_ylabel('cum SFH',fontsize=axfontsize,weight='bold')
 	ax_inset.set_xlabel('t [Gyr]',fontsize=axfontsize,weight='bold')
 	ax_inset.tick_params(labelsize=axfontsize)

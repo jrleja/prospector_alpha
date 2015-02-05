@@ -11,7 +11,7 @@ tophat = priors.tophat
 #############
 
 run_params = {'verbose':True,
-              'outfile':os.getenv('APPS')+'/threedhst_bsfh/results/dcsp_neboff/dcsp_neboff',
+              'outfile':os.getenv('APPS')+'/threedhst_bsfh/results/dtau_neboff/dtau_neboff',
               'ftol':0.5e-5, 
               'maxfev':5000,
               'nwalkers':248,
@@ -116,7 +116,6 @@ model_params.append({'name': 'add_agb_dust_model', 'N': 1,
 model_params.append({'name': 'mass', 'N': 2,
                         'isfree': True,
                         'init': np.array([1e10, 1e9]),
-                        'reinit': False,
                         'units': r'M_\odot',
                         'prior_function': tophat,
                         'prior_args': {'mini':np.array([1e7, 1e7]),

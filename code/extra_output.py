@@ -94,7 +94,7 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 
     # initialize output arrays for SFH parameters
 	nwalkers,niter = sample_results['chain'].shape[:2]
-	half_time,sfr_10,sfr_100,sfr_1000,ssfr_100 = [np.zeros(shape=(nwalkers,niter)) for i in range(5)]
+	half_time,sfr_10,sfr_100,sfr_1000,ssfr_100,totmass = [np.zeros(shape=(nwalkers,niter)) for i in range(6)]
 
     # get constants for SFH calculation [MODEL DEPENDENT]
 	z = sample_results['model'].params['zred'][0]
@@ -113,7 +113,7 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 					sfh_parms.append(sample_results['chain'][jj,kk,indexes[ll]])
 				else:
 					_ = [x['init'] for x in sample_results['model'].config_list if x['name'] == str_sfh_parms[ll]][0]
-					if len(_) != np.sum(indexes[0]):
+					if len(np.atleast_1d(_)) != np.sum(indexes[0]):
 						_ = np.zeros(np.sum(indexes[0]))+_
 					sfh_parms.append(_)
 			mass,tau,tburst,fburst,sf_start,tage = sfh_parms
@@ -130,6 +130,8 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 	                                                     sf_start,tburst,fburst)*np.sum(mass)/(deltat[2]*1e9)
 
 			ssfr_100[jj,kk] = sfr_100[jj,kk] / np.sum(mass)
+
+			totmass[jj,kk] = np.sum(mass)
 	     
 	# CALCULATE Q16,Q50,Q84 FOR VARIABLE PARAMETERS
 	ntheta = len(sample_results['initial_theta'])
@@ -141,7 +143,8 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 		                     sfr_10.reshape(sfr_10.shape[0],sfr_10.shape[1],1), 
 		                     sfr_100.reshape(sfr_100.shape[0],sfr_100.shape[1],1), 
 		                     sfr_1000.reshape(sfr_1000.shape[0],sfr_1000.shape[1],1), 
-		                     ssfr_100.reshape(ssfr_100.shape[0],ssfr_100.shape[1],1)))
+		                     ssfr_100.reshape(ssfr_100.shape[0],ssfr_100.shape[1],1),
+		                     totmass.reshape(ssfr_100.shape[0],totmass.shape[1],1)))
 	extra_flatchain = threed_dutils.chop_chain(extra_chain)
 	nextra = extra_chain.shape[-1]
 	q_16e, q_50e, q_84e = (np.zeros(nextra)+np.nan for i in range(3))
@@ -184,7 +187,7 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 	thetas = sample_results['chain'][probind,:]
 	if type(thetas[0]) != np.dtype('float64'):
 		thetas = thetas[0]
-	maxhalf_time,maxsfr_10,maxsfr_100,maxsfr_1000,maxssfr_100 = extra_chain[probind.nonzero()[0][0],probind.nonzero()[1][0],:]
+	maxhalf_time,maxsfr_10,maxsfr_100,maxsfr_1000,maxssfr_100,maxtotmass = extra_chain[probind.nonzero()[0][0],probind.nonzero()[1][0],:]
 
 	# grab most likely emlines
 	sample_results['model'].params['add_neb_emission'] = np.array(True)
@@ -207,8 +210,8 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 	# EXTRA PARAMETER OUTPUTS #
 	extras = {'chain': extra_chain,
 			  'flatchain': extra_flatchain,
-			  'parnames': np.array(['half_time','sfr_10','sfr_100','sfr_1000','ssfr_100']),
-			  'maxprob': np.array([maxhalf_time,maxsfr_10,maxsfr_100,maxsfr_1000,maxssfr_100]),
+			  'parnames': np.array(['half_time','sfr_10','sfr_100','sfr_1000','ssfr_100','totmass']),
+			  'maxprob': np.array([maxhalf_time,maxsfr_10,maxsfr_100,maxsfr_1000,maxssfr_100,maxtotmass]),
 			  'q16': q_16e,
 			  'q50': q_50e,
 			  'q84': q_84e}
