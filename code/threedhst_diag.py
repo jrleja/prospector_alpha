@@ -63,47 +63,47 @@ def plot_sfh(sample_results,nsamp=1000):
 
 def create_plotquant(sample_results, logplot = ['mass', 'tau', 'tage', 'tburst', 'sf_start']):
     
-    '''
-    creates plottable versions of chain and sets up new plotnames
-    '''
-    
-    # set up plot chain, parnames
-    plotchain = copy.deepcopy(sample_results['chain'])
-    parnames = np.array(sample_results['model'].theta_labels())
-    
-    # properly define timescales in certain parameters
-    # will have to redefine after inserting p(z)
-    # note that we switch prior min/max here!!
-    tuniv = WMAP9.age(sample_results['model'].config_list[0]['init']).value*1.2
-    redefine = ['tburst','sf_start']
-	
+	'''
+	creates plottable versions of chain and sets up new plotnames
+	'''
+
+	# set up plot chain, parnames
+	plotchain = copy.deepcopy(sample_results['chain'])
+	parnames = np.array(sample_results['model'].theta_labels())
+
+	# properly define timescales in certain parameters
+	# will have to redefine after inserting p(z)
+	# note that we switch prior min/max here!!
+	tuniv = WMAP9.age(sample_results['model'].config_list[0]['init']).value*1.2
+	redefine = ['tburst','sf_start']
+
 	# check for multiple stellar populations
 	for ii in xrange(len(parnames)):    	
-    	if parnames[ii] in redefine:
-	    	priors = [f['prior_args'] for f in sample_results['model'].config_list if f['name'] == parnames[ii]][0]
-	    	min = priors['mini']
-	    	max = priors['maxi']
-	    	priors['mini'] = np.clip(tuniv-max,tiny_number,big_number)
-	    	priors['maxi'] = tuniv-min
+		if parnames[ii] in redefine:
+			priors = [f['prior_args'] for f in sample_results['model'].config_list if f['name'] == parnames[ii]][0]
+			min = priors['mini']
+			max = priors['maxi']
+			priors['mini'] = np.clip(tuniv-max,tiny_number,big_number)
+			priors['maxi'] = tuniv-min
 
-	    	plotchain[:,:,list(parnames).index(parnames[ii])] = np.clip(tuniv - plotchain[:,:,list(parnames).index(parnames[ii])],tiny_number,big_number)
-	    
-	    elif parnames[ii][:-2] in redefine:
-	    	priors = [f['prior_args'] for f in sample_results['model'].config_list if f['name'] == parnames[ii][:-2]][0]
-	    	min = priors['mini']
-	    	max = priors['maxi']
-	    	priors['mini'] = np.clip(tuniv-max,tiny_number,big_number)
-	    	priors['maxi'] = tuniv-min
+			plotchain[:,:,list(parnames).index(parnames[ii])] = np.clip(tuniv - plotchain[:,:,list(parnames).index(parnames[ii])],tiny_number,big_number)
 
-	    	plotchain[:,:,list(parnames).index(parnames[ii][:-2])] = np.clip(tuniv - plotchain[:,:,list(parnames).index(parnames[ii][:-2])],tiny_number,big_number)	    	
+		elif parnames[ii][:-2] in redefine:
+			priors = [f['prior_args'] for f in sample_results['model'].config_list if f['name'] == parnames[ii][:-2]][0]
+			min = priors['mini']
+			max = priors['maxi']
+			priors['mini'] = np.clip(tuniv-max,tiny_number,big_number)
+			priors['maxi'] = tuniv-min
+
+			plotchain[:,:,list(parnames).index(parnames[ii][:-2])] = np.clip(tuniv - plotchain[:,:,list(parnames).index(parnames[ii][:-2])],tiny_number,big_number)	    	
 
 	# define plot quantities and plot names
 	# primarily converting to log or not
-    if logplot is not None:
+	if logplot is not None:
     	
-    	# if we're interested in logging it...
-    	# change the plotname, chain values, and priors
-    	plotnames=[]
+		# if we're interested in logging it...
+		# change the plotname, chain values, and priors
+		plotnames=[]
     	for ii in xrange(len(parnames)): 
     		
     		# check for multiple stellar populations
@@ -119,13 +119,13 @@ def create_plotquant(sample_results, logplot = ['mass', 'tau', 'tage', 'tburst',
 				for k,v in priors.iteritems(): priors[k]=np.log10(v)
 			else:
 				plotnames.append(parnames[ii])
-    else:
-    	plotnames = [f for f in parnames]
+	else:
+		plotnames = [f for f in parnames]
     
-    sample_results['plotnames'] = plotnames
-    sample_results['plotchain'] = plotchain
+	sample_results['plotnames'] = plotnames
+	sample_results['plotchain'] = plotchain
 
-    return sample_results
+	return sample_results
 
 def return_extent(sample_results):    
     
