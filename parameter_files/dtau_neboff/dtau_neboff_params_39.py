@@ -31,7 +31,7 @@ run_params = {'verbose':True,
               'fastname':os.getenv('APPS')+'/threedhst_bsfh/data/COSMOS_testsamp.fout',
               'ancilname':os.getenv('APPS')+'/threedhst_bsfh/data/COSMOS_testsamp.dat',
               'mipsname':os.getenv('APPS')+'/threedhst_bsfh/data/MIPS/cosmos_3dhst.v4.1.4.sfr',
-              'objname':'19723',
+              'objname':'20219',
               }
 
 ############
@@ -81,7 +81,7 @@ class BurstyModel(sedmodel.CSPModel):
             start, end = v
             lnp_prior += np.sum(self._config_dict[k]['prior_function']
                                 (theta[start:end], **self._config_dict[k]['prior_args']))
-
+        
         return lnp_prior
 
 model_type = BurstyModel
@@ -123,7 +123,7 @@ model_params.append({'name': 'mass', 'N': 2,
 
 model_params.append({'name': 'logzsol', 'N': 1,
                         'isfree': True,
-                        'init': 0,
+                        'init': 0.0,
                         'init_disp': 0.75,
                         'reinit': True,
                         'units': r'$\log (Z/Z_\odot)$',
@@ -150,7 +150,8 @@ model_params.append({'name': 'tau', 'N': 2,
                         'init': np.array([10.0, 1.0]),
                         'units': 'Gyr',
                         'prior_function':tophat,
-                        'prior_args': {'mini':0.1, 'maxi':100}})
+                        'prior_args': {'mini':np.array([0.1, 0.1]),
+                                       'maxi':np.array([100.0, 100.0])}})
 
 model_params.append({'name': 'tage', 'N': 1,
                         'isfree': False,
@@ -185,10 +186,11 @@ model_params.append({'name': 'fconst', 'N': 1,
 model_params.append({'name': 'sf_start', 'N': 2,
                         'isfree': True,
                         'reinit': True,
-                        'init': np.array([0.0, 0.0]),
+                        'init': np.array([1.0, 1.0]),
                         'units': 'Gyr',
                         'prior_function': tophat,
-                        'prior_args': {'mini':0.0, 'maxi':14.0}})
+                        'prior_args': {'mini':np.array([0.0, 0.0]),
+                                       'maxi':np.array([14.0, 14.0])}})
 
 ########    IMF  ##############
 model_params.append({'name': 'imf_type', 'N': 1,
@@ -216,12 +218,13 @@ model_params.append({'name': 'dust1', 'N': 1,
 
 model_params.append({'name': 'dust2', 'N': 2,
                         'isfree': True,
-                        'init': np.array([0.35,0.35]),
+                        'init': np.array([0.0,0.0]),
                         'reinit': True,
                         'init_disp': 0.2,
                         'units': '',
                         'prior_function': tophat,
-                        'prior_args': {'mini':0.0, 'maxi':4.0}})
+                        'prior_args': {'mini':np.array([0.0, 0.0]),
+                                       'maxi':np.array([4.0, 4.0])}})
 
 model_params.append({'name': 'dust_index', 'N': 1,
                         'isfree': True,
