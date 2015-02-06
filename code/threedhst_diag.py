@@ -8,9 +8,9 @@ import fsps
 
 tiny_number = 1e-90
 big_number = 1e90
-plt_chain_figure = 0
+plt_chain_figure = 1
 plt_triangle_plot = 1
-plt_sed_figure = 0
+plt_sed_figure = 1
 
 def plot_sfh(sample_results,nsamp=1000):
 
@@ -76,16 +76,26 @@ def create_plotquant(sample_results, logplot = ['mass', 'tau', 'tage', 'tburst',
     # note that we switch prior min/max here!!
     tuniv = WMAP9.age(sample_results['model'].config_list[0]['init']).value*1.2
     redefine = ['tburst','sf_start']
-    for par in redefine:
-    	if par in parnames:
-	    	priors = [f['prior_args'] for f in sample_results['model'].config_list if f['name'] == par][0]
-
+	
+	# check for multiple stellar populations
+	for ii in xrange(len(parnames)):    	
+    	if parnames[ii] in redefine:
+	    	priors = [f['prior_args'] for f in sample_results['model'].config_list if f['name'] == parnames[ii]][0]
 	    	min = priors['mini']
 	    	max = priors['maxi']
 	    	priors['mini'] = np.clip(tuniv-max,tiny_number,big_number)
 	    	priors['maxi'] = tuniv-min
 
-	    	plotchain[:,:,list(parnames).index(par)] = np.clip(tuniv - plotchain[:,:,list(parnames).index(par)],tiny_number,big_number)
+	    	plotchain[:,:,list(parnames).index(parnames[ii])] = np.clip(tuniv - plotchain[:,:,list(parnames).index(parnames[ii])],tiny_number,big_number)
+	    
+	    elif parnames[ii][:-2] in redefine:
+	    	priors = [f['prior_args'] for f in sample_results['model'].config_list if f['name'] == parnames[ii][:-2]][0]
+	    	min = priors['mini']
+	    	max = priors['maxi']
+	    	priors['mini'] = np.clip(tuniv-max,tiny_number,big_number)
+	    	priors['maxi'] = tuniv-min
+
+	    	plotchain[:,:,list(parnames).index(parnames[ii][:-2])] = np.clip(tuniv - plotchain[:,:,list(parnames).index(parnames[ii][:-2])],tiny_number,big_number)	    	
 
 	# define plot quantities and plot names
 	# primarily converting to log or not

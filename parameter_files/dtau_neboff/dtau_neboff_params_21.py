@@ -31,7 +31,7 @@ run_params = {'verbose':True,
               'fastname':os.getenv('APPS')+'/threedhst_bsfh/data/COSMOS_testsamp.fout',
               'ancilname':os.getenv('APPS')+'/threedhst_bsfh/data/COSMOS_testsamp.dat',
               'mipsname':os.getenv('APPS')+'/threedhst_bsfh/data/MIPS/cosmos_3dhst.v4.1.4.sfr',
-              'objname':'19723',
+              'objname':'5196',
               }
 
 ############
@@ -150,7 +150,8 @@ model_params.append({'name': 'tau', 'N': 2,
                         'init': np.array([10.0, 1.0]),
                         'units': 'Gyr',
                         'prior_function':tophat,
-                        'prior_args': {'mini':0.1, 'maxi':100}})
+                        'prior_args': {'mini':np.array([0.1, 100]),
+                                       'maxi':np.array([0.1, 100])}})
 
 model_params.append({'name': 'tage', 'N': 1,
                         'isfree': False,
@@ -188,7 +189,8 @@ model_params.append({'name': 'sf_start', 'N': 2,
                         'init': np.array([0.0, 0.0]),
                         'units': 'Gyr',
                         'prior_function': tophat,
-                        'prior_args': {'mini':0.0, 'maxi':14.0}})
+                        'prior_args': {'mini':np.array([0.0, 14.0]),
+                                       'maxi':np.array([0.0, 14.0])}})
 
 ########    IMF  ##############
 model_params.append({'name': 'imf_type', 'N': 1,
@@ -221,7 +223,8 @@ model_params.append({'name': 'dust2', 'N': 2,
                         'init_disp': 0.2,
                         'units': '',
                         'prior_function': tophat,
-                        'prior_args': {'mini':0.0, 'maxi':4.0}})
+                        'prior_args': {'mini':np.array([0.0, 4.0]),
+                                       'maxi':np.array([0.0, 4.0])}})
 
 model_params.append({'name': 'dust_index', 'N': 1,
                         'isfree': True,
