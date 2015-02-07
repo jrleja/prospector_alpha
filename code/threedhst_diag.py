@@ -95,7 +95,7 @@ def create_plotquant(sample_results, logplot = ['mass', 'tau', 'tage', 'tburst',
 			priors['mini'] = np.clip(tuniv-max,tiny_number,big_number)
 			priors['maxi'] = tuniv-min
 
-			plotchain[:,:,list(parnames).index(parnames[ii][:-2])] = np.clip(tuniv - plotchain[:,:,list(parnames).index(parnames[ii][:-2])],tiny_number,big_number)	    	
+			plotchain[:,:,ii] = np.clip(tuniv - plotchain[:,:,ii],tiny_number,big_number)	    	
 
 	# define plot quantities and plot names
 	# primarily converting to log or not
