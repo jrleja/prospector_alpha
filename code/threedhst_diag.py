@@ -90,8 +90,8 @@ def create_plotquant(sample_results, logplot = ['mass', 'tau', 'tage', 'tburst',
 
 		elif parnames[ii][:-2] in redefine:
 			priors = [f['prior_args'] for f in sample_results['model'].config_list if f['name'] == parnames[ii][:-2]][0]
-			min = priors['mini']
-			max = priors['maxi']
+			min = np.zeros(2)+priors['mini']
+			max = np.zeros(2)+priors['maxi']
 			priors['mini'] = np.clip(tuniv-max,tiny_number,big_number)
 			priors['maxi'] = tuniv-min
 
@@ -100,13 +100,13 @@ def create_plotquant(sample_results, logplot = ['mass', 'tau', 'tage', 'tburst',
 	# define plot quantities and plot names
 	# primarily converting to log or not
 	if logplot is not None:
-    	
+
 		# if we're interested in logging it...
 		# change the plotname, chain values, and priors
 		plotnames=[]
-    	for ii in xrange(len(parnames)): 
-    		
-    		# check for multiple stellar populations
+		for ii in xrange(len(parnames)): 
+			
+			# check for multiple stellar populations
 			if (parnames[ii] in logplot): 
 				plotnames.append('log('+parnames[ii]+')')
 				plotchain[:,:,ii] = np.log10(plotchain[:,:,ii])
