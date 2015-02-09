@@ -475,7 +475,7 @@ def nebcomp(runname):
 	plt.savefig(outname_errs+'.png',dpi=300)
 	plt.close()
 
-def emline_comparison(runname,emline_base='Halpha'):
+def emline_comparison(runname,emline_base='Halpha', indiv_sfr=False):
 	inname = os.getenv('APPS')+'/threedhst_bsfh/results/'+runname+'/'+runname+'_ensemble.pickle'
 	outname_errs = os.getenv('APPS') + '/threedhst_bsfh/plots/ensemble_plots/'+runname+'/emline_comp_kscalc_'+emline_base+'_'
 
@@ -530,6 +530,7 @@ def emline_comparison(runname,emline_base='Halpha'):
 			                              dust1[valid_comp],
 			                              dust2[valid_comp],
 			                              ensemble['q50'][ensemble['parname'] == 'dust_index'][0,valid_comp])
+
 		x['flux'] = x['flux']/(4*np.pi*distances**2)/1e-17
 		f_emline = x['flux'][x['name'] == emline_base].reshape(np.sum(valid_comp))
 
@@ -541,7 +542,7 @@ def emline_comparison(runname,emline_base='Halpha'):
 		emline_q84 = np.clip(np.array([x['q84'][x['name'].index(cloudyname)] for x in ensemble['model_emline']]),minmodel_flux,1e50)*factor
 		emline_lam = np.array([x['lam'][x['name'].index(cloudyname)] for x in ensemble['model_emline']])[0]
 		emline_errs = asym_errors(emline_q50,emline_q84,emline_q16,log=True)
-
+		
 		# EXTRACT OBSERVED EMISSION LINE FLUX
 		# flux: 10**-17 ergs / s / cm**2
 		obs_emline = np.array([x[obsname+'_flux'][0] for x in ensemble['ancildat']])
@@ -553,6 +554,10 @@ def emline_comparison(runname,emline_base='Halpha'):
 				  np.log10(emline_q50)
 				  ]
 
+		x_err =[None,
+				None,
+		        emline_errs]
+
 		x_labels = [r'log('+axislabel+' flux) [observed]',
 					r'log('+axislabel+' flux) [observed]',
 					r'log('+axislabel+' flux) [cloudy]',
@@ -562,6 +567,10 @@ def emline_comparison(runname,emline_base='Halpha'):
 				  np.log10(f_emline),
 				  np.log10(f_emline)
 				  ]
+
+		y_err = [emline_errs,
+		         None,
+		         None]
 
 		y_labels = [r'log('+axislabel+' flux) [cloudy]',
 					r'log('+axislabel+' flux) [ks]',
@@ -573,7 +582,9 @@ def emline_comparison(runname,emline_base='Halpha'):
 		
 			ax[kk].errorbar(x_data[kk],y_data[kk], 
 				        fmt='bo', ecolor='0.20', alpha=0.8,
-				        linestyle=' ')
+				        linestyle=' ',
+				        yerr=y_err[kk],
+				        xerr=x_err[kk])
 
 			ax[kk].set_xlabel(x_labels[kk])
 			ax[kk].set_ylabel(y_labels[kk])

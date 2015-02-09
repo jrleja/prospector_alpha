@@ -7,21 +7,29 @@ from scipy.optimize import brentq
 from copy import copy
 from astropy import constants
 
-def test_csfr_model(model):
+def calc_emp_ha(mass,tage,tau,sf_start,tburst,fburst,tuniv,dust2,dustindex):
 
-	# step 1: create model [DONE]
-	# step 2: give it constant SFR [long tau], no dust, put it at z=0
-	# step 3: calculate SFR from SFH parms
-	# step 4: convert SFR to KS-flux
-	# step 5: measure nebon/neboff flux
-	# step 6: plot
-
-	# tau = 100 Gyr
-	# 'fburst', 'sf_start', 'dust1', 'dust2' = 0
-	model.theta[2] = 100
-	model.theta[4:8] = 0
-	model.params['tage']=6
-	model.params['zred']=0
+	ncomp = len(mass)
+	ha_flux=0.0
+	oiii_flux=0.0
+	for kk in xrange(ncomp):
+		sfr = threed_dutils.integrate_sfh(np.asarray([tage[kk]-0.1]),
+			                              np.asarray([tage[kk]]),
+			                              np.asarray([mass[kk]]),
+			                              np.asarray([tage[kk]]),
+			                              np.asarray([tau[kk]]),
+	                                      np.asarray([sf_start[kk]]),
+	                                      np.asarray([tburst[kk]]),
+	                                      np.asarray([fburst[kk]]))*mass[kk]/(0.1*1e9)
+		x=threed_dutils.synthetic_emlines(mass[kk],
+				                          sfr,
+				                          0.0,
+				                          dust2[kk],
+				                          dustindex)
+		oiii_flux = oiii_flux + x['flux'][x['name'] == '[OIII]']
+		ha_flux = ha_flux + x['flux'][x['name'] == 'Halpha']
+	
+	return ha_flux,oiii_flux
 
 def sfh_half_time(x,mass,tage,tau,sf_start,tburst,fburst,c):
 	 return threed_dutils.integrate_sfh(sf_start,x,mass,tage,tau,sf_start,tburst,fburst)-c
@@ -94,13 +102,17 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 
     # initialize output arrays for SFH parameters
 	nwalkers,niter = sample_results['chain'].shape[:2]
-	half_time,sfr_10,sfr_100,sfr_1000,ssfr_100,totmass = [np.zeros(shape=(nwalkers,niter)) for i in range(6)]
+	half_time,sfr_10,sfr_100,sfr_1000,ssfr_100,totmass,emp_ha,emp_oiii = [np.zeros(shape=(nwalkers,niter)) for i in range(8)]
 
     # get constants for SFH calculation [MODEL DEPENDENT]
 	z = sample_results['model'].params['zred'][0]
 	tuniv = WMAP9.age(z).value
 	deltat=[0.01,0.1,1.0] # in Gyr
     
+	##### TEMPORARY CALCULATION TO DO EMPIRICAL EMISSION LINES IN CHAIN ######
+	dust2_index = np.array([True if x[:-2] == 'dust2' else False for x in parnames])
+	dust_index_index = np.array([True if x == 'dust_index' else False for x in parnames])
+
     ######## SFH parameters #########
 	for jj in xrange(nwalkers):
 		for kk in xrange(niter):
@@ -120,6 +132,10 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 
 			# calculate half-mass assembly time, sfr
 			half_time[jj,kk] = halfmass_assembly_time(mass,tage,tau,sf_start,tburst,fburst,tuniv)
+
+			# empirical halpha
+			emp_ha[jj,kk],emp_oiii[jj,kk] = calc_emp_ha(mass,tage,tau,sf_start,tburst,fburst,tuniv,
+				                                        sample_results['chain'][jj,kk,dust2_index],sample_results['chain'][jj,kk,dust_index_index])
 
 			# calculate sfr
 			sfr_10[jj,kk] = threed_dutils.integrate_sfh(tage-deltat[0],tage,mass,tage,tau,
@@ -144,7 +160,10 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 		                     sfr_100.reshape(sfr_100.shape[0],sfr_100.shape[1],1), 
 		                     sfr_1000.reshape(sfr_1000.shape[0],sfr_1000.shape[1],1), 
 		                     ssfr_100.reshape(ssfr_100.shape[0],ssfr_100.shape[1],1),
-		                     totmass.reshape(ssfr_100.shape[0],totmass.shape[1],1)))
+		                     totmass.reshape(ssfr_100.shape[0],totmass.shape[1],1),
+		                     emp_ha.reshape(emp_ha.shape[0],emp_ha.shape[1],1),
+		                     emp_oiii.reshape(emp_oiii.shape[0],emp_oiii.shape[1],1)
+		                     ))
 	extra_flatchain = threed_dutils.chop_chain(extra_chain)
 	nextra = extra_chain.shape[-1]
 	q_16e, q_50e, q_84e = (np.zeros(nextra)+np.nan for i in range(3))
@@ -187,7 +206,7 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 	thetas = sample_results['chain'][probind,:]
 	if type(thetas[0]) != np.dtype('float64'):
 		thetas = thetas[0]
-	maxhalf_time,maxsfr_10,maxsfr_100,maxsfr_1000,maxssfr_100,maxtotmass = extra_chain[probind.nonzero()[0][0],probind.nonzero()[1][0],:]
+	maxhalf_time,maxsfr_10,maxsfr_100,maxsfr_1000,maxssfr_100,maxtotmass,maxemp_ha,maxemp_oiii = extra_chain[probind.nonzero()[0][0],probind.nonzero()[1][0],:]
 
 	# grab most likely emlines
 	sample_results['model'].params['add_neb_emission'] = np.array(True)
@@ -210,8 +229,8 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 	# EXTRA PARAMETER OUTPUTS #
 	extras = {'chain': extra_chain,
 			  'flatchain': extra_flatchain,
-			  'parnames': np.array(['half_time','sfr_10','sfr_100','sfr_1000','ssfr_100','totmass']),
-			  'maxprob': np.array([maxhalf_time,maxsfr_10,maxsfr_100,maxsfr_1000,maxssfr_100,maxtotmass]),
+			  'parnames': np.array(['half_time','sfr_10','sfr_100','sfr_1000','ssfr_100','totmass','emp_ha','emp_oiii']),
+			  'maxprob': np.array([maxhalf_time,maxsfr_10,maxsfr_100,maxsfr_1000,maxssfr_100,maxtotmass,emp_ha,emp_oiii]),
 			  'q16': q_16e,
 			  'q50': q_50e,
 			  'q84': q_84e}

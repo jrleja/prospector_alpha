@@ -25,7 +25,7 @@ def synthetic_emlines(mass,sfr,dust1,dust2,dust_index):
 	# wavelength in angstroms
 	emlines = np.array(['Halpha','Hbeta','Hgamma','[OIII]', '[NII]','[OII]'])
 	lam     = np.array([6563,4861,4341,5007,6583,3727])
-	flux    = np.zeros(shape=(len(lam),len(mass)))
+	flux    = np.zeros(shape=(len(lam),len(np.atleast_1d(mass))))
 
 	# calculate SFR
 	#deltat = 0.3 # in Gyr
@@ -326,18 +326,23 @@ def integrate_sfh(t1,t2,mass,tage,tau,sf_start,tburst,fburst):
 	# double or single tau model?
 	# does NOT currently accept different tages
 	# double t2 if not doubled:
-	if len(np.atleast_1d(t2)) == 1:
-		t2 = np.zeros(len(t1))+t2
+	ndim = len(np.atleast_1d(mass))
+	if len(np.atleast_1d(t2)) != ndim:
+		t2 = np.zeros(ndim)+t2
 
 		
 	totmass = np.sum(mass)
 	norm=(mass/totmass)*(1.0-fburst)
-	tot = np.zeros(len(mass))-99
+	tot = np.zeros(ndim)-99
 	
 	# if we're outside of the boundaries, return boundary values
-	tot[t1<sf_start] = 0.0
-	tot[t2<sf_start] = 0.0
-	tot[t2>tage]     = norm[t2>tage]
+	_= np.logical_or((t1<sf_start),(t2<sf_start))
+	if np.sum(_) > 0:
+		tot[_] = 0.0
+
+	_ = t2 > tage
+	if np.sum(_) > 0:
+		tot[_]     = norm[_]
 
 	# check what needs to be calculated still
 	# add tau model
@@ -349,8 +354,9 @@ def integrate_sfh(t1,t2,mass,tage,tau,sf_start,tburst,fburst):
 		tot[need2calc]=intsfr*norm[need2calc]/(np.exp(-sf_start[need2calc]/tau[need2calc])*(sf_start[need2calc]/tau[need2calc]+1)-
 				                               np.exp(-tage[need2calc]    /tau[need2calc])*(tage[need2calc]    /tau[need2calc]+1))
 	# add burst
-	need_burst = (t2 > tburst) & (t1 < tburst)
-	tot[need_burst] = tot[need_burst] + fburst[need_burst]
+	need_burst = np.logical_and((t2 > tburst),(t1 < tburst))
+	if np.sum(need_burst) > 0:
+		tot[need_burst] = tot[need_burst] + fburst[need_burst]
 	intsfr = np.sum(tot)
 
 	if intsfr > 1.00000001:
