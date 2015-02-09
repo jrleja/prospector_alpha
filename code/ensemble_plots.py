@@ -109,8 +109,9 @@ def collate_output(runname,outname):
 	print 'total galaxies: {0}, successful loads: {1}'.format(ngals,ngals-nfail)
 	print 'saving in {0}'.format(outname)
 
+
 	output = {'outname': output_name,\
-			  'parname': np.array(sample_results['model'].theta_labels() + ['half_time','sfr_10','sfr_100','sfr_1000','ssfr_100']),\
+			  'parname': np.concatenate([sample_results['model'].theta_labels(),sample_results['extras']['parnames']]),\
 		      'q16': q_16,\
 		      'q50': q_50,\
 		      'q84': q_84,\
@@ -495,6 +496,25 @@ def emline_comparison(runname,emline_base='Halpha'):
 		axislabel='[OIII]' # plot axis name
 		cloudyname='[OIII]1' # name in CLOUDY data
 
+	try:
+		mass=ensemble['q50'][ensemble['parname'] == 'mass'][0]
+	except IndexError:
+		mass = ensemble['q50'][ensemble['parname'] == 'totmass'][0]
+
+	try:
+		dust1=ensemble['q50'][ensemble['parname'] == 'dust1'][0]
+		dust2=ensemble['q50'][ensemble['parname'] == 'dust2'][0]
+	except:
+		dust2_1=ensemble['q50'][ensemble['parname'] == 'dust2_1'][0]
+		dust2_2=ensemble['q50'][ensemble['parname'] == 'dust2_2'][0]
+		dust1=np.zeros(len(dust2_1))
+		dust2=np.zeros(len(dust2_1))
+		for nn in xrange(len(dust2)):
+			if dust2_1[nn] > dust2_2[nn]:
+				dust2[nn] = dust2_2[nn]
+			else:
+				dust2[nn] = dust2_1[nn]
+
 	# make plots for all three timescales
 	sfr_str = ['10','100','1000']
 	for bobo in xrange(len(sfr_str)):
@@ -505,10 +525,10 @@ def emline_comparison(runname,emline_base='Halpha'):
 		distances = WMAP9.luminosity_distance(ensemble['z'][valid_comp]).value*1e6*pc2cm
 
 		####### NEW WAY (TO COMPARE WITH OLD WAY) #########
-		x=threed_dutils.synthetic_emlines(ensemble['q50'][ensemble['parname'] == 'mass'][0,valid_comp],
+		x=threed_dutils.synthetic_emlines(mass[valid_comp],
 			                              ensemble['q50'][ensemble['parname'] == 'sfr_'+sfr_str[bobo]][0,valid_comp],
-			                              ensemble['q50'][ensemble['parname'] == 'dust1'][0,valid_comp],
-			                              ensemble['q50'][ensemble['parname'] == 'dust2'][0,valid_comp],
+			                              dust1[valid_comp],
+			                              dust2[valid_comp],
 			                              ensemble['q50'][ensemble['parname'] == 'dust_index'][0,valid_comp])
 		x['flux'] = x['flux']/(4*np.pi*distances**2)/1e-17
 		f_emline = x['flux'][x['name'] == emline_base].reshape(np.sum(valid_comp))
@@ -579,9 +599,11 @@ def emline_comparison(runname,emline_base='Halpha'):
 			ax[kk].plot([-1e3,1e3],[-1e3,1e3],linestyle='--',color='0.1',alpha=0.8)
 			ax[kk].axis((min,max,min,max))
 
-			ratio = (10**x_data[kk])/(10**y_data[kk])
-			#ax[kk].text(min+(max-min)*0.05,min+(max-min)*0.95, 'std(x/y)={0}'.format(ratio.std()))
-			#ax[kk].text(min+(max-min)*0.05,min+(max-min)*0.90, 'mean(x/y)={0}'.format(ratio.mean()))
+			n = np.sum(np.isfinite(y_data[kk]))
+			scat=np.sqrt(np.sum((y_data[kk]-x_data[kk])**2.)/(n-2))
+			mean_offset = np.sum(y_data[kk]-x_data[kk])/n
+			ax[kk].text(min+(max-min)*0.05,min+(max-min)*0.95, 'scatter='+"{:.2f}".format(scat)+' dex')
+			ax[kk].text(min+(max-min)*0.05,min+(max-min)*0.90, 'mean offset='+"{:.2f}".format(mean_offset)+' dex')
 
 		fig.subplots_adjust(wspace=0.30,hspace=0.0)
 		plt.savefig(outname_errs+'sfr'+sfr_str[bobo]+'.png',dpi=300)

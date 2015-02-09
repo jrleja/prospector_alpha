@@ -92,6 +92,24 @@ def generate_basenames(runname):
 	parm=[]
 	ancilname='COSMOS_testsamp.dat'
 
+
+	if runname == 'dtau_neboff':
+
+		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/COSMOS_testsamp.ids"
+		ids = np.loadtxt(id_list, dtype='|S20')
+		ngals = len(ids)
+
+		basename = "dtau_neboff"
+		parm_basename = "dtau_neboff_params"
+
+		for jj in xrange(ngals):
+			ancildat = load_ancil_data(os.getenv('APPS')+
+			                           '/threedhst_bsfh/data/COSMOS_testsamp.dat',
+			                           ids[jj])
+			heqw_txt = "%04d" % int(ancildat['Ha_EQW_obs']) 
+			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+basename+'_'+heqw_txt+'_'+ids[jj])
+			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')		
+
 	if runname == 'neboff_oiii':
 
 		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/COSMOS_oiii_em.ids"

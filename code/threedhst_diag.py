@@ -116,7 +116,7 @@ def create_plotquant(sample_results, logplot = ['mass', 'tau', 'tage', 'tburst',
 				plotnames.append('log('+parnames[ii]+')')
 				plotchain[:,:,ii] = np.log10(plotchain[:,:,ii])
 				priors = [f['prior_args'] for f in sample_results['model'].config_list if f['name'] == parnames[ii][:-2]][0]
-				for k,v in priors.iteritems(): priors[k]=np.log10(v)
+				for k,v in priors.iteritems(): priors[k]=np.log10(np.clip(v,1e-30,1e99))
 			else:
 				plotnames.append(parnames[ii])
 	else:
@@ -525,9 +525,11 @@ def plot_all_driver():
 	runname = "neboff"
 	
 	runname = "photerr"
+	runname = 'dtau_neboff'
 
-	filebase, parm_basename=threed_dutils.generate_basenames(runname)
+	filebase, parm_basename, ancilname=threed_dutils.generate_basenames(runname)
 	for jj in xrange(len(filebase)):
+		print 'iteration '+str(jj) 
 		make_all_plots(filebase=filebase[jj],\
 		               parm_file=parm_basename[jj],\
 		               outfolder=os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/')

@@ -354,5 +354,5 @@ tuniv = WMAP9.age(model_params[0]['init']).value
 
 # set tage
 # set max on sf_start
-model_params[parmlist.index('tage')]['init'] = np.zeros(len(model_params[parmlist.index('tage')]['init'])+tuniv
-model_params[parmlist.index('sf_start')]['prior_args']['maxi'] = np.zeros(len(model_params[parmlist.index('sf_start')]['prior_args']['maxi']))+ 0.9*tuniv
+model_params[parmlist.index('tage')]['init'] = np.zeros(len(np.atleast_1d(model_params[parmlist.index('tage')]['init'])))+tuniv
+model_params[parmlist.index('sf_start')]['prior_args']['maxi'] = np.zeros(len(np.atleast_1d(model_params[parmlist.index('sf_start')]['prior_args']['maxi'])))+ 0.9*tuniv
