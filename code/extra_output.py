@@ -230,7 +230,7 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 	extras = {'chain': extra_chain,
 			  'flatchain': extra_flatchain,
 			  'parnames': np.array(['half_time','sfr_10','sfr_100','sfr_1000','ssfr_100','totmass','emp_ha','emp_oiii']),
-			  'maxprob': np.array([maxhalf_time,maxsfr_10,maxsfr_100,maxsfr_1000,maxssfr_100,maxtotmass,emp_ha,emp_oiii]),
+			  'maxprob': np.array([maxhalf_time,maxsfr_10,maxsfr_100,maxsfr_1000,maxssfr_100,maxtotmass,maxemp_ha,maxemp_oiii]),
 			  'q16': q_16e,
 			  'q50': q_50e,
 			  'q84': q_84e}
