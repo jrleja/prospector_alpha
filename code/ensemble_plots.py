@@ -61,9 +61,11 @@ def collate_output(runname,outname):
 			sample_results, powell_results, model = read_results.read_pickles(mcmc_filename, model_file=model_filename,inmod=None)
 		except (ValueError,EOFError):
 			print mcmc_filename + ' failed during output writing'
+			nfail+=1
 			continue
 		except IOError:
 			print mcmc_filename + ' does not exist!'
+			nfail+=1
 			continue
 
 		# check for existence of extra information
@@ -475,7 +477,7 @@ def nebcomp(runname):
 	plt.savefig(outname_errs+'.png',dpi=300)
 	plt.close()
 
-def emline_comparison(runname,emline_base='Halpha', indiv_sfr=False):
+def emline_comparison(runname,emline_base='Halpha', chain_emlines=False):
 	inname = os.getenv('APPS')+'/threedhst_bsfh/results/'+runname+'/'+runname+'_ensemble.pickle'
 	outname_errs = os.getenv('APPS') + '/threedhst_bsfh/plots/ensemble_plots/'+runname+'/emline_comp_kscalc_'+emline_base+'_'
 
@@ -523,6 +525,7 @@ def emline_comparison(runname,emline_base='Halpha', indiv_sfr=False):
 		pc2cm = 3.08567758e18
 		valid_comp = ensemble['z'] > 0
 		distances = WMAP9.luminosity_distance(ensemble['z'][valid_comp]).value*1e6*pc2cm
+		dfactor = (4*np.pi*distances**2)*1e-17
 
 		####### NEW WAY (TO COMPARE WITH OLD WAY) #########
 		x=threed_dutils.synthetic_emlines(mass[valid_comp],
@@ -531,8 +534,14 @@ def emline_comparison(runname,emline_base='Halpha', indiv_sfr=False):
 			                              dust2[valid_comp],
 			                              ensemble['q50'][ensemble['parname'] == 'dust_index'][0,valid_comp])
 
-		x['flux'] = x['flux']/(4*np.pi*distances**2)/1e-17
+		x['flux'] = x['flux']/dfactor
 		f_emline = x['flux'][x['name'] == emline_base].reshape(np.sum(valid_comp))
+		if chain_emlines:
+			f_emline = ensemble['q50'][ensemble['parname'] == chain_emlines][0,valid_comp]/dfactor
+			fluxup = ensemble['q84'][ensemble['parname'] == chain_emlines][0,valid_comp]/dfactor
+			fluxdo = ensemble['q16'][ensemble['parname'] == chain_emlines][0,valid_comp]/dfactor
+			f_err_emline = asym_errors(f_emline,fluxup,fluxdo,log=True)
+
 
 		# EXTRACT EMISSION LINE FLUX FROM CLOUDY
 		# 'luminosity' in cgs
@@ -545,8 +554,16 @@ def emline_comparison(runname,emline_base='Halpha', indiv_sfr=False):
 		
 		# EXTRACT OBSERVED EMISSION LINE FLUX
 		# flux: 10**-17 ergs / s / cm**2
-		obs_emline = np.array([x[obsname+'_flux'][0] for x in ensemble['ancildat']])
-		obs_emline_err = np.array([x[obsname+'_error'][0] for x in ensemble['ancildat']])
+		# calculate scale
+		obs_emline_lams = np.log(emline_lam*(1+ensemble['z'][valid_comp])/1.e4)
+		s0 = np.array([x['s0'][0] for x in ensemble['ancildat']])
+		s1 = np.array([x['s1'][0] for x in ensemble['ancildat']])
+		tilts = np.exp(s0 + s1*obs_emline_lams)
+
+		# extract obs emlines
+		obs_emline = np.array([x[obsname+'_flux'][0] for x in ensemble['ancildat']])*tilts
+		obs_emline_err = np.array([x[obsname+'_error'][0] for x in ensemble['ancildat']])*tilts
+		obs_emline_lerr = asym_errors(obs_emline,obs_emline+obs_emline_err,obs_emline-obs_emline_err,log=True)
 
 		# SET UP PLOTTING QUANTITIES
 		x_data = [np.log10(obs_emline),
@@ -554,8 +571,8 @@ def emline_comparison(runname,emline_base='Halpha', indiv_sfr=False):
 				  np.log10(emline_q50)
 				  ]
 
-		x_err =[None,
-				None,
+		x_err =[obs_emline_lerr,
+				obs_emline_lerr,
 		        emline_errs]
 
 		x_labels = [r'log('+axislabel+' flux) [observed]',
@@ -571,6 +588,12 @@ def emline_comparison(runname,emline_base='Halpha', indiv_sfr=False):
 		y_err = [emline_errs,
 		         None,
 		         None]
+
+		# if we have chain values
+		try:
+			y_err[1:] = f_err_emline
+		except:
+			pass
 
 		y_labels = [r'log('+axislabel+' flux) [cloudy]',
 					r'log('+axislabel+' flux) [ks]',
@@ -589,32 +612,14 @@ def emline_comparison(runname,emline_base='Halpha', indiv_sfr=False):
 			ax[kk].set_xlabel(x_labels[kk])
 			ax[kk].set_ylabel(y_labels[kk])
 
-			# set plot limits to be slightly outside max values
-			dynx, dyny = (np.nanmax(x_data[kk])-np.nanmin(x_data[kk]))*0.05,\
-			         	 (np.nanmax(y_data[kk])-np.nanmin(y_data[kk]))*0.05
-			
-			ax[kk].axis((np.nanmin(x_data[kk])-dynx,
-					 np.nanmax(x_data[kk])+dynx,
-					 np.nanmin(y_data[kk])-dyny,
-					 np.nanmax(y_data[kk])+dyny,
-					 ))
-			if np.nanmin(x_data[kk])-dynx > np.nanmin(y_data[kk])-dyny:
-				min = np.nanmin(y_data[kk])-dyny*3
-			else:
-				min = np.nanmin(x_data[kk])-dynx*3
-			if np.nanmax(x_data[kk])+dynx > np.nanmax(y_data[kk])+dyny:
-				max = np.nanmax(x_data[kk])+dynx*3
-			else:
-				max = np.nanmax(y_data[kk])+dyny*3
-
+			ax[kk].axis((-3,3,-3,3))
 			ax[kk].plot([-1e3,1e3],[-1e3,1e3],linestyle='--',color='0.1',alpha=0.8)
-			ax[kk].axis((min,max,min,max))
 
 			n = np.sum(np.isfinite(y_data[kk]))
 			scat=np.sqrt(np.sum((y_data[kk]-x_data[kk])**2.)/(n-2))
 			mean_offset = np.sum(y_data[kk]-x_data[kk])/n
-			ax[kk].text(min+(max-min)*0.05,min+(max-min)*0.95, 'scatter='+"{:.2f}".format(scat)+' dex')
-			ax[kk].text(min+(max-min)*0.05,min+(max-min)*0.90, 'mean offset='+"{:.2f}".format(mean_offset)+' dex')
+			ax[kk].text(-2.7,2.7, 'scatter='+"{:.2f}".format(scat)+' dex')
+			ax[kk].text(-2.7,2.4, 'mean offset='+"{:.2f}".format(mean_offset)+' dex')
 
 		fig.subplots_adjust(wspace=0.30,hspace=0.0)
 		plt.savefig(outname_errs+'sfr'+sfr_str[bobo]+'.png',dpi=300)
