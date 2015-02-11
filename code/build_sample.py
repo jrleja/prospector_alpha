@@ -24,8 +24,12 @@ def load_linelist(field='COSMOS'):
 	dat      = dat[in_field]
 	
 	# build output
-	t = Table([dat['id'],[-99.0]*len(dat),dat['use_grism1']],
-	          names=('id','zgris','use_grism1'))
+	t = Table([dat['id'],
+		      [-99.0]*len(dat),
+		      dat['use_grism1'],
+		      [-99.0]*len(dat),
+		      [-99.0]*len(dat)],
+	          names=('id','zgris','use_grism1','s0','s1'))
 	for jj in xrange(len(dat)):
 		
 		# no spectrum
@@ -51,6 +55,14 @@ def load_linelist(field='COSMOS'):
 			                     dtype = {'names':([n for n in hdr[1:]]),
 	                                      'formats':('S40', 'f16','f16','f16','f16','f16')})
 			
+			# tilt correction
+			with open(filename) as search:
+				for line in search:
+					if 'tilt correction' in line:
+						splitline = line.split(' ')
+						t[jj]['s0'] = float(splitline[splitline.index('s0')+2])
+						t[jj]['s1'] = float(splitline[splitline.index('s1')+2])
+
 			# if there's only one line, loadtxt returns a different thing
 			if linedat.size == 1:
 				linedat=np.array(linedat.reshape(1),dtype=linedat.dtype)
@@ -111,10 +123,10 @@ def build_sample():
 
 	# output
 	field = 'COSMOS'
-	fast_str_out = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_oiii_em.fout'
-	ancil_str_out = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_oiii_em.dat'
-	phot_str_out = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_oiii_em.cat'
-	id_str_out   = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_oiii_em.ids'
+	fast_str_out = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_testsamp.fout'
+	ancil_str_out = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_testsamp.dat'
+	phot_str_out = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_testsamp.cat'
+	id_str_out   = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_testsamp.ids'
 
 	# load data
 	# use grism redshift
@@ -129,7 +141,7 @@ def build_sample():
 	good = (phot['use_phot'] == 1) & \
 	       (rf['L153'] > 0) & (rf['L155'] > 0) & (rf['L161'] > 0) & \
 	       (phot['f_IRAC4'] < 1e7) & (phot['f_IRAC3'] < 1e7) & (phot['f_IRAC2'] < 1e7) & (phot['f_IRAC1'] < 1e7) & \
-	       (lineinfo['use_grism1'] == 1) & (lineinfo['OIII_EQW_obs']/lineinfo['OIII_EQW_obs_err'] > 2)
+	       (lineinfo['use_grism1'] == 1) & (lineinfo['Ha_EQW_obs']/lineinfo['Ha_EQW_obs_err'] > 2)
 
 	phot = phot[good]
 	fast = fast[good]
@@ -140,6 +152,7 @@ def build_sample():
 	# define UVJ flag, S/N, HA EQW
 	uvj_flag = calc_uvj_flag(rf)
 	sn_F160W = phot['f_F160W']/phot['e_F160W']
+	Ha_EQW_obs = lineinfo['Ha_EQW_obs']
 	fast['z'] = lineinfo['zgris']
 	lineinfo.rename_column('zgris' , 'z')
 	lineinfo['uvj_flag'] = uvj_flag
@@ -148,9 +161,8 @@ def build_sample():
 	lineinfo['z_sfr'] = mips['z_best']
 	
 	# split into bins
-	Ha_EQW_obs = lineinfo['OIII_EQW_obs']
-	lowlim = np.percentile(Ha_EQW_obs,35)
-	highlim = np.percentile(Ha_EQW_obs,85)
+	lowlim = np.percentile(Ha_EQW_obs,65)
+	highlim = np.percentile(Ha_EQW_obs,95)
 	
 	selection = (Ha_EQW_obs > lowlim) & (Ha_EQW_obs < highlim)
 	random_index = random.sample(xrange(np.sum(selection)), 108)
@@ -193,4 +205,3 @@ def build_sample():
 	ascii.write(lineinfo, output=ancil_str_out, 
 	            delimiter=' ', format='commented_header')
 	ascii.write([np.array(phot_out['id'],dtype='int')], output=id_str_out, Writer=ascii.NoHeader)
-	
