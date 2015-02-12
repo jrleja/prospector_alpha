@@ -108,7 +108,7 @@ model_params.append({'name': 'add_igm_absorption', 'N': 1,
 
 model_params.append({'name': 'add_agb_dust_model', 'N': 1,
                         'isfree': False,
-                        'init': 0,
+                        'init': True,
                         'units': None,
                         'prior_function': None,
                         'prior_args': None})
@@ -276,7 +276,7 @@ model_params.append({'name': 'duste_qpah', 'N': 1,
 ###### Nebular Emission ###########
 model_params.append({'name': 'add_neb_emission', 'N': 1,
                         'isfree': False,
-                        'init': True,
+                        'init': False,
                         'units': r'log Z/Z_\odot',
                         'prior_function_name': None,
                         'prior_args': None})

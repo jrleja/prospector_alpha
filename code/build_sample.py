@@ -2,6 +2,8 @@ import read_sextractor, read_data, random, os, threed_dutils
 import numpy as np
 from astropy.table import Table, vstack
 from astropy.io import ascii
+from astropy.coordinates import ICRS
+from astropy import units as u
 random.seed(25001)
 
 def load_linelist(field='COSMOS'):
@@ -37,7 +39,7 @@ def load_linelist(field='COSMOS'):
 			pass
 		else: # let's get to work
 			fieldno = dat['spec_id'][jj].split('-')[1]
-			filename='/Users/joel/data/3d_hst/spectra/cosmos-wfc3-spectra_v4.1.4/cosmos-'+ fieldno+'/LINE/DAT/'+dat['spec_id'][jj]+'.linefit.dat'
+			filename='/Users/joel/data/3d_hst/spectra/'+field.lower()+'-wfc3-spectra_v4.1.4/'+field.lower()+'-'+ fieldno+'/LINE/DAT/'+dat['spec_id'][jj]+'.linefit.dat'
 			
 			# if the line file doesn't exist, abandon all hope (WHY DO SOME NOT EXIST?!?!?!)
 			# some don't exist, others are empty
@@ -197,6 +199,118 @@ def build_sample():
 	# artificially add "z" to ancillary outputs
 	# later, will draw z from zbest
 	# later still, will do PDF...
+	ascii.write(phot_out, output=phot_str_out, 
+	            delimiter=' ', format='commented_header')
+	ascii.write(fast_out, output=fast_str_out, 
+	            delimiter=' ', format='commented_header',
+	            include_names=fast.keys()[:11])
+	ascii.write(lineinfo, output=ancil_str_out, 
+	            delimiter=' ', format='commented_header')
+	ascii.write([np.array(phot_out['id'],dtype='int')], output=id_str_out, Writer=ascii.NoHeader)
+
+def load_rachel_sample():
+	
+
+	loc = os.getenv('APPS')+'/threedhst_bsfh/data/bezanson_2015_disps.txt'
+	data = ascii.read(loc,format='cds') 
+	return data
+
+def build_sample_dynamics():
+
+	'''
+	finds Rachel's galaxies in the threedhst catalogs
+	'''
+
+	# output
+	field = ['COSMOS','UDS']
+	#field = ['UDS']
+	bez = load_rachel_sample()
+
+	for bb in xrange(len(field)):
+
+		fast_str_out = '/Users/joel/code/python/threedhst_bsfh/data/'+field[bb]+'_dynsamp.fout'
+		ancil_str_out = '/Users/joel/code/python/threedhst_bsfh/data/'+field[bb]+'_dynsamp.dat'
+		phot_str_out = '/Users/joel/code/python/threedhst_bsfh/data/'+field[bb]+'_dynsamp.cat'
+		id_str_out   = '/Users/joel/code/python/threedhst_bsfh/data/'+field[bb]+'_dynsamp.ids'
+
+		# load data
+		# use grism redshift
+		phot = read_sextractor.load_phot_v41(field[bb])
+		fast = read_sextractor.load_fast_v41(field[bb])
+		rf = read_sextractor.load_rf_v41(field[bb])
+		
+		# matches
+		c = ICRS(phot['ra'], phot['dec'], unit=(u.degree, u.degree))
+		catalog = ICRS(bez['RAdeg'], bez['DEdeg'], unit=(u.degree, u.degree))
+		idx, d2d, d3d = catalog.match_to_catalog_sky(c)
+		print np.sum(d2d.value < 2.5)
+		print 1/0
+
+		# do this properly... not just COSMOS
+		lineinfo = load_linelist(field=field[bb])
+		mips = threed_dutils.load_mips_data(os.getenv('APPS')+'/threedhst_bsfh/data/MIPS/'+field.lower()+'_3dhst.v4.1.4.sfr')
+		
+		# remove junk
+		# 153, 155, 161 are U, V, J
+		good = (phot['use_phot'] == 1) & \
+		       (rf['L153'] > 0) & (rf['L155'] > 0) & (rf['L161'] > 0) & \
+		       (phot['f_IRAC4'] < 1e7) & (phot['f_IRAC3'] < 1e7) & (phot['f_IRAC2'] < 1e7) & (phot['f_IRAC1'] < 1e7) & \
+		       (lineinfo['use_grism1'] == 1) & (lineinfo['Ha_EQW_obs']/lineinfo['Ha_EQW_obs_err'] > 2)
+
+		phot = phot[good]
+		fast = fast[good]
+		rf = rf[good]
+		lineinfo = lineinfo[good]
+		mips = mips[good]
+		
+		# define UVJ flag, S/N, HA EQW
+		uvj_flag = calc_uvj_flag(rf)
+		sn_F160W = phot['f_F160W']/phot['e_F160W']
+		Ha_EQW_obs = lineinfo['Ha_EQW_obs']
+		fast['z'] = lineinfo['zgris']
+		lineinfo.rename_column('zgris' , 'z')
+		lineinfo['uvj_flag'] = uvj_flag
+		lineinfo['sn_F160W'] = sn_F160W
+		lineinfo['sfr'] = mips['sfr']
+		lineinfo['z_sfr'] = mips['z_best']
+		
+		# split into bins
+		lowlim = np.percentile(Ha_EQW_obs,65)
+		highlim = np.percentile(Ha_EQW_obs,95)
+		
+		selection = (Ha_EQW_obs > lowlim) & (Ha_EQW_obs < highlim)
+		random_index = random.sample(xrange(np.sum(selection)), 108)
+		fast_out = fast[selection][random_index]
+		phot_out = phot[selection][random_index]
+		
+		# variables
+		#n_per_bin = 3
+		#sn_bins = ((12,20),(20,100),(100,1e5))
+		#z_bins  = ((0.2,0.6),(0.6,1.0),(1.0,1.5),(1.5,2.0))
+		#uvj_bins = [1,2,3]  # 0 = outside box, 1 = sfing, 2 = dusty sf, 3 = quiescent
+		
+		#for sn in sn_bins:
+		#	for z in z_bins:
+		#		for uvj in uvj_bins:
+		#			selection = (sn_F160W >= sn[0]) & (sn_F160W < sn[1]) & (uvj_flag == uvj) & (fast['z'] >= z[0]) & (fast['z'] < z[1])
+
+		#			if np.sum(selection) < n_per_bin:
+		#				print 'ERROR: Not enough galaxies in bin!'
+		#				print sn, z, uvj
+					
+					# choose random set of indices
+		#			random_index = random.sample(xrange(np.sum(selection)), n_per_bin)
+		
+		#			fast_out = vstack([fast_out,fast[selection][random_index]])
+		#			phot_out = vstack([phot_out,phot[selection][random_index]])
+		
+					#fast_out = vstack([fast_out,fast[selection][:n_per_bin]])
+					#phot_out = vstack([phot_out,phot[selection][:n_per_bin]])
+		
+		# output photometric catalog, fast catalog, id list
+		# artificially add "z" to ancillary outputs
+		# later, will draw z from zbest
+		# later still, will do PDF...
 	ascii.write(phot_out, output=phot_str_out, 
 	            delimiter=' ', format='commented_header')
 	ascii.write(fast_out, output=fast_str_out, 
