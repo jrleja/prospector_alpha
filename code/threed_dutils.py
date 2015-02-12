@@ -2,14 +2,14 @@ import numpy as np
 import os, fsps
 from bsfh import model_setup
 
-def setup_sps():
+def setup_sps(zcontinuous=2):
 
 	'''
 	easy way to define an SPS
 	'''
 
 	# load stellar population, set up custom filters
-	sps = fsps.StellarPopulation(zcontinuous=2, compute_vega_mags=False)
+	sps = fsps.StellarPopulation(zcontinuous=zcontinuous, compute_vega_mags=False)
 	custom_filter_keys = os.getenv('APPS')+'/threedhst_bsfh/filters/filter_keys_threedhst.txt'
 	fsps.filters.FILTERS = model_setup.custom_filter_dict(custom_filter_keys)
 

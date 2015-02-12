@@ -177,7 +177,11 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 	nline = len(emline)
 
 	# initialize sps
-	sps = threed_dutils.setup_sps()
+	# check to see if we want zcontinuous=2 (i.e., the MDF)
+	if np.sum([1 for x in sample_results['model'].config_list if x['name'] == 'pmetals']) > 0:
+		sps = threed_dutils.setup_sps()
+	else:
+		sps = threed_dutils.setup_sps(zcontinuous=1)
 
     # first randomize
     # use flattened and thinned chain for random posterior draws
