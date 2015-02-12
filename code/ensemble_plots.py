@@ -161,33 +161,62 @@ def plot_driver(runname):
 	lobs_halpha = obs_ha*(4*np.pi*distances**2)*1e-17
 	lobs_halpha_err = obs_ha_err*(4*np.pi*distances**2)*1e-17
 
-	x_data = [np.log10(ensemble['q50'][ensemble['parname'] == 'mass'][0]),\
+
+	# Create parameters that 
+	# vary between models
+	# currently, total mass, dust1, dust2, tburst, tau
+	try:
+		mass = np.log10(ensemble['q50'][ensemble['parname'] == 'mass'][0])
+		masserrs = asym_errors(ensemble['q50'][ensemble['parname'] == 'mass'][0],ensemble['q84'][ensemble['parname'] == 'mass'][0], ensemble['q16'][ensemble['parname'] == 'mass'][0],log=True)
+	except:
+		mass = np.log10(ensemble['q50'][ensemble['parname'] == 'totmass'][0])
+		masserrs = asym_errors(ensemble['q50'][ensemble['parname'] == 'totmass'][0],ensemble['q84'][ensemble['parname'] == 'totmass'][0], ensemble['q16'][ensemble['parname'] == 'totmass'][0],log=True)
+
+	try:
+		sig_dust1=ensemble['q84'][ensemble['parname'] == 'dust1'][0]-ensemble['q16'][ensemble['parname'] == 'dust1'][0]
+		sig_dust2=ensemble['q84'][ensemble['parname'] == 'dust2'][0]-ensemble['q16'][ensemble['parname'] == 'dust2'][0]
+		sig_qpah =ensemble['q84'][ensemble['parname'] == 'duste_qpah'][0]-ensemble['q16'][ensemble['parname'] == 'duste_qpah'][0]
+	except:
+		sig_dust1 = np.zeros(len(valid_comp))
+		sig_dust2 = ensemble['q84'][ensemble['parname'] == 'dust2_1'][0]-ensemble['q16'][ensemble['parname'] == 'dust2_1'][0]
+		sig_qpah  = np.zeros(len(valid_comp))
+
+	try:
+		tburst = np.log10(np.clip(tuniv-ensemble['q50'][ensemble['parname'] == 'tburst'][0,valid_comp],1e-2,1e50))
+		tbursterrs = asym_errors(np.clip(tuniv-ensemble['q50'][ensemble['parname'] == 'tburst'][0,valid_comp],1e-4,1e50),np.clip(tuniv-ensemble['q84'][ensemble['parname'] == 'tburst'][0,valid_comp],1e-4,1e50),np.clip(tuniv-ensemble['q16'][ensemble['parname'] == 'tburst'][0,valid_comp],1e-4,1e50),log=True)
+		tau = np.log10(np.clip(tuniv-ensemble['q50'][ensemble['parname'] == 'tau'][0,valid_comp],1e-2,1e50))
+		tauerrs = asym_errors(np.clip(tuniv-ensemble['q50'][ensemble['parname'] == 'tau'][0,valid_comp],1e-4,1e50),np.clip(tuniv-ensemble['q84'][ensemble['parname'] == 'tau'][0,valid_comp],1e-4,1e50),np.clip(tuniv-ensemble['q16'][ensemble['parname'] == 'tau'][0,valid_comp],1e-4,1e50),log=True)
+	except:
+		tburst = np.zeros(len(valid_comp))
+		tbursterrs = np.zeros(len(valid_comp))
+		tau = np.log10(np.clip(tuniv-ensemble['q50'][ensemble['parname'] == 'tau_1'][0,valid_comp],1e-2,1e50))
+		tauerrs = asym_errors(np.clip(tuniv-ensemble['q50'][ensemble['parname'] == 'tau_1'][0,valid_comp],1e-4,1e50),np.clip(tuniv-ensemble['q84'][ensemble['parname'] == 'tau_1'][0,valid_comp],1e-4,1e50),np.clip(tuniv-ensemble['q16'][ensemble['parname'] == 'tau_1'][0,valid_comp],1e-4,1e50),log=True)
+
+	x_data = [mass,\
 	          ensemble['q84'][ensemble['parname'] == 'dust_index'][0]-ensemble['q16'][ensemble['parname'] == 'dust_index'][0],\
 	          ensemble['q84'][ensemble['parname'] == 'dust_index'][0]-ensemble['q16'][ensemble['parname'] == 'dust_index'][0],\
 	          ensemble['mips_sn'],\
 	          np.log10(ensemble['q50'][ensemble['parname'] == 'sfr_100'][0]),\
 	          np.log10(ensemble['q50'][ensemble['parname'] == 'sfr_100'][0]),\
 	          np.log10(ensemble['q50'][ensemble['parname'] == 'sfr_100'][0]),\
-	          np.log10(ensemble['q50'][ensemble['parname'] == 'mass'][0]),\
+	          mass,\
 	          np.log10(ensemble['q50'][ensemble['parname'] == 'ssfr_100'][0]),\
 	          np.log10(sfr_obs),\
 	          np.log10(sfr_obs),\
-	          np.log10(sfr_obs/ensemble['q50'][ensemble['parname'] == 'mass'][0,valid_comp]),\
 	          np.log10(np.clip(np.array([x['q50'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50)),
 	          np.log10(np.clip(np.array([x['q50'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50)),
 	          np.log10(lobs_halpha)
 	          ]
 
-	x_err  = [asym_errors(ensemble['q50'][ensemble['parname'] == 'mass'][0],ensemble['q84'][ensemble['parname'] == 'mass'][0], ensemble['q16'][ensemble['parname'] == 'mass'][0],log=True),\
+	x_err  = [masserrs,\
 			  None,\
 			  None,\
 			  None,\
 			  asym_errors(ensemble['q50'][ensemble['parname'] == 'sfr_100'][0],ensemble['q84'][ensemble['parname'] == 'sfr_100'][0],ensemble['q16'][ensemble['parname'] == 'sfr_100'][0],log=True),\
 			  asym_errors(ensemble['q50'][ensemble['parname'] == 'sfr_100'][0],ensemble['q84'][ensemble['parname'] == 'sfr_100'][0],ensemble['q16'][ensemble['parname'] == 'sfr_100'][0],log=True),\
 			  asym_errors(ensemble['q50'][ensemble['parname'] == 'sfr_100'][0],ensemble['q84'][ensemble['parname'] == 'sfr_100'][0],ensemble['q16'][ensemble['parname'] == 'sfr_100'][0],log=True),\
-			  asym_errors(ensemble['q50'][ensemble['parname'] == 'mass'][0],ensemble['q84'][ensemble['parname'] == 'mass'][0],ensemble['q16'][ensemble['parname'] == 'mass'][0],log=True),\
+			  masserrs,\
 			  asym_errors(ensemble['q50'][ensemble['parname'] == 'ssfr_100'][0],ensemble['q84'][ensemble['parname'] == 'ssfr_100'][0],ensemble['q16'][ensemble['parname'] == 'sfr_100'][0],log=True),\
-			  None,\
 			  None,\
 			  None,\
 			  asym_errors(np.clip(np.array([x['q50'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50),np.clip(np.array([x['q84'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50),np.clip(np.array([x['q16'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50),log=True),\
@@ -196,8 +225,7 @@ def plot_driver(runname):
 			 ]
 
 	x_labels = [r'log(M) [M$_{\odot}$]',
-	            r'$\sigma$ (dust index)',
-	            r'$\sigma$ (dust index)',
+ 	            r'$\sigma$ (dust index)',
 	            'MIPS S/N',
 	            r'log(SFR_{100}) [M$_{\odot}$/yr]',
 	            r'log(SFR_{100}) [M$_{\odot}$/yr]',
@@ -206,26 +234,24 @@ def plot_driver(runname):
 	            r'log(sSFR_{100}) [yr$^{-1}$]',
 	            r'log(SFR$_{obs}$) [M$_{\odot}$/yr]',
 	            r'log(SFR$_{obs}$) [M$_{\odot}$/yr]',
-	            r'log(sSFR$_{obs}$) [yr$^{-1}$]',
 	            r'log(H$\alpha$ flux) [model]',
 	            r'log(H$\alpha$ flux) [model]',
 	            r'log(H$\alpha$ lum) [obs]'
 	            ]
 
 	y_data = [ensemble['q50'][ensemble['parname'] == 'logzsol'][0],\
-	          ensemble['q84'][ensemble['parname'] == 'dust1'][0]-ensemble['q16'][ensemble['parname'] == 'dust1'][0],\
-	          ensemble['q84'][ensemble['parname'] == 'dust2'][0]-ensemble['q16'][ensemble['parname'] == 'dust2'][0],\
-	          ensemble['q84'][ensemble['parname'] == 'duste_qpah'][0]-ensemble['q16'][ensemble['parname'] == 'duste_qpah'][0],\
+	          sig_dust1,\
+	          sig_dust2,\
+	          sig_qpah,\
 	          ensemble['q84'][ensemble['parname'] == 'half_time'][0]-ensemble['q16'][ensemble['parname'] == 'half_time'][0],\
 	          ensemble['q50'][ensemble['parname'] == 'half_time'][0],\
-	          ensemble['q84'][ensemble['parname'] == 'dust1'][0]-ensemble['q16'][ensemble['parname'] == 'dust1'][0],\
+	          sig_dust1,\
 	          np.log10(ensemble['q50'][ensemble['parname'] == 'sfr_100'][0]),\
 	          ensemble['q84'][ensemble['parname'] == 'half_time'][0]-ensemble['q16'][ensemble['parname'] == 'half_time'][0],\
-	          np.log10(ensemble['q50'][ensemble['parname'] == 'sfr_100'][0,valid_comp]),\
-	          np.log10(ensemble['q50'][ensemble['parname'] == 'sfr_1000'][0,valid_comp]),\
-	          np.log10(ensemble['q50'][ensemble['parname'] == 'ssfr_100'][0,valid_comp]**-1),\
-	          np.log10(np.clip(tuniv-ensemble['q50'][ensemble['parname'] == 'tburst'][0,valid_comp],1e-2,1e50)),\
-	          np.log10(np.clip(tuniv-ensemble['q50'][ensemble['parname'] == 'tau'][0,valid_comp],1e-2,1e50)),\
+	          np.log10(ensemble['q50'][ensemble['parname'] == 'sfr_100'][0]),\
+	          np.log10(ensemble['q50'][ensemble['parname'] == 'sfr_1000'][0]),\
+	          tburst,\
+	          tau,\
 	          np.log10(sfr_obs)\
 	          ]
 
@@ -238,11 +264,10 @@ def plot_driver(runname):
 			  None,\
 			  asym_errors(ensemble['q50'][ensemble['parname'] == 'sfr_100'][0],ensemble['q84'][ensemble['parname'] == 'sfr_100'][0],ensemble['q16'][ensemble['parname'] == 'sfr_100'][0],log=True),\
 			  None,\
-			  asym_errors(ensemble['q50'][ensemble['parname'] == 'sfr_100'][0,valid_comp],ensemble['q84'][ensemble['parname'] == 'sfr_100'][0,valid_comp],ensemble['q16'][ensemble['parname'] == 'sfr_100'][0,valid_comp],log=True),\
-			  asym_errors(ensemble['q50'][ensemble['parname'] == 'sfr_1000'][0,valid_comp],ensemble['q84'][ensemble['parname'] == 'sfr_1000'][0,valid_comp],ensemble['q16'][ensemble['parname'] == 'sfr_1000'][0,valid_comp],log=True),\
-			  asym_errors(ensemble['q50'][ensemble['parname'] == 'ssfr_100'][0,valid_comp]**-1,ensemble['q84'][ensemble['parname'] == 'ssfr_100'][0,valid_comp]**-1,ensemble['q16'][ensemble['parname'] == 'sfr_100'][0,valid_comp]**-1,log=True),\
-			  asym_errors(np.clip(tuniv-ensemble['q50'][ensemble['parname'] == 'tburst'][0,valid_comp],1e-4,1e50),np.clip(tuniv-ensemble['q84'][ensemble['parname'] == 'tburst'][0,valid_comp],1e-4,1e50),np.clip(tuniv-ensemble['q16'][ensemble['parname'] == 'tburst'][0,valid_comp],1e-4,1e50),log=True),\
-			  asym_errors(np.clip(tuniv-ensemble['q50'][ensemble['parname'] == 'tau'][0,valid_comp],1e-4,1e50),np.clip(tuniv-ensemble['q84'][ensemble['parname'] == 'tau'][0,valid_comp],1e-4,1e50),np.clip(tuniv-ensemble['q16'][ensemble['parname'] == 'tau'][0,valid_comp],1e-4,1e50),log=True),\
+			  asym_errors(ensemble['q50'][ensemble['parname'] == 'sfr_100'][0],ensemble['q84'][ensemble['parname'] == 'sfr_100'][0],ensemble['q16'][ensemble['parname'] == 'sfr_100'][0],log=True),\
+			  asym_errors(ensemble['q50'][ensemble['parname'] == 'sfr_1000'][0],ensemble['q84'][ensemble['parname'] == 'sfr_1000'][0],ensemble['q16'][ensemble['parname'] == 'sfr_1000'][0],log=True),\
+			  tbursterrs,\
+			  tauerrs,\
 			  None\
 			 ]
 
@@ -257,7 +282,6 @@ def plot_driver(runname):
 	            r'$\sigma$ (t$_{half}$) [Gyr]',
 	            r'log(SFR$_{mcmc,100}$) [M$_{\odot}$/yr]',
 	            r'log(SFR$_{mcmc,1000}$) [M$_{\odot}$/yr]',
-	            r'log(sSFR$_{mcmc,100}$) [yr$^{-1}$]',
 	            r'log(t$_{burst}$/Gyr)',
 	            r'log($\tau$/Gyr)',
 	            r'log(SFR$_{obs}$) [M$_{\odot}$/yr]',
@@ -274,7 +298,6 @@ def plot_driver(runname):
 				'ssfr_deltahalftime',
 				'sfrobs_sfrmcmc100',
 				'sfrobs_sfrmcmc1000',
-				'ssfrobs_ssfrmcmc100',
 				'modelemline_tburst',
 				'modelemline_tau',
 				'obsemline_sfrobs'
@@ -289,6 +312,9 @@ def plot_driver(runname):
 		fig = plt.figure()
 		ax = fig.add_subplot(111)
 		
+		if len(x_data[jj]) != len(y_data[jj]):
+			print 1/0
+
 		ax.errorbar(x_data[jj],y_data[jj], 
 			        fmt='bo', linestyle=' ', alpha=0.7)
 		ax.errorbar(x_data[jj],y_data[jj], 
@@ -565,6 +591,9 @@ def emline_comparison(runname,emline_base='Halpha', chain_emlines=False):
 		obs_emline_err = np.array([x[obsname+'_error'][0] for x in ensemble['ancildat']])*tilts
 		obs_emline_lerr = asym_errors(obs_emline,obs_emline+obs_emline_err,obs_emline-obs_emline_err,log=True)
 
+		# extract stellar metallicity
+		logzsol=ensemble['q50'][ensemble['parname'] == 'logzsol'][0,valid_comp]
+
 		# SET UP PLOTTING QUANTITIES
 		x_data = [np.log10(obs_emline),
 				  np.log10(obs_emline),
@@ -625,3 +654,9 @@ def emline_comparison(runname,emline_base='Halpha', chain_emlines=False):
 		plt.savefig(outname_errs+'sfr'+sfr_str[bobo]+'.png',dpi=300)
 		plt.close()
 
+	fig_resid, ax_resid = plt.subplots(1, 3, figsize = (18, 5))
+	ax_resid[kk].plot(logzsol, x_data[kk]-y_data[kk],
+				              'bo', alpha=0.8, linestyle=' ')
+	ax_resid[kk].set_xlabel('logzsol')
+	ax_resid[kk].set_ylabel(x_labels[kk]+y_labels[kk])
+	plt.savefig(outname_errs+'_logzsol_resid.png', dpi=300)
