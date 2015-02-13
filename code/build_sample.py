@@ -222,8 +222,7 @@ def build_sample_dynamics():
 	'''
 
 	# output
-	field = ['COSMOS','UDS']
-	#field = ['UDS']
+	field = ['UDS','COSMOS']
 	bez = load_rachel_sample()
 
 	for bb in xrange(len(field)):
@@ -238,79 +237,59 @@ def build_sample_dynamics():
 		phot = read_sextractor.load_phot_v41(field[bb])
 		fast = read_sextractor.load_fast_v41(field[bb])
 		rf = read_sextractor.load_rf_v41(field[bb])
-		
-		# matches
-		c = ICRS(phot['ra'], phot['dec'], unit=(u.degree, u.degree))
-		catalog = ICRS(bez['RAdeg'], bez['DEdeg'], unit=(u.degree, u.degree))
-		idx, d2d, d3d = catalog.match_to_catalog_sky(c)
-		print np.sum(d2d.value < 2.5)
-		print 1/0
 
 		# do this properly... not just COSMOS
-		lineinfo = load_linelist(field=field[bb])
-		mips = threed_dutils.load_mips_data(os.getenv('APPS')+'/threedhst_bsfh/data/MIPS/'+field.lower()+'_3dhst.v4.1.4.sfr')
+		lineinfo = Table(load_linelist(field=field[bb]))
+		mips = Table(threed_dutils.load_mips_data(os.getenv('APPS')+'/threedhst_bsfh/data/MIPS/'+field[bb].lower()+'_3dhst.v4.1.4.sfr'))
 		
-		# remove junk
-		# 153, 155, 161 are U, V, J
-		good = (phot['use_phot'] == 1) & \
-		       (rf['L153'] > 0) & (rf['L155'] > 0) & (rf['L161'] > 0) & \
-		       (phot['f_IRAC4'] < 1e7) & (phot['f_IRAC3'] < 1e7) & (phot['f_IRAC2'] < 1e7) & (phot['f_IRAC1'] < 1e7) & \
-		       (lineinfo['use_grism1'] == 1) & (lineinfo['Ha_EQW_obs']/lineinfo['Ha_EQW_obs_err'] > 2)
+		# find matches
+		massmatch=0.5 #dex
+		matching_radius = 2.5 #arcseconds
+		matches = np.zeros(0)
+		for nn in xrange(len(bez)):
+			catalog = ICRS(bez['RAdeg'][nn], bez['DEdeg'][nn], unit=(u.degree, u.degree))
+			close_mass = np.abs(fast['lmass']-bez['logm'][nn]) < massmatch
+			c = ICRS(phot['ra'][close_mass], phot['dec'][close_mass], unit=(u.degree, u.degree))
+			idx, d2d, d3d = catalog.match_to_catalog_sky(c)
+			if d2d.value*3600 < matching_radius:
+				i = -1
+				for j in xrange(idx):
+					i = close_mass.index(True, i + 1)
+			matches=np.append(matches,i)
+		print 1/0
+		
 
-		phot = phot[good]
-		fast = fast[good]
-		rf = rf[good]
-		lineinfo = lineinfo[good]
-		mips = mips[good]
-		
-		# define UVJ flag, S/N, HA EQW
-		uvj_flag = calc_uvj_flag(rf)
-		sn_F160W = phot['f_F160W']/phot['e_F160W']
-		Ha_EQW_obs = lineinfo['Ha_EQW_obs']
+		# only accept matches within some matching radius,
+		# and dlogM < 1.0 (FAST compared to Rachel's masses)
+		matching_radius = 2.0 # arcseconds
+		good = np.logical_and(d2d.value*3600 < matching_radius,\
+			                  np.abs(fast[idx]['lmass']- bez['logM']) < 1.0)
+		print 'mass difference:'
+		print fast[idx[good]]['lmass']- bez[good]['logM']
+
+		# define useful things
 		fast['z'] = lineinfo['zgris']
 		lineinfo.rename_column('zgris' , 'z')
-		lineinfo['uvj_flag'] = uvj_flag
-		lineinfo['sn_F160W'] = sn_F160W
+		lineinfo['uvj_flag'] = calc_uvj_flag(rf)
+		lineinfo['sn_F160W'] = phot['f_F160W']/phot['e_F160W']
 		lineinfo['sfr'] = mips['sfr']
 		lineinfo['z_sfr'] = mips['z_best']
 		
-		# split into bins
-		lowlim = np.percentile(Ha_EQW_obs,65)
-		highlim = np.percentile(Ha_EQW_obs,95)
-		
-		selection = (Ha_EQW_obs > lowlim) & (Ha_EQW_obs < highlim)
-		random_index = random.sample(xrange(np.sum(selection)), 108)
-		fast_out = fast[selection][random_index]
-		phot_out = phot[selection][random_index]
-		
-		# variables
-		#n_per_bin = 3
-		#sn_bins = ((12,20),(20,100),(100,1e5))
-		#z_bins  = ((0.2,0.6),(0.6,1.0),(1.0,1.5),(1.5,2.0))
-		#uvj_bins = [1,2,3]  # 0 = outside box, 1 = sfing, 2 = dusty sf, 3 = quiescent
-		
-		#for sn in sn_bins:
-		#	for z in z_bins:
-		#		for uvj in uvj_bins:
-		#			selection = (sn_F160W >= sn[0]) & (sn_F160W < sn[1]) & (uvj_flag == uvj) & (fast['z'] >= z[0]) & (fast['z'] < z[1])
+		if bb > 0:
+			phot_out = vstack([phot_out, phot[idx[good]]])
+			fast_out = vstack([fast_out, fast[idx[good]]])
+			rf_out = vstack([rf_out, rf[idx[good]]])
+			lineinfo_out = vstack([lineinfo_out, lineinfo[idx[good]]])
+			mips_out = vstack([mips_out,mips[idx[good]]])
+		else:
+			phot_out = phot[idx[good]]
+			fast_out = fast[idx[good]]
+			rf_out = rf[idx[good]]
+			lineinfo_out = lineinfo[idx[good]]
+			mips_out = mips[idx[good]]
+	
+	print
 
-		#			if np.sum(selection) < n_per_bin:
-		#				print 'ERROR: Not enough galaxies in bin!'
-		#				print sn, z, uvj
-					
-					# choose random set of indices
-		#			random_index = random.sample(xrange(np.sum(selection)), n_per_bin)
-		
-		#			fast_out = vstack([fast_out,fast[selection][random_index]])
-		#			phot_out = vstack([phot_out,phot[selection][random_index]])
-		
-					#fast_out = vstack([fast_out,fast[selection][:n_per_bin]])
-					#phot_out = vstack([phot_out,phot[selection][:n_per_bin]])
-		
-		# output photometric catalog, fast catalog, id list
-		# artificially add "z" to ancillary outputs
-		# later, will draw z from zbest
-		# later still, will do PDF...
 	ascii.write(phot_out, output=phot_str_out, 
 	            delimiter=' ', format='commented_header')
 	ascii.write(fast_out, output=fast_str_out, 
@@ -319,3 +298,4 @@ def build_sample_dynamics():
 	ascii.write(lineinfo, output=ancil_str_out, 
 	            delimiter=' ', format='commented_header')
 	ascii.write([np.array(phot_out['id'],dtype='int')], output=id_str_out, Writer=ascii.NoHeader)
+	print 1/0		
