@@ -19,4 +19,4 @@
 #SBATCH --mail-type=END
 #SBATCH --mail-user=joel.leja@gmail.com
 ### source activate pympi
-python $APPS/threedhst_bsfh/code/extra_output.py $APPS/threedhst_bsfh/parameter_files/dtau_nebon/dtau_nebon_params_$SLURM_ARRAY_TASK_ID.py 
+python $APPS/threedhst_bsfh/code/extra_output.py $APPS/threedhst_bsfh/parameter_files/dtau_intmet/dtau_intmet_params_$SLURM_ARRAY_TASK_ID.py 
