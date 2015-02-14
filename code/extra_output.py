@@ -268,8 +268,10 @@ def post_processing(param_name, add_extra=True, nsamp_mc=1000):
 	chop_chain=1.666
 
 	# make sure the output folder exists
-	if not os.path.isdir(outfolder):
+	try:
 		os.makedirs(outfolder)
+	except OSError:
+		pass
 
 	# find most recent output file
 	# with the objname
@@ -280,13 +282,15 @@ def post_processing(param_name, add_extra=True, nsamp_mc=1000):
 
 	# if we found no files, skip this object
 	if len(times) == 0:
-		print 'Failed to find any files to extract times in ' + folder + ' of form ' + filename
+		print 'Failed to find any files in ' + folder + ' of form ' + filename
 		return 0
 
 	# load results
 	mcmc_filename=outname+'_'+max(times)+"_mcmc"
 	model_filename=outname+'_'+max(times)+"_model"
 	
+	print 'loading ' + mcmc_filename +', ' + model_filename
+
 	try:
 		sample_results, powell_results, model = read_results.read_pickles(mcmc_filename, model_file=model_filename,inmod=None)
 	except ValueError:
@@ -295,6 +299,8 @@ def post_processing(param_name, add_extra=True, nsamp_mc=1000):
 	except IOError:
 		print mcmc_filename + ' does not exist!'
 		return 0
+
+	print 'Successfully loaded file'
 
 	if add_extra:
 		print 'ADDING EXTRA OUTPUT FOR ' + filename + ' in ' + outfolder

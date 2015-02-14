@@ -528,7 +528,7 @@ def plot_all_driver():
 	runname = "neboff"
 	
 	runname = "photerr"
-	runname = 'dtau_neboff'
+	runname = 'dtau_nebon'
 
 	filebase, parm_basename, ancilname=threed_dutils.generate_basenames(runname)
 	for jj in xrange(len(filebase)):
