@@ -209,6 +209,12 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 
 	##### MAXIMUM PROBABILITY
 	# grab best-fitting model
+
+	# if we're stupid and pre-cut the chain but not the lnprobability,
+	# this cuts lnprobability to the same shape
+	if sample_results['lnprobability'].shape[1] != sample_results['chain'].shape[1]:
+		sample_results['lnprobability'] = sample_results['lnprobability'][:,-sample_results['chain'].shape[1]:]
+
 	maxprob = np.max(sample_results['lnprobability'])
 	probind = sample_results['lnprobability'] == maxprob
 	thetas = sample_results['chain'][probind,:]
