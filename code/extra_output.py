@@ -319,7 +319,7 @@ def post_processing(param_name, add_extra=True, nsamp_mc=1000):
 		pickle.dump(sample_results,open(mcmc_filename, "wb"))
 
 	### PLOT HERE
-	threedhst_diag.make_all_plots(sample_results=sample_results,filebase=outname)
+	threedhst_diag.make_all_plots(sample_results=sample_results,filebase=outname,outfolder=outfolder)
 
 if __name__ == "__main__":
 	post_processing(sys.argv[1])
