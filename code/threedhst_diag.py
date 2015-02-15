@@ -240,7 +240,10 @@ def show_chain(sample_results,outname=None,alpha=0.6):
 			axarr[jj+1,ii].set_yticklabels([])
 
 		testable = np.isfinite(sample_results['lnprobability'])
-		max = np.amax(sample_results['lnprobability'][testable])
+		try:
+			max = np.amax(sample_results['lnprobability'][testable])
+		except ValueError:
+			print 1/0
 		stddev = np.std(sample_results['lnprobability'][testable])
 		axarr[jj+1,ii].set_ylim(max-stddev, max)
 		

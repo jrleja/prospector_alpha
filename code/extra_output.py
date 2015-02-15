@@ -152,7 +152,11 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 	# CALCULATE Q16,Q50,Q84 FOR VARIABLE PARAMETERS
 	ntheta = len(sample_results['initial_theta'])
 	q_16, q_50, q_84 = (np.zeros(ntheta)+np.nan for i in range(3))
-	for kk in xrange(ntheta): q_16[kk], q_50[kk], q_84[kk] = triangle.quantile(sample_results['flatchain'][:,kk], [0.16, 0.5, 0.84])
+	try:
+		for kk in xrange(ntheta): q_16[kk], q_50[kk], q_84[kk] = triangle.quantile(sample_results['flatchain'][:,kk], [0.16, 0.5, 0.84])
+	except ValueError as e:
+		print e
+		print 1/0
 
 	# CALCULATE Q16,Q50,Q84 FOR EXTRA PARAMETERS
 	extra_chain = np.dstack((half_time.reshape(half_time.shape[0],half_time.shape[1],1), 

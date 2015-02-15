@@ -214,7 +214,7 @@ def chop_chain(chain):
 	will someday replace with a test for convergence to determine where to chop
 	JRL 1/5/14
 	'''
-	nchop=1.0
+	nchop=1e50
 
 	flatchain = chain[:,int(chain.shape[1]/nchop):,:]
 	flatchain = flatchain.reshape(flatchain.shape[0] * flatchain.shape[1],
