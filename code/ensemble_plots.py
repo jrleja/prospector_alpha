@@ -226,6 +226,7 @@ def plot_driver(runname):
 
 	x_labels = [r'log(M) [M$_{\odot}$]',
  	            r'$\sigma$ (dust index)',
+ 	            r'$\sigma$ (dust index)',
 	            'MIPS S/N',
 	            r'log(SFR_{100}) [M$_{\odot}$/yr]',
 	            r'log(SFR_{100}) [M$_{\odot}$/yr]',
@@ -248,7 +249,7 @@ def plot_driver(runname):
 	          sig_dust1,\
 	          np.log10(ensemble['q50'][ensemble['parname'] == 'sfr_100'][0]),\
 	          ensemble['q84'][ensemble['parname'] == 'half_time'][0]-ensemble['q16'][ensemble['parname'] == 'half_time'][0],\
-	          np.log10(ensemble['q50'][ensemble['parname'] == 'sfr_100'][0]),\
+	          np.log10(ensemble['q50'][ensemble['parname'] == 'sfr_100'][0,valid_comp]),\
 	          np.log10(ensemble['q50'][ensemble['parname'] == 'sfr_1000'][0]),\
 	          tburst,\
 	          tau,\
@@ -264,7 +265,7 @@ def plot_driver(runname):
 			  None,\
 			  asym_errors(ensemble['q50'][ensemble['parname'] == 'sfr_100'][0],ensemble['q84'][ensemble['parname'] == 'sfr_100'][0],ensemble['q16'][ensemble['parname'] == 'sfr_100'][0],log=True),\
 			  None,\
-			  asym_errors(ensemble['q50'][ensemble['parname'] == 'sfr_100'][0],ensemble['q84'][ensemble['parname'] == 'sfr_100'][0],ensemble['q16'][ensemble['parname'] == 'sfr_100'][0],log=True),\
+			  asym_errors(ensemble['q50'][ensemble['parname'] == 'sfr_100'][0,valid_comp],ensemble['q84'][ensemble['parname'] == 'sfr_100'][0,valid_comp],ensemble['q16'][ensemble['parname'] == 'sfr_100'][0,valid_comp],log=True),\
 			  asym_errors(ensemble['q50'][ensemble['parname'] == 'sfr_1000'][0],ensemble['q84'][ensemble['parname'] == 'sfr_1000'][0],ensemble['q16'][ensemble['parname'] == 'sfr_1000'][0],log=True),\
 			  tbursterrs,\
 			  tauerrs,\
