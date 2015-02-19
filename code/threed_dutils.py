@@ -1,6 +1,9 @@
 import numpy as np
 import os, fsps
 from bsfh import model_setup
+from scipy.interpolate import interp1d
+from scipy.integrate import simps
+from calc_ml import load_filter_response
 
 def setup_sps(zcontinuous=2):
 
@@ -350,6 +353,115 @@ def load_fast_3dhst(filename, objnum):
 	values = dat[fields].view(float).reshape(len(dat),-1)[obj_ind]
 
 	return values, fields
+
+def integrate_mag(spec_lam,spectra,filter, z=None, alt_file=None):
+
+	'''
+	borrowed from calc_ml
+	given a filter name and spectrum, calculate magnitude/luminosity in filter (see alt_file for filter names)
+	luminosity comes out in erg/s
+	if redshift is specified, return apparent magnitude and flux
+	'''
+
+	if type(filter) == str:
+		resp_lam, res = load_filter_response(filter, 
+		                                 	 alt_file='/Users/joel/code/fsps/data/allfilters_threedhst.dat')
+	else:
+		resp_lam = filter[0][0]
+		res      = filter[1][0]
+	
+	# calculate effective width
+	#dlam = (resp_lam[1:]-resp_lam[:-1])/2.
+	#width = np.array([dlam[ii]+dlam[ii+1] for ii in xrange(len(resp_lam)-2)])
+	#width = np.concatenate((np.atleast_1d(dlam[0]*2),width,np.atleast_1d(dlam[-1]*2)))
+	#effective_width = np.sum(res*width)
+
+	# redshift?
+	if z:
+		spectra_interp = interp1d(spec_lam*(1+z), spectra, bounds_error = False, fill_value = 0)
+		spectra = spectra_interp(spec_lam)
+		spectra[spectra<0] = 0
+	
+	# physical units, in CGS, from sps_vars.f90 in the SPS code
+	pc2cm = 3.08568E18
+	lsun  = 3.839E33
+	c     = 2.99E10
+
+	# interpolate filter response onto spectral lambda array
+	# when interpolating, set response outside wavelength range to be zero.
+	response_interp = interp1d(resp_lam,res, bounds_error = False, fill_value = 0)
+
+	# normalize [THIS STEP I DON'T UNDERSTAND... BUT IT IS NECESSARY]
+	norm = simps(response_interp(spec_lam)/spec_lam,spec_lam)
+
+	# integrate filter
+	# luminosity density in filter is calculated
+	# luminosity is also calculated: multiply by extra factor of (c/lambda) in sum, and convert one lambda to CGS
+	luminosity = simps(spectra*(response_interp(spec_lam)/norm)*(c/(spec_lam**2*1E-8)),spec_lam)
+	luminosity_density = simps(spectra*(response_interp(spec_lam)/norm)/spec_lam,spec_lam)
+
+	# if redshift is specified, convert to flux and apparent magnitude
+	if z:
+		from astropy.cosmology import WMAP9
+		dfactor = (WMAP9.luminosity_distance(z).value*1e5)**(-2)
+		luminosity = luminosity*dfactor
+		luminosity_density = luminosity_density*dfactor
+
+	# convert luminosity density to flux density
+	# the units of the spectra are Lsun/Hz; convert to
+	# erg/s/cm^2/Hz, at 10pc for absolute mags
+	flux_density = luminosity_density*lsun/(4.0*np.pi*(pc2cm*10)**2)
+	luminosity   = luminosity*lsun
+
+	# convert flux density to magnitudes in AB system
+	mag = -2.5*np.log10(flux_density)-48.60
+
+	return mag, luminosity
+
+def mips_to_lir(z):
+
+	# mips information
+	# effective width from commented calculation in integrate_mag above
+	# avg wavelength from table 2.2 of mips instrument handbook
+	mips_eff_width = 48850.322
+	mips_avg_lam   = 236800.0
+
+	# load Table 2 from Dale & Helou 2002
+	filename = os.getenv('APPS')+'/threedhst_bsfh/data/dale_helou_table2.dat'
+	with open(filename, 'r') as f:
+		for jj in range(1): hdr = f.readline().split()
+	data = np.loadtxt(filename, comments = '#',dtype = np.dtype([(n, np.float) for n in hdr[1:]]))
+
+	# take log average to make SED
+	# note that Kate refers to L_IR as 8-1000 ums
+	# whereas this integral is implicitly over 3um-1100um
+	# only ~3% flux in 3-5 um, and up to ~13% in 5-13um, so not too worried...
+	# but these will be slightly underestimated as a result!
+	to_average = data['alpha'] < 2.5
+	fluxes = np.zeros(6)
+	waves = [(3,5),(5,13),(13,20),(20,42),(42,122),(122,1100)] # in microns
+	avg_waves = np.array([(x[0]+x[1])/2. for x in waves])
+	for i, names in enumerate(data.dtype.names):
+		if np.logical_and(names != 'lfnu60_lfnu100', names != 'alpha'):
+			fluxes[i-2] = 10**np.mean(np.log10(data[names][to_average]))
+	fluxes = np.array([fluxes[ii]/(waves[ii][1]-waves[ii][0]) for ii in xrange(len(waves))])
+	fluxes = fluxes/np.sum(fluxes)
+
+	# interpolate flux density fraction
+	interp_helou = interp1d(avg_waves, fluxes)
+	fluxfrac = interp_helou(mips_avg_lam/(1.+z))*mips_eff_width/(1.+z)
+	
+	return 1./fluxfrac
+
+def calculate_uv_ir_sfr():
+
+	# step 1: calculate MIPS flux from spectrum (or plug in MIPS flux for testing)
+	# step 2: calculate MIPS flux ---> f_{IR}
+	# step 3: convert to L_{IR}
+	# step 4: calculate L_2500 (?)
+	# step 5: tear it up
+	# step 6: realize you need to do none of this
+	pass
 
 def integrate_sfh(t1,t2,mass,tage,tau,sf_start,tburst,fburst):
 	
