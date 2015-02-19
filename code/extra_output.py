@@ -87,7 +87,7 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 	model nebular emission line strength
 	model star formation history parameters (ssfr,sfr,half-mass time)
 	'''
-    
+
     # save nebon/neboff status
 	nebstatus = sample_results['model'].params['add_neb_emission']
 
@@ -152,11 +152,7 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 	# CALCULATE Q16,Q50,Q84 FOR VARIABLE PARAMETERS
 	ntheta = len(sample_results['initial_theta'])
 	q_16, q_50, q_84 = (np.zeros(ntheta)+np.nan for i in range(3))
-	try:
-		for kk in xrange(ntheta): q_16[kk], q_50[kk], q_84[kk] = triangle.quantile(sample_results['flatchain'][:,kk], [0.16, 0.5, 0.84])
-	except ValueError as e:
-		print e
-		print 1/0
+	for kk in xrange(ntheta): q_16[kk], q_50[kk], q_84[kk] = triangle.quantile(sample_results['flatchain'][:,kk], [0.16, 0.5, 0.84])
 
 	# CALCULATE Q16,Q50,Q84 FOR EXTRA PARAMETERS
 	extra_chain = np.dstack((half_time.reshape(half_time.shape[0],half_time.shape[1],1), 
@@ -187,10 +183,17 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 	else:
 		sps = threed_dutils.setup_sps(zcontinuous=1)
 
+	# set up MIPS + fake L_IR filter
+	mips_flux = np.zeros(nsamp_mc)
+	mips_index = [i for i, s in enumerate(sample_results['obs']['filters']) if 'mips' in s]
+	lir_filter = [[np.linspace(8e4, 1000e4, num=100)],
+	              [np.ones(100)]] 
+
     # first randomize
     # use flattened and thinned chain for random posterior draws
 	flatchain = copy(sample_results['flatchain'])
 	lineflux = np.empty(shape=(nsamp_mc,nline))
+	lir      = np.zeros(nsamp_mc)
 	np.random.shuffle(flatchain)
 	for jj in xrange(nsamp_mc):
 		thetas = flatchain[jj,:]
@@ -206,6 +209,11 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 			saveplot=False
 
 		lineflux[jj]= measure_emline_lum(w/(1+z),spec-spec_neboff,emline,wavelength,sideband,saveplot=saveplot)
+
+		# add mips info
+		mips_flux[jj] = mags_neboff[mips_index][0]*1e10 # comes out in maggies, convert to flux such that AB zeropoint is 25 mags
+		_,lir[jj]     = threed_dutils.integrate_mag(w,spec_neboff,lir_filter, z=None, alt_file=None) # comes out in ergs/s
+		lir[jj]       = lir[jj] / 3.846e33 #  convert to Lsun
 
 	##### MAXIMUM PROBABILITY
 	# grab best-fitting model
@@ -239,6 +247,10 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 	               'q84':q_84em,
 	               'maxprob':lineflux_maxprob}
 	sample_results['model_emline'] = emline_info
+
+	###### FORMAT MIPS OUTPUT
+	mips = {'mips_flux':mips_flux,'L_IR':lir}
+	sample_results['mips'] = mips
 
 	# EXTRA PARAMETER OUTPUTS #
 	extras = {'chain': extra_chain,
