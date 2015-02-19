@@ -159,8 +159,12 @@ def build_sample():
 	lineinfo.rename_column('zgris' , 'z')
 	lineinfo['uvj_flag'] = uvj_flag
 	lineinfo['sn_F160W'] = sn_F160W
-	lineinfo['sfr'] = mips['sfr']
-	lineinfo['z_sfr'] = mips['z_best']
+	for i in xrange(len(mips.dtype.names)):
+		tempname=mips.dtype.names[i]
+		if tempname != 'z_best' and tempname != 'id':
+			lineinfo[tempname] = mips[tempname]
+		elif tempname == 'z_best':
+			lineinfo['z_sfr'] = mips[tempname]
 	
 	# split into bins
 	lowlim = np.percentile(Ha_EQW_obs,65)
