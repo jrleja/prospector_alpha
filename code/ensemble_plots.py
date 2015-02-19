@@ -437,6 +437,27 @@ def photerr_plot(runname, scale=False):
 	plt.savefig(outname_cent+'.png', dpi=300)
 	plt.close()
 
+
+def lir_comp(runname):
+
+	outname = os.getenv('APPS')+'/threedhst_bsfh/results/'+runname+'/'+runname+'_ensemble.pickle'
+
+	# if the save file doesn't exist, make it
+	if not os.path.isfile(outname):
+		collate_output(runname,outname)
+
+	with open(outname, "rb") as f:
+		ensemble=pickle.load(f)
+	
+	# get SFR_observed
+	sfr_obs = np.clip(np.array([x['sfr'][0] for x in ensemble['ancildat']]),1e-2,1e4)
+	lir = np.clip(np.array([x['L_IR'][0] for x in ensemble['ancildat']]),1e-2,1e4)
+	z_sfr = np.array([x['z_sfr'] for x in ensemble['ancildat']])
+	valid_comp = ensemble['z'] > 0
+
+	
+
+
 def nebcomp(runname):
 	inname = os.getenv('APPS')+'/threedhst_bsfh/results/'+runname+'/'+runname+'_ensemble.pickle'
 	outname_errs = os.getenv('APPS') + '/threedhst_bsfh/plots/ensemble_plots/'+runname+'/emline_comp'
