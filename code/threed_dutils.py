@@ -359,8 +359,13 @@ def integrate_mag(spec_lam,spectra,filter, z=None, alt_file=None):
 	'''
 	borrowed from calc_ml
 	given a filter name and spectrum, calculate magnitude/luminosity in filter (see alt_file for filter names)
-	luminosity comes out in erg/s
-	if redshift is specified, return apparent magnitude and flux
+	INPUT: 
+		SPEC_LAM: must be in angstroms. if redshift is specified, this should ALREADY be corrected for reddening.
+		SPECTRA: must be in Lsun/Hz (FSPS standard). if redshift is specified, the normalization will be taken care of.
+	OUTPUT:
+		LUMINOSITY: comes out in erg/s
+		MAG: comes out as absolute magnitude
+			NOTE: if redshift is specified, INSTEAD RETURN apparent magnitude and flux [erg/s/cm^2]
 	'''
 
 	if type(filter) == str:
@@ -369,18 +374,12 @@ def integrate_mag(spec_lam,spectra,filter, z=None, alt_file=None):
 	else:
 		resp_lam = filter[0][0]
 		res      = filter[1][0]
-	
+
 	# calculate effective width
 	#dlam = (resp_lam[1:]-resp_lam[:-1])/2.
 	#width = np.array([dlam[ii]+dlam[ii+1] for ii in xrange(len(resp_lam)-2)])
 	#width = np.concatenate((np.atleast_1d(dlam[0]*2),width,np.atleast_1d(dlam[-1]*2)))
 	#effective_width = np.sum(res*width)
-
-	# redshift?
-	if z:
-		spectra_interp = interp1d(spec_lam*(1+z), spectra, bounds_error = False, fill_value = 0)
-		spectra = spectra_interp(spec_lam)
-		spectra[spectra<0] = 0
 	
 	# physical units, in CGS, from sps_vars.f90 in the SPS code
 	pc2cm = 3.08568E18
@@ -389,21 +388,24 @@ def integrate_mag(spec_lam,spectra,filter, z=None, alt_file=None):
 
 	# interpolate filter response onto spectral lambda array
 	# when interpolating, set response outside wavelength range to be zero.
-	response_interp = interp1d(resp_lam,res, bounds_error = False, fill_value = 0)
-
-	# normalize [THIS STEP I DON'T UNDERSTAND... BUT IT IS NECESSARY]
-	norm = simps(response_interp(spec_lam)/spec_lam,spec_lam)
-
-	# integrate filter
-	# luminosity density in filter is calculated
-	# luminosity is also calculated: multiply by extra factor of (c/lambda) in sum, and convert one lambda to CGS
-	luminosity = simps(spectra*(response_interp(spec_lam)/norm)*(c/(spec_lam**2*1E-8)),spec_lam)
-	luminosity_density = simps(spectra*(response_interp(spec_lam)/norm)/spec_lam,spec_lam)
+	response_interp_function = interp1d(resp_lam,res, bounds_error = False, fill_value = 0)
+	resp_interp = response_interp_function(spec_lam)
+	
+	# integrate spectrum over filter response
+	# first calculate luminosity: convert to flambda (factor of c/lam^2, with c converted to AA/s)
+	# then integrate over flambda [Lsun/AA] to get Lsun
+	spec_flam = spectra*(c*1e8/(spec_lam**2))
+	luminosity = simps(spec_flam*resp_interp,spec_lam)
+	
+	# now calculate luminosity density [erg/s/Hz] in filter
+	# this involves normalizing the filter response by integrating over wavelength
+	norm = simps(resp_interp/spec_lam,spec_lam)
+	luminosity_density = simps(spectra*(resp_interp/norm)/spec_lam,spec_lam)
 
 	# if redshift is specified, convert to flux and apparent magnitude
 	if z:
 		from astropy.cosmology import WMAP9
-		dfactor = (WMAP9.luminosity_distance(z).value*1e5)**(-2)
+		dfactor = (WMAP9.luminosity_distance(z).value*1e5)**(-2)*(1+z)
 		luminosity = luminosity*dfactor
 		luminosity_density = luminosity_density*dfactor
 
@@ -416,6 +418,7 @@ def integrate_mag(spec_lam,spectra,filter, z=None, alt_file=None):
 	# convert flux density to magnitudes in AB system
 	mag = -2.5*np.log10(flux_density)-48.60
 
+	#print 'maggies: {0}'.format(10**(-0.4*mag)*1e10)
 	return mag, luminosity
 
 def mips_to_lir(z):

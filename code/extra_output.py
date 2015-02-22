@@ -113,7 +113,7 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 	dust2_index = np.array([True if x[:-2] == 'dust2' else False for x in parnames])
 	dust_index_index = np.array([True if x == 'dust_index' else False for x in parnames])
 
-    ######## SFH parameters #########
+	######## SFH parameters #########
 	for jj in xrange(nwalkers):
 		for kk in xrange(niter):
 	    
@@ -186,8 +186,14 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 	# set up MIPS + fake L_IR filter
 	mips_flux = np.zeros(nsamp_mc)
 	mips_index = [i for i, s in enumerate(sample_results['obs']['filters']) if 'mips' in s]
-	lir_filter = [[np.linspace(8e4, 1000e4, num=100)],
-	              [np.ones(100)]] 
+	botlam = np.atleast_1d(8e4-1)
+	toplam = np.atleast_1d(1000e4+1)
+	edgetrans = np.atleast_1d(0)
+	lir_filter = [[np.concatenate((botlam,np.linspace(8e4, 1000e4, num=100),toplam))],
+	              [np.concatenate((edgetrans,np.ones(100),edgetrans))]]
+
+	lir_filter = [[np.concatenate((np.atleast_1d(18005-1),np.linspace(180050, 322070, num=100),np.atleast_1d(322070+1)))],
+	              [np.concatenate((edgetrans,np.ones(100),edgetrans))]]
 
     # first randomize
     # use flattened and thinned chain for random posterior draws
@@ -213,6 +219,11 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 		# add mips info
 		mips_flux[jj] = mags_neboff[mips_index][0]*1e10 # comes out in maggies, convert to flux such that AB zeropoint is 25 mags
 		_,lir[jj]     = threed_dutils.integrate_mag(w,spec_neboff,lir_filter, z=None, alt_file=None) # comes out in ergs/s
+		#tmips  = threed_dutils.integrate_mag(w,spec_neboff,'MIPS_24um_AEGIS', z=sps.params['zred'], alt_file=None) # comes out in ergs/s
+		#tmips_intrin  = threed_dutils.integrate_mag(w,spec_neboff,'MIPS_24um_AEGIS', z=None, alt_file=None) # comes out in ergs/s
+
+		#print mips_flux[jj]
+		#print 1/0
 		lir[jj]       = lir[jj] / 3.846e33 #  convert to Lsun
 
 	##### MAXIMUM PROBABILITY
