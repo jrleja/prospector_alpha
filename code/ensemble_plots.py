@@ -1,4 +1,4 @@
-import os, threed_dutils, triangle, pickle, extra_output
+import os, threed_dutils, pickle, extra_output
 from bsfh import read_results
 import numpy as np
 import matplotlib.pyplot as plt
@@ -82,7 +82,8 @@ def collate_output(runname,outname):
 			q_16
 		except:
 			q_16, q_50, q_84, thetamax = (np.zeros(shape=(ntheta,ngals))+np.nan for i in range(4))
-			z, mips_sn, mips_flux, L_IR = (np.zeros(ngals) for i in range(4))
+			z, mips_sn = (np.zeros(ngals) for i in range(2))
+			mips_flux, L_IR = (np.zeros(shape=(3,ngals)) for i in range(2))
 			output_name = np.empty(0,dtype='object')
 			obs,model_emline,ancildat = [],[],[]
 
@@ -98,10 +99,12 @@ def collate_output(runname,outname):
 
 		# MIPS information
 		try:
-			mips_flux[jj] = sample_results['mips']['mips_flux']
-			L_IR[jj]      = sample_results['mips']['L_IR']
+			q_16_mips, q_50_mips, q_84_mips = triangle.quantile(sample_results['mips']['mips_flux'], [0.16, 0.5, 0.84])
+			q_16_lir, q_50_lir, q_84_lir = triangle.quantile(sample_results['mips']['L_IR'], [0.16, 0.5, 0.84])
+			mips_flux[:,jj] = np.array([q_16_mips, q_50_mips, q_84_mips])
+			L_IR[:,jj] = np.array([q_16_lir, q_50_lir, q_84_lir])
 		except:
-			pass
+			print 1/0
 
 		# grab best-fitting model
 		thetamax[:,jj] = np.concatenate((sample_results['quantiles']['maxprob_params'],
@@ -464,6 +467,16 @@ def lir_comp(runname):
 	z_sfr = np.array([x['z_sfr'] for x in ensemble['ancildat']])
 	valid_comp = ensemble['z'] > 0
 
+	fig = plt.figure()
+	ax = fig.add_subplot(111)
+	
+	mips_err = asym_errors(ensemble['mips_flux'][1,:],ensemble['mips_flux'][2,:],ensemble['mips_flux'][0,:],log=True)
+	L_IR_err = asym_errors(ensemble['L_IR'][1,:],ensemble['L_IR'][2,:],ensemble['L_IR'][0,:],log=True)
+	ax.errorbar(np.log10(ensemble['mips_flux'][1,:]),np.log10(ensemble['L_IR'][1,:]),
+			 yerr=L_IR_err, xerr=mips_err,
+			 fmt='bo',alpha=0.5)
+	ax.errorbar(np.log10(f_24m),np.log10(lir),
+		        fmt='ro',alpha=0.5)
 	print 1/0
 
 	
