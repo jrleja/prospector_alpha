@@ -82,7 +82,7 @@ def collate_output(runname,outname):
 			q_16
 		except:
 			q_16, q_50, q_84, thetamax = (np.zeros(shape=(ntheta,ngals))+np.nan for i in range(4))
-			z, mips_sn = (np.zeros(ngals) for i in range(2))
+			z, mips_sn, mips_flux, L_IR = (np.zeros(ngals) for i in range(4))
 			output_name = np.empty(0,dtype='object')
 			obs,model_emline,ancildat = [],[],[]
 
@@ -95,6 +95,13 @@ def collate_output(runname,outname):
 		z[jj] = sample_results['model_params'][0]['init'][0]
 		mips_sn[jj] = sample_results['obs']['maggies'][-1]/sample_results['obs']['maggies_unc'][-1]
 		output_name=np.append(output_name,filename)
+
+		# MIPS information
+		try:
+			mips_flux[jj] = sample_results['mips']['mips_flux']
+			L_IR[jj]      = sample_results['mips']['L_IR']
+		except:
+			pass
 
 		# grab best-fitting model
 		thetamax[:,jj] = np.concatenate((sample_results['quantiles']['maxprob_params'],
@@ -119,6 +126,8 @@ def collate_output(runname,outname):
 		      'q84': q_84,\
 		      'maxprob': thetamax,\
 		      'mips_sn': mips_sn,\
+		      'mips_flux': mips_flux,\
+		      'L_IR': L_IR,
 		      'z':z,
 		      'obs':obs,
 		      'model_emline':model_emline,
@@ -449,11 +458,13 @@ def lir_comp(runname):
 	with open(outname, "rb") as f:
 		ensemble=pickle.load(f)
 	
-	# get SFR_observed
-	sfr_obs = np.clip(np.array([x['sfr'][0] for x in ensemble['ancildat']]),1e-2,1e4)
-	lir = np.clip(np.array([x['L_IR'][0] for x in ensemble['ancildat']]),1e-2,1e4)
+	# get observed quantities
+	f_24m = np.array([x['f24tot'][0] for x in ensemble['ancildat']])
+	lir   = np.array([x['L_IR'][0] for x in ensemble['ancildat']])
 	z_sfr = np.array([x['z_sfr'] for x in ensemble['ancildat']])
 	valid_comp = ensemble['z'] > 0
+
+	print 1/0
 
 	
 

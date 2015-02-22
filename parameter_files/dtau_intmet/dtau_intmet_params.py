@@ -121,17 +121,11 @@ model_params.append({'name': 'mass', 'N': 2,
                         'prior_args': {'mini':np.array([1e7, 1e7]),
                                        'maxi':np.array([1e14, 1e14])}})
 
-model_params.append({'name': 'pmetals', 'N': 1,
-                        'isfree': False,
-                        'init': 2,
-                        'units': '',
-                        'prior_function': None,
-                        'prior_args': {'mini':-3, 'maxi':-1}})
-
 model_params.append({'name': 'logzsol', 'N': 1,
                         'isfree': True,
                         'init': 0.0,
                         'init_disp': 0.4,
+                        'log_param': True,
                         'units': r'$\log (Z/Z_\odot)$',
                         'prior_function': tophat,
                         'prior_args': {'mini':-1, 'maxi':0.19}})
@@ -147,6 +141,7 @@ model_params.append({'name': 'sfh', 'N': 1,
 model_params.append({'name': 'tau', 'N': 2,
                         'isfree': True,
                         'init': np.array([10.0, 1.0]),
+                        'init_disp': 0.5,
                         'units': 'Gyr',
                         'prior_function':tophat,
                         'prior_args': {'mini':np.array([0.1, 0.1]),
