@@ -192,9 +192,6 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 	lir_filter = [[np.concatenate((botlam,np.linspace(8e4, 1000e4, num=100),toplam))],
 	              [np.concatenate((edgetrans,np.ones(100),edgetrans))]]
 
-	lir_filter = [[np.concatenate((np.atleast_1d(18005-1),np.linspace(180050, 322070, num=100),np.atleast_1d(322070+1)))],
-	              [np.concatenate((edgetrans,np.ones(100),edgetrans))]]
-
     # first randomize
     # use flattened and thinned chain for random posterior draws
 	flatchain = copy(sample_results['flatchain'])

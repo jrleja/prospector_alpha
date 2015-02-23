@@ -1,4 +1,4 @@
-import os, threed_dutils, pickle, extra_output
+import os, threed_dutils, pickle, extra_output, triangle
 from bsfh import read_results
 import numpy as np
 import matplotlib.pyplot as plt
@@ -7,6 +7,7 @@ from astropy.cosmology import WMAP9
 from astropy import constants
 
 # minimum flux: no model emission line has strength of 0!
+pc2cm = 3.08567758e18
 minmodel_flux = 1e-2
 
 def asym_errors(center, up, down, log=False):
@@ -450,9 +451,10 @@ def photerr_plot(runname, scale=False):
 	plt.close()
 
 
-def lir_comp(runname):
+def lir_comp(runname, lum=True, mjy=False):
 
 	outname = os.getenv('APPS')+'/threedhst_bsfh/results/'+runname+'/'+runname+'_ensemble.pickle'
+	outname_errs = os.getenv('APPS') + '/threedhst_bsfh/plots/ensemble_plots/'+runname+'/lir_comp'
 
 	# if the save file doesn't exist, make it
 	if not os.path.isfile(outname):
@@ -461,23 +463,49 @@ def lir_comp(runname):
 	with open(outname, "rb") as f:
 		ensemble=pickle.load(f)
 	
-	# get observed quantities
+	# get observed quantities from ancillary data
+	# f_24: AB = 25
 	f_24m = np.array([x['f24tot'][0] for x in ensemble['ancildat']])
 	lir   = np.array([x['L_IR'][0] for x in ensemble['ancildat']])
-	z_sfr = np.array([x['z_sfr'] for x in ensemble['ancildat']])
+	z_sfr = np.array([x['z_sfr'][0] for x in ensemble['ancildat']])
 	valid_comp = ensemble['z'] > 0
 
+	# luminosity rather than flux
+	if lum:
+		distances = WMAP9.luminosity_distance(ensemble['z'][valid_comp]).value*1e6*pc2cm
+		dfactor = (4*np.pi*distances**2)*(1+ensemble['z'][valid_comp])
+		ensemble['mips_flux'][:,valid_comp] = ensemble['mips_flux'][:,valid_comp] * dfactor
+		f_24m = f_24m * dfactor
+
+	# plot millijanskies
+	if mjy:
+		# put in maggies, then multiply by maggies to janskies, then to mjy
+		jfactor = (1/1e10)*3631*1e3
+		f_24m = f_24m *jfactor
+		ensemble['mips_flux'][:,valid_comp] = ensemble['mips_flux'][:,valid_comp] * jfactor
+
+
+	# create figure
 	fig = plt.figure()
 	ax = fig.add_subplot(111)
 	
+	# calculate L_IR, mips flux from model
 	mips_err = asym_errors(ensemble['mips_flux'][1,:],ensemble['mips_flux'][2,:],ensemble['mips_flux'][0,:],log=True)
 	L_IR_err = asym_errors(ensemble['L_IR'][1,:],ensemble['L_IR'][2,:],ensemble['L_IR'][0,:],log=True)
+
+	# plot
 	ax.errorbar(np.log10(ensemble['mips_flux'][1,:]),np.log10(ensemble['L_IR'][1,:]),
 			 yerr=L_IR_err, xerr=mips_err,
 			 fmt='bo',alpha=0.5)
 	ax.errorbar(np.log10(f_24m),np.log10(lir),
 		        fmt='ro',alpha=0.5)
-	print 1/0
+	
+	ax.set_xlabel('MIPS flux density')
+	ax.set_ylabel("L(IR) [8-1000$\mu$m]")
+
+	plt.savefig(outname_errs+'.png', dpi=300)
+	plt.close()
+
 
 	
 
@@ -594,7 +622,6 @@ def emline_comparison(runname,emline_base='Halpha', chain_emlines=False):
 	for bobo in xrange(len(sfr_str)):
 
 		# CALCULATE EXPECTED HALPHA FLUX FROM SFH
-		pc2cm = 3.08567758e18
 		valid_comp = ensemble['z'] > 0
 		distances = WMAP9.luminosity_distance(ensemble['z'][valid_comp]).value*1e6*pc2cm
 		dfactor = (4*np.pi*distances**2)*1e-17
