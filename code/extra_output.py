@@ -197,6 +197,7 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 	flatchain = copy(sample_results['flatchain'])
 	lineflux = np.empty(shape=(nsamp_mc,nline))
 	lir      = np.zeros(nsamp_mc)
+	z        = np.atleast_1d(sample_results['model'].params['zred'])
 	np.random.shuffle(flatchain)
 	for jj in xrange(nsamp_mc):
 		thetas = flatchain[jj,:]
@@ -213,8 +214,13 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 
 		lineflux[jj]= measure_emline_lum(w/(1+z),spec-spec_neboff,emline,wavelength,sideband,saveplot=saveplot)
 
-		# add mips info
+		# calculate redshifted mips magnitudes
 		mips_flux[jj] = mags_neboff[mips_index][0]*1e10 # comes out in maggies, convert to flux such that AB zeropoint is 25 mags
+
+		# now calculate z=0 magnitudes
+		sample_results['model'].params['zred'] = np.atleast_1d(0.00)
+		spec_neboff,mags_neboff,w = sample_results['model'].mean_model(thetas, sample_results['obs'], sps=sps,norm_spec=False)
+
 		_,lir[jj]     = threed_dutils.integrate_mag(w,spec_neboff,lir_filter, z=None, alt_file=None) # comes out in ergs/s
 		#tmips  = threed_dutils.integrate_mag(w,spec_neboff,'MIPS_24um_AEGIS', z=sps.params['zred'], alt_file=None) # comes out in ergs/s
 		#tmips_intrin  = threed_dutils.integrate_mag(w,spec_neboff,'MIPS_24um_AEGIS', z=None, alt_file=None) # comes out in ergs/s
@@ -222,6 +228,9 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 		#print mips_flux[jj]
 		#print 1/0
 		lir[jj]       = lir[jj] / 3.846e33 #  convert to Lsun
+
+		# revert
+		sample_results['model'].params['zred'] = np.atleast_1d(z)
 
 	##### MAXIMUM PROBABILITY
 	# grab best-fitting model

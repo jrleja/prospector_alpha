@@ -21,6 +21,58 @@ def asym_errors(center, up, down, log=False):
 
 	return errarray
 
+def restore_mips_info(sample_results):
+	''' temporary function'''
+
+	from copy import copy
+	nsamp_mc = 20
+
+	# initialize sps
+	# check to see if we want zcontinuous=2 (i.e., the MDF)
+	if np.sum([1 for x in sample_results['model'].config_list if x['name'] == 'pmetals']) > 0:
+		sps = threed_dutils.setup_sps()
+	else:
+		sps = threed_dutils.setup_sps(zcontinuous=1)
+
+	# set up MIPS + fake L_IR filter
+	mips_flux = np.zeros(nsamp_mc)
+	mips_index = [i for i, s in enumerate(sample_results['obs']['filters']) if 'mips' in s]
+	botlam = np.atleast_1d(8e4-1)
+	toplam = np.atleast_1d(1000e4+1)
+	edgetrans = np.atleast_1d(0)
+	lir_filter = [[np.concatenate((botlam,np.linspace(8e4, 1000e4, num=100),toplam))],
+	              [np.concatenate((edgetrans,np.ones(100),edgetrans))]]
+
+	# first randomize
+    # use flattened and thinned chain for random posterior draws
+	flatchain = copy(sample_results['flatchain'])
+	lir      = np.zeros(nsamp_mc)
+	np.random.shuffle(flatchain)
+	z = np.atleast_1d(sample_results['model'].params['zred'])
+
+	for jj in xrange(nsamp_mc):
+		thetas = flatchain[jj,:]
+
+		# calculate redshifted magnitudes
+		sample_results['model'].params['zred'] = np.atleast_1d(z)
+		spec_neboff,mags_neboff,w = sample_results['model'].mean_model(thetas, sample_results['obs'], sps=sps,norm_spec=False)
+
+		# add mips flux info
+		mips_flux[jj] = mags_neboff[mips_index][0]*1e10 # comes out in maggies, convert to flux such that AB zeropoint is 25 mags
+
+		# now calculate z=0 magnitudes
+		sample_results['model'].params['zred'] = np.atleast_1d(0.00)
+		spec_neboff,mags_neboff,w = sample_results['model'].mean_model(thetas, sample_results['obs'], sps=sps,norm_spec=False)
+
+		# calculate L_IR intrinsic
+		_,lir[jj]     = threed_dutils.integrate_mag(w,spec_neboff,lir_filter, z=None, alt_file=None) # comes out in ergs/s
+		lir[jj]       = lir[jj] / 3.846e33 #  convert to Lsun
+
+	###### FORMAT MIPS OUTPUT
+	mips = {'mips_flux':mips_flux,'L_IR':lir}
+	sample_results['mips'] = mips
+	return sample_results
+
 def collate_output(runname,outname):
 
 	'''
@@ -500,6 +552,11 @@ def lir_comp(runname, lum=True, mjy=False):
 	ax.errorbar(np.log10(f_24m),np.log10(lir),
 		        fmt='ro',alpha=0.5)
 	
+	#testable = f_24m > 0
+	#offset = np.mean(np.log10(ensemble['L_IR'][1,valid_comp])-np.log10(ensemble['mips_flux'][1,valid_comp]))
+	#offset_2 = np.mean(np.log10(lir[testable])-np.log10(f_24m[testable]))
+	#print 1/0
+
 	ax.set_xlabel('MIPS flux density')
 	ax.set_ylabel("L(IR) [8-1000$\mu$m]")
 
@@ -718,8 +775,8 @@ def emline_comparison(runname,emline_base='Halpha', chain_emlines=False):
 			ax[kk].plot([-1e3,1e3],[-1e3,1e3],linestyle='--',color='0.1',alpha=0.8)
 
 			n = np.sum(np.isfinite(y_data[kk]))
-			scat=np.sqrt(np.sum((y_data[kk]-x_data[kk])**2.)/(n-2))
 			mean_offset = np.sum(y_data[kk]-x_data[kk])/n
+			scat=np.sqrt(np.sum((y_data[kk]-x_data[kk]-mean_offset)**2.)/(n-2))
 			ax[kk].text(-2.7,2.7, 'scatter='+"{:.2f}".format(scat)+' dex')
 			ax[kk].text(-2.7,2.4, 'mean offset='+"{:.2f}".format(mean_offset)+' dex')
 
