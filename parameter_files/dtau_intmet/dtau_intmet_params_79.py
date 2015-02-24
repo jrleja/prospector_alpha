@@ -266,7 +266,7 @@ model_params.append({'name': 'duste_umin', 'N': 1,
 
 model_params.append({'name': 'duste_qpah', 'N': 1,
                         'isfree': False,
-                        'init': 1.5,
+                        'init': 3.0,
                         'units': 'percent',
                         'prior_function': tophat,
                         'prior_args': {'mini':0.0, 'maxi':10.0}})
