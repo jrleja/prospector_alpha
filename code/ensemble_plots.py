@@ -521,11 +521,12 @@ def lir_comp(runname, lum=True, mjy=False):
 	lir   = np.array([x['L_IR'][0] for x in ensemble['ancildat']])
 	z_sfr = np.array([x['z_sfr'][0] for x in ensemble['ancildat']])
 	valid_comp = ensemble['z'] > 0
+	ensemble['z'] = ensemble['z'][valid_comp]
 
 	# luminosity rather than flux
 	if lum:
-		distances = WMAP9.luminosity_distance(ensemble['z'][valid_comp]).value*1e6*pc2cm
-		dfactor = (4*np.pi*distances**2)*(1+ensemble['z'][valid_comp])
+		distances = WMAP9.luminosity_distance(ensemble['z']).value*1e6*pc2cm
+		dfactor = (4*np.pi*distances**2)/(1+ensemble['z'])
 		ensemble['mips_flux'][:,valid_comp] = ensemble['mips_flux'][:,valid_comp] * dfactor
 		f_24m = f_24m * dfactor
 
@@ -555,7 +556,6 @@ def lir_comp(runname, lum=True, mjy=False):
 	#testable = f_24m > 0
 	#offset = np.mean(np.log10(ensemble['L_IR'][1,valid_comp])-np.log10(ensemble['mips_flux'][1,valid_comp]))
 	#offset_2 = np.mean(np.log10(lir[testable])-np.log10(f_24m[testable]))
-	#print 1/0
 
 	ax.set_xlabel('MIPS flux density')
 	ax.set_ylabel("L(IR) [8-1000$\mu$m]")
