@@ -421,98 +421,45 @@ def integrate_mag(spec_lam,spectra,filter, z=None, alt_file=None):
 	#print 'maggies: {0}'.format(10**(-0.4*mag)*1e10)
 	return mag, luminosity
 
-def mips_to_lir(z):
-
-	# mips information
-	# effective width from commented calculation in integrate_mag above
-	# avg wavelength from table 2.2 of mips instrument handbook
-	mips_eff_width = 48850.322
-	mips_avg_lam   = 236800.0
-
-	# load Table 2 from Dale & Helou 2002
-	filename = os.getenv('APPS')+'/threedhst_bsfh/data/dale_helou_table2.dat'
-	with open(filename, 'r') as f:
-		for jj in range(1): hdr = f.readline().split()
-	data = np.loadtxt(filename, comments = '#',dtype = np.dtype([(n, np.float) for n in hdr[1:]]))
-
-	# take log average to make SED
-	# note that Kate refers to L_IR as 8-1000 ums
-	# whereas this integral is implicitly over 3um-1100um
-	# only ~3% flux in 3-5 um, and up to ~13% in 5-13um, so not too worried...
-	# but these will be slightly underestimated as a result!
-	to_average = data['alpha'] < 2.5
-	fluxes = np.zeros(6)
-	waves = [(3,5),(5,13),(13,20),(20,42),(42,122),(122,1100)] # in microns
-	avg_waves = np.array([(x[0]+x[1])/2. for x in waves])
-	for i, names in enumerate(data.dtype.names):
-		if np.logical_and(names != 'lfnu60_lfnu100', names != 'alpha'):
-			fluxes[i-2] = 10**np.mean(np.log10(data[names][to_average]))
-	fluxes = np.array([fluxes[ii]/(waves[ii][1]-waves[ii][0]) for ii in xrange(len(waves))])
-	fluxes = fluxes/np.sum(fluxes)
-
-	# interpolate flux density fraction
-	interp_helou = interp1d(avg_waves, fluxes)
-	fluxfrac = interp_helou(mips_avg_lam/(1.+z))*mips_eff_width/(1.+z)
-	
-	return 1./fluxfrac
-
-def calculate_uv_ir_sfr():
-
-	# step 1: calculate MIPS flux from spectrum (or plug in MIPS flux for testing)
-	# step 2: calculate MIPS flux ---> f_{IR}
-	# step 3: convert to L_{IR}
-	# step 4: calculate L_2500 (?)
-	# step 5: tear it up
-	# step 6: realize you need to do none of this
-	pass
-
-def integrate_sfh(t1,t2,mass,tage,tau,sf_start,tburst,fburst):
+def integrate_sfh(t1,t2,mass,tage,tau,sf_start):
 	
 	'''
 	integrate a delayed tau SFH between t1 and t2
 	'''
-	
-	# double or single tau model?
-	# does NOT currently accept different tages
-	# double t2 if not doubled:
+	t1 = t1-sf_start
+	t2 = t2-sf_start
+	tage = tage-sf_start
+
+	# sanitize inputs
 	ndim = len(np.atleast_1d(mass))
 	if len(np.atleast_1d(t2)) != ndim:
 		t2 = np.zeros(ndim)+t2
+	if len(np.atleast_1d(t1)) != ndim:
+		t1 = np.zeros(ndim)+t1
 
-		
-	totmass = np.sum(mass)
-	norm=(mass/totmass)*(1.0-fburst)
-	tot = np.zeros(ndim)-99
-	
-	# if we're outside of the boundaries, return boundary values
-	_= np.logical_or((t1<sf_start),(t2<sf_start))
-	if np.sum(_) > 0:
-		tot[_] = 0.0
+	# if we're outside of the time boundaries, clip to boundary values
+	t1 = np.clip(t1,0,tage)
+	t2 = np.clip(t2,0,tage)
 
-	_ = t2 > tage
-	if np.sum(_) > 0:
-		tot[_]     = norm[_]
-
-	# check what needs to be calculated still
 	# add tau model
-	need2calc = (tot == -99)
-	if np.sum(need2calc) > 0:
-		intsfr = (np.exp(-t1[need2calc]/tau[need2calc])*(1+t1[need2calc]/tau[need2calc]) - 
-		          np.exp(-t2[need2calc]/tau[need2calc])*(1+t2[need2calc]/tau[need2calc]))
+	intsfr =  np.exp(-t1/tau)*(1+t1/tau) - \
+	          np.exp(-t2/tau)*(1+t2/tau)
+	norm =    1.0- np.exp(-tage    /tau)*(1+tage/tau)
+	intsfr = intsfr/norm
 
-		tot[need2calc]=intsfr*norm[need2calc]/(np.exp(-sf_start[need2calc]/tau[need2calc])*(sf_start[need2calc]/tau[need2calc]+1)-
-				                               np.exp(-tage[need2calc]    /tau[need2calc])*(tage[need2calc]    /tau[need2calc]+1))
-	# add burst
-	need_burst = np.logical_and((t2 > tburst),(t1 < tburst))
-	if np.sum(need_burst) > 0:
-		tot[need_burst] = tot[need_burst] + fburst[need_burst]
-	intsfr = np.sum(tot)
+	# return sum of SFR components
+	tot_sfr = np.sum(intsfr*mass)
+	return tot_sfr
 
-	if intsfr > 1.00000001:
-		print intsfr
-		print 'intsfr should not be greater than 1.0!'
-		print 1/0
-	if intsfr < -0.0000001:
-		print intsfr
-		print 1/0
-	return intsfr
+
+
+
+
+
+
+
+
+
+
+
+
