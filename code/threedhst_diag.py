@@ -21,7 +21,7 @@ def plot_sfh(sample_results,nsamp=1000):
 
 	# find SFH parameters that are variables in the chain
     # save their indexes for future use
-	str_sfh_parms = ['mass','tau','tburst','fburst','sf_start','tage']
+	str_sfh_parms = ['mass','tau','sf_start','tage']
 	parnames = sample_results['model'].theta_labels()
 	indexes = []
 	for string in str_sfh_parms:
