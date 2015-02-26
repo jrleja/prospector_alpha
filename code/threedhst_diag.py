@@ -16,7 +16,7 @@ def plot_sfh(sample_results,nsamp=1000):
 
 	'''
 	create sfh for plotting purposes
-	input: str_sfh_parms = ['tage','tau','tburst','fburst','sf_start']
+	input: str_sfh_parms = ['tage','tau','sf_start']
 	'''
 
 	# find SFH parameters that are variables in the chain
@@ -49,19 +49,19 @@ def plot_sfh(sample_results,nsamp=1000):
 				if len(np.atleast_1d(_)) != np.sum(indexes[0]):
 					_ = np.zeros(np.sum(indexes[0]))+_
 				sfh_parms.append(_)
-		mass,tau,tburst,fburst,sf_start,tage = sfh_parms
+		mass,tau,sf_start,tage = sfh_parms
 
 		if mm == 0:
 			t=np.linspace(0,np.max(tage),num=50)
 
 		for jj in xrange(nt): intsfr[mm,jj] = threed_dutils.integrate_sfh(sf_start,t[jj],mass,
-		                                                                      tage,tau,sf_start,tburst,fburst)
+		                                                                      tage,tau,sf_start)
 
 	q = np.zeros(shape=(nt,3))
 	for jj in xrange(nt): q[jj,:] = np.percentile(intsfr[:,jj],[16.0,50.0,84.0])
 	return t, q
 
-def create_plotquant(sample_results, logplot = ['mass', 'tau', 'tage', 'tburst', 'sf_start']):
+def create_plotquant(sample_results, logplot = ['mass', 'tau', 'tage', 'sf_start']):
     
 	'''
 	creates plottable versions of chain and sets up new plotnames
@@ -75,7 +75,7 @@ def create_plotquant(sample_results, logplot = ['mass', 'tau', 'tage', 'tburst',
 	# will have to redefine after inserting p(z)
 	# note that we switch prior min/max here!!
 	tuniv = WMAP9.age(sample_results['model'].config_list[0]['init']).value*1.2
-	redefine = ['tburst','sf_start']
+	redefine = ['sf_start']
 
 	# check for multiple stellar populations
 	for ii in xrange(len(parnames)):    	
