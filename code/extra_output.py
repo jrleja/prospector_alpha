@@ -7,7 +7,7 @@ from scipy.optimize import brentq
 from copy import copy
 from astropy import constants
 
-def calc_emp_ha(mass,tage,tau,sf_start,tburst,fburst,tuniv,dust2,dustindex):
+def calc_emp_ha(mass,tage,tau,sf_start,tuniv,dust2,dustindex):
 
 	ncomp = len(mass)
 	ha_flux=0.0
@@ -18,9 +18,7 @@ def calc_emp_ha(mass,tage,tau,sf_start,tburst,fburst,tuniv,dust2,dustindex):
 			                              np.asarray([mass[kk]]),
 			                              np.asarray([tage[kk]]),
 			                              np.asarray([tau[kk]]),
-	                                      np.asarray([sf_start[kk]]),
-	                                      np.asarray([tburst[kk]]),
-	                                      np.asarray([fburst[kk]]))*mass[kk]/(0.1*1e9)
+	                                      np.asarray([sf_start[kk]]))*mass[kk]/(0.1*1e9)
 		x=threed_dutils.synthetic_emlines(mass[kk],
 				                          sfr,
 				                          0.0,
@@ -31,15 +29,15 @@ def calc_emp_ha(mass,tage,tau,sf_start,tburst,fburst,tuniv,dust2,dustindex):
 	
 	return ha_flux,oiii_flux
 
-def sfh_half_time(x,mass,tage,tau,sf_start,tburst,fburst,c):
-	 return threed_dutils.integrate_sfh(sf_start,x,mass,tage,tau,sf_start,tburst,fburst)-c
+def sfh_half_time(x,mass,tage,tau,sf_start,c):
+	 return threed_dutils.integrate_sfh(sf_start,x,mass,tage,tau,sf_start)-c
 
-def halfmass_assembly_time(mass,tage,tau,sf_start,tburst,fburst,tuniv):
+def halfmass_assembly_time(mass,tage,tau,sf_start,tuniv):
 
 	# calculate half-mass assembly time
 	# c = 0.5 if half-mass assembly time occurs before burst
 	half_time = brentq(sfh_half_time, 0,14,
-                       args=(mass,tage,tau,sf_start,tburst,fburst,0.5),
+                       args=(mass,tage,tau,sf_start,0.5),
                        rtol=1.48e-08, maxiter=100)
 
 	return tuniv-half_time
@@ -93,7 +91,7 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 
     # find SFH parameters that are variables in the chain
     # save their indexes for future use
-	str_sfh_parms = ['mass','tau','tburst','fburst','sf_start','tage']
+	str_sfh_parms = ['mass','tau','sf_start','tage']
 	parnames = sample_results['model'].theta_labels()
 	indexes = []
 	for string in str_sfh_parms:
@@ -128,22 +126,22 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 					if len(np.atleast_1d(_)) != np.sum(indexes[0]):
 						_ = np.zeros(np.sum(indexes[0]))+_
 					sfh_parms.append(_)
-			mass,tau,tburst,fburst,sf_start,tage = sfh_parms
+			mass,tau,sf_start,tage = sfh_parms
 
 			# calculate half-mass assembly time, sfr
-			half_time[jj,kk] = halfmass_assembly_time(mass,tage,tau,sf_start,tburst,fburst,tuniv)
+			half_time[jj,kk] = halfmass_assembly_time(mass,tage,tau,sf_start,tuniv)
 
 			# empirical halpha
-			emp_ha[jj,kk],emp_oiii[jj,kk] = calc_emp_ha(mass,tage,tau,sf_start,tburst,fburst,tuniv,
+			emp_ha[jj,kk],emp_oiii[jj,kk] = calc_emp_ha(mass,tage,tau,sf_start,tuniv,
 				                                        sample_results['chain'][jj,kk,dust2_index],sample_results['chain'][jj,kk,dust_index_index])
 
 			# calculate sfr
 			sfr_10[jj,kk] = threed_dutils.integrate_sfh(tage-deltat[0],tage,mass,tage,tau,
-	                                                    sf_start,tburst,fburst)*np.sum(mass)/(deltat[0]*1e9)
+	                                                    sf_start)*np.sum(mass)/(deltat[0]*1e9)
 			sfr_100[jj,kk] = threed_dutils.integrate_sfh(tage-deltat[1],tage,mass,tage,tau,
-	                                                     sf_start,tburst,fburst)*np.sum(mass)/(deltat[1]*1e9)
+	                                                     sf_start)*np.sum(mass)/(deltat[1]*1e9)
 			sfr_1000[jj,kk] = threed_dutils.integrate_sfh(tage-deltat[2],tage,mass,tage,tau,
-	                                                     sf_start,tburst,fburst)*np.sum(mass)/(deltat[2]*1e9)
+	                                                     sf_start)*np.sum(mass)/(deltat[2]*1e9)
 
 			ssfr_100[jj,kk] = sfr_100[jj,kk] / np.sum(mass)
 
@@ -192,18 +190,29 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 	lir_filter = [[np.concatenate((botlam,np.linspace(8e4, 1000e4, num=100),toplam))],
 	              [np.concatenate((edgetrans,np.ones(100),edgetrans))]]
 
-    # first randomize
-    # use flattened and thinned chain for random posterior draws
-	flatchain = copy(sample_results['flatchain'])
+    # setup outputs
 	lineflux = np.empty(shape=(nsamp_mc,nline))
 	lir      = np.zeros(nsamp_mc)
-	z        = np.atleast_1d(sample_results['model'].params['zred'])
+
+	# save initial states
+	neb_em = sample_results['model'].params['add_neb_emission']
+	con_em = sample_results['model'].params['add_neb_continuum']
+	z      = np.atleast_1d(sample_results['model'].params['zred'])
+
+    # use randomized, flattened, thinned chain for posterior draws
+	flatchain = copy(sample_results['flatchain'])
 	np.random.shuffle(flatchain)
 	for jj in xrange(nsamp_mc):
 		thetas = flatchain[jj,:]
-		sample_results['model'].params['add_neb_emission'] = np.array(True)
+		
+		# nebon
+		sample_results['model'].params['add_neb_emission'] = np.array(2)
+		sample_results['model'].params['add_neb_continuum'] = np.array(True)
 		spec,mags,w = sample_results['model'].mean_model(thetas, sample_results['obs'], sps=sps,norm_spec=False)
+		
+		# neboff
 		sample_results['model'].params['add_neb_emission'] = np.array(False)
+		sample_results['model'].params['add_neb_continuum'] = np.array(False)
 		spec_neboff,mags_neboff,w = sample_results['model'].mean_model(thetas, sample_results['obs'], sps=sps,norm_spec=False)
 
 		# randomly save emline fig
@@ -231,6 +240,11 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 
 		# revert
 		sample_results['model'].params['zred'] = np.atleast_1d(z)
+
+	
+	# restore initial states
+	sample_results['model'].params['add_neb_emission'] = neb_em
+	sample_results['model'].params['add_neb_continuum'] = con_em
 
 	##### MAXIMUM PROBABILITY
 	# grab best-fitting model
