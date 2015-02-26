@@ -195,9 +195,10 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 	lir      = np.zeros(nsamp_mc)
 
 	# save initial states
-	neb_em = sample_results['model'].params['add_neb_emission']
-	con_em = sample_results['model'].params['add_neb_continuum']
-	z      = np.atleast_1d(sample_results['model'].params['zred'])
+	neb_em = sample_results['model'].params.get('add_neb_emission', np.array(False))
+	con_em = sample_results['model'].params.get('add_neb_continuum', np.array(False))
+	z      = sample_results['model'].params.get('zred', np.array(0.0))
+
 
     # use randomized, flattened, thinned chain for posterior draws
 	flatchain = copy(sample_results['flatchain'])
