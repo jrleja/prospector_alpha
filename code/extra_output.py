@@ -207,7 +207,7 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 		thetas = flatchain[jj,:]
 		
 		# nebon
-		sample_results['model'].params['add_neb_emission'] = np.array(2)
+		sample_results['model'].params['add_neb_emission'] = np.array(True)
 		sample_results['model'].params['add_neb_continuum'] = np.array(True)
 		spec,mags,w = sample_results['model'].mean_model(thetas, sample_results['obs'], sps=sps,norm_spec=False)
 		
