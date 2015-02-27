@@ -448,7 +448,7 @@ def integrate_sfh(t1,t2,mass,tage,tau,sf_start):
 	intsfr = intsfr/norm
 
 	# return sum of SFR components
-	tot_sfr = np.sum(intsfr*mass)
+	tot_sfr = np.sum(intsfr*mass)/np.sum(mass)
 	return tot_sfr
 
 

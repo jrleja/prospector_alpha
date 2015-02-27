@@ -226,7 +226,7 @@ def build_sample_dynamics():
 	'''
 
 	# output
-	field = ['UDS','COSMOS']
+	field = ['COSMOS','UDS']
 	bez = load_rachel_sample()
 
 	for bb in xrange(len(field)):
@@ -254,6 +254,7 @@ def build_sample_dynamics():
 			catalog = ICRS(bez['RAdeg'][nn], bez['DEdeg'][nn], unit=(u.degree, u.degree))
 			close_mass = list(np.abs(fast['lmass']-bez[nn]['logM']) < massmatch)
 			c = ICRS(phot['ra'][close_mass], phot['dec'][close_mass], unit=(u.degree, u.degree))
+			print 1/0
 			idx, d2d, d3d = catalog.match_to_catalog_sky(c)
 			if d2d.value*3600 < matching_radius:
 				i = -1
