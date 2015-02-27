@@ -485,7 +485,7 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None, measure_ir 
 
 		# switch to flam
 		factor = 3e18 / w**2
-		spec *= spec
+		spec *= factor
 		spec_neboff *= factor
 
 	else:
@@ -502,7 +502,6 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None, measure_ir 
 	emline_flux = np.zeros(len(wavelength))
 
 	for jj in xrange(len(wavelength)):
-
 		integrate_lam = (w > wavelength[jj]-sideband[jj]) & (w < wavelength[jj]+sideband[jj])
 		emline_flux[jj] = np.trapz(spec[integrate_lam], w[integrate_lam])
 

@@ -638,6 +638,9 @@ def emline_comparison(runname,emline_base='Halpha', chain_emlines=False):
 	inname = os.getenv('APPS')+'/threedhst_bsfh/results/'+runname+'/'+runname+'_ensemble.pickle'
 	outname_errs = os.getenv('APPS') + '/threedhst_bsfh/plots/ensemble_plots/'+runname+'/emline_comp_kscalc_'+emline_base+'_'
 
+	# will need to change to look at other emlines
+	halpha_lam = 6563.0
+
 	# if the save file doesn't exist, make it
 	if not os.path.isfile(inname):
 		collate_output(runname,inname)
@@ -702,16 +705,16 @@ def emline_comparison(runname,emline_base='Halpha', chain_emlines=False):
 		# EXTRACT EMISSION LINE FLUX FROM CLOUDY
 		# 'luminosity' in cgs
 		factor = (constants.L_sun.cgs.value)/(1e-17)/(4*np.pi*distances**2)
-		emline_q50 = np.clip(np.array([x['q50'][x['name'].index(cloudyname)] for x in ensemble['model_emline']]),minmodel_flux,1e50)*factor
-		emline_q16 = np.clip(np.array([x['q16'][x['name'].index(cloudyname)] for x in ensemble['model_emline']]),minmodel_flux,1e50)*factor
-		emline_q84 = np.clip(np.array([x['q84'][x['name'].index(cloudyname)] for x in ensemble['model_emline']]),minmodel_flux,1e50)*factor
-		emline_lam = np.array([x['lam'][x['name'].index(cloudyname)] for x in ensemble['model_emline']])[0]
+		halpha_ind = x['name'] == cloudyname
+		emline_q50 = np.array([x['q50'][halpha_ind][0] for x in ensemble['model_emline']])*factor
+		emline_q16 = np.array([x['q16'][halpha_ind][0] for x in ensemble['model_emline']])*factor
+		emline_q84 = np.array([x['q84'][halpha_ind][0] for x in ensemble['model_emline']])*factor
 		emline_errs = asym_errors(emline_q50,emline_q84,emline_q16,log=True)
-		
+
 		# EXTRACT OBSERVED EMISSION LINE FLUX
 		# flux: 10**-17 ergs / s / cm**2
 		# calculate scale
-		obs_emline_lams = np.log(emline_lam*(1+ensemble['z'][valid_comp])/1.e4)
+		obs_emline_lams = np.log(halpha_lam*(1+ensemble['z'][valid_comp])/1.e4)
 		s0 = np.array([x['s0'][0] for x in ensemble['ancildat']])
 		s1 = np.array([x['s1'][0] for x in ensemble['ancildat']])
 		tilts = np.exp(s0 + s1*obs_emline_lams)
@@ -761,7 +764,6 @@ def emline_comparison(runname,emline_base='Halpha', chain_emlines=False):
 
 		fig, ax = plt.subplots(1, 3, figsize = (18, 5))
 		for kk in xrange(len(x_data)):
-		
 			ax[kk].errorbar(x_data[kk],y_data[kk], 
 				        fmt='bo', ecolor='0.20', alpha=0.8,
 				        linestyle=' ',
