@@ -1,5 +1,6 @@
 import numpy as np
 import os, fsps
+import matplotlib.pyplot as plt
 from bsfh import model_setup
 from scipy.interpolate import interp1d
 from scipy.integrate import simps
@@ -451,7 +452,103 @@ def integrate_sfh(t1,t2,mass,tage,tau,sf_start):
 	tot_sfr = np.sum(intsfr*mass)/np.sum(mass)
 	return tot_sfr
 
+def measure_emline_lum(sps, model = None, obs = None, thetas = None, measure_ir = False, saveplot = False):
+	
+	'''
+	takes spec(on)-spec(off) to measure emission line luminosity
+	sideband is defined for each emission line after visually 
+	inspecting the spectral sampling density around each line
+	'''
 
+    # define emission lines
+	emline = np.array(['[OII]','Hbeta','[OIII]1','[OIII]2','Halpha','[SII]'])
+	wavelength = np.array([3728,4861.33,4959,5007,6562,6732.71])
+	sideband   = np.array([  10,     10,  10,  10,  10,     10])
+	nline = len(emline)
+
+	# get spectrum
+	if model:
+
+		# save redshift
+		z      = model.params.get('zred', np.array(0.0))
+		model.params['zred'] = np.array(0.0)
+
+		# nebon
+		model.params['add_neb_emission'] = np.array(True)
+		model.params['add_neb_continuum'] = np.array(True)
+		spec,mags,w = model.mean_model(thetas, obs, sps=sps, norm_spec=False)
+		
+		# neboff
+		model.params['add_neb_emission'] = np.array(False)
+		model.params['add_neb_continuum'] = np.array(False)
+		spec_neboff,mags_neboff,w = model.mean_model(thetas, obs, sps=sps, norm_spec=False)
+
+		# switch to flam
+		factor = 3e18 / w**2
+		spec *= spec
+		spec_neboff *= factor
+
+	else:
+		sps.params['add_neb_emission'] = True
+		sps.params['add_neb_continuum'] = True
+		w, spec = sps.get_spectrum(tage=sps.params['tage'], peraa=True)
+
+		sps.params['add_neb_emission'] = False
+		sps.params['add_neb_continuum'] = False
+		w, spec_neboff = sps.get_spectrum(tage=sps.params['tage'], peraa=True)
+
+	# diff
+	spec = spec-spec_neboff
+	emline_flux = np.zeros(len(wavelength))
+
+	for jj in xrange(len(wavelength)):
+
+		integrate_lam = (w > wavelength[jj]-sideband[jj]) & (w < wavelength[jj]+sideband[jj])
+		emline_flux[jj] = np.trapz(spec[integrate_lam], w[integrate_lam])
+
+		if saveplot and jj==4:
+			plt.plot(w,spec,'ro',linestyle='-')
+			plt.plot(w[integrate_lam], spec[integrate_lam], 'bo',linestyle=' ')
+			plt.xlim(wavelength[jj]-200,wavelength[jj]+200)
+			plt.ylim(-np.max(spec[integrate_lam])*0.2,np.max(spec[integrate_lam])*1.2)
+			
+			plotlines=['[SIII]','[NII]','Halpha','[SII]']
+			plotlam  =np.array([6312,6583,6563,6725])
+			for kk in xrange(len(plotlam)):
+				plt.vlines(plotlam[kk],plt.ylim()[0],plt.ylim()[1],color='0.5',linestyle='--')
+				plt.text(plotlam[kk],(plt.ylim()[0]+plt.ylim()[1])/2.*(1.0-kk/6.0),plotlines[kk])
+			plt.savefig(os.getenv('APPS')+'/threedhst_bsfh/plots/testem/emline_'+str(saveplot)+'.png',dpi=300)
+			plt.close()
+
+	if measure_ir:
+
+		# set up filters
+		mips_index = [i for i, s in enumerate(obs['filters']) if 'mips' in s]
+		botlam = np.atleast_1d(8e4-1)
+		toplam = np.atleast_1d(1000e4+1)
+		edgetrans = np.atleast_1d(0)
+		lir_filter = [[np.concatenate((botlam,np.linspace(8e4, 1000e4, num=100),toplam))],
+		              [np.concatenate((edgetrans,np.ones(100),edgetrans))]]
+
+		# calculate z=0 magnitudes
+		spec_neboff,mags_neboff,w = model.mean_model(thetas, obs, sps=sps,norm_spec=False)
+
+		_,lir     = integrate_mag(w,spec_neboff,lir_filter, z=None, alt_file=None) # comes out in ergs/s
+		lir       = lir / 3.846e33 #  convert to Lsun
+
+		# revert to proper redshift, calculate redshifted mips magnitudes
+		model.params['zred'] = np.atleast_1d(z)
+		mips = mags_neboff[mips_index][0]*1e10 # comes out in maggies, convert to flux such that AB zeropoint is 25 mags
+
+		out = {'emline_flux': emline_flux,
+		       'emline_name': emline,
+		       'lir': lir,
+		       'mips': mips}
+	else:
+		out = {'emline_flux': emline_flux,
+			   'emline_name': emline}
+
+	return out
 
 
 

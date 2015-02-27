@@ -42,42 +42,6 @@ def halfmass_assembly_time(mass,tage,tau,sf_start,tuniv):
 
 	return tuniv-half_time
 
-def measure_emline_lum(w,spec,emline,wavelength,sideband,saveplot=False):
-	
-	'''
-	takes spec(on)-spec(off) to measure emission line luminosity
-	sideband is defined for each emission line after visually 
-	inspecting the spectral sampling density around each line
-	'''
-
-	emline_flux = np.zeros(len(wavelength))
-	
-	for jj in xrange(len(wavelength)):
-		center = (np.abs(w-wavelength[jj]) == np.min(np.abs(w-wavelength[jj]))).nonzero()[0][0]
-		bot,top = center-sideband[jj],center+sideband[jj]+1
-		
-		# spectral units on arrival are flux density (maggies)
-		# we convert first to flux density in fnu, in cgs
-		# then integrate to get the line flux
-		factor = 3e18 / w**2
-		wings = spec[bot:top]*factor[bot:top]
-		emline_flux[jj] = np.trapz(wings, w[bot:top])
-
-		if saveplot and jj==4:
-			plt.plot(w,spec*factor,'ro',linestyle='-')
-			plt.plot(w[bot:top], wings, 'bo',linestyle=' ')
-			plt.xlim(wavelength[jj]-800,wavelength[jj]+800)
-			plt.ylim(-np.max(wings)*0.2,np.max(wings)*1.2)
-			
-			plotlines=['[SIII]','[NII]','Halpha','[SII]']
-			plotlam  =np.array([6312,6583,6563,6725])
-			for kk in xrange(len(plotlam)):
-				plt.vlines(plotlam[kk],plt.ylim()[0],plt.ylim()[1],color='0.5',linestyle='--')
-				plt.text(plotlam[kk],(plt.ylim()[0]+plt.ylim()[1])/2.*(1.0-kk/6.0),plotlines[kk])
-			plt.savefig(os.getenv('APPS')+'/threedhst_bsfh/plots/testem/emline_'+str(saveplot)+'.png',dpi=300)
-			plt.close()
-	return emline_flux
-
 def calc_extra_quantities(sample_results, nsamp_mc=1000):
 
 	'''' 
@@ -168,12 +132,6 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 	for kk in xrange(nextra): q_16e[kk], q_50e[kk], q_84e[kk] = triangle.quantile(extra_flatchain[:,kk], [0.16, 0.5, 0.84])
 
     ######## MODEL CALL PARAMETERS ########
-    # measure emission lines
-	emline = ['[OII]','Hbeta','[OIII]1','[OIII]2','Halpha','[SII]']
-	wavelength = np.array([3728,4861.33,4959,5007,6562,6732.71])
-	sideband   = np.array([20,1,1,1,2,1])
-	nline = len(emline)
-
 	# initialize sps
 	# check to see if we want zcontinuous=2 (i.e., the MDF)
 	if np.sum([1 for x in sample_results['model'].config_list if x['name'] == 'pmetals']) > 0:
@@ -181,24 +139,15 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 	else:
 		sps = threed_dutils.setup_sps(zcontinuous=1)
 
-	# set up MIPS + fake L_IR filter
+	# set up outputs
+	nline = 6 # set by number of lines measured in threed_dutils
 	mips_flux = np.zeros(nsamp_mc)
-	mips_index = [i for i, s in enumerate(sample_results['obs']['filters']) if 'mips' in s]
-	botlam = np.atleast_1d(8e4-1)
-	toplam = np.atleast_1d(1000e4+1)
-	edgetrans = np.atleast_1d(0)
-	lir_filter = [[np.concatenate((botlam,np.linspace(8e4, 1000e4, num=100),toplam))],
-	              [np.concatenate((edgetrans,np.ones(100),edgetrans))]]
-
-    # setup outputs
 	lineflux = np.empty(shape=(nsamp_mc,nline))
 	lir      = np.zeros(nsamp_mc)
 
 	# save initial states
 	neb_em = sample_results['model'].params.get('add_neb_emission', np.array(False))
 	con_em = sample_results['model'].params.get('add_neb_continuum', np.array(False))
-	z      = sample_results['model'].params.get('zred', np.array(0.0))
-
 
     # use randomized, flattened, thinned chain for posterior draws
 	flatchain = copy(sample_results['flatchain'])
@@ -206,43 +155,20 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 	for jj in xrange(nsamp_mc):
 		thetas = flatchain[jj,:]
 		
-		# nebon
-		sample_results['model'].params['add_neb_emission'] = np.array(True)
-		sample_results['model'].params['add_neb_continuum'] = np.array(True)
-		spec,mags,w = sample_results['model'].mean_model(thetas, sample_results['obs'], sps=sps,norm_spec=False)
-		
-		# neboff
-		sample_results['model'].params['add_neb_emission'] = np.array(False)
-		sample_results['model'].params['add_neb_continuum'] = np.array(False)
-		spec_neboff,mags_neboff,w = sample_results['model'].mean_model(thetas, sample_results['obs'], sps=sps,norm_spec=False)
-
 		# randomly save emline fig
 		if jj == 5:
 			saveplot=sample_results['run_params']['objname']
 		else:
 			saveplot=False
 
-		lineflux[jj]= measure_emline_lum(w/(1+z),spec-spec_neboff,emline,wavelength,sideband,saveplot=saveplot)
+		modelout = threed_dutils.measure_emline_lum(sps, thetas = thetas,
+			 										model=sample_results['model'], obs = sample_results['obs'],
+											        saveplot=saveplot, measure_ir=True)
+		
+		lineflux[jj,:] = modelout['emline_flux']
+		mips_flux[jj]  = modelout['mips']
+		lir[jj]        = modelout['lir']
 
-		# calculate redshifted mips magnitudes
-		mips_flux[jj] = mags_neboff[mips_index][0]*1e10 # comes out in maggies, convert to flux such that AB zeropoint is 25 mags
-
-		# now calculate z=0 magnitudes
-		sample_results['model'].params['zred'] = np.atleast_1d(0.00)
-		spec_neboff,mags_neboff,w = sample_results['model'].mean_model(thetas, sample_results['obs'], sps=sps,norm_spec=False)
-
-		_,lir[jj]     = threed_dutils.integrate_mag(w,spec_neboff,lir_filter, z=None, alt_file=None) # comes out in ergs/s
-		#tmips  = threed_dutils.integrate_mag(w,spec_neboff,'MIPS_24um_AEGIS', z=sps.params['zred'], alt_file=None) # comes out in ergs/s
-		#tmips_intrin  = threed_dutils.integrate_mag(w,spec_neboff,'MIPS_24um_AEGIS', z=None, alt_file=None) # comes out in ergs/s
-
-		#print mips_flux[jj]
-		#print 1/0
-		lir[jj]       = lir[jj] / 3.846e33 #  convert to Lsun
-
-		# revert
-		sample_results['model'].params['zred'] = np.atleast_1d(z)
-
-	
 	# restore initial states
 	sample_results['model'].params['add_neb_emission'] = neb_em
 	sample_results['model'].params['add_neb_continuum'] = con_em
@@ -262,22 +188,14 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 		thetas = thetas[0]
 	maxhalf_time,maxsfr_10,maxsfr_100,maxsfr_1000,maxssfr_100,maxtotmass,maxemp_ha,maxemp_oiii = extra_chain[probind.nonzero()[0][0],probind.nonzero()[1][0],:]
 
-	# grab most likely emlines
-	sample_results['model'].params['add_neb_emission'] = np.array(True)
-	spec,mags,w = sample_results['model'].mean_model(thetas, sample_results['obs'], sps=sps)
-	sample_results['model'].params['add_neb_emission'] = np.array(False)
-	spec_neboff,mags_neboff,w = sample_results['model'].mean_model(thetas, sample_results['obs'], sps=sps)
-	lineflux_maxprob = measure_emline_lum(w,spec-spec_neboff,emline,wavelength,sideband)
-
 	##### FORMAT EMLINE OUTPUT #####
 	q_16em, q_50em, q_84em, thetamaxem = (np.zeros(nline)+np.nan for i in range(4))
 	for kk in xrange(nline): q_16em[kk], q_50em[kk], q_84em[kk] = triangle.quantile(lineflux[:,kk], [0.16, 0.5, 0.84])
-	emline_info = {'name':emline,'lam':wavelength,
+	emline_info = {'name':modelout['emline_name'],
 	               'fluxchain':lineflux,
 	               'q16':q_16em,
 	               'q50':q_50em,
-	               'q84':q_84em,
-	               'maxprob':lineflux_maxprob}
+	               'q84':q_84em}
 	sample_results['model_emline'] = emline_info
 
 	###### FORMAT MIPS OUTPUT
