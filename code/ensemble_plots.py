@@ -8,7 +8,7 @@ from astropy import constants
 
 # minimum flux: no model emission line has strength of 0!
 pc2cm = 3.08567758e18
-minmodel_flux = 1e-2
+minmodel_flux = 2e-1
 
 def asym_errors(center, up, down, log=False):
 
@@ -268,8 +268,8 @@ def plot_driver(runname):
 	          np.log10(ensemble['q50'][ensemble['parname'] == 'ssfr_100'][0]),\
 	          np.log10(sfr_obs),\
 	          np.log10(sfr_obs),\
-	          np.log10(np.clip(np.array([x['q50'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50)),
-	          np.log10(np.clip(np.array([x['q50'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50)),
+	          np.log10(np.clip(np.array([x['q50'][x['name'] == 'Halpha'] for x in ensemble['model_emline']]),minmodel_flux,1e50)),
+	          np.log10(np.clip(np.array([x['q50'][x['name'] == 'Halpha'] for x in ensemble['model_emline']]),minmodel_flux,1e50)),
 	          np.log10(lobs_halpha)
 	          ]
 
@@ -284,8 +284,8 @@ def plot_driver(runname):
 			  asym_errors(ensemble['q50'][ensemble['parname'] == 'ssfr_100'][0],ensemble['q84'][ensemble['parname'] == 'ssfr_100'][0],ensemble['q16'][ensemble['parname'] == 'sfr_100'][0],log=True),\
 			  None,\
 			  None,\
-			  asym_errors(np.clip(np.array([x['q50'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50),np.clip(np.array([x['q84'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50),np.clip(np.array([x['q16'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50),log=True),\
-			  asym_errors(np.clip(np.array([x['q50'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50),np.clip(np.array([x['q84'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50),np.clip(np.array([x['q16'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50),log=True),\
+			  asym_errors(np.clip(np.array([x['q50'][x['name'] == 'Halpha'] for x in ensemble['model_emline']]),minmodel_flux,1e50),np.clip(np.array([x['q84'][x['name'] == 'Halpha'] for x in ensemble['model_emline']]),minmodel_flux,1e50),np.clip(np.array([x['q16'][x['name'] == 'Halpha'] for x in ensemble['model_emline']]),minmodel_flux,1e50),log=True),\
+			  asym_errors(np.clip(np.array([x['q50'][x['name'] == 'Halpha'] for x in ensemble['model_emline']]),minmodel_flux,1e50),np.clip(np.array([x['q84'][x['name'] == 'Halpha'] for x in ensemble['model_emline']]),minmodel_flux,1e50),np.clip(np.array([x['q16'][x['name'] == 'Halpha'] for x in ensemble['model_emline']]),minmodel_flux,1e50),log=True),\
 			  asym_errors(lobs_halpha,lobs_halpha+lobs_halpha_err,lobs_halpha-lobs_halpha_err,log=True)\
 			 ]
 
@@ -414,6 +414,14 @@ def plot_driver(runname):
 
 			ax.axis((min,max,min,max))
 			ax.errorbar([-1e3,1e3],[-1e3,1e3],linestyle='--',color='0.1',alpha=0.8)
+
+			n = np.sum(np.isfinite(y_data[jj]))
+			detections = x_data[jj] > -1
+			mean_offset = np.sum(y_data[jj][detections]-x_data[jj][detections])/n
+			scat=np.sqrt(np.sum((y_data[jj][detections]-x_data[jj][detections]-mean_offset)**2.)/(n-2))
+			ax.text(0.04,0.95, 'scatter='+"{:.2f}".format(scat)+' dex',transform = ax.transAxes)
+			ax.text(0.04,0.9, 'mean offset='+"{:.2f}".format(mean_offset)+' dex',transform = ax.transAxes)
+
 
 		print 'saving '+outname
  		plt.savefig(outname, dpi=300)
@@ -563,77 +571,6 @@ def lir_comp(runname, lum=True, mjy=False):
 	plt.savefig(outname_errs+'.png', dpi=300)
 	plt.close()
 
-
-	
-
-
-def nebcomp(runname):
-	inname = os.getenv('APPS')+'/threedhst_bsfh/results/'+runname+'/'+runname+'_ensemble.pickle'
-	outname_errs = os.getenv('APPS') + '/threedhst_bsfh/plots/ensemble_plots/'+runname+'/emline_comp'
-
-	# if the save file doesn't exist, make it
-	if not os.path.isfile(inname):
-		collate_output(runname,inname)
-
-	with open(inname, "rb") as f:
-		ensemble=pickle.load(f)
-
-	# extract model
-	# 'luminosity' in cgs
-	halpha_q50 = np.clip(np.array([x['q50'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50)
-	halpha_q16 = np.clip(np.array([x['q16'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50)
-	halpha_q84 = np.clip(np.array([x['q84'][x['name'].index('Halpha')] for x in ensemble['model_emline']]),minmodel_flux,1e50)
-	ha_lam = np.array([x['lam'][x['name'].index('Halpha')] for x in ensemble['model_emline']])[0]
-	halpha_errs = asym_errors(halpha_q50,halpha_q84,halpha_q16,log=True)
-	halpha_q50 = np.log10(halpha_q50)
-
-	# extract observations
-	# flux: 10**-17 ergs / s / cm**2
-	jansky_cgs=1e-23
-	to_flux_density = (2.99e8/(ha_lam*1e-10))
-	conv_factor = (10**(-17))/(jansky_cgs*3631*to_flux_density)
-	conv_factor = 1e-17
-
-	obs_ha = np.log10(np.array([x['Ha_flux'][0] for x in ensemble['ancildat']])*conv_factor)
-	obs_ha_err = np.array([x['Ha_error'][0] for x in ensemble['ancildat']])*conv_factor
-	
-	fig = plt.figure()
-	ax  = fig.add_subplot(111)
-
-	###### HERE'S THE BIG PLOT ######
-	ax[kk].errorbar(obs_ha,halpha_q50, 
-			    fmt='bo', ecolor='0.20', alpha=0.8,
-			    yerr=halpha_errs,xerr=obs_ha_err,linestyle=' ')
-
-
-	#### formatting ####
-	ax[kk].set_xlabel('observed Ha flux')
-	ax[kk].set_ylabel('model Ha flux')
-
-	# set plot limits to be slightly outside max values
-	dynx, dyny = (np.nanmax(obs_ha)-np.nanmin(obs_ha))*0.05,\
-		         (np.nanmax(halpha_q50)-np.nanmin(halpha_q50))*0.05
-		
-	ax[kk].axis((np.nanmin(obs_ha)-dynx,
-			 np.nanmax(obs_ha)+dynx,
-			 np.nanmin(halpha_q50)-dyny,
-			 np.nanmax(halpha_q50)+dyny,
-			 ))
-	if np.nanmin(obs_ha)-dynx > np.nanmin(halpha_q50)-dyny:
-		min = np.nanmin(halpha_q50)-dyny*3
-	else:
-		min = np.nanmin(obs_ha)-dynx*3
-	if np.nanmax(obs_ha)+dynx > np.nanmax(halpha_q50)+dyny:
-		max = np.nanmax(obs_ha)+dynx*3
-	else:
-		max = np.nanmax(halpha_q50)+dyny*3
-
-	ax[kk].plot([-1e3,1e3],[-1e3,1e3],linestyle='--',color='0.1',alpha=0.8)
-	ax[kk].axis((min,max,min,max))
-
-	plt.savefig(outname_errs+'.png',dpi=300)
-	plt.close()
-
 def emline_comparison(runname,emline_base='Halpha', chain_emlines=False):
 	inname = os.getenv('APPS')+'/threedhst_bsfh/results/'+runname+'/'+runname+'_ensemble.pickle'
 	outname_errs = os.getenv('APPS') + '/threedhst_bsfh/plots/ensemble_plots/'+runname+'/emline_comp_kscalc_'+emline_base+'_'
@@ -663,52 +600,28 @@ def emline_comparison(runname,emline_base='Halpha', chain_emlines=False):
 	except IndexError:
 		mass = ensemble['q50'][ensemble['parname'] == 'totmass'][0]
 
-	try:
-		dust1=ensemble['q50'][ensemble['parname'] == 'dust1'][0]
-		dust2=ensemble['q50'][ensemble['parname'] == 'dust2'][0]
-	except:
-		dust2_1=ensemble['q50'][ensemble['parname'] == 'dust2_1'][0]
-		dust2_2=ensemble['q50'][ensemble['parname'] == 'dust2_2'][0]
-		dust1=np.zeros(len(dust2_1))
-		dust2=np.zeros(len(dust2_1))
-		for nn in xrange(len(dust2)):
-			if dust2_1[nn] > dust2_2[nn]:
-				dust2[nn] = dust2_2[nn]
-			else:
-				dust2[nn] = dust2_1[nn]
-
 	# make plots for all three timescales
 	sfr_str = ['10','100','1000']
 	for bobo in xrange(len(sfr_str)):
 
-		# CALCULATE EXPECTED HALPHA FLUX FROM SFH
+		# CALCULATE EXPECTED HALPHA FLUX FROM SFH + KENNICUTT
 		valid_comp = ensemble['z'] > 0
 		distances = WMAP9.luminosity_distance(ensemble['z'][valid_comp]).value*1e6*pc2cm
 		dfactor = (4*np.pi*distances**2)*1e-17
 
-		####### NEW WAY (TO COMPARE WITH OLD WAY) #########
-		x=threed_dutils.synthetic_emlines(mass[valid_comp],
-			                              ensemble['q50'][ensemble['parname'] == 'sfr_'+sfr_str[bobo]][0,valid_comp],
-			                              dust1[valid_comp],
-			                              dust2[valid_comp],
-			                              ensemble['q50'][ensemble['parname'] == 'dust_index'][0,valid_comp])
-
-		x['flux'] = x['flux']/dfactor
-		f_emline = x['flux'][x['name'] == emline_base].reshape(np.sum(valid_comp))
-		if chain_emlines:
-			f_emline = ensemble['q50'][ensemble['parname'] == chain_emlines][0,valid_comp]/dfactor
-			fluxup = ensemble['q84'][ensemble['parname'] == chain_emlines][0,valid_comp]/dfactor
-			fluxdo = ensemble['q16'][ensemble['parname'] == chain_emlines][0,valid_comp]/dfactor
-			f_err_emline = asym_errors(f_emline,fluxup,fluxdo,log=True)
-
+		# pull kennicutt halpha + errors out of chain
+		index = ensemble['parname'] == chain_emlines
+		f_emline = ensemble['q50'][index][0,valid_comp]/dfactor
+		fluxup = ensemble['q84'][index][0,valid_comp]/dfactor
+		fluxdo = ensemble['q16'][index][0,valid_comp]/dfactor
+		f_err_emline = asym_errors(f_emline,fluxup,fluxdo,log=True)
 
 		# EXTRACT EMISSION LINE FLUX FROM CLOUDY
-		# 'luminosity' in cgs
-		factor = (constants.L_sun.cgs.value)/(1e-17)/(4*np.pi*distances**2)
-		halpha_ind = x['name'] == cloudyname
-		emline_q50 = np.array([x['q50'][halpha_ind][0] for x in ensemble['model_emline']])*factor
-		emline_q16 = np.array([x['q16'][halpha_ind][0] for x in ensemble['model_emline']])*factor
-		emline_q84 = np.array([x['q84'][halpha_ind][0] for x in ensemble['model_emline']])*factor
+		# include conversion from Lsun to cgs in dfactor
+		dfactor = dfactor/constants.L_sun.cgs.value
+		emline_q50 = np.array([x['q50'][x['name'] == cloudyname][0] for x in ensemble['model_emline']])/dfactor
+		emline_q16 = np.array([x['q16'][x['name'] == cloudyname][0] for x in ensemble['model_emline']])/dfactor
+		emline_q84 = np.array([x['q84'][x['name'] == cloudyname][0] for x in ensemble['model_emline']])/dfactor
 		emline_errs = asym_errors(emline_q50,emline_q84,emline_q16,log=True)
 
 		# EXTRACT OBSERVED EMISSION LINE FLUX
@@ -730,7 +643,7 @@ def emline_comparison(runname,emline_base='Halpha', chain_emlines=False):
 		# SET UP PLOTTING QUANTITIES
 		x_data = [np.log10(obs_emline),
 				  np.log10(obs_emline),
-				  np.log10(emline_q50)
+				  np.log10(np.clip(emline_q50,minmodel_flux,1e50))
 				  ]
 
 		x_err =[obs_emline_lerr,
@@ -742,7 +655,7 @@ def emline_comparison(runname,emline_base='Halpha', chain_emlines=False):
 					r'log('+axislabel+' flux) [cloudy]',
 					]
 
-		y_data = [np.log10(emline_q50),
+		y_data = [np.log10(np.clip(emline_q50,minmodel_flux,1e50)),
 				  np.log10(f_emline),
 				  np.log10(f_emline)
 				  ]
@@ -773,22 +686,28 @@ def emline_comparison(runname,emline_base='Halpha', chain_emlines=False):
 			ax[kk].set_xlabel(x_labels[kk])
 			ax[kk].set_ylabel(y_labels[kk])
 
-			ax[kk].axis((-3,3,-3,3))
+			ax[kk].axis((-1,2.7,-1,2.7))
 			ax[kk].plot([-1e3,1e3],[-1e3,1e3],linestyle='--',color='0.1',alpha=0.8)
 
 			n = np.sum(np.isfinite(y_data[kk]))
 			mean_offset = np.sum(y_data[kk]-x_data[kk])/n
 			scat=np.sqrt(np.sum((y_data[kk]-x_data[kk]-mean_offset)**2.)/(n-2))
-			ax[kk].text(-2.7,2.7, 'scatter='+"{:.2f}".format(scat)+' dex')
-			ax[kk].text(-2.7,2.4, 'mean offset='+"{:.2f}".format(mean_offset)+' dex')
+			ax[kk].text(-0.75,2.5, 'scatter='+"{:.2f}".format(scat)+' dex')
+			ax[kk].text(-0.75,2.3, 'mean offset='+"{:.2f}".format(mean_offset)+' dex')
 
 		fig.subplots_adjust(wspace=0.30,hspace=0.0)
 		plt.savefig(outname_errs+'sfr'+sfr_str[bobo]+'.png',dpi=300)
 		plt.close()
 
+	# residuals with stellar metallicity
 	fig_resid, ax_resid = plt.subplots(1, 3, figsize = (18, 5))
-	ax_resid[kk].plot(logzsol, x_data[kk]-y_data[kk],
-				              'bo', alpha=0.8, linestyle=' ')
-	ax_resid[kk].set_xlabel('logzsol')
-	ax_resid[kk].set_ylabel(x_labels[kk]+y_labels[kk])
-	plt.savefig(outname_errs+'_logzsol_resid.png', dpi=300)
+	for kk in xrange(len(x_data)):
+		ax_resid[kk].plot(logzsol, x_data[kk]-y_data[kk],
+					              'bo', alpha=0.8, linestyle=' ')
+		ax_resid[kk].set_xlabel('logzsol')
+		ax_resid[kk].set_ylabel(x_labels[kk]+'-'+y_labels[kk])
+		ax_resid[kk].axis((-1,0.19,-1,1))
+		ax_resid[kk].hlines(0.0,ax_resid[kk].get_xlim()[0],ax_resid[kk].get_xlim()[1], linestyle='--',colors='k')
+	fig.subplots_adjust(wspace=0.30,hspace=0.0)
+	plt.savefig(outname_errs+'logzsol_resid.png', dpi=300)
+	plt.close()

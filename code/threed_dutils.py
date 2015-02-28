@@ -30,18 +30,6 @@ def synthetic_emlines(mass,sfr,dust1,dust2,dust_index):
 	emlines = np.array(['Halpha','Hbeta','Hgamma','[OIII]', '[NII]','[OII]'])
 	lam     = np.array([6563,4861,4341,5007,6583,3727])
 	flux    = np.zeros(shape=(len(lam),len(np.atleast_1d(mass))))
-
-	# calculate SFR
-	#deltat = 0.3 # in Gyr
-	#sfr = integrate_sfh(sps.params['tage']-deltat,
-	#                    sps.params['tage'],
-	#                    [np.array(1.0)],
-	#                    sps.params['tage'],
-	#                    sps.params['tau'],
-	#                    sps.params['sf_start'],
-	#                    sps.params['tburst'],
-	#                    sps.params['fburst'])
-	#sfr = sfr / (1e9*deltat)
     
 	# calculate Halpha luminosity from KS relationship
 	# comes out in units of [ergs/s]

@@ -148,6 +148,8 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 	# save initial states
 	neb_em = sample_results['model'].params.get('add_neb_emission', np.array(False))
 	con_em = sample_results['model'].params.get('add_neb_continuum', np.array(False))
+	met_save = sample_results['model'].params.get('logzsol', np.array(0.0))
+	sample_results['model'].params['logzsol'] = 0.0
 
     # use randomized, flattened, thinned chain for posterior draws
 	flatchain = copy(sample_results['flatchain'])
@@ -172,6 +174,7 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 	# restore initial states
 	sample_results['model'].params['add_neb_emission'] = neb_em
 	sample_results['model'].params['add_neb_continuum'] = con_em
+	sample_results['model'].params['logzsol'] = met_save
 
 	##### MAXIMUM PROBABILITY
 	# grab best-fitting model
