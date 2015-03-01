@@ -15,7 +15,7 @@ run_params = {'verbose':True,
               'ftol':0.5e-5, 
               'maxfev':5000,
               'nwalkers':248,
-              'nburn':[32,64,128], 
+              'nburn':[32,64,128,128], 
               'niter': 2048,
               'initial_disp':0.1,
               'debug': False,
@@ -108,7 +108,7 @@ model_params.append({'name': 'add_igm_absorption', 'N': 1,
 
 model_params.append({'name': 'add_agb_dust_model', 'N': 1,
                         'isfree': False,
-                        'init': 0,
+                        'init': True,
                         'units': None,
                         'prior_function': None,
                         'prior_args': None})
@@ -124,7 +124,8 @@ model_params.append({'name': 'mass', 'N': 2,
 model_params.append({'name': 'logzsol', 'N': 1,
                         'isfree': True,
                         'init': 0.0,
-                        'init_disp': 0.75,
+                        'init_disp': 0.2,
+                        'log_param': True,
                         'reinit': True,
                         'units': r'$\log (Z/Z_\odot)$',
                         'prior_function': tophat,
@@ -148,6 +149,7 @@ model_params.append({'name': 'sfh', 'N': 1,
 model_params.append({'name': 'tau', 'N': 2,
                         'isfree': True,
                         'init': np.array([10.0, 1.0]),
+                        'init_disp': 0.5,
                         'units': 'Gyr',
                         'prior_function':tophat,
                         'prior_args': {'mini':np.array([0.1, 0.1]),
@@ -218,7 +220,7 @@ model_params.append({'name': 'dust1', 'N': 1,
 
 model_params.append({'name': 'dust2', 'N': 2,
                         'isfree': True,
-                        'init': np.array([0.0,0.0]),
+                        'init': np.array([0.35,0.35]),
                         'reinit': True,
                         'init_disp': 0.2,
                         'units': '',
@@ -272,9 +274,7 @@ model_params.append({'name': 'duste_umin', 'N': 1,
 
 model_params.append({'name': 'duste_qpah', 'N': 1,
                         'isfree': False,
-                        'reinit': True,
                         'init': 3.0,
-                        'init_disp': 0.5,
                         'units': 'percent',
                         'prior_function': tophat,
                         'prior_args': {'mini':0.0, 'maxi':10.0}})
@@ -354,5 +354,5 @@ tuniv = WMAP9.age(model_params[0]['init']).value
 
 # set tage
 # set max on sf_start
-model_params[parmlist.index('tage')]['init'] = tuniv
-model_params[parmlist.index('sf_start')]['prior_args']['maxi'] = 0.9*tuniv
+model_params[parmlist.index('tage')]['init'] = np.zeros(len(np.atleast_1d(model_params[parmlist.index('tage')]['init'])))+tuniv
+model_params[parmlist.index('sf_start')]['prior_args']['maxi'] = np.zeros(len(np.atleast_1d(model_params[parmlist.index('sf_start')]['prior_args']['maxi'])))+ 0.9*tuniv
