@@ -1,4 +1,4 @@
-import os, threed_dutils, pickle, extra_output, triangle
+import os, threed_dutils, pickle, extra_output, triangle, pylab
 from bsfh import read_results
 import numpy as np
 import matplotlib.pyplot as plt
@@ -711,3 +711,144 @@ def emline_comparison(runname,emline_base='Halpha', chain_emlines=False):
 	fig.subplots_adjust(wspace=0.30,hspace=0.0)
 	plt.savefig(outname_errs+'logzsol_resid.png', dpi=300)
 	plt.close()
+
+def vary_logzsol(runname):
+
+	filebase,params,ancilname=threed_dutils.generate_basenames(runname)
+	ngals = len(filebase)
+
+	nfail = 0
+	for jj in xrange(ngals):
+
+		# find most recent output file
+		# with the objname
+		folder = "/".join(filebase[jj].split('/')[:-1])
+		filename = filebase[jj].split("/")[-1]
+		files = [f for f in os.listdir(folder) if "_".join(f.split('_')[:-2]) == filename]	
+		times = [f.split('_')[-2] for f in files]
+
+		# if we found no files, skip this object
+		if len(times) == 0:
+			print 'Failed to find any files in '+folder+' of type ' +filename+' to extract times'
+			nfail+=1
+			continue
+
+		# load results
+		mcmc_filename=filebase[jj]+'_'+max(times)+"_mcmc"
+		model_filename=filebase[jj]+'_'+max(times)+"_model"
+
+		try:
+			sample_results, powell_results, model = read_results.read_pickles(mcmc_filename, model_file=model_filename,inmod=None)
+		except (ValueError,EOFError):
+			print mcmc_filename + ' failed during output writing'
+			nfail+=1
+			continue
+		except IOError:
+			print mcmc_filename + ' does not exist!'
+			nfail+=1
+			continue
+
+		# check for existence of extra information
+		try:
+			sample_results['quantiles']
+		except:
+			print 'Generating extra information for '+mcmc_filename+', '+model_filename
+			extra_output.post_processing(params[jj])
+			sample_results, powell_results, model = read_results.read_pickles(mcmc_filename, model_file=model_filename,inmod=None)
+
+		# check to see if we want zcontinuous=2 (i.e., the MDF)
+		if np.sum([1 for x in sample_results['model'].config_list if x['name'] == 'pmetals']) > 0:
+			sps = threed_dutils.setup_sps()
+		else:
+			sps = threed_dutils.setup_sps(zcontinuous=1)
+
+		# generate figure
+		fig, ax = plt.subplots(1, 1, figsize = (6, 6))
+		thetas = sample_results['quantiles']['maxprob_params']
+		theta_names = np.array(model.theta_labels())
+		metind = theta_names == 'logzsol'
+
+		# label best-fit params
+		for i in xrange(len(theta_names)):
+			if theta_names[i] == 'logzsol':
+				weight = 'bold'
+			else:
+				weight = 'normal'
+			ax.text(0.04,0.3-0.03*i, theta_names[i]+'='+"{:.2g}".format(thetas[i]),
+				    transform = ax.transAxes,fontsize=8,
+				    weight=weight)
+
+		# grab and plot original spectrum
+		spec,mags,w = sample_results['model'].mean_model(thetas, sample_results['obs'], sps=sps,norm_spec=True)
+		
+		# nfnu or flam?
+		#spec *= 3e18/w**2
+		spec *= (3e18)/w
+		ax.plot(np.log10(w), np.log10(spec), color='black', zorder=0)
+
+		# logzsol dummy array
+		logzsol = np.array([-1.0,-0.6,-0.2,0.0,0.19])
+
+		# generate colors
+		npoints = len(logzsol)
+		cm = pylab.get_cmap('cool')
+		plt.rcParams['axes.color_cycle'] = [cm(1.*i/npoints) for i in range(npoints)] 
+		for kk in xrange(len(logzsol)):
+			thetas[metind] = logzsol[kk]
+			spec,mags,w = sample_results['model'].mean_model(thetas, sample_results['obs'], sps=sps,norm_spec=True)
+			
+			# nfnu or flam?
+			#spec *= 3e18/w**2
+			spec *= (3e18)/w
+
+			ax.plot(np.log10(w), np.log10(spec),
+					label = logzsol[kk],
+					zorder=-32)
+
+		# plot limits
+		xlim = (3.3,4.8)
+		ax.set_xlim(xlim)
+		good = (np.array(w) > 10**xlim[0]) & (np.array(w) < 10**xlim[1])
+		ax.set_ylim(np.log10(min(spec[good]))*0.96,np.log10(max(spec[good]))*1.04)
+
+		# legend
+		ax.legend(loc=1,prop={'size':10},
+				  frameon=False,
+				  title='logzsol')
+		ax.get_legend().get_title().set_size(10)
+
+		# plot obs + obs errs
+		mask = sample_results['obs']['phot_mask']
+		obs_mags = sample_results['obs']['maggies'][mask]
+		obs_lam  = sample_results['obs']['wave_effective'][mask]
+		obs_err  = sample_results['obs']['maggies_unc'][mask]
+		linerr_down = np.clip(obs_mags-obs_err, 1e-80, 1e80)
+		linerr_up = np.clip(obs_mags+obs_err, 1e-80, 1e80)
+		yerr = [np.log10(obs_mags) - np.log10(linerr_down),
+		        np.log10(linerr_up)- np.log10(obs_mags)]
+
+		# nfnu or flam?
+		#spec *= 3e18/w**2
+		obs_mags *= (3e18)/obs_lam
+		ax.errorbar(np.log10(obs_lam), np.log10(obs_mags), yerr=yerr,
+					fmt='ok',ms=5)
+		
+		# save
+		outname = sample_results['run_params']['objname']
+		plt.savefig('/Users/joel/code/python/threedhst_bsfh/plots/testmet/'+outname+'_metsed.png', dpi=300)
+		plt.close()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
