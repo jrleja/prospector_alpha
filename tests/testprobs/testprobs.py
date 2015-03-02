@@ -15,7 +15,7 @@ can be run in different environments to ensure underlying stellar pops are consi
 def test_likelihood(param_file=None, sps=None, model=None, obs=None, thetas=None):
 
 	if not param_file:
-		param_file = os.getenv('APPS')+'/python/threedhst_bsfh/parameter_files/dtau_intmet/dtau_intmet_params_66.py'
+		param_file = os.getenv('APPS')+'/threedhst_bsfh/parameter_files/dtau_intmet/dtau_intmet_params_66.py'
 
 	if not sps:
 		# load stellar population, set up custom filters
@@ -31,7 +31,7 @@ def test_likelihood(param_file=None, sps=None, model=None, obs=None, thetas=None
 		obs = model_setup.load_obs(**run_params)
 
 	if thetas is None:
-		thetas = model.initial_theta
+		thetas = np.array([2.06382260e+09,1.55273910e+10,-7.94072640e-01,5.82656906e+01,2.89232690e-01,5.94558117e+00,9.10674270e-01,2.42980691e-01,7.21169529e-01,-1.53203324e+00])
 
 	likefn = LikelihoodFunction(obs=obs, model=obs)
 	mu, phot, x = model.mean_model(thetas, obs, sps = sps)
