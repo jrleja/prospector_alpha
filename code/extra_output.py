@@ -63,8 +63,8 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 	indexes = np.array(indexes,dtype='bool')
 
     # initialize output arrays for SFH parameters
-	nwalkers,niter = sample_results['chain'].shape[:2]
-	half_time,sfr_10,sfr_100,sfr_1000,ssfr_100,totmass,emp_ha,emp_oiii = [np.zeros(shape=(nwalkers,niter)) for i in range(8)]
+	nchain = sample_results['flatchain'].shape[0]
+	half_time,sfr_10,sfr_100,sfr_1000,ssfr_100,totmass,emp_ha,emp_oiii = [np.zeros(shape=(nchain)) for i in range(8)]
 
     # get constants for SFH calculation [MODEL DEPENDENT]
 	z = sample_results['model'].params['zred'][0]
@@ -76,58 +76,48 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 	dust_index_index = np.array([True if x == 'dust_index' else False for x in parnames])
 
 	######## SFH parameters #########
-	for jj in xrange(nwalkers):
-		for kk in xrange(niter):
-	    
-			# extract sfh parameters
-			# the ELSE finds SFH parameters that are NOT part of the chain
-			sfh_parms = []
-			for ll in xrange(len(str_sfh_parms)):
-				if np.sum(indexes[ll]) > 0:
-					sfh_parms.append(sample_results['chain'][jj,kk,indexes[ll]])
-				else:
-					_ = [x['init'] for x in sample_results['model'].config_list if x['name'] == str_sfh_parms[ll]][0]
-					if len(np.atleast_1d(_)) != np.sum(indexes[0]):
-						_ = np.zeros(np.sum(indexes[0]))+_
-					sfh_parms.append(_)
-			mass,tau,sf_start,tage = sfh_parms
+	for jj in xrange(nchain):
+		    
+		# extract sfh parameters
+		# the ELSE finds SFH parameters that are NOT part of the chain
+		sfh_parms = []
+		for ll in xrange(len(str_sfh_parms)):
+			if np.sum(indexes[ll]) > 0:
+				sfh_parms.append(sample_results['flatchain'][jj,indexes[ll]])
+			else:
+				_ = [x['init'] for x in sample_results['model'].config_list if x['name'] == str_sfh_parms[ll]][0]
+				if len(np.atleast_1d(_)) != np.sum(indexes[0]):
+					_ = np.zeros(np.sum(indexes[0]))+_
+				sfh_parms.append(_)
+		mass,tau,sf_start,tage = sfh_parms
 
-			# calculate half-mass assembly time, sfr
-			half_time[jj,kk] = halfmass_assembly_time(mass,tage,tau,sf_start,tuniv)
+		# calculate half-mass assembly time, sfr
+		half_time[jj] = halfmass_assembly_time(mass,tage,tau,sf_start,tuniv)
 
-			# empirical halpha
-			emp_ha[jj,kk],emp_oiii[jj,kk] = calc_emp_ha(mass,tage,tau,sf_start,tuniv,
-				                                        sample_results['chain'][jj,kk,dust2_index],sample_results['chain'][jj,kk,dust_index_index])
+		# empirical halpha
+		emp_ha[jj],emp_oiii[jj] = calc_emp_ha(mass,tage,tau,sf_start,tuniv,
+			                                  sample_results['flatchain'][jj,dust2_index],sample_results['flatchain'][jj,dust_index_index])
 
-			# calculate sfr
-			sfr_10[jj,kk] = threed_dutils.integrate_sfh(tage-deltat[0],tage,mass,tage,tau,
-	                                                    sf_start)*np.sum(mass)/(deltat[0]*1e9)
-			sfr_100[jj,kk] = threed_dutils.integrate_sfh(tage-deltat[1],tage,mass,tage,tau,
-	                                                     sf_start)*np.sum(mass)/(deltat[1]*1e9)
-			sfr_1000[jj,kk] = threed_dutils.integrate_sfh(tage-deltat[2],tage,mass,tage,tau,
-	                                                     sf_start)*np.sum(mass)/(deltat[2]*1e9)
+		# calculate sfr
+		sfr_10[jj] = threed_dutils.integrate_sfh(tage-deltat[0],tage,mass,tage,tau,
+                                                    sf_start)*np.sum(mass)/(deltat[0]*1e9)
+		sfr_100[jj] = threed_dutils.integrate_sfh(tage-deltat[1],tage,mass,tage,tau,
+                                                     sf_start)*np.sum(mass)/(deltat[1]*1e9)
+		sfr_1000[jj] = threed_dutils.integrate_sfh(tage-deltat[2],tage,mass,tage,tau,
+                                                     sf_start)*np.sum(mass)/(deltat[2]*1e9)
 
-			ssfr_100[jj,kk] = sfr_100[jj,kk] / np.sum(mass)
+		ssfr_100[jj] = sfr_100[jj] / np.sum(mass)
 
-			totmass[jj,kk] = np.sum(mass)
+		totmass[jj] = np.sum(mass)
 	     
 	# CALCULATE Q16,Q50,Q84 FOR VARIABLE PARAMETERS
 	ntheta = len(sample_results['initial_theta'])
 	q_16, q_50, q_84 = (np.zeros(ntheta)+np.nan for i in range(3))
 	for kk in xrange(ntheta): q_16[kk], q_50[kk], q_84[kk] = triangle.quantile(sample_results['flatchain'][:,kk], [0.16, 0.5, 0.84])
-
+	
 	# CALCULATE Q16,Q50,Q84 FOR EXTRA PARAMETERS
-	extra_chain = np.dstack((half_time.reshape(half_time.shape[0],half_time.shape[1],1), 
-		                     sfr_10.reshape(sfr_10.shape[0],sfr_10.shape[1],1), 
-		                     sfr_100.reshape(sfr_100.shape[0],sfr_100.shape[1],1), 
-		                     sfr_1000.reshape(sfr_1000.shape[0],sfr_1000.shape[1],1), 
-		                     ssfr_100.reshape(ssfr_100.shape[0],ssfr_100.shape[1],1),
-		                     totmass.reshape(ssfr_100.shape[0],totmass.shape[1],1),
-		                     emp_ha.reshape(emp_ha.shape[0],emp_ha.shape[1],1),
-		                     emp_oiii.reshape(emp_oiii.shape[0],emp_oiii.shape[1],1)
-		                     ))
-	extra_flatchain = threed_dutils.chop_chain(extra_chain)
-	nextra = extra_chain.shape[-1]
+	extra_flatchain = np.dstack((half_time, sfr_10, sfr_100, sfr_1000, ssfr_100, totmass, emp_ha, emp_oiii))[0]
+	nextra = extra_flatchain.shape[1]
 	q_16e, q_50e, q_84e = (np.zeros(nextra)+np.nan for i in range(3))
 	for kk in xrange(nextra): q_16e[kk], q_50e[kk], q_84e[kk] = triangle.quantile(extra_flatchain[:,kk], [0.16, 0.5, 0.84])
 
@@ -178,18 +168,11 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 
 	##### MAXIMUM PROBABILITY
 	# grab best-fitting model
-
-	# if we're stupid and pre-cut the chain but not the lnprobability,
-	# this cuts lnprobability to the same shape
-	if sample_results['lnprobability'].shape[1] != sample_results['chain'].shape[1]:
-		sample_results['lnprobability'] = sample_results['lnprobability'][:,-sample_results['chain'].shape[1]:]
-
 	maxprob = np.max(sample_results['lnprobability'])
 	probind = sample_results['lnprobability'] == maxprob
 	thetas = sample_results['chain'][probind,:]
 	if type(thetas[0]) != np.dtype('float64'):
 		thetas = thetas[0]
-	maxhalf_time,maxsfr_10,maxsfr_100,maxsfr_1000,maxssfr_100,maxtotmass,maxemp_ha,maxemp_oiii = extra_chain[probind.nonzero()[0][0],probind.nonzero()[1][0],:]
 
 	##### FORMAT EMLINE OUTPUT #####
 	q_16em, q_50em, q_84em, thetamaxem = (np.zeros(nline)+np.nan for i in range(4))
@@ -206,10 +189,8 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 	sample_results['mips'] = mips
 
 	# EXTRA PARAMETER OUTPUTS #
-	extras = {'chain': extra_chain,
-			  'flatchain': extra_flatchain,
+	extras = {'flatchain': extra_flatchain,
 			  'parnames': np.array(['half_time','sfr_10','sfr_100','sfr_1000','ssfr_100','totmass','emp_ha','emp_oiii']),
-			  'maxprob': np.array([maxhalf_time,maxsfr_10,maxsfr_100,maxsfr_1000,maxssfr_100,maxtotmass,maxemp_ha,maxemp_oiii]),
 			  'q16': q_16e,
 			  'q50': q_50e,
 			  'q84': q_84e}
@@ -225,7 +206,6 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 
 	# reset nebon/neboff status in model
 	sample_results['model'].params['add_neb_emission'] = np.array(nebstatus)
-
 	return sample_results
 
 def post_processing(param_name, add_extra=True, nsamp_mc=1000):
