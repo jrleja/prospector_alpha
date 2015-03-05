@@ -12,7 +12,7 @@ plt_chain_figure = 1
 plt_triangle_plot = 1
 plt_sed_figure = 1
 
-def plot_sfh(sample_results,nsamp=1000):
+def plot_sfh(sample_results,nsamp=1000,ncomp=2):
 
 	'''
 	create sfh for plotting purposes
@@ -35,7 +35,7 @@ def plot_sfh(sample_results,nsamp=1000):
 
 	# initialize output variables
 	nt = 50
-	intsfr = np.zeros(shape=(nsamp,nt))
+	intsfr = np.zeros(shape=(nsamp,nt,ncomp+1))
 
 	for mm in xrange(nsamp):
 
@@ -54,11 +54,19 @@ def plot_sfh(sample_results,nsamp=1000):
 		if mm == 0:
 			t=np.linspace(0,np.max(tage),num=50)
 
-		for jj in xrange(nt): intsfr[mm,jj] = threed_dutils.integrate_sfh(sf_start,t[jj],mass,
-		                                                                      tage,tau,sf_start)
+		totmass = np.sum(mass)
+		for jj in xrange(nt): intsfr[mm,jj,0] = threed_dutils.integrate_sfh(t[jj]-0.001,t[jj],mass,
+		                                                                    tage,tau,sf_start)
+		for jj in xrange(nt): intsfr[mm,jj,1] = threed_dutils.integrate_sfh(t[jj]-0.001,t[jj],mass[0],
+		                                                                    tage[0],tau[0],sf_start[0])*mass[0]/totmass
+		for jj in xrange(nt): intsfr[mm,jj,2] = threed_dutils.integrate_sfh(t[jj]-0.001,t[jj],mass[1],
+		                                                                    tage[1],tau[1],sf_start[1])*mass[1]/totmass
 
-	q = np.zeros(shape=(nt,3))
-	for jj in xrange(nt): q[jj,:] = np.percentile(intsfr[:,jj],[16.0,50.0,84.0])
+	q = np.zeros(shape=(nt,ncomp+1,3))
+	for jj in xrange(nt): q[jj,0,:] = np.percentile(intsfr[:,jj,0],[16.0,50.0,84.0])
+	for jj in xrange(nt): q[jj,1,:] = np.percentile(intsfr[:,jj,1],[16.0,50.0,84.0])
+	for jj in xrange(nt): q[jj,2,:] = np.percentile(intsfr[:,jj,2],[16.0,50.0,84.0])
+
 	return t, q
 
 def create_plotquant(sample_results, logplot = ['mass', 'tau', 'tage', 'sf_start']):
@@ -346,16 +354,31 @@ def sed_figure(sample_results, sps, model,
 	
 	# add SFH plot
 	t, perc = plot_sfh(sample_results)
+	perc = np.clip(np.log10(perc),-5.5,5000)
 	axfontsize=4
 	ax_inset=fig.add_axes([0.17,0.36,0.12,0.14],zorder=32)
-	axlim_sfh=[np.min(t),np.max(t)+0.08*(np.max(t)-np.min(t)),0,1.05]
+	
+	# plot whole SFH
+	ax_inset.plot(t, perc[:,0,1],'-',color='black')
+	#ax_inset.fill_between(t, perc[:,0,0], perc[:,0,2], color='0.75')
+	colors=['blue','red']
+	for aa in xrange(1,perc.shape[1]):
+		ax_inset.plot(t, perc[:,aa,1],'-',color=colors[aa-1],alpha=0.4)
+
+	axlim_sfh=[np.min(t),
+	           np.max(t)+0.08*(np.max(t)-np.min(t)),
+	           np.min(perc)*0.98,np.max(perc)*1.02]
 	ax_inset.axis(axlim_sfh)
-	ax_inset.plot(t, perc[:,1],'-',color='black')
-	ax_inset.fill_between(t, perc[:,0], perc[:,2], color='0.75')
-	ax_inset.set_ylabel('cum SFH',fontsize=axfontsize,weight='bold')
+
+	ax_inset.set_ylabel('log(SFH)',fontsize=axfontsize,weight='bold')
 	ax_inset.set_xlabel('t [Gyr]',fontsize=axfontsize,weight='bold')
 	ax_inset.tick_params(labelsize=axfontsize)
-	
+
+	# label
+	ax_inset.text(0.08,0.9, 'tot',transform = ax_inset.transAxes,fontsize=axfontsize*1.4)
+	ax_inset.text(0.08,0.83, 'tau1',transform = ax_inset.transAxes,color=colors[0],fontsize=axfontsize*1.4)
+	ax_inset.text(0.08,0.76, 'tau2',transform = ax_inset.transAxes,color=colors[1],fontsize=axfontsize*1.4)
+
 	# add RGB
 	try:
 		field=sample_results['run_params']['photname'].split('/')[-1].split('_')[0]
@@ -532,6 +555,7 @@ def plot_all_driver():
 	
 	runname = "photerr"
 	runname = 'dtau_nebon'
+	runname = 'dtau_intmet'
 
 	filebase, parm_basename, ancilname=threed_dutils.generate_basenames(runname)
 	for jj in xrange(len(filebase)):
