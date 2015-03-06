@@ -7,7 +7,7 @@ from scipy.optimize import brentq
 from copy import copy
 from astropy import constants
 
-def calc_emp_ha(mass,tage,tau,sf_start,tuniv,dust2,dustindex):
+def calc_emp_ha(mass,tage,tau,sf_start,tuniv,dust2,dustindex,ncomp=1):
 
 	ncomp = len(mass)
 	ha_flux=0.0
@@ -53,6 +53,9 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
     # save nebon/neboff status
 	nebstatus = sample_results['model'].params['add_neb_emission']
 
+	# calculate number of components
+	sample_results['ncomp'] = np.max([len(np.atleast_1d(x['init'])) for x in sample_results['model'].config_list if x['isfree'] == True])
+
     # find SFH parameters that are variables in the chain
     # save their indexes for future use
 	str_sfh_parms = ['mass','tau','sf_start','tage']
@@ -72,7 +75,9 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 	deltat=[0.01,0.1,1.0] # in Gyr
     
 	##### TEMPORARY CALCULATION TO DO EMPIRICAL EMISSION LINES IN CHAIN ######
-	dust2_index = np.array([True if x[:-2] == 'dust2' else False for x in parnames])
+	dust2_index = np.array([True if (x[:-sample_results['ncomp']] == 'dust2') or 
+		                            (x == 'dust2') else 
+		                            False for x in parnames])
 	dust_index_index = np.array([True if x == 'dust_index' else False for x in parnames])
 
 	######## SFH parameters #########
@@ -96,7 +101,8 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 
 		# empirical halpha
 		emp_ha[jj],emp_oiii[jj] = calc_emp_ha(mass,tage,tau,sf_start,tuniv,
-			                                  sample_results['flatchain'][jj,dust2_index],sample_results['flatchain'][jj,dust_index_index])
+			                                  sample_results['flatchain'][jj,dust2_index],sample_results['flatchain'][jj,dust_index_index],
+			                                  ncomp=sample_results['ncomp'])
 
 		# calculate sfr
 		sfr_10[jj] = threed_dutils.integrate_sfh(tage-deltat[0],tage,mass,tage,tau,
@@ -109,7 +115,7 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 		ssfr_100[jj] = sfr_100[jj] / np.sum(mass)
 
 		totmass[jj] = np.sum(mass)
-	     
+
 	# CALCULATE Q16,Q50,Q84 FOR VARIABLE PARAMETERS
 	ntheta = len(sample_results['initial_theta'])
 	q_16, q_50, q_84 = (np.zeros(ntheta)+np.nan for i in range(3))

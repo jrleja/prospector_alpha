@@ -807,12 +807,12 @@ def vary_logzsol(runname):
 				    weight=weight)
 
 		# grab and plot original spectrum
-		spec,mags,w = sample_results['model'].mean_model(thetas, sample_results['obs'], sps=sps,norm_spec=True)
+		specmax,magsmax,w = sample_results['model'].mean_model(thetas, sample_results['obs'], sps=sps,norm_spec=True)
 		
 		# nfnu or flam?
 		#spec *= 3e18/w**2
-		spec *= (3e18)/w
-		ax.plot(np.log10(w), np.log10(spec), color='black', zorder=0)
+		specmax *= (3e18)/w
+		ax.plot(np.log10(w), np.log10(specmax), color='black', zorder=0)
 
 		# logzsol dummy array
 		logzsol = np.array([-1.0,-0.6,-0.2,0.0,0.19])
@@ -865,6 +865,8 @@ def vary_logzsol(runname):
 		outname = sample_results['run_params']['objname']
 		plt.savefig('/Users/joel/code/python/threedhst_bsfh/plots/testmet/'+outname+'_metsed.png', dpi=300)
 		plt.close()
+
+		# save residuals
 
 
 

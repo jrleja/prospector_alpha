@@ -57,15 +57,13 @@ def plot_sfh(sample_results,nsamp=1000,ncomp=2):
 		totmass = np.sum(mass)
 		for jj in xrange(nt): intsfr[mm,jj,0] = threed_dutils.integrate_sfh(t[jj]-0.001,t[jj],mass,
 		                                                                    tage,tau,sf_start)
-		for jj in xrange(nt): intsfr[mm,jj,1] = threed_dutils.integrate_sfh(t[jj]-0.001,t[jj],mass[0],
-		                                                                    tage[0],tau[0],sf_start[0])*mass[0]/totmass
-		for jj in xrange(nt): intsfr[mm,jj,2] = threed_dutils.integrate_sfh(t[jj]-0.001,t[jj],mass[1],
-		                                                                    tage[1],tau[1],sf_start[1])*mass[1]/totmass
+		for kk in xrange(ncomp):
+			for jj in xrange(nt): intsfr[mm,jj,kk+1] = threed_dutils.integrate_sfh(t[jj]-0.001,t[jj],mass[kk],
+	                                                                    tage[kk],tau[kk],sf_start[kk])*mass[kk]/totmass
 
 	q = np.zeros(shape=(nt,ncomp+1,3))
-	for jj in xrange(nt): q[jj,0,:] = np.percentile(intsfr[:,jj,0],[16.0,50.0,84.0])
-	for jj in xrange(nt): q[jj,1,:] = np.percentile(intsfr[:,jj,1],[16.0,50.0,84.0])
-	for jj in xrange(nt): q[jj,2,:] = np.percentile(intsfr[:,jj,2],[16.0,50.0,84.0])
+	for kk in xrange(ncomp+1):
+		for jj in xrange(nt): q[jj,kk,:] = np.percentile(intsfr[:,jj,kk],[16.0,50.0,84.0])
 
 	return t, q
 
@@ -353,7 +351,7 @@ def sed_figure(sample_results, sps, model,
                   color='#545454', marker='o', label='observed', alpha=alpha, linestyle=' ',ms=ms)
 	
 	# add SFH plot
-	t, perc = plot_sfh(sample_results)
+	t, perc = plot_sfh(sample_results, ncomp=sample_results['ncomp'])
 	perc = np.clip(np.log10(perc),-5.5,5000)
 	axfontsize=4
 	ax_inset=fig.add_axes([0.17,0.36,0.12,0.14],zorder=32)
@@ -364,6 +362,7 @@ def sed_figure(sample_results, sps, model,
 	colors=['blue','red']
 	for aa in xrange(1,perc.shape[1]):
 		ax_inset.plot(t, perc[:,aa,1],'-',color=colors[aa-1],alpha=0.4)
+		ax_inset.text(0.08,0.83-0.07*(aa-1), 'tau'+str(aa),transform = ax_inset.transAxes,color=colors[aa-1],fontsize=axfontsize*1.4)
 
 	axlim_sfh=[np.min(t),
 	           np.max(t)+0.08*(np.max(t)-np.min(t)),
@@ -376,8 +375,6 @@ def sed_figure(sample_results, sps, model,
 
 	# label
 	ax_inset.text(0.08,0.9, 'tot',transform = ax_inset.transAxes,fontsize=axfontsize*1.4)
-	ax_inset.text(0.08,0.83, 'tau1',transform = ax_inset.transAxes,color=colors[0],fontsize=axfontsize*1.4)
-	ax_inset.text(0.08,0.76, 'tau2',transform = ax_inset.transAxes,color=colors[1],fontsize=axfontsize*1.4)
 
 	# add RGB
 	try:
