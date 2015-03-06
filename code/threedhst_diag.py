@@ -492,7 +492,6 @@ def make_all_plots(filebase=None, parm_file=None,
 		# load results
 		mcmc_filename=filebase+'_'+max(times)+"_mcmc"
 		model_filename=filebase+'_'+max(times)+"_model"
-		
 		try:
 			sample_results, powell_results, model = read_results.read_pickles(mcmc_filename, model_file=model_filename,inmod=None)
 		except:
@@ -548,14 +547,10 @@ def plot_all_driver():
 	for a list of galaxies, make all plots
 	'''
 
-	runname = "neboff"
-	
-	runname = "photerr"
-	runname = 'dtau_nebon'
-	runname = 'dtau_intmet'
+	runname = 'stau_intmet'
 
 	filebase, parm_basename, ancilname=threed_dutils.generate_basenames(runname)
-	for jj in xrange(len(filebase)):
+	for jj in xrange(29,len(filebase)):
 		print 'iteration '+str(jj) 
 		make_all_plots(filebase=filebase[jj],\
 		               parm_file=parm_basename[jj],\
