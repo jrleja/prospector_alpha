@@ -112,7 +112,7 @@ def collate_output(runname,outname):
 
 		try:
 			sample_results, powell_results, model = read_results.read_pickles(mcmc_filename, model_file=model_filename,inmod=None)
-		except (ValueError,EOFError):
+		except (ValueError,EOFError,KeyError):
 			print mcmc_filename + ' failed during output writing'
 			nfail+=1
 			continue
@@ -792,6 +792,8 @@ def vary_logzsol(runname):
 
 		# plot obs + obs errs
 		mask = sample_results['obs']['phot_mask']
+		obs['phot_mask'][-5:-1] = True # restore IRAC
+
 		obs_mags = sample_results['obs']['maggies'][mask]
 		obs_lam  = sample_results['obs']['wave_effective'][mask]
 		obs_err  = sample_results['obs']['maggies_unc'][mask]
@@ -811,8 +813,6 @@ def vary_logzsol(runname):
 		plt.savefig('/Users/joel/code/python/threedhst_bsfh/plots/testmet/'+outname+'_metsed.png', dpi=300)
 		plt.close()
 
-		# save residuals
-		magmax[mask]
 
 
 

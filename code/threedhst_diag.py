@@ -550,7 +550,7 @@ def plot_all_driver():
 	runname = 'stau_intmet'
 
 	filebase, parm_basename, ancilname=threed_dutils.generate_basenames(runname)
-	for jj in xrange(29,len(filebase)):
+	for jj in xrange(len(filebase)):
 		print 'iteration '+str(jj) 
 		make_all_plots(filebase=filebase[jj],\
 		               parm_file=parm_basename[jj],\

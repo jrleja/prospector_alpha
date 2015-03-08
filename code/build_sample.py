@@ -241,36 +241,52 @@ def build_sample_dynamics():
 		phot = read_sextractor.load_phot_v41(field[bb])
 		fast = read_sextractor.load_fast_v41(field[bb])
 		rf = read_sextractor.load_rf_v41(field[bb])
+		morph = read_sextractor.read_morphology(field[bb],'F160W')
 
 		# do this properly... not just COSMOS
 		lineinfo = Table(load_linelist(field=field[bb]))
 		mips = Table(threed_dutils.load_mips_data(os.getenv('APPS')+'/threedhst_bsfh/data/MIPS/'+field[bb].lower()+'_3dhst.v4.1.4.sfr'))
 		
+		# remove phot_flag=0
+		good = phot['use_phot'] == 1
+		phot = phot[good]
+		fast = fast[good]
+		rf   = rf[good]
+		lineinfo = lineinfo[good]
+		mips = mips[good]
+		morph = morph[good]
+
 		# find matches
-		massmatch=0.5 #dex
-		matching_radius = 2.5 #arcseconds
-		matches = np.zeros(0)
+		massmatch=10.5 #dex
+		matching_radius = 2.5 # arcseconds
+		matching_size   = 0.5 # arcseconds
+		matches = np.zeros(len(bez),dtype=np.int)-1
+		distance = np.zeros(len(bez))-1
 		for nn in xrange(len(bez)):
 			catalog = ICRS(bez['RAdeg'][nn], bez['DEdeg'][nn], unit=(u.degree, u.degree))
-			close_mass = list(np.abs(fast['lmass']-bez[nn]['logM']) < massmatch)
+			close_mass = np.abs(fast['lmass']-bez[nn]['logM']) < massmatch
 			c = ICRS(phot['ra'][close_mass], phot['dec'][close_mass], unit=(u.degree, u.degree))
-			print 1/0
 			idx, d2d, d3d = catalog.match_to_catalog_sky(c)
+
 			if d2d.value*3600 < matching_radius:
 				i = -1
 				for j in xrange(idx):
-					i = close_mass.index(True, i + 1)
-				matches=np.append(matches,i)
-		print 1/0
+					i = list(close_mass).index(True, i + 1)
+				matches[nn] = int(i)
+				distance[nn] = d2d.value*3600
 		
 
-		# only accept matches within some matching radius,
-		# and dlogM < 1.0 (FAST compared to Rachel's masses)
-		matching_radius = 2.0 # arcseconds
-		good = np.logical_and(d2d.value*3600 < matching_radius,\
-			                  np.abs(fast[idx]['lmass']- bez['logM']) < 1.0)
-		print 'mass difference:'
-		print fast[idx[good]]['lmass']- bez[good]['logM']
+		# only accept matches within some matching radius
+		for kk in xrange(len(matches)):
+			if matches[kk] == -1:
+				continue
+			print fast[matches[kk]]['lmass'],bez[kk]['logM'],\
+			      fast[matches[kk]]['z'],bez[kk]['z'],\
+			      distance[kk]
+		
+		# generate output stuff
+		matches = matches[matches >= 0]
+
 
 		# define useful things
 		fast['z'] = lineinfo['zgris']
@@ -281,20 +297,18 @@ def build_sample_dynamics():
 		lineinfo['z_sfr'] = mips['z_best']
 		
 		if bb > 0:
-			phot_out = vstack([phot_out, phot[idx[good]]])
-			fast_out = vstack([fast_out, fast[idx[good]]])
-			rf_out = vstack([rf_out, rf[idx[good]]])
-			lineinfo_out = vstack([lineinfo_out, lineinfo[idx[good]]])
-			mips_out = vstack([mips_out,mips[idx[good]]])
+			phot_out = vstack([phot_out, phot[matches]])
+			fast_out = vstack([fast_out, fast[matches]])
+			rf_out = vstack([rf_out, rf[matches]])
+			lineinfo_out = vstack([lineinfo_out, lineinfo[matches]])
+			mips_out = vstack([mips_out,mips[matches]])
 		else:
-			phot_out = phot[idx[good]]
-			fast_out = fast[idx[good]]
-			rf_out = rf[idx[good]]
-			lineinfo_out = lineinfo[idx[good]]
-			mips_out = mips[idx[good]]
+			phot_out = phot[matches]
+			fast_out = fast[matches]
+			rf_out = rf[matches]
+			lineinfo_out = lineinfo[matches]
+			mips_out = mips[matches]
 	
-	print
-
 	ascii.write(phot_out, output=phot_str_out, 
 	            delimiter=' ', format='commented_header')
 	ascii.write(fast_out, output=fast_str_out, 
