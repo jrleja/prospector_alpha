@@ -11,7 +11,7 @@ tophat = priors.tophat
 #############
 
 run_params = {'verbose':True,
-              'outfile':os.getenv('APPS')+'/threedhst_bsfh/results/stau/stau',
+              'outfile':os.getenv('APPS')+'/threedhst_bsfh/results/stau_solar/stau_solar',
               'ftol':0.5e-5, 
               'maxfev':5000,
               'nwalkers':248,
