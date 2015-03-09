@@ -256,15 +256,22 @@ def build_sample_dynamics():
 		mips = mips[good]
 		morph = morph[good]
 
-		# find matches
-		massmatch=10.5 #dex
+		# matching parameters
+		matching_mass   = 10.5 #dex
 		matching_radius = 2.5 # arcseconds
-		matching_size   = 0.5 # arcseconds
+		matching_size   = 0.3 # percent
+		from astropy.cosmology import WMAP9
+		# note: converting to physical sizes, not comoving. I assume this is right.
+		arcsec_size = bez['Re']*WMAP9.arcsec_per_kpc_proper(bez['z']).value
+		
+
 		matches = np.zeros(len(bez),dtype=np.int)-1
 		distance = np.zeros(len(bez))-1
 		for nn in xrange(len(bez)):
 			catalog = ICRS(bez['RAdeg'][nn], bez['DEdeg'][nn], unit=(u.degree, u.degree))
-			close_mass = np.abs(fast['lmass']-bez[nn]['logM']) < massmatch
+			close_mass = np.logical_and(
+				         (np.abs(fast['lmass']-bez[nn]['logM']) < matching_mass),
+			             (np.abs(morph['re']-arcsec_size[nn]/arcsec_size[nn]) < matching_size))
 			c = ICRS(phot['ra'][close_mass], phot['dec'][close_mass], unit=(u.degree, u.degree))
 			idx, d2d, d3d = catalog.match_to_catalog_sky(c)
 
@@ -282,14 +289,17 @@ def build_sample_dynamics():
 				continue
 			print fast[matches[kk]]['lmass'],bez[kk]['logM'],\
 			      fast[matches[kk]]['z'],bez[kk]['z'],\
+			      morph[matches[kk]]['re'],arcsec_size[kk],\
 			      distance[kk]
+
+			# use rachel's redshifts
+			fast[matches[kk]]['z'] = bez[kk]['z']
+			fast[matches[kk]]['lmass'] = bez[kk]['logM']
 		
 		# generate output stuff
 		matches = matches[matches >= 0]
 
-
 		# define useful things
-		fast['z'] = lineinfo['zgris']
 		lineinfo.rename_column('zgris' , 'z')
 		lineinfo['uvj_flag'] = calc_uvj_flag(rf)
 		lineinfo['sn_F160W'] = phot['f_F160W']/phot['e_F160W']
