@@ -420,7 +420,6 @@ def photerr_plot(runname, scale=False):
 	photerrs = np.array([float(x.split('_')[-2]) for x in ensemble['outname']])
 
 	# initialize colors
-	import pylab
 	NUM_COLORS = nparam
 	cm = pylab.get_cmap('gist_ncar')
 	plt.rcParams['axes.color_cycle'] = [cm(1.*i/NUM_COLORS) for i in range(NUM_COLORS)] 
@@ -691,6 +690,12 @@ def vary_logzsol(runname):
 	ngals = len(filebase)
 
 	nfail = 0
+
+	# make output folder
+	outdir = os.getenv('APPS')+'/threedhst_bsfh/plots/ensemble_plots/'+runname+'/mettests/'
+	if not os.path.exists(outdir):
+		os.makedirs(outdir)
+
 	for jj in xrange(ngals):
 
 		# find most recent output file
@@ -712,7 +717,7 @@ def vary_logzsol(runname):
 
 		try:
 			sample_results, powell_results, model = read_results.read_pickles(mcmc_filename, model_file=model_filename,inmod=None)
-		except (ValueError,EOFError):
+		except (ValueError,EOFError,KeyError):
 			print mcmc_filename + ' failed during output writing'
 			nfail+=1
 			continue
@@ -737,7 +742,7 @@ def vary_logzsol(runname):
 
 		# generate figure
 		fig, ax = plt.subplots(1, 1, figsize = (6, 6))
-		thetas = sample_results['quantiles']['maxprob_params']
+		thetas = sample_results['quantiles']['q50']
 		theta_names = np.array(model.theta_labels())
 		metind = theta_names == 'logzsol'
 
@@ -792,8 +797,7 @@ def vary_logzsol(runname):
 
 		# plot obs + obs errs
 		mask = sample_results['obs']['phot_mask']
-		obs['phot_mask'][-5:-1] = True # restore IRAC
-
+		sample_results['obs']['phot_mask'][-5:-1] = False # restore IRAC
 		obs_mags = sample_results['obs']['maggies'][mask]
 		obs_lam  = sample_results['obs']['wave_effective'][mask]
 		obs_err  = sample_results['obs']['maggies_unc'][mask]
@@ -804,14 +808,85 @@ def vary_logzsol(runname):
 
 		# nfnu or flam?
 		#spec *= 3e18/w**2
-		obs_mags *= (3e18)/obs_lam
-		ax.errorbar(np.log10(obs_lam), np.log10(obs_mags), yerr=yerr,
+		pmags = obs_mags*(3e18)/obs_lam
+		ax.errorbar(np.log10(obs_lam), np.log10(pmags), yerr=yerr,
 					fmt='ok',ms=5)
 		
 		# save
 		outname = sample_results['run_params']['objname']
-		plt.savefig('/Users/joel/code/python/threedhst_bsfh/plots/testmet/'+outname+'_metsed.png', dpi=300)
+		plt.savefig(outdir+outname+'_metsed.png', dpi=300)
 		plt.close()
+
+		# residuals
+		#lam = np.log10(obs_lam/(1+sample_results['model'].params['zred']))
+		try:
+			residuals[mask]    += (obs_mags - magsmax[mask])**2 / obs_err**2
+			percentresid[mask] += (obs_mags - magsmax[mask]) / obs_mags
+			nfilt              += mask
+
+		except:
+			nfilters = len(sample_results['obs']['filters'])
+			lam = np.log10(sample_results['obs']['wave_effective'])
+			residuals    = np.zeros(nfilters)
+			percentresid = np.zeros(nfilters)
+			nfilt        = np.zeros(nfilters)
+
+			residuals[mask]    += (obs_mags - magsmax[mask]) / obs_err
+			percentresid[mask] += (obs_mags - magsmax[mask]) / obs_mags
+			nfilt              += mask
+
+		#restframe = np.concatenate((restframe,lam))
+
+	# plot normalized by errors
+	fig, ax = plt.subplots(1, 1, figsize = (6, 6))
+
+	# initialize colors
+	NUM_COLORS = nfilters
+	cm = pylab.get_cmap('gist_ncar')
+	plt.rcParams['axes.color_cycle'] = [cm(1.*i/NUM_COLORS) for i in range(NUM_COLORS)] 
+
+	for kk in xrange(len(lam)): ax.scatter(lam[kk],residuals[kk]/nfilt[kk],color=cm(1.*kk/NUM_COLORS),lw=0.6,edgecolor='k')
+	for kk in xrange(len(lam)): ax.text(0.04,0.9-0.02*kk,sample_results['obs']['filters'][kk],color=cm(1.*kk/NUM_COLORS),transform = ax.transAxes, fontsize=7)
+
+	ax.hlines(0.0,ax.get_xlim()[0],ax.get_xlim()[1], linestyle='--',colors='k')
+
+	#bins,running_median = threed_dutils.running_median(restframe,residuals)
+	#running_median = np.array(running_median)
+	#bad = np.isfinite(running_median) == 0
+	#running_median[bad] = 0
+	#plt.plot(bins,running_median,'r--',lw=2,alpha=.8)
+
+	ax.set_ylabel('(obs-model)/errors')
+	ax.set_xlabel('observed wavelength')
+	ax.set_ylim(-5,5)
+	plt.savefig(outdir+'residuals_by_err.png', dpi=300)
+	plt.close()
+
+	# plot normalized by errors
+	fig, ax = plt.subplots(1, 1, figsize = (6, 6))
+
+	# initialize colors
+	NUM_COLORS = nfilters
+	cm = pylab.get_cmap('gist_ncar')
+	plt.rcParams['axes.color_cycle'] = [cm(1.*i/NUM_COLORS) for i in range(NUM_COLORS)] 
+
+	for kk in xrange(len(lam)): ax.scatter(lam[kk],percentresid[kk]/nfilt[kk],color=cm(1.*kk/NUM_COLORS),lw=0.6,edgecolor='k')
+	for kk in xrange(len(lam)): ax.text(0.04,0.9-0.02*kk,sample_results['obs']['filters'][kk],color=cm(1.*kk/NUM_COLORS),transform = ax.transAxes, fontsize=7)
+	ax.hlines(0.0,ax.get_xlim()[0],ax.get_xlim()[1], linestyle='--',colors='k')
+
+	#bins,running_median = threed_dutils.running_median(restframe,percentresid)
+	#running_median = np.array(running_median)
+	#bad = np.isfinite(running_median) == 0
+	#running_median[bad] = 0
+	#plt.plot(bins,running_median,'r--',lw=2,alpha=.8)
+
+	ax.set_ylabel('(obs-model)/obs')
+	ax.set_xlabel('observed wavelength')
+	ax.set_ylim(-0.6,0.6)
+	plt.savefig(outdir+'residuals_by_obs.png', dpi=300)
+	plt.close()
+	print 1/0
+
 
 
 
