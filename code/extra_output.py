@@ -42,6 +42,23 @@ def halfmass_assembly_time(mass,tage,tau,sf_start,tuniv):
 
 	return tuniv-half_time
 
+def maxprob_model(sample_results,sps):
+
+	# grab maximum probability, plus the thetas that gave it
+	maxprob = np.max(sample_results['lnprobability'])
+	probind = sample_results['lnprobability'] == maxprob
+	thetas = sample_results['chain'][probind,:]
+	if type(thetas[0]) != np.dtype('float64'):
+		thetas = thetas[0]
+
+	# ensure that maxprob stored is the same as calculated now
+	current_maxprob = threed_dutils.test_likelihood(sps=sps, model=sample_results['model'], obs=sample_results['obs'], thetas=thetas)
+	print current_maxprob
+	print maxprob
+	assert current_maxprob == maxprob, 'probabilities do not compute'
+
+	return thetas, maxprob
+
 def calc_extra_quantities(sample_results, nsamp_mc=1000):
 
 	'''' 
@@ -52,6 +69,16 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 
     # save nebon/neboff status
 	nebstatus = sample_results['model'].params['add_neb_emission']
+
+	# initialize sps
+	# check to see if we want zcontinuous=2 (i.e., the MDF)
+	if np.sum([1 for x in sample_results['model'].config_list if x['name'] == 'pmetals']) > 0:
+		sps = threed_dutils.setup_sps()
+	else:
+		sps = threed_dutils.setup_sps(zcontinuous=1)
+
+	# maxprob
+	thetas, maxprob = maxprob_model(sample_results,sps)
 
 	# calculate number of components
 	sample_results['ncomp'] = np.max([len(np.atleast_1d(x['init'])) for x in sample_results['model'].config_list if x['isfree'] == True])
@@ -128,13 +155,6 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 	for kk in xrange(nextra): q_16e[kk], q_50e[kk], q_84e[kk] = triangle.quantile(extra_flatchain[:,kk], [0.16, 0.5, 0.84])
 
     ######## MODEL CALL PARAMETERS ########
-	# initialize sps
-	# check to see if we want zcontinuous=2 (i.e., the MDF)
-	if np.sum([1 for x in sample_results['model'].config_list if x['name'] == 'pmetals']) > 0:
-		sps = threed_dutils.setup_sps()
-	else:
-		sps = threed_dutils.setup_sps(zcontinuous=1)
-
 	# set up outputs
 	nline = 6 # set by number of lines measured in threed_dutils
 	mips_flux = np.zeros(nsamp_mc)
@@ -174,11 +194,7 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 
 	##### MAXIMUM PROBABILITY
 	# grab best-fitting model
-	maxprob = np.max(sample_results['lnprobability'])
-	probind = sample_results['lnprobability'] == maxprob
-	thetas = sample_results['chain'][probind,:]
-	if type(thetas[0]) != np.dtype('float64'):
-		thetas = thetas[0]
+	thetas, maxprob = maxprob_model(sample_results,sps)
 
 	##### FORMAT EMLINE OUTPUT #####
 	q_16em, q_50em, q_84em, thetamaxem = (np.zeros(nline)+np.nan for i in range(4))
