@@ -119,8 +119,13 @@ def running_median(x,y,nbins=10):
 	bins = np.linspace(x.min(),x.max(), nbins)
 	delta = bins[1]-bins[0]
 	idx  = np.digitize(x,bins)
-	running_median = [np.median(y[idx==k]) for k in range(nbins)]
+	running_median = np.array([np.median(y[idx-1==k]) for k in range(nbins)])
 	bins = bins-delta/2.
+
+	# remove empty
+	empty = np.isnan(running_median) == 1
+	running_median[empty] = 0
+
 	return bins,running_median
 
 def generate_basenames(runname):

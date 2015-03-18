@@ -11,7 +11,7 @@ tophat = priors.tophat
 #############
 
 run_params = {'verbose':True,
-              'outfile':os.getenv('APPS')+'/threedhst_bsfh/results/stau_iracoff/stau_iracoff',
+              'outfile':os.getenv('APPS')+'/threedhst_bsfh/results/dtau_intmet/dtau_intmet',
               'ftol':0.5e-5, 
               'maxfev':5000,
               'nwalkers':248,
@@ -41,8 +41,6 @@ run_params = {'verbose':True,
 obs = threed_dutils.load_obs_3dhst(run_params['photname'], run_params['objname'],
 									mips=run_params['mipsname'], min_error=run_params['min_error'],
                                     abs_error=run_params['abs_error'])
-# turn off irac
-obs['phot_mask'][-5:-1] = False
 
 #############
 # MODEL_PARAMS
@@ -64,6 +62,20 @@ class BurstyModel(sedmodel.CSPModel):
             these parameter values.
         """  
         lnp_prior = 0
+        
+        # check to make sure tau models are separated
+        if 'tau' in self.theta_index:
+            start,end = self.theta_index['tau']
+            tau = theta[start:end]
+            if (tau[0] < 2*tau[1]):
+                return -np.inf
+
+        # implement mass ratio
+        if 'mass' in self.theta_index:
+            start,end = self.theta_index['mass']
+            mass = theta[start:end]
+            if (mass[1]/mass[0] > 20):
+                return -np.inf
 
         for k, v in self.theta_index.iteritems():
             start, end = v
@@ -96,7 +108,7 @@ model_params.append({'name': 'add_igm_absorption', 'N': 1,
 
 model_params.append({'name': 'add_agb_dust_model', 'N': 1,
                         'isfree': False,
-                        'init': True,
+                        'init': False,
                         'units': None,
                         'prior_function': None,
                         'prior_args': None})
@@ -109,16 +121,9 @@ model_params.append({'name': 'mass', 'N': 1,
                         'prior_args': {'mini':1e7,
                                        'maxi':1e14}})
 
-model_params.append({'name': 'pmetals', 'N': 1,
-                        'isfree': False,
-                        'init': 2,
-                        'units': '',
-                        'prior_function': None,
-                        'prior_args': {'mini':-3, 'maxi':-1}})
-
 model_params.append({'name': 'logzsol', 'N': 1,
-                        'isfree': True,
-                        'init': -0.2,
+                        'isfree': False,
+                        'init': 0.0,
                         'init_disp': 0.4,
                         'log_param': True,
                         'units': r'$\log (Z/Z_\odot)$',
@@ -128,14 +133,14 @@ model_params.append({'name': 'logzsol', 'N': 1,
 ###### SFH   ########
 model_params.append({'name': 'sfh', 'N': 1,
                         'isfree': False,
-                        'init': 4,
+                        'init': 1,
                         'units': 'type',
                         'prior_function_name': None,
                         'prior_args': None})
 
 model_params.append({'name': 'tau', 'N': 1,
                         'isfree': True,
-                        'init': 10.0,
+                        'init': 10,
                         'init_disp': 0.5,
                         'units': 'Gyr',
                         'prior_function':tophat,
@@ -143,7 +148,7 @@ model_params.append({'name': 'tau', 'N': 1,
                                        'maxi':100.0}})
 
 model_params.append({'name': 'tage', 'N': 1,
-                        'isfree': False,
+                        'isfree': True,
                         'init': 1.0,
                         'units': 'Gyr',
                         'prior_function': tophat,
@@ -173,9 +178,9 @@ model_params.append({'name': 'fconst', 'N': 1,
                         'prior_args': {'mini':0.0, 'maxi':1.0}})
 
 model_params.append({'name': 'sf_start', 'N': 1,
-                        'isfree': True,
+                        'isfree': False,
                         'reinit': True,
-                        'init': 1.0,
+                        'init': 0.0,
                         'units': 'Gyr',
                         'prior_function': tophat,
                         'prior_args': {'mini':0.0,
@@ -192,79 +197,28 @@ model_params.append({'name': 'imf_type', 'N': 1,
 ######## Dust Absorption ##############
 model_params.append({'name': 'dust_type', 'N': 1,
                         'isfree': False,
-                        'init': 0,
+                        'init': 2,
                         'units': 'index',
                         'prior_function_name': None,
                         'prior_args': None})
-                        
-model_params.append({'name': 'dust1', 'N': 1,
-                        'isfree': False,
-                        'init': 0.0,
-                        'init_disp': 0.5,
-                        'units': '',
-                        'prior_function': tophat,
-                        'prior_args': {'mini':0.0, 'maxi':3.0}})
 
 model_params.append({'name': 'dust2', 'N': 1,
                         'isfree': True,
-                        'init': 0.35,
-                        'reinit': True,
+                        'init': 0.0,
                         'init_disp': 0.2,
                         'units': '',
                         'prior_function': tophat,
                         'prior_args': {'mini':0.0,
                                        'maxi':4.0}})
 
-model_params.append({'name': 'dust_index', 'N': 1,
-                        'isfree': True,
-                        'init': -0.7,
-                        'reinit': True,
-                        'units': '',
-                        'prior_function': tophat,
-                        'prior_args': {'mini':-3.0, 'maxi': -0.4}})
-
-model_params.append({'name': 'dust1_index', 'N': 1,
-                        'isfree': False,
-                        'init': -1.0,
-                        'units': '',
-                        'prior_function': tophat,
-                        'prior_args': {'mini':-1.5, 'maxi':-0.5}})
-
-model_params.append({'name': 'dust_tesc', 'N': 1,
-                        'isfree': False,
-                        'init': 7.0,
-                        'units': 'log(Gyr)',
-                        'prior_function_name': None,
-                        'prior_args': None})
-
 ###### Dust Emission ##############
 model_params.append({'name': 'add_dust_emission', 'N': 1,
                         'isfree': False,
-                        'init': 1,
+                        'init': 0,
                         'units': None,
                         'prior_function': None,
                         'prior_args': None})
 
-model_params.append({'name': 'duste_gamma', 'N': 1,
-                        'isfree': False,
-                        'init': 0.01,
-                        'units': None,
-                        'prior_function': tophat,
-                        'prior_args': {'mini':0.0, 'maxi':1.0}})
-
-model_params.append({'name': 'duste_umin', 'N': 1,
-                        'isfree': False,
-                        'init': 1.0,
-                        'units': None,
-                        'prior_function': tophat,
-                        'prior_args': {'mini':0.1, 'maxi':25.0}})
-
-model_params.append({'name': 'duste_qpah', 'N': 1,
-                        'isfree': False,
-                        'init': 3.0,
-                        'units': 'percent',
-                        'prior_function': tophat,
-                        'prior_args': {'mini':0.0, 'maxi':10.0}})
 
 ###### Nebular Emission ###########
 model_params.append({'name': 'add_neb_emission', 'N': 1,
