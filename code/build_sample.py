@@ -28,10 +28,11 @@ def load_linelist(field='COSMOS'):
 	# build output
 	t = Table([dat['id'],
 		      [-99.0]*len(dat),
+		      dat['z_best'],
 		      dat['use_grism1'],
 		      [-99.0]*len(dat),
 		      [-99.0]*len(dat)],
-	          names=('id','zgris','use_grism1','s0','s1'))
+	          names=('id','zgris','zbest','use_grism1','s0','s1'))
 	for jj in xrange(len(dat)):
 		
 		# no spectrum
@@ -116,7 +117,7 @@ def calc_uvj_flag(rf):
 	
 	return uvj_flag
 
-def build_sample():
+def build_sample_general():
 
 	'''
 	selects a sample of galaxies "randomly"
@@ -125,10 +126,77 @@ def build_sample():
 
 	# output
 	field = 'COSMOS'
-	fast_str_out = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_testsamp.fout'
-	ancil_str_out = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_testsamp.dat'
-	phot_str_out = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_testsamp.cat'
-	id_str_out   = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_testsamp.ids'
+	basename = 'gensamp'
+	fast_str_out = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_'+basename+'.fout'
+	ancil_str_out = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_'+basename+'.dat'
+	phot_str_out = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_'+basename+'.cat'
+	id_str_out   = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_'+basename+'.ids'
+
+	# load data
+	# use grism redshift
+	phot = read_sextractor.load_phot_v41(field)
+	fast = read_sextractor.load_fast_v41(field)
+	rf = read_sextractor.load_rf_v41(field)
+	lineinfo = load_linelist()
+	mips = threed_dutils.load_mips_data(os.getenv('APPS')+'/threedhst_bsfh/data/MIPS/cosmos_3dhst.v4.1.4.sfr')
+	
+	# remove junk
+	# 153, 155, 161 are U, V, J
+	good = (phot['use_phot'] == 1) & \
+	       (phot['f_IRAC4'] < 1e7) & (phot['f_IRAC3'] < 1e7) & (phot['f_IRAC2'] < 1e7) & (phot['f_IRAC1'] < 1e7) & \
+	       (phot['f_F160W']/phot['e_F160W'] > 100) & (fast['lmass'] > 10)
+
+	phot = phot[good]
+	fast = fast[good]
+	rf = rf[good]
+	lineinfo = lineinfo[good]
+	mips = mips[good]
+	
+	# define UVJ flag, S/N, HA EQW
+	uvj_flag = calc_uvj_flag(rf)
+	sn_F160W = phot['f_F160W']/phot['e_F160W']
+	Ha_EQW_obs = lineinfo['Ha_EQW_obs']
+	fast['z'] = lineinfo['zbest']
+	lineinfo.rename_column('zgris' , 'z')
+	lineinfo['uvj_flag'] = uvj_flag
+	lineinfo['sn_F160W'] = sn_F160W
+	for i in xrange(len(mips.dtype.names)):
+		tempname=mips.dtype.names[i]
+		if tempname != 'z_best' and tempname != 'id':
+			lineinfo[tempname] = mips[tempname]
+		elif tempname == 'z_best':
+			lineinfo['z_sfr'] = mips[tempname]
+	
+	# split into bins
+	selection = np.arange(0,np.sum(good))
+	random_index = random.sample(xrange(len(selection)), 108)
+	fast_out = fast[selection][random_index]
+	phot_out = phot[selection][random_index]
+	
+	ascii.write(phot_out, output=phot_str_out, 
+	            delimiter=' ', format='commented_header')
+	ascii.write(fast_out, output=fast_str_out, 
+	            delimiter=' ', format='commented_header',
+	            include_names=fast.keys()[:11])
+	ascii.write(lineinfo, output=ancil_str_out, 
+	            delimiter=' ', format='commented_header')
+	ascii.write([np.array(phot_out['id'],dtype='int')], output=id_str_out, Writer=ascii.NoHeader)
+
+
+def build_sample_halpha():
+
+	'''
+	selects a sample of galaxies "randomly"
+	to add: output for the EAZY parameters, so I can include p(z) [or whatever I need for that]
+	'''
+
+	# output
+	field = 'COSMOS'
+	basename = 'testsamp'
+	fast_str_out = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_'+basename+'.fout'
+	ancil_str_out = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_'+basename+'.dat'
+	phot_str_out = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_'+basename+'.cat'
+	id_str_out   = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_'+basename+'.ids'
 
 	# load data
 	# use grism redshift
