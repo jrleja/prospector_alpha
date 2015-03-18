@@ -237,6 +237,9 @@ def plot_driver(runname):
 		mass = np.log10(ensemble['q50'][ensemble['parname'] == 'totmass'][0,valid_comp])
 		masserrs = asym_errors(ensemble['q50'][ensemble['parname'] == 'totmass'][0,valid_comp],ensemble['q84'][ensemble['parname'] == 'totmass'][0,valid_comp], ensemble['q16'][ensemble['parname'] == 'totmass'][0,valid_comp],log=True)
 
+	logzsol = ensemble['q50'][ensemble['parname'] == 'logzsol'][0,valid_comp]
+	logzsolerrs = asym_errors(ensemble['q50'][ensemble['parname'] == 'logzsol'][0,valid_comp],ensemble['q84'][ensemble['parname'] == 'logzsol'][0,valid_comp],ensemble['q16'][ensemble['parname'] == 'logzsol'][0,valid_comp])
+
 	try:
 		tau = np.log10(np.clip(tuniv-ensemble['q50'][ensemble['parname'] == 'tau'][0,valid_comp],1e-2,1e50))
 		tauerrs = asym_errors(np.clip(tuniv-ensemble['q50'][ensemble['parname'] == 'tau'][0,valid_comp],1e-4,1e50),np.clip(tuniv-ensemble['q84'][ensemble['parname'] == 'tau'][0,valid_comp],1e-4,1e50),np.clip(tuniv-ensemble['q16'][ensemble['parname'] == 'tau'][0,valid_comp],1e-4,1e50),log=True)
@@ -245,9 +248,9 @@ def plot_driver(runname):
 		tauerrs = asym_errors(np.clip(tuniv-ensemble['q50'][ensemble['parname'] == 'tau_1'][0,valid_comp],1e-4,1e50),np.clip(tuniv-ensemble['q84'][ensemble['parname'] == 'tau_1'][0,valid_comp],1e-4,1e50),np.clip(tuniv-ensemble['q16'][ensemble['parname'] == 'tau_1'][0,valid_comp],1e-4,1e50),log=True)
 
 	x_data = [mass,\
-			  ensemble['q50'][ensemble['parname'] == 'logzsol'][0,valid_comp],\
-	          ensemble['q50'][ensemble['parname'] == 'logzsol'][0,valid_comp],\
-	          ensemble['q50'][ensemble['parname'] == 'logzsol'][0,valid_comp],\
+			  logzsol,\
+	          logzsol,\
+	          logzsol,\
 	          np.log10(ensemble['q50'][ensemble['parname'] == 'sfr_100'][0]),\
 	          np.log10(ensemble['q50'][ensemble['parname'] == 'sfr_100'][0]),\
 	          mass,\
@@ -259,9 +262,9 @@ def plot_driver(runname):
 	          ]
 
 	x_err  = [masserrs,\
-			  asym_errors(ensemble['q50'][ensemble['parname'] == 'logzsol'][0,valid_comp],ensemble['q84'][ensemble['parname'] == 'logzsol'][0,valid_comp],ensemble['q16'][ensemble['parname'] == 'logzsol'][0,valid_comp]),\
-			  asym_errors(ensemble['q50'][ensemble['parname'] == 'logzsol'][0,valid_comp],ensemble['q84'][ensemble['parname'] == 'logzsol'][0,valid_comp],ensemble['q16'][ensemble['parname'] == 'logzsol'][0,valid_comp]),\
-			  asym_errors(ensemble['q50'][ensemble['parname'] == 'logzsol'][0,valid_comp],ensemble['q84'][ensemble['parname'] == 'logzsol'][0,valid_comp],ensemble['q16'][ensemble['parname'] == 'logzsol'][0,valid_comp]),\
+			  logzsolerrs,\
+			  logzsolerrs,\
+			  logzsolerrs,\
 			  asym_errors(ensemble['q50'][ensemble['parname'] == 'sfr_100'][0],ensemble['q84'][ensemble['parname'] == 'sfr_100'][0],ensemble['q16'][ensemble['parname'] == 'sfr_100'][0],log=True),\
 			  asym_errors(ensemble['q50'][ensemble['parname'] == 'sfr_100'][0],ensemble['q84'][ensemble['parname'] == 'sfr_100'][0],ensemble['q16'][ensemble['parname'] == 'sfr_100'][0],log=True),\
 			  masserrs,\
@@ -286,7 +289,7 @@ def plot_driver(runname):
 	            r'log(H$\alpha$ lum) [obs]'
 	            ]
 
-	y_data = [ensemble['q50'][ensemble['parname'] == 'logzsol'][0,valid_comp],\
+	y_data = [logzsol,\
 			  np.log10(ensemble['q50'][ensemble['parname'] == 'sfr_100'][0,valid_comp]),\
 			  ensemble['q50'][ensemble['parname'] == 'dust_index'][0,valid_comp],\
 	          ensemble['q50'][ensemble['parname'] == 'half_time'][0,valid_comp],\
@@ -300,7 +303,7 @@ def plot_driver(runname):
 	          np.log10(sfr_obs)\
 	          ]
 
-	y_err  = [asym_errors(ensemble['q50'][ensemble['parname'] == 'logzsol'][0,valid_comp],ensemble['q84'][ensemble['parname'] == 'logzsol'][0,valid_comp],ensemble['q16'][ensemble['parname'] == 'logzsol'][0,valid_comp]),\
+	y_err  = [logzsolerrs,\
 			  asym_errors(ensemble['q50'][ensemble['parname'] == 'sfr_100'][0,valid_comp],ensemble['q84'][ensemble['parname'] == 'sfr_100'][0,valid_comp],ensemble['q16'][ensemble['parname'] == 'sfr_100'][0,valid_comp],log=True),\
 			  asym_errors(ensemble['q50'][ensemble['parname'] == 'dust_index'][0,valid_comp],ensemble['q84'][ensemble['parname'] == 'dust_index'][0,valid_comp],ensemble['q16'][ensemble['parname'] == 'dust_index'][0,valid_comp],log=False),\
 			  None,\
@@ -736,13 +739,15 @@ def vary_logzsol(runname):
 
 		# check to see if we want zcontinuous=2 (i.e., the MDF)
 		if np.sum([1 for x in sample_results['model'].config_list if x['name'] == 'pmetals']) > 0:
-			sps = threed_dutils.setup_sps()
+			sps = threed_dutils.setup_sps(zcontinuous=2)
+			print 'using the MDF'
 		else:
-			sps = threed_dutils.setup_sps(zcontinuous=1)
+			sps = threed_dutils.setup_sps(zcontinuous=2)
+			print 'using the MDF'
 
 		# generate figure
 		fig, ax = plt.subplots(1, 1, figsize = (6, 6))
-		thetas = sample_results['quantiles']['q50']
+		thetas = sample_results['quantiles']['maxprob_params']
 		theta_names = np.array(model.theta_labels())
 		metind = theta_names == 'logzsol'
 
@@ -797,7 +802,14 @@ def vary_logzsol(runname):
 
 		# plot obs + obs errs
 		mask = sample_results['obs']['phot_mask']
-		sample_results['obs']['phot_mask'][-5:-1] = False # restore IRAC
+		
+		# restore irac
+		good = np.logical_and((sample_results['obs']['maggies'] > -9.8e-9),
+		                      (sample_results['obs']['maggies'] != sample_results['obs']['maggies_unc']))
+		mask = good
+
+
+		sample_results['obs']['phot_mask'][-5:-1] = True # restore IRAC
 		obs_mags = sample_results['obs']['maggies'][mask]
 		obs_lam  = sample_results['obs']['wave_effective'][mask]
 		obs_err  = sample_results['obs']['maggies_unc'][mask]
@@ -817,77 +829,255 @@ def vary_logzsol(runname):
 		plt.savefig(outdir+outname+'_metsed.png', dpi=300)
 		plt.close()
 
-		# residuals
-		#lam = np.log10(obs_lam/(1+sample_results['model'].params['zred']))
+def plot_residuals(runname):
+
+	filebase,params,ancilname=threed_dutils.generate_basenames(runname)
+	ngals = len(filebase)
+
+	nfail = 0
+
+	# make output folder
+	outdir = os.getenv('APPS')+'/threedhst_bsfh/plots/ensemble_plots/'+runname+'/mettests/'
+	if not os.path.exists(outdir):
+		os.makedirs(outdir)
+
+	for jj in xrange(ngals):
+
+		# find most recent output file
+		# with the objname
+		folder = "/".join(filebase[jj].split('/')[:-1])
+		filename = filebase[jj].split("/")[-1]
+		files = [f for f in os.listdir(folder) if "_".join(f.split('_')[:-2]) == filename]	
+		times = [f.split('_')[-2] for f in files]
+
+		# if we found no files, skip this object
+		if len(times) == 0:
+			print 'Failed to find any files in '+folder+' of type ' +filename+' to extract times'
+			nfail+=1
+			continue
+
+		# load results
+		mcmc_filename=filebase[jj]+'_'+max(times)+"_mcmc"
+		model_filename=filebase[jj]+'_'+max(times)+"_model"
+
 		try:
-			residuals[mask]    += (obs_mags - magsmax[mask])**2 / obs_err**2
-			percentresid[mask] += (obs_mags - magsmax[mask]) / obs_mags
-			nfilt              += mask
+			sample_results, powell_results, model = read_results.read_pickles(mcmc_filename, model_file=model_filename,inmod=None)
+		except (ValueError,EOFError,KeyError):
+			print mcmc_filename + ' failed during output writing'
+			nfail+=1
+			continue
+		except IOError:
+			print mcmc_filename + ' does not exist!'
+			nfail+=1
+			continue
+
+		# check for existence of extra information
+		try:
+			sample_results['quantiles']
+		except:
+			print 'Generating extra information for '+mcmc_filename+', '+model_filename
+			extra_output.post_processing(params[jj])
+			sample_results, powell_results, model = read_results.read_pickles(mcmc_filename, model_file=model_filename,inmod=None)
+
+		# check to see if we want zcontinuous=2 (i.e., the MDF)
+		if np.sum([1 for x in sample_results['model'].config_list if x['name'] == 'pmetals']) > 0:
+			sps = threed_dutils.setup_sps(zcontinuous=2)
+			print 'using the MDF'
+		else:
+			sps = threed_dutils.setup_sps(zcontinuous=2)
+			print 'using the MDF'
+
+		# generate figure
+		thetas = sample_results['quantiles']['maxprob_params']
+		theta_names = np.array(model.theta_labels())
+		metind = theta_names == 'logzsol'
+
+		# grab best-fit magnitudes
+		specmax,magsmax,w = sample_results['model'].mean_model(thetas, sample_results['obs'], sps=sps,norm_spec=True)
+
+		# grab obs + obs errors
+		# start with mask
+		mask = sample_results['obs']['phot_mask']
+		# restore irac
+		good = np.logical_and((sample_results['obs']['maggies'] > -9.8e-9),
+		                      (sample_results['obs']['maggies'] != sample_results['obs']['maggies_unc']))
+		mask = good
+
+		# define obs things
+		obs_mags = sample_results['obs']['maggies'][mask]
+		obs_lam  = sample_results['obs']['wave_effective'][mask]
+		obs_err  = sample_results['obs']['maggies_unc'][mask]
+
+
+		# residuals
+		tempresid = (obs_mags - magsmax[mask]) / obs_err
+		tempresid_perc = (obs_mags - magsmax[mask]) / obs_mags
+
+		try:
+			residuals[mask,jj]    = tempresid
+			percentresid[mask,jj] = tempresid_perc
+			restlam[mask,jj]      = np.log10(obs_lam/(1+sample_results['model'].params['zred']))
+			bestmet[jj]           = thetas[1]
 
 		except:
 			nfilters = len(sample_results['obs']['filters'])
 			lam = np.log10(sample_results['obs']['wave_effective'])
-			residuals    = np.zeros(nfilters)
-			percentresid = np.zeros(nfilters)
-			nfilt        = np.zeros(nfilters)
+			residuals    = np.zeros(shape=(nfilters,ngals)) + np.nan 
+			restlam      = np.zeros(shape=(nfilters,ngals)) + np.nan
+			percentresid = np.zeros(shape=(nfilters,ngals)) + np.nan
+			bestmet      = np.zeros(ngals) + np.nan
 
-			residuals[mask]    += (obs_mags - magsmax[mask]) / obs_err
-			percentresid[mask] += (obs_mags - magsmax[mask]) / obs_mags
-			nfilt              += mask
+			residuals[mask,jj]    = tempresid
+			percentresid[mask,jj] = tempresid_perc
+			restlam[mask,jj]      = np.log10(obs_lam/(1+sample_results['model'].params['zred']))
+			bestmet[jj]           = thetas[1]
 
-		#restframe = np.concatenate((restframe,lam))
+		print bestmet[jj]
+
+	# take mean
+	meanresid = np.nanmean(residuals,axis=1)
+	meanpercent = np.nanmean(percentresid,axis=1)
+
+	stdresid = np.nanstd(residuals,axis=1)
+	stdpercent = np.nanstd(percentresid,axis=1)
 
 	# plot normalized by errors
-	fig, ax = plt.subplots(1, 1, figsize = (6, 6))
+	fig = plt.figure()
+	ax = fig.add_subplot(111)
 
 	# initialize colors
 	NUM_COLORS = nfilters
-	cm = pylab.get_cmap('gist_ncar')
+	cm = pylab.get_cmap('gist_rainbow')
 	plt.rcParams['axes.color_cycle'] = [cm(1.*i/NUM_COLORS) for i in range(NUM_COLORS)] 
 
-	for kk in xrange(len(lam)): ax.scatter(lam[kk],residuals[kk]/nfilt[kk],color=cm(1.*kk/NUM_COLORS),lw=0.6,edgecolor='k')
+	for kk in xrange(len(lam)): ax.errorbar(lam[kk],meanresid[kk],yerr=stdresid[kk],fmt='o',color=cm(1.*kk/NUM_COLORS))
 	for kk in xrange(len(lam)): ax.text(0.04,0.9-0.02*kk,sample_results['obs']['filters'][kk],color=cm(1.*kk/NUM_COLORS),transform = ax.transAxes, fontsize=7)
-
-	ax.hlines(0.0,ax.get_xlim()[0],ax.get_xlim()[1], linestyle='--',colors='k')
-
-	#bins,running_median = threed_dutils.running_median(restframe,residuals)
-	#running_median = np.array(running_median)
-	#bad = np.isfinite(running_median) == 0
-	#running_median[bad] = 0
-	#plt.plot(bins,running_median,'r--',lw=2,alpha=.8)
 
 	ax.set_ylabel('(obs-model)/errors')
 	ax.set_xlabel('observed wavelength')
-	ax.set_ylim(-5,5)
+	ax.set_ylim(-7.0,7.0)
+	ax.set_xlim(3.0,5.5)
+	ax.hlines(0.0,ax.get_xlim()[0],ax.get_xlim()[1], linestyle='--',colors='k')
 	plt.savefig(outdir+'residuals_by_err.png', dpi=300)
 	plt.close()
 
 	# plot normalized by errors
+	fig = plt.figure()
+	ax = fig.add_subplot(111)
+
+	# initialize colors
+	NUM_COLORS = nfilters
+	cm = pylab.get_cmap('gist_rainbow')
+	plt.rcParams['axes.color_cycle'] = [cm(1.*i/NUM_COLORS) for i in range(NUM_COLORS)] 
+
+	for kk in xrange(len(lam)): ax.errorbar(lam[kk],meanpercent[kk],yerr=stdpercent[kk],fmt='o',color=cm(1.*kk/NUM_COLORS))
+	for kk in xrange(len(lam)): ax.text(0.04,0.9-0.02*kk,sample_results['obs']['filters'][kk],color=cm(1.*kk/NUM_COLORS),transform = ax.transAxes, fontsize=7)
+
+	ax.set_ylabel('(obs-model)/obs')
+	ax.set_xlabel('observed wavelength')
+	ax.set_ylim(-3,3)
+	ax.set_xlim(3.0,5.5)
+	ax.hlines(0.0,ax.get_xlim()[0],ax.get_xlim()[1], linestyle='--',colors='k')
+
+	plt.savefig(outdir+'residuals_by_obs.png', dpi=300)
+	plt.close()
+
+	# average by metallicity
+	# take mean
+	topmet = bestmet > 0.1
+	ntopmet = np.sum(topmet)
+	botmet = bestmet <= -0.6
+	nbotmet = np.sum(botmet)
+	meanresid_topmet = np.nanmean(residuals[:,topmet],axis=1)
+	meanpercent_topmet = np.nanmean(percentresid[:,topmet],axis=1)
+
+	stdresid_topmet = np.nanstd(residuals[:,topmet],axis=1)
+	stdpercent_topmet = np.nanstd(percentresid[:,topmet],axis=1)
+
+	meanresid_botmet = np.nanmean(residuals[:,botmet],axis=1)
+	meanpercent_botmet = np.nanmean(percentresid[:,botmet],axis=1)
+
+	stdresid_botmet = np.nanstd(residuals[:,botmet],axis=1)
+	stdpercent_botmet = np.nanstd(percentresid[:,botmet],axis=1)
+
+	# plot normalized by errors
+	fig = plt.figure()
+	ax = fig.add_subplot(111)
+
+	ax.errorbar(lam,meanresid_topmet,fmt='-o',color='red')
+	ax.errorbar(lam,meanresid_botmet,fmt='-o',color='blue')
+
+	ax.set_ylabel('(obs-model)/errors')
+	ax.set_xlabel('observed wavelength')
+	ax.set_ylim(-7.0,7.0)
+	ax.set_xlim(3.0,5.5)
+	ax.hlines(0.0,ax.get_xlim()[0],ax.get_xlim()[1], linestyle='--',colors='k')
+	plt.savefig(outdir+'residuals_by_err_metsplit.png', dpi=300)
+	plt.close()
+
+	# average by metallicity, in rest-frame
+	# plot normalized by errors
+	fig = plt.figure()
+	ax = fig.add_subplot(111)
+	topmet_resid = residuals[:,topmet].reshape(ntopmet*nfilters)
+	topmet_restlam = restlam[:,topmet].reshape(ntopmet*nfilters)
+
+	nonan = np.isfinite(topmet_resid)
+	topmet_resid = topmet_resid[nonan]
+	topmet_restlam = topmet_restlam[nonan]
+
+	plt.scatter(topmet_restlam, topmet_resid, marker='o', facecolor='red', alpha=0.2,lw=0,s=8.0)
+
+	bins, median = threed_dutils.running_median(topmet_restlam,topmet_resid,nbins=20)
+	plt.plot(bins,median,color='red',lw=5)
+
+	botmet_resid = residuals[:,botmet].reshape(nbotmet*nfilters)
+	botmet_restlam = restlam[:,botmet].reshape(nbotmet*nfilters)
+
+	nonan = np.isfinite(botmet_resid)
+	botmet_resid = botmet_resid[nonan]
+	botmet_restlam = botmet_restlam[nonan]
+
+	plt.scatter(botmet_restlam, botmet_resid, marker='o', facecolor='blue', alpha=0.2,lw=0,s=8.0)
+
+	bins, median = threed_dutils.running_median(botmet_restlam,botmet_resid,nbins=20)
+	plt.plot(bins,median,color='blue',lw=5)
+
+	ax.set_ylabel('(obs-model)/errors')
+	ax.set_xlabel('rest-frame wavelength')
+	ax.set_ylim(-7.0,7.0)
+	ax.set_xlim(3.0,5.5)
+	ax.hlines(0.0,ax.get_xlim()[0],ax.get_xlim()[1], linestyle='--',colors='k')
+	plt.savefig(outdir+'residuals_by_err_metsplit_rf.png', dpi=300)
+	plt.close()
+
+	print 1/0
+
+
+	# RESTFRAME
+	# plot normalized by errors
 	fig, ax = plt.subplots(1, 1, figsize = (6, 6))
 
 	# initialize colors
 	NUM_COLORS = nfilters
-	cm = pylab.get_cmap('gist_ncar')
+	cm = pylab.get_cmap('gist_rainbow')
 	plt.rcParams['axes.color_cycle'] = [cm(1.*i/NUM_COLORS) for i in range(NUM_COLORS)] 
 
-	for kk in xrange(len(lam)): ax.scatter(lam[kk],percentresid[kk]/nfilt[kk],color=cm(1.*kk/NUM_COLORS),lw=0.6,edgecolor='k')
-	for kk in xrange(len(lam)): ax.text(0.04,0.9-0.02*kk,sample_results['obs']['filters'][kk],color=cm(1.*kk/NUM_COLORS),transform = ax.transAxes, fontsize=7)
+	plt.plot(restframe,residuals_all,'bo',lw=0.6,alpha=0.5,ms=0.5)
 	ax.hlines(0.0,ax.get_xlim()[0],ax.get_xlim()[1], linestyle='--',colors='k')
 
-	#bins,running_median = threed_dutils.running_median(restframe,percentresid)
-	#running_median = np.array(running_median)
-	#bad = np.isfinite(running_median) == 0
-	#running_median[bad] = 0
-	#plt.plot(bins,running_median,'r--',lw=2,alpha=.8)
+	bins,running_median = threed_dutils.running_median(restframe,residuals_all)
+	running_median = np.array(running_median)
+	bad = np.isfinite(running_median) == 0
+	running_median[bad] = 0
+	plt.plot(bins,running_median,'r--',lw=2,alpha=.8)
 
-	ax.set_ylabel('(obs-model)/obs')
-	ax.set_xlabel('observed wavelength')
-	ax.set_ylim(-0.6,0.6)
-	plt.savefig(outdir+'residuals_by_obs.png', dpi=300)
+	ax.set_ylabel('(obs-model)/err')
+	ax.set_xlabel('rest-frame wavelength')
+	ax.set_ylim(-0.8,0.8)
+	plt.savefig(outdir+'residuals_by_err_restframe.png', dpi=300)
 	plt.close()
 	print 1/0
-
-
 
 
 
