@@ -2,7 +2,7 @@
 # script to replicate parameter file
 # for multiple galaxy IDs
 # set location of ID file, base parameter file
-IDFILE=$APPS"/threedhst_bsfh/data/COSMOS_testsamp.ids"
+IDFILE=$APPS"/threedhst_bsfh/data/COSMOS_gensamp.ids"
 PARAMBASE="dtau_genpop_params"
 PARAMEXT=".py"
 
@@ -23,7 +23,7 @@ do
   LINE=$(sed -n "${i}p" "$IDFILE")
   echo $LINE
   
-  # find line with "'objname': '9'", replace 9 with $i
+  # find line with "'objname': '15431'", replace 9 with $i
   sed -ie "s/\'objname\':\'15431\'/\'objname\':\'$LINE\'/g" $PARAMBASE"_$i"$PARAMEXT
   rm $PARAMBASE"_$i"$PARAMEXT"e"
 done
