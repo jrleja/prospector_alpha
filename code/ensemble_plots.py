@@ -168,14 +168,15 @@ def collate_output(runname,outname):
 		model_emline.append(sample_results['model_emline'])
 		ancildat.append(threed_dutils.load_ancil_data(os.getenv('APPS')+'/threedhst_bsfh/data/'+ancilname,
 			            							  sample_results['run_params']['objname']))
-	
+
 		print jj
 
 	print 'total galaxies: {0}, successful loads: {1}'.format(ngals,ngals-nfail)
 	print 'saving in {0}'.format(outname)
-
+	fastname = sample_results['run_params']['fastname']
 
 	output = {'outname': output_name,\
+			  'fastname': fastname,\
 			  'parname': np.concatenate([sample_results['model'].theta_labels(),sample_results['extras']['parnames']]),\
 		      'q16': q_16,\
 		      'q50': q_50,\
@@ -206,12 +207,30 @@ def plot_driver(runname):
 		ensemble=pickle.load(f)
 	
 	# get SFR_observed
-	sfr_obs = np.clip(np.array([x['sfr'][0] for x in ensemble['ancildat']]),1e-2,1e4)
+	sfrmin = 1e-2
+	sfrmax = 1e4
+	sfr_obs = np.clip(np.array([x['sfr'][0] for x in ensemble['ancildat']]),sfrmin,sfrmax)
 	z_sfr = np.array([x['z_sfr'] for x in ensemble['ancildat']])
 	valid_comp = ensemble['z'] > 0
 
+	# load FAST stuff
+	filename = '/threedhst_bsfh'+ensemble['fastname'].split('/threedhst_bsfh')[1]
+	fast,values = threed_dutils.load_fast_3dhst(os.getenv('APPS')+filename, None)
+	fastmass = fast[:,np.array(values)=='lmass'].reshape(fast.shape[0])
+	fastsfr  = 10**fast[:,np.array(values)=='lsfr'].reshape(fast.shape[0])
+	fastav   = fast[:,np.array(values)=='Av'].reshape(fast.shape[0])
+	
+	# get FAST halphas
+	fhalpha = np.zeros(len(fastsfr))
+	for kk in xrange(len(fastsfr)):
+		synth_emlines = threed_dutils.synthetic_emlines(10**fastmass[kk],fastsfr[kk],0.0,fastav[kk],None)
+		fhalpha[kk]   = np.log10(synth_emlines['flux'][0])
+
+	# format FAST
+	fastsfr = np.log10(np.clip(fastsfr,sfrmin,sfrmax))
+
 	# calculate tuniv
-	tuniv=WMAP9.age(ensemble['z'][valid_comp]).value*1.2
+	tuniv=WMAP9.age(ensemble['z'][valid_comp]).value
 
 	if np.sum(z_sfr-ensemble['z'][valid_comp]) != 0:
 		print "you got some redshift mismatches yo"
@@ -240,6 +259,11 @@ def plot_driver(runname):
 	logzsol = ensemble['q50'][ensemble['parname'] == 'logzsol'][0,valid_comp]
 	logzsolerrs = asym_errors(ensemble['q50'][ensemble['parname'] == 'logzsol'][0,valid_comp],ensemble['q84'][ensemble['parname'] == 'logzsol'][0,valid_comp],ensemble['q16'][ensemble['parname'] == 'logzsol'][0,valid_comp])
 
+	sfr_100 = np.log10(np.clip(ensemble['q50'][ensemble['parname'] == 'sfr_100'][0],sfrmin,sfrmax))
+	sfr_100errs = np.array(asym_errors(np.clip(ensemble['q50'][ensemble['parname'] == 'sfr_100'][0],sfrmin,sfrmax),
+		                               np.clip(ensemble['q84'][ensemble['parname'] == 'sfr_100'][0],sfrmin,sfrmax),
+		                               np.clip(ensemble['q16'][ensemble['parname'] == 'sfr_100'][0],sfrmin,sfrmax),log=True))
+
 	try:
 		tau = np.log10(np.clip(tuniv-ensemble['q50'][ensemble['parname'] == 'tau'][0,valid_comp],1e-2,1e50))
 		tauerrs = asym_errors(np.clip(tuniv-ensemble['q50'][ensemble['parname'] == 'tau'][0,valid_comp],1e-4,1e50),np.clip(tuniv-ensemble['q84'][ensemble['parname'] == 'tau'][0,valid_comp],1e-4,1e50),np.clip(tuniv-ensemble['q16'][ensemble['parname'] == 'tau'][0,valid_comp],1e-4,1e50),log=True)
@@ -251,28 +275,34 @@ def plot_driver(runname):
 			  logzsol,\
 	          logzsol,\
 	          logzsol,\
-	          np.log10(ensemble['q50'][ensemble['parname'] == 'sfr_100'][0]),\
-	          np.log10(ensemble['q50'][ensemble['parname'] == 'sfr_100'][0]),\
+	          sfr_100,\
+	          sfr_100,\
 	          mass,\
 	          np.log10(ensemble['q50'][ensemble['parname'] == 'ssfr_100'][0]),\
 	          np.log10(sfr_obs),\
 	          np.log10(sfr_obs),\
 	          np.log10(np.clip(np.array([x['q50'][x['name'] == 'Halpha'] for x in ensemble['model_emline']]),minmodel_flux,1e50)),
-	          np.log10(lobs_halpha)
+	          np.log10(lobs_halpha),\
+	          fastmass[valid_comp],\
+	          fastsfr[valid_comp],
+	          fhalpha[valid_comp]\
 	          ]
 
 	x_err  = [masserrs,\
 			  logzsolerrs,\
 			  logzsolerrs,\
 			  logzsolerrs,\
-			  asym_errors(ensemble['q50'][ensemble['parname'] == 'sfr_100'][0],ensemble['q84'][ensemble['parname'] == 'sfr_100'][0],ensemble['q16'][ensemble['parname'] == 'sfr_100'][0],log=True),\
-			  asym_errors(ensemble['q50'][ensemble['parname'] == 'sfr_100'][0],ensemble['q84'][ensemble['parname'] == 'sfr_100'][0],ensemble['q16'][ensemble['parname'] == 'sfr_100'][0],log=True),\
+			  sfr_100errs,\
+			  sfr_100errs,\
 			  masserrs,\
 			  asym_errors(ensemble['q50'][ensemble['parname'] == 'ssfr_100'][0],ensemble['q84'][ensemble['parname'] == 'ssfr_100'][0],ensemble['q16'][ensemble['parname'] == 'sfr_100'][0],log=True),\
 			  None,\
 			  None,\
 			  asym_errors(np.clip(np.array([x['q50'][x['name'] == 'Halpha'] for x in ensemble['model_emline']]),minmodel_flux,1e50),np.clip(np.array([x['q84'][x['name'] == 'Halpha'] for x in ensemble['model_emline']]),minmodel_flux,1e50),np.clip(np.array([x['q16'][x['name'] == 'Halpha'] for x in ensemble['model_emline']]),minmodel_flux,1e50),log=True),\
-			  asym_errors(lobs_halpha,lobs_halpha+lobs_halpha_err,lobs_halpha-lobs_halpha_err,log=True)\
+			  asym_errors(lobs_halpha,lobs_halpha+lobs_halpha_err,lobs_halpha-lobs_halpha_err,log=True),\
+			  None,\
+			  None,\
+			  None\
 			 ]
 
 	x_labels = [r'log(M) [M$_{\odot}$]',
@@ -286,35 +316,44 @@ def plot_driver(runname):
 	            r'log(SFR$_{obs}$) [M$_{\odot}$/yr]',
 	            r'log(SFR$_{obs}$) [M$_{\odot}$/yr]',
 	            r'log(H$\alpha$ flux) [model]',
-	            r'log(H$\alpha$ lum) [obs]'
+	            r'log(H$\alpha$ lum) [obs]',
+	            r'log(M$_{FAST}$) [M$_{\odot}$]',
+	            r'log(SFR$_{FAST}$) [M$_{\odot}$/yr]',
+	            r'log(H$_{\alpha,FAST}$) [cgs]'
 	            ]
 
 	y_data = [logzsol,\
-			  np.log10(ensemble['q50'][ensemble['parname'] == 'sfr_100'][0,valid_comp]),\
+			  sfr_100[valid_comp],\
 			  ensemble['q50'][ensemble['parname'] == 'dust_index'][0,valid_comp],\
 	          ensemble['q50'][ensemble['parname'] == 'half_time'][0,valid_comp],\
 	          ensemble['q84'][ensemble['parname'] == 'half_time'][0]-ensemble['q16'][ensemble['parname'] == 'half_time'][0],\
 	          ensemble['q50'][ensemble['parname'] == 'half_time'][0],\
-	          np.log10(ensemble['q50'][ensemble['parname'] == 'sfr_100'][0,valid_comp]),\
+	          sfr_100[valid_comp],\
 	          ensemble['q84'][ensemble['parname'] == 'half_time'][0]-ensemble['q16'][ensemble['parname'] == 'half_time'][0],\
-	          np.log10(ensemble['q50'][ensemble['parname'] == 'sfr_100'][0,valid_comp]),\
-	          np.log10(ensemble['q50'][ensemble['parname'] == 'sfr_1000'][0]),\
+	          sfr_100[valid_comp],\
+	          np.log10(ensemble['q50'][ensemble['parname'] == 'sfr_1000'][0,valid_comp]),\
 	          tau,\
-	          np.log10(sfr_obs)\
+	          np.log10(sfr_obs),\
+	          mass,\
+	          sfr_100[valid_comp],\
+	          np.log10(lobs_halpha)
 	          ]
 
 	y_err  = [logzsolerrs,\
-			  asym_errors(ensemble['q50'][ensemble['parname'] == 'sfr_100'][0,valid_comp],ensemble['q84'][ensemble['parname'] == 'sfr_100'][0,valid_comp],ensemble['q16'][ensemble['parname'] == 'sfr_100'][0,valid_comp],log=True),\
+			  sfr_100errs[:,valid_comp],\
 			  asym_errors(ensemble['q50'][ensemble['parname'] == 'dust_index'][0,valid_comp],ensemble['q84'][ensemble['parname'] == 'dust_index'][0,valid_comp],ensemble['q16'][ensemble['parname'] == 'dust_index'][0,valid_comp],log=False),\
 			  None,\
 			  None,\
 			  asym_errors(ensemble['q50'][ensemble['parname'] == 'half_time'][0],ensemble['q84'][ensemble['parname'] == 'half_time'][0],ensemble['q16'][ensemble['parname'] == 'half_time'][0]),\
-			  asym_errors(ensemble['q50'][ensemble['parname'] == 'sfr_100'][0,valid_comp],ensemble['q84'][ensemble['parname'] == 'sfr_100'][0,valid_comp],ensemble['q16'][ensemble['parname'] == 'sfr_100'][0,valid_comp],log=True),\
+			  sfr_100errs[:,valid_comp],\
 			  None,\
-			  asym_errors(ensemble['q50'][ensemble['parname'] == 'sfr_100'][0,valid_comp],ensemble['q84'][ensemble['parname'] == 'sfr_100'][0,valid_comp],ensemble['q16'][ensemble['parname'] == 'sfr_100'][0,valid_comp],log=True),\
-			  asym_errors(ensemble['q50'][ensemble['parname'] == 'sfr_1000'][0],ensemble['q84'][ensemble['parname'] == 'sfr_1000'][0],ensemble['q16'][ensemble['parname'] == 'sfr_1000'][0],log=True),\
+			  sfr_100errs[:,valid_comp],\
+			  asym_errors(ensemble['q50'][ensemble['parname'] == 'sfr_1000'][0,valid_comp],ensemble['q84'][ensemble['parname'] == 'sfr_1000'][0,valid_comp],ensemble['q16'][ensemble['parname'] == 'sfr_1000'][0,valid_comp],log=True),\
 			  tauerrs,\
-			  None\
+			  None,\
+			  masserrs,\
+			  sfr_100errs[:,valid_comp],\
+			  asym_errors(lobs_halpha,lobs_halpha+lobs_halpha_err,lobs_halpha-lobs_halpha_err,log=True)\
 			 ]
 
 	y_labels = [r'log(Z$_{\odot}$)',
@@ -329,6 +368,9 @@ def plot_driver(runname):
 	            r'log(SFR$_{mcmc,1000}$) [M$_{\odot}$/yr]',
 	            r'log($\tau$/Gyr)',
 	            r'log(SFR$_{obs}$) [M$_{\odot}$/yr]',
+	            r'log(M$_{PROSP}$) [M$_{\odot}$]',
+	            r'log(SFR$_{PROSP}$) [M$_{\odot}$/yr]',
+	            r'log(H$_{\alpha,obs}$) [M$_{\odot}$/yr]'
 	            ]
 
 	plotname = ['mass_metallicity',
@@ -342,7 +384,10 @@ def plot_driver(runname):
 				'sfrobs_sfrmcmc100',
 				'sfrobs_sfrmcmc1000',
 				'modelemline_tau',
-				'obsemline_sfrobs'
+				'obsemline_sfrobs',
+				'fastmass_comp',
+				'fastsfr_comp',
+				'fasthalpha_comp'
 				]
 
 	assert len(plotname) == len(y_labels) == len(y_err) == len(y_data), 'improper number of y data'
@@ -378,7 +423,12 @@ def plot_driver(runname):
 			    ))
 
 		# make sure comparison plot is 1:1
-		if x_labels[jj] == r'log(SFR$_{obs}$) [M$_{\odot}$/yr]' or x_labels[jj] == r'log(sSFR$_{obs}$) [yr$^{-1}$]':
+		if x_labels[jj] == r'log(SFR$_{obs}$) [M$_{\odot}$/yr]' or \
+		   x_labels[jj] == r'log(sSFR$_{obs}$) [yr$^{-1}$]' or \
+		   x_labels[jj] == r'log(M$_{FAST}$) [M$_{\odot}$]' or \
+		   x_labels[jj] == r'log(SFR$_{FAST}$) [M$_{\odot}$/yr]' or \
+		   x_labels[jj] == r'log(H$_{\alpha,FAST}$) [cgs]':
+
 			if np.nanmin(x_data[jj])-dynx > np.nanmin(y_data[jj])-dyny:
 				min = np.nanmin(y_data[jj])-dyny*3
 			else:
@@ -546,7 +596,7 @@ def lir_comp(runname, lum=True, mjy=False):
 	plt.savefig(outname_errs+'.png', dpi=300)
 	plt.close()
 
-def emline_comparison(runname,emline_base='Halpha', chain_emlines=False):
+def emline_comparison(runname,emline_base='Halpha', chain_emlines='emp_ha'):
 	inname = os.getenv('APPS')+'/threedhst_bsfh/results/'+runname+'/'+runname+'_ensemble.pickle'
 	outname_errs = os.getenv('APPS') + '/threedhst_bsfh/plots/ensemble_plots/'+runname+'/emline_comp_kscalc_'+emline_base+'_'
 
