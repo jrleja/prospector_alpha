@@ -12,11 +12,34 @@ plt_chain_figure = 1
 plt_triangle_plot = 1
 plt_sed_figure = 1
 
+def plot_sfh_fast(tau,tage,mass,tuniv=None):
+
+	'''
+	version of plot_sfh, but only for FAST outputs
+	this means no chain sampling, and simple tau rather than delayed tau models
+	if we specify tuniv, return instead (tuniv-t)
+	'''
+	
+	t=np.linspace(0,tage,num=50)
+	sfr = np.exp(-t/tau)
+	sfr_int = mass/np.sum(sfr * (t[1]-t[0])*1e9)  # poor man's integral, integrate f*yrs
+	sfr = sfr * sfr_int
+
+	if tuniv:
+		t = tuniv-t
+		t = t[::-1]
+
+	return t,sfr
+
 def plot_sfh(sample_results,nsamp=1000,ncomp=2):
 
 	'''
 	create sfh for plotting purposes
 	input: str_sfh_parms = ['tage','tau','sf_start']
+	returns: time-vector, plus SFR(t), where SFR is in units of Gyr^-1 (normalize by mass to get true SFR)
+	SFR(t) = [len(TIME),len(COMPONENTS)+1,3]
+	the 0th vector is total sfh, 1st is 1st component, etc
+	third dimension is [q16,q50,q84]
 	'''
 
 	# find SFH parameters that are variables in the chain
@@ -36,6 +59,7 @@ def plot_sfh(sample_results,nsamp=1000,ncomp=2):
 	# initialize output variables
 	nt = 50
 	intsfr = np.zeros(shape=(nsamp,nt,ncomp+1))
+	deltat=0.001
 
 	for mm in xrange(nsamp):
 
@@ -55,15 +79,19 @@ def plot_sfh(sample_results,nsamp=1000,ncomp=2):
 			t=np.linspace(0,np.max(tage),num=50)
 
 		totmass = np.sum(mass)
-		for jj in xrange(nt): intsfr[mm,jj,0] = threed_dutils.integrate_sfh(t[jj]-0.001,t[jj],mass,
-		                                                                    tage,tau,sf_start)
+		for jj in xrange(nt): intsfr[mm,jj,0] = threed_dutils.integrate_sfh(t[jj]-deltat,t[jj],mass,
+		                                                                    tage,tau,sf_start)*totmass/(deltat*1e9)
 		for kk in xrange(ncomp):
-			for jj in xrange(nt): intsfr[mm,jj,kk+1] = threed_dutils.integrate_sfh(t[jj]-0.001,t[jj],mass[kk],
-	                                                                    tage[kk],tau[kk],sf_start[kk])*mass[kk]/totmass
+			for jj in xrange(nt): intsfr[mm,jj,kk+1] = threed_dutils.integrate_sfh(t[jj]-deltat,t[jj],mass[kk],
+	                                                                    tage[kk],tau[kk],sf_start[kk])*mass[kk]/(deltat*1e9)
 
 	q = np.zeros(shape=(nt,ncomp+1,3))
 	for kk in xrange(ncomp+1):
 		for jj in xrange(nt): q[jj,kk,:] = np.percentile(intsfr[:,jj,kk],[16.0,50.0,84.0])
+
+	# check to see if (SFH1 + SFH2) == SFHTOT [should it?]
+	#if (np.abs(intsfr[:,0,1] - intsfr[:,1,1]-intsfr[:,2,1]) > intsfr[:,0,1]*0.001).any():
+	#	print 1/0
 
 	return t, q
 
@@ -80,7 +108,7 @@ def create_plotquant(sample_results, logplot = ['mass', 'tau', 'tage', 'sf_start
 	# properly define timescales in certain parameters
 	# will have to redefine after inserting p(z)
 	# note that we switch prior min/max here!!
-	tuniv = WMAP9.age(sample_results['model'].config_list[0]['init']).value*1.2
+	tuniv = WMAP9.age(sample_results['model'].params['zred'][0]).value
 	redefine = ['sf_start']
 
 	# check for multiple stellar populations
@@ -246,10 +274,7 @@ def show_chain(sample_results,outname=None,alpha=0.6):
 			axarr[jj+1,ii].set_yticklabels([])
 
 		testable = np.isfinite(sample_results['lnprobability'])
-		try:
-			max = np.amax(sample_results['lnprobability'][testable])
-		except ValueError:
-			print 1/0
+		max = np.amax(sample_results['lnprobability'][testable])
 		stddev = np.std(sample_results['lnprobability'][testable])
 		axarr[jj+1,ii].set_ylim(max-stddev, max)
 		
@@ -285,7 +310,7 @@ def comp_samples(thetas, sample_results, sps, inlog=True, photflag=0):
 
 def sed_figure(sample_results, sps, model,
                 alpha=0.3, samples = [-1],
-                maxprob=0, outname=None, plot_init = 0,
+                maxprob=0, outname=None, plot_init = 0, fast=True,
                 **kwargs):
 	"""
 	Plot the photometry for the model and data (with error bars), and
@@ -303,30 +328,8 @@ def sed_figure(sample_results, sps, model,
 	gs.update(hspace=0)
 	phot, res = plt.Subplot(fig, gs[0]), plt.Subplot(fig, gs[1])
 
-	# FLATTEN AND CHOP CHAIN
-	# chain = chain[nwalkers,nsteps,ndim]
+	# flatchain
 	flatchain = sample_results['flatchain']
-
-	# MAKE RANDOM POSTERIOR DRAWS
-	nsample = 5
-	ns = flatchain.shape[0] * flatchain.shape[1]
-	samples = np.random.uniform(0, 1, size=nsample)
-	sample = [int(s * ns) for s in samples]
-		
-	thetas = [flatchain[s,:] for s in samples]
-	mwave, mospec, mounc, specvecs = comp_samples(thetas, sample_results, sps, photflag=1)
-
-	# define observations
-	xplot = np.log10(mwave)
-	yplot = np.log10(mospec*(c/(mwave/1e10)))
-	linerr_down = np.clip(mospec-mounc, 1e-80, 1e80)*(c/(mwave/1e10))
-	linerr_up = np.clip(mospec+mounc, 1e-80, 1e80)*(c/(mwave/1e10))
-	yerr = [yplot - np.log10(linerr_down), np.log10(linerr_up)-yplot]
-
-	# set up plot limits
-	phot.set_xlim(min(xplot)*0.9,max(xplot)*1.04)
-	phot.set_ylim(min(yplot[np.isfinite(yplot)])*0.7,max(yplot[np.isfinite(yplot)])*1.04)
-	res.set_xlim(min(xplot)*0.9,max(xplot)*1.04)
 
 	# plot max probability model
 	mwave, mospec, mounc, specvecs = comp_samples([sample_results['quantiles']['maxprob_params']], sample_results, sps, photflag=1)
@@ -339,6 +342,18 @@ def sed_figure(sample_results, sps, model,
 		     color='#e60000', marker='o', linestyle=' ', label='max lnprob', 
 		     ms=ms,alpha=alpha,markeredgewidth=0.7,**kwargs)
 	
+	# define observations
+	xplot = np.log10(mwave)
+	yplot = np.log10(mospec*(c/(mwave/1e10)))
+	linerr_down = np.clip(mospec-mounc, 1e-80, 1e80)*(c/(mwave/1e10))
+	linerr_up = np.clip(mospec+mounc, 1e-80, 1e80)*(c/(mwave/1e10))
+	yerr = [yplot - np.log10(linerr_down), np.log10(linerr_up)-yplot]
+
+	# set up plot limits
+	phot.set_xlim(min(xplot)*0.9,max(xplot)*1.04)
+	phot.set_ylim(min(yplot[np.isfinite(yplot)])*0.7,max(yplot[np.isfinite(yplot)])*1.04)
+	res.set_xlim(min(xplot)*0.9,max(xplot)*1.04)
+
 	# add most likely spectrum
 	spec,_,w = model.mean_model(sample_results['quantiles']['maxprob_params'], sample_results['obs'], sps=sps)
 	nz = spec > 0
@@ -350,11 +365,30 @@ def sed_figure(sample_results, sps, model,
 	phot.errorbar(xplot, yplot, yerr=yerr,
                   color='#545454', marker='o', label='observed', alpha=alpha, linestyle=' ',ms=ms)
 	
+
+	# plot best-fit FAST model
+	if fast:
+		fastcolor='#00CCFF'
+		f_filename = os.getenv('APPS')+'/threedhst_bsfh'+sample_results['run_params']['fastname'].split('/threedhst_bsfh')[1]
+		f_objname  = sample_results['run_params']['objname']
+		fspec,fmags,fw,fastparms,fastfields=threed_dutils.return_fast_sed(f_filename,f_objname, sps=sps, obs=sample_results['obs'], dustem = False)
+		nz = fspec > 0
+
+		phot.plot(np.log10(fw[nz]), np.log10(fspec[nz]*(c/(fw[nz]/1e10))), linestyle='-',
+	              color=fastcolor, alpha=0.6,zorder=-1)
+
+		fwave = sample_results['obs']['wave_effective']
+		phot.plot(np.log10(fwave), np.log10(fmags*(c/(fwave/1e10))), 
+			     color=fastcolor, marker='o', linestyle=' ', label='fast', 
+			     ms=ms,alpha=alpha,markeredgewidth=0.7,zorder=-1)
+
 	# add SFH plot
-	t, perc = plot_sfh(sample_results, ncomp=sample_results['ncomp'])
-	perc = np.clip(np.log10(perc),-5.5,5000)
+	t, perc = plot_sfh(sample_results, ncomp=sample_results.get('ncomp',2))
+	minsfr = 0.005
+	maxsfr = 10000
+	perc = np.log10(np.clip(perc,minsfr,maxsfr))
 	axfontsize=4
-	ax_inset=fig.add_axes([0.17,0.36,0.12,0.14],zorder=32)
+	ax_inset=fig.add_axes([0.2,0.35,0.12,0.14],zorder=32)
 	
 	# plot whole SFH
 	ax_inset.plot(t, perc[:,0,1],'-',color='black')
@@ -364,9 +398,29 @@ def sed_figure(sample_results, sps, model,
 		ax_inset.plot(t, perc[:,aa,1],'-',color=colors[aa-1],alpha=0.4)
 		ax_inset.text(0.08,0.83-0.07*(aa-1), 'tau'+str(aa),transform = ax_inset.transAxes,color=colors[aa-1],fontsize=axfontsize*1.4)
 
+	# FAST SFH
+	if fast:
+		ltau = 10**fastparms[fastfields=='ltau'][0]/1e9
+		lage = 10**fastparms[fastfields=='lage'][0]/1e9
+		fmass = 10**fastparms[fastfields=='lmass'][0]
+		tuniv = WMAP9.age(fastparms[fastfields=='z'][0]).value
+
+		tf, pf = plot_sfh_fast(ltau,lage,fmass,tuniv)
+		pf = np.log10(np.clip(pf,minsfr,maxsfr))
+		ax_inset.plot(tf, pf,'-',color='k')
+		ax_inset.plot(tf, pf,'-',color=fastcolor,alpha=1.0,linewidth=0.75)
+		ax_inset.text(0.08,0.83-0.07*(perc.shape[1]-1), 'fast',transform = ax_inset.transAxes,color=fastcolor,fontsize=axfontsize*1.4)
+		
+		# for setting limits
+		# WARNING: THIS IS A HACK
+		# possible since not using q16 part of perc
+		perc[:,0,0] = pf
+
+
+	dynrange = (np.max(perc)-np.min(perc))*0.1
 	axlim_sfh=[np.min(t),
 	           np.max(t)+0.08*(np.max(t)-np.min(t)),
-	           np.min(perc)*0.98,np.max(perc)*1.02]
+	           np.min(perc)-dynrange,np.max(perc)+dynrange]
 	ax_inset.axis(axlim_sfh)
 
 	ax_inset.set_ylabel('log(SFH)',fontsize=axfontsize,weight='bold')
@@ -383,12 +437,12 @@ def sed_figure(sample_results, sps, model,
 		img=mpimg.imread(os.getenv('APPS')+
 		                 '/threedhst_bsfh/data/RGB_v4.0_field/'+
 		                 field.lower()+'_'+objnum+'_vJH_6.png')
-		ax_inset2=fig.add_axes([0.155,0.51,0.15,0.15],zorder=32)
+		ax_inset2=fig.add_axes([0.31,0.34,0.15,0.15],zorder=32)
 		ax_inset2.imshow(img)
 		ax_inset2.set_axis_off()
 	except:
 		print 'no RGB image'
-	
+
 	# calculate reduced chi-squared
 	chisq=np.sum(specvecs[0][-1]**2)
 	ndof = np.sum(sample_results['obs']['phot_mask']) - len(sample_results['model'].free_params)-1
@@ -404,13 +458,38 @@ def sed_figure(sample_results, sps, model,
 	phot.text(textx, texty-deltay, r'avg acceptance='+"{:.2f}".format(np.mean(sample_results['acceptance'])),
 				 fontsize=10, ha='right')
 		
+	# FAST text
+	if fast:
+		textx_f = (phot.get_xlim()[1]-phot.get_xlim()[0])*0.42+phot.get_xlim()[0]
+		totmass = np.log10(np.sum(sample_results['quantiles']['maxprob_params'][0:2]))
+		av    = threed_dutils.av_to_dust2(fastparms[fastfields=='Av'])[0]
+		zf    = fastparms[fastfields=='z'][0]
+
+		taucolor='black'
+		tagecolor='black'
+		if ltau < 0.1:
+			taucolor='red'
+		if lage < 0.1:
+			tagecolor='red'
+
+		phot.text(textx_f, texty, r'M$_{fast}$='+"{:.3f}".format(np.log10(fmass))+' ('+"{:.3f}".format(totmass)+')',
+			  fontsize=10)
+		phot.text(textx_f, texty-deltay, 'Av='+"{:.3f}".format(av),
+			  fontsize=10)
+		phot.text(textx_f, texty-deltay*2, r'$\tau$='+"{:.3f}".format(ltau),
+			  fontsize=10,color=taucolor)
+		phot.text(textx_f, texty-deltay*3, 'tage='+"{:.3f}".format(lage),
+			  fontsize=10,color=tagecolor)
+		phot.text(textx_f, texty-deltay*4, 'z='+"{:.3f}".format(zf),
+			  fontsize=10)
+
 	# load ancil data
 	if 'ancilname' not in sample_results['run_params'].keys():
 		sample_results['run_params']['ancilname'] = os.getenv('APPS')+'/threedhst_bsfh/data/COSMOS_testsamp.dat'
 	ancildat = threed_dutils.load_ancil_data(os.getenv('APPS')+'/threedh'+sample_results['run_params']['ancilname'].split('/threedh')[1],sample_results['run_params']['objname'])
 	sn_txt = ancildat['sn_F160W'][0]
 	uvj_txt = ancildat['uvj_flag'][0]
-	z_txt = ancildat['z'][0]
+	z_txt = sample_results['model'].params['zred'][0]
 		
 	# galaxy text
 	phot.text(textx, texty-2*deltay, 'z='+"{:.2f}".format(z_txt),
@@ -457,6 +536,7 @@ def sed_figure(sample_results, sps, model,
 	if outname is not None:
 		fig.savefig(outname, bbox_inches='tight', dpi=300)
 		plt.close()
+	#os.system('open '+outname)
 
 def make_all_plots(filebase=None, parm_file=None, 
 				   outfolder=os.getenv('APPS')+'/threedhst_bsfh/plots/',
@@ -547,7 +627,8 @@ def plot_all_driver():
 	for a list of galaxies, make all plots
 	'''
 
-	runname = 'stau_intmet'
+	runname = 'dtau_intmet'
+	runname = 'dtau_genpop'
 
 	filebase, parm_basename, ancilname=threed_dutils.generate_basenames(runname)
 	for jj in xrange(len(filebase)):
