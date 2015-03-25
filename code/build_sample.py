@@ -33,6 +33,9 @@ def load_linelist(field='COSMOS'):
 		      [-99.0]*len(dat),
 		      [-99.0]*len(dat)],
 	          names=('id','zgris','zbest','use_grism1','s0','s1'))
+
+	# include only these lines
+	good_lines = ['Ha', 'OIII', 'OIIIx', 'OII']
 	for jj in xrange(len(dat)):
 		
 		# no spectrum
@@ -71,9 +74,11 @@ def load_linelist(field='COSMOS'):
 				linedat=np.array(linedat.reshape(1),dtype=linedat.dtype)
 	        
 			for kk in xrange(linedat.size): #for each line
-				if linedat['line'][kk]+'_flux' not in t.keys(): #check for existing column names
-					for name in linedat.dtype.names[1:]: t[linedat['line'][kk]+'_'+name] = [-99.0]*len(t)
-				for name in linedat.dtype.names[1:]: t[jj][linedat['line'][kk]+'_'+name] = linedat[name][kk]
+				if linedat['line'][kk] in good_lines: # only include lines we're interested in
+					if linedat['line'][kk]+'_flux' not in t.keys(): #check for existing column names
+							for line in good_lines: # only add lines we're intersetd in!
+								for name in linedat.dtype.names[1:]: t[line+'_'+name] = [-99.0]*len(t)
+					for name in linedat.dtype.names[1:]: t[jj][linedat['line'][kk]+'_'+name] = linedat[name][kk]
 
 	# convert to rest-frame eqw
 	for key in t.keys():
@@ -156,7 +161,6 @@ def build_sample_general():
 	uvj_flag = calc_uvj_flag(rf)
 	sn_F160W = phot['f_F160W']/phot['e_F160W']
 	Ha_EQW_obs = lineinfo['Ha_EQW_obs']
-	fast['z'] = lineinfo['zbest']
 	lineinfo.rename_column('zgris' , 'z')
 	lineinfo['uvj_flag'] = uvj_flag
 	lineinfo['sn_F160W'] = sn_F160W
@@ -172,6 +176,7 @@ def build_sample_general():
 	random_index = random.sample(xrange(len(selection)), 108)
 	fast_out = fast[selection][random_index]
 	phot_out = phot[selection][random_index]
+	lineinfo = lineinfo[selection][random_index]
 	
 	ascii.write(phot_out, output=phot_str_out, 
 	            delimiter=' ', format='commented_header')
@@ -181,7 +186,7 @@ def build_sample_general():
 	ascii.write(lineinfo, output=ancil_str_out, 
 	            delimiter=' ', format='commented_header')
 	ascii.write([np.array(phot_out['id'],dtype='int')], output=id_str_out, Writer=ascii.NoHeader)
-
+	print 1/0
 
 def build_sample_halpha():
 
@@ -223,7 +228,6 @@ def build_sample_halpha():
 	uvj_flag = calc_uvj_flag(rf)
 	sn_F160W = phot['f_F160W']/phot['e_F160W']
 	Ha_EQW_obs = lineinfo['Ha_EQW_obs']
-	fast['z'] = lineinfo['zgris']
 	lineinfo.rename_column('zgris' , 'z')
 	lineinfo['uvj_flag'] = uvj_flag
 	lineinfo['sn_F160W'] = sn_F160W
@@ -242,6 +246,7 @@ def build_sample_halpha():
 	random_index = random.sample(xrange(np.sum(selection)), 108)
 	fast_out = fast[selection][random_index]
 	phot_out = phot[selection][random_index]
+	lineinfo = lineinfo[selection][random_index]
 	
 	# variables
 	#n_per_bin = 3
