@@ -66,7 +66,7 @@ def synthetic_emlines(mass,sfr,dust1,dust2,dust_index):
 	emlines = np.array(['Halpha','Hbeta','Hgamma','[OIII]', '[NII]','[OII]'])
 	lam     = np.array([6563,4861,4341,5007,6583,3727])
 	flux    = np.zeros(shape=(len(lam),len(np.atleast_1d(mass))))
-    
+
 	# calculate Halpha luminosity from KS relationship
 	# comes out in units of [ergs/s]
 	# correct from Chabrier to Salpeter with a factor of 1.7
@@ -103,10 +103,18 @@ def synthetic_emlines(mass,sfr,dust1,dust2,dust_index):
 	flux[5,:] = (1.0/ratio)*flux[0,:]
 
 	# correct for dust
-	tau2 = ((lam.reshape(len(lam),1)/5500.)**dust_index)*dust2
-	tau1 = ((lam.reshape(len(lam),1)/5500.)**dust_index)*dust1
-	tautot = tau2+tau1
-	flux = flux*np.exp(-tautot)
+	# if dust_index == None, use Calzetti
+	if dust_index != None:
+		tau2 = ((lam.reshape(len(lam),1)/5500.)**dust_index)*dust2
+		tau1 = ((lam.reshape(len(lam),1)/5500.)**dust_index)*dust1
+		tautot = tau2+tau1
+		flux = flux*np.exp(-tautot)
+	else:
+		Rv   = 4.05
+		klam = 2.659*(-2.156+1.509/(lam/1e4)-0.198/(lam/1e4)**2+0.011/(lam/1e4)**3)+Rv
+		A_lam = klam/Rv*dust2
+
+		flux = flux[:,0]*10**(-0.4*A_lam)
 
 	# comes out in ergs/s
 	output = {'name': emlines,
@@ -133,6 +141,24 @@ def generate_basenames(runname):
 	filebase=[]
 	parm=[]
 	ancilname='COSMOS_testsamp.dat'
+
+	if runname == 'dtau_genpop':
+
+		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/COSMOS_gensamp.ids"
+		ids = np.loadtxt(id_list, dtype='|S20')
+		ngals = len(ids)
+
+		basename = "dtau_genpop"
+		parm_basename = "dtau_genpop_params"
+		ancilname='COSMOS_gensamp.dat'
+
+		for jj in xrange(ngals):
+			ancildat = load_ancil_data(os.getenv('APPS')+
+			                           '/threedhst_bsfh/data/COSMOS_gensamp.dat',
+			                           ids[jj])
+			heqw_txt = "%04d" % int(ancildat['Ha_EQW_obs']) 
+			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+basename+'_'+heqw_txt+'_'+ids[jj])
+			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
 
 
 	if runname == 'stau':
@@ -426,6 +452,80 @@ def load_obs_3dhst(filename, objnum, mips=None, min_error = None, abs_error=Fals
 
 	return obs
 
+def av_to_dust2(av):
+
+	# FSPS
+	# dust2: opacity at 5500 
+	# e.g., tau1 = (lam/5500)**dust_index)*dust1, and flux = flux*np.exp(-tautot)
+	# 
+	# Calzetti
+	# A_V = Rv (A_B - A_V)
+	# A_V = Rv*A_B / (1+Rv)
+	# Rv = 4.05
+	# 0.63um < lambda < 2.20um
+	#k = 2.659(-1.857+1.040/lam) + Rv
+	# 0.12um < lambda < 0.63um
+	#k = 2.659*(-2.156+1.509/lam - 0.198/(lam**2)+0.11/(lam**3))+Rv
+	# F(lambda) = Fobs(lambda)*10**(0.4*E(B-V)*k)
+
+	# eqn: 10**(0.4*E(B-V)*k) = np.exp(-tau), solve for opacity(Av)
+
+	# http://webast.ast.obs-mip.fr/hyperz/hyperz_manual1/node10.html
+	# A_5500 = k(lambda)/Rv * Av
+
+	# first, calculate Calzetti extinction at 5500 Angstroms
+	lam = 5500/1e4   # in microns
+	Rv   = 4.05
+	klam = 2.659*(-2.156+1.509/(lam)-0.198/(lam)**2+0.011/(lam)**3)+Rv
+	A_lam = klam/Rv*av
+
+	# now convert from extinction (fobs = fint * 10 ** -0.4*extinction)
+	# into opacity (fobs = fint * exp(-opacity)) [i.e, dust2]
+	#tau = -np.log(10**(-0.4*A_5500))
+	#return av
+	tau = av/1.086
+	tau = av/1.17
+	return tau
+
+	#return av
+
+def return_fast_sed(fastname,objname, sps=None, obs=None, dustem = False):
+
+	'''
+	give the fast parameters straight from the FAST out file
+	return observables with best-fit FAST parameters, main difference hopefully being stellar population models
+	'''
+
+	# load fast parameters
+	fast, fields = load_fast_3dhst(fastname, objname)
+	fields = np.array(fields)
+
+	# load fast model
+	param_file = os.getenv('APPS')+'/threedhst_bsfh/parameter_files/fast_mimic/fast_mimic.py'
+	model = model_setup.load_model(param_file)
+	parnames = np.array(model.theta_labels())
+
+	# feed parameters into model
+	model.params['zred']                   = np.array(fast[fields == 'z'])
+	model.initial_theta[parnames=='tage']  = np.clip(np.array((10**fast[fields == 'lage'])/1e9),0.101,10000)
+	model.initial_theta[parnames=='tau']   = np.array((10**fast[fields == 'ltau'])/1e9)
+	model.initial_theta[parnames=='dust2'] = np.array(av_to_dust2(fast[fields == 'Av']))
+	model.initial_theta[parnames=='mass']  = np.array(10**fast[fields == 'lmass'])
+
+	print 'z,tage,tau,dust2,mass'
+	print model.params['zred'],model.initial_theta[parnames=='tage'],model.initial_theta[parnames=='tau'],model.initial_theta[parnames=='dust2'],model.initial_theta[parnames=='mass']
+
+	# get dust emission, if desired
+	if dustem:
+		model.params['add_dust_emission']  = np.array(True)
+		model.params['add_agb_dust_model'] = np.array(True)
+
+
+	spec, mags, w = model.mean_model(model.initial_theta, obs, sps=sps, norm_spec=True)
+
+	return spec,mags,w,fast,fields
+
+
 def load_fast_3dhst(filename, objnum):
 	"""
 	Load FAST output for a particular object
@@ -439,9 +539,15 @@ def load_fast_3dhst(filename, objnum):
 
 	# extract field names, search for ID, pull out object info
 	fields = [f for f in dat.dtype.names]
-	id_ind = fields.index('id')
-	obj_ind = [int(x[id_ind]) for x in dat].index(int(objnum))
-	values = dat[fields].view(float).reshape(len(dat),-1)[obj_ind]
+	
+	
+	if objnum is None:
+		values = dat[fields].view(float).reshape(len(dat),-1)
+	else:
+		values = dat[fields].view(float).reshape(len(dat),-1)
+		id_ind = fields.index('id')
+		obj_ind = [int(x[id_ind]) for x in dat].index(int(objnum))
+		values = values[obj_ind]
 
 	return values, fields
 
