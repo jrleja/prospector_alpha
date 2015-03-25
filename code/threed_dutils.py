@@ -161,6 +161,23 @@ def generate_basenames(runname):
 			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
 
 
+	if runname == 'dtau_calzetti':
+
+		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/COSMOS_testsamp.ids"
+		ids = np.loadtxt(id_list, dtype='|S20')
+		ngals = len(ids)
+
+		basename = "dtau_calzetti"
+		parm_basename = "dtau_calzetti_params"
+
+		for jj in xrange(ngals):
+			ancildat = load_ancil_data(os.getenv('APPS')+
+			                           '/threedhst_bsfh/data/COSMOS_testsamp.dat',
+			                           ids[jj])
+			heqw_txt = "%04d" % int(ancildat['Ha_EQW_obs']) 
+			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+basename+'_'+heqw_txt+'_'+ids[jj])
+			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
+
 	if runname == 'stau':
 
 		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/COSMOS_testsamp.ids"
@@ -399,7 +416,7 @@ def load_obs_3dhst(filename, objnum, mips=None, min_error = None, abs_error=Fals
 	of the flux. if not set, use default errors.
 	"""
 	obs ={}
-	fieldname=filename.split('/')[-1].split('_')[0].upper()
+
 	with open(filename, 'r') as f:
 		hdr = f.readline().split()
 	dat = np.loadtxt(filename, comments = '#',
@@ -415,15 +432,7 @@ def load_obs_3dhst(filename, objnum, mips=None, min_error = None, abs_error=Fals
 	flux = dat[flux_fields].view(float).reshape(len(dat),-1)[obj_ind]
 	unc  = dat[unc_fields].view(float).reshape(len(dat),-1)[obj_ind]
 
-	# add mips
-	if mips:
-		mips_dat = load_mips_data(mips,objnum=objnum)
-		flux=np.append(flux,mips_dat['f24tot'])
-		unc=np.append(unc,mips_dat['ef24tot'])
-		filters.append('MIPS_24um')
-
 	# define all outputs
-	filters = [filter.lower()+'_'+fieldname.lower() for filter in filters]
 	wave_effective = np.array(return_mwave_custom(filters))
 	phot_mask = np.logical_or(np.logical_or((flux != unc),(flux > 0)),flux != -99.0)
 	maggies = flux/(10**10)

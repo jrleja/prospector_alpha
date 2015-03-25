@@ -164,6 +164,11 @@ def build_sample_general():
 	lineinfo.rename_column('zgris' , 'z')
 	lineinfo['uvj_flag'] = uvj_flag
 	lineinfo['sn_F160W'] = sn_F160W
+
+	# mips
+	phot['f_MIPS_24um'] = mips['f24tot']
+	phot['e_MIPS_24um'] = mips['ef24tot']
+
 	for i in xrange(len(mips.dtype.names)):
 		tempname=mips.dtype.names[i]
 		if tempname != 'z_best' and tempname != 'id':
@@ -178,6 +183,11 @@ def build_sample_general():
 	phot_out = phot[selection][random_index]
 	lineinfo = lineinfo[selection][random_index]
 	
+	# rename bands in photometric catalogs
+	for column in phot_out.colnames:
+		if column[:2] == 'f_' or column[:2] == 'e_':
+			phot_out.rename_column(column, column.lower()+'_'+field.lower())	
+
 	ascii.write(phot_out, output=phot_str_out, 
 	            delimiter=' ', format='commented_header')
 	ascii.write(fast_out, output=fast_str_out, 
@@ -231,6 +241,11 @@ def build_sample_halpha():
 	lineinfo.rename_column('zgris' , 'z')
 	lineinfo['uvj_flag'] = uvj_flag
 	lineinfo['sn_F160W'] = sn_F160W
+
+	# mips
+	phot['f_MIPS_24um'] = mips['f24tot']
+	phot['e_MIPS_24um'] = mips['ef24tot']
+
 	for i in xrange(len(mips.dtype.names)):
 		tempname=mips.dtype.names[i]
 		if tempname != 'z_best' and tempname != 'id':
@@ -248,6 +263,11 @@ def build_sample_halpha():
 	phot_out = phot[selection][random_index]
 	lineinfo = lineinfo[selection][random_index]
 	
+	# rename bands in photometric catalogs
+	for column in phot_out.colnames:
+		if column[:2] == 'f_' or column[:2] == 'e_':
+			phot_out.rename_column(column, column.lower()+'_'+field.lower())	
+
 	# variables
 	#n_per_bin = 3
 	#sn_bins = ((12,20),(20,100),(100,1e5))
@@ -286,28 +306,43 @@ def build_sample_halpha():
 	ascii.write([np.array(phot_out['id'],dtype='int')], output=id_str_out, Writer=ascii.NoHeader)
 
 def load_rachel_sample():
-	
 
 	loc = os.getenv('APPS')+'/threedhst_bsfh/data/bezanson_2015_disps.txt'
 	data = ascii.read(loc,format='cds') 
 	return data
 
+from itertools import compress, count, imap, islice
+from functools import partial
+from operator import eq
+
+def nth_item(n, item, iterable):
+
+	'''
+	indexing tool, used to match catalogs
+	'''
+
+	indicies = compress(count(), imap(partial(eq, item), iterable))
+	return next(islice(indicies, n, None), -1)
+
 def build_sample_dynamics():
 
 	'''
 	finds Rachel's galaxies in the threedhst catalogs
+	basically just matches on (ra, dec, mass), where distance < 2.5" and mass within 0.4 dex
+	this will FAIL if we have two identical IDs in UDS/COSMOS... unlikely but if used
+	in the future as a template for multi-field runs, beware!!!
 	'''
 
 	# output
 	field = ['COSMOS','UDS']
 	bez = load_rachel_sample()
 
-	for bb in xrange(len(field)):
+	fast_str_out = '/Users/joel/code/python/threedhst_bsfh/data/twofield_dynsamp.fout'
+	ancil_str_out = '/Users/joel/code/python/threedhst_bsfh/data/twofield_dynsamp.dat'
+	phot_str_out = '/Users/joel/code/python/threedhst_bsfh/data/twofield_dynsamp.cat'
+	id_str_out   = '/Users/joel/code/python/threedhst_bsfh/data/twofield_dynsamp.ids'
 
-		fast_str_out = '/Users/joel/code/python/threedhst_bsfh/data/'+field[bb]+'_dynsamp.fout'
-		ancil_str_out = '/Users/joel/code/python/threedhst_bsfh/data/'+field[bb]+'_dynsamp.dat'
-		phot_str_out = '/Users/joel/code/python/threedhst_bsfh/data/'+field[bb]+'_dynsamp.cat'
-		id_str_out   = '/Users/joel/code/python/threedhst_bsfh/data/'+field[bb]+'_dynsamp.ids'
+	for bb in xrange(len(field)):
 
 		# load data
 		# use grism redshift
@@ -330,9 +365,9 @@ def build_sample_dynamics():
 		morph = morph[good]
 
 		# matching parameters
-		matching_mass   = 10.5 #dex
-		matching_radius = 2.5 # arcseconds
-		matching_size   = 0.3 # percent
+		matching_mass   = 0.4 #dex
+		matching_radius = 3.0 # arcseconds
+		matching_size   = 100.5 # fractional difference
 		from astropy.cosmology import WMAP9
 		# note: converting to physical sizes, not comoving. I assume this is right.
 		arcsec_size = bez['Re']*WMAP9.arcsec_per_kpc_proper(bez['z']).value
@@ -344,19 +379,15 @@ def build_sample_dynamics():
 			catalog = ICRS(bez['RAdeg'][nn], bez['DEdeg'][nn], unit=(u.degree, u.degree))
 			close_mass = np.logical_and(
 				         (np.abs(fast['lmass']-bez[nn]['logM']) < matching_mass),
-			             (np.abs(morph['re']-arcsec_size[nn]/arcsec_size[nn]) < matching_size))
-			c = ICRS(phot['ra'][close_mass], phot['dec'][close_mass], unit=(u.degree, u.degree))
-			idx, d2d, d3d = catalog.match_to_catalog_sky(c)
-
+			             (np.abs((morph['re']-arcsec_size[nn])/arcsec_size[nn]) < matching_size))
+			threed_cat = ICRS(phot['ra'][close_mass], phot['dec'][close_mass], unit=(u.degree, u.degree))
+			idx, d2d, d3d = catalog.match_to_catalog_sky(threed_cat)
 			if d2d.value*3600 < matching_radius:
-				i = -1
-				for j in xrange(idx):
-					i = list(close_mass).index(True, i + 1)
-				matches[nn] = int(i)
+				matches[nn] = nth_item(idx,True,close_mass)
 				distance[nn] = d2d.value*3600
 		
 
-		# only accept matches within some matching radius
+		# print out relevant parameters for visual inspection
 		for kk in xrange(len(matches)):
 			if matches[kk] == -1:
 				continue
@@ -365,39 +396,56 @@ def build_sample_dynamics():
 			      morph[matches[kk]]['re'],arcsec_size[kk],\
 			      distance[kk]
 
-			# use rachel's redshifts
-			fast[matches[kk]]['z'] = bez[kk]['z']
-			fast[matches[kk]]['lmass'] = bez[kk]['logM']
-		
-		# generate output stuff
-		matches = matches[matches >= 0]
-
 		# define useful things
-		lineinfo.rename_column('zgris' , 'z')
 		lineinfo['uvj_flag'] = calc_uvj_flag(rf)
 		lineinfo['sn_F160W'] = phot['f_F160W']/phot['e_F160W']
 		lineinfo['sfr'] = mips['sfr']
 		lineinfo['z_sfr'] = mips['z_best']
+
+		# mips
+		phot['f_MIPS_24um'] = mips['f24tot']
+		phot['e_MIPS_24um'] = mips['ef24tot']
 		
+		# save rachel info
+		lineinfo_temp = lineinfo[matches[matches >= 0]]
+		bezind = matches > 0
+		for i in xrange(len(bez.dtype.names)):
+			tempname=bez.dtype.names[i]
+			if tempname != 'z' and tempname != 'ID' and tempname != 'Filter':
+				lineinfo_temp[tempname] = bez[bezind][tempname]
+			elif tempname == 'z':
+				lineinfo_temp['z_bez'] = bez[bezind][tempname]
+
+		matches = matches[matches >= 0]
+
+		# rename bands in photometric catalogs
+		for column in phot.colnames:
+			if column[:2] == 'f_' or column[:2] == 'e_':
+				phot.rename_column(column, column.lower()+'_'+field[bb].lower())		
+
 		if bb > 0:
-			phot_out = vstack([phot_out, phot[matches]])
-			fast_out = vstack([fast_out, fast[matches]])
-			rf_out = vstack([rf_out, rf[matches]])
-			lineinfo_out = vstack([lineinfo_out, lineinfo[matches]])
-			mips_out = vstack([mips_out,mips[matches]])
+			phot_out = vstack([phot_out, phot[matches]], join_type=u'outer')
+			fast_out = vstack([fast_out, fast[matches]],join_type=u'outer')
+			rf_out = vstack([rf_out, rf[matches]],join_type=u'outer')
+			lineinfo_out = vstack([lineinfo_out, lineinfo_temp],join_type=u'outer')
+			mips_out = vstack([mips_out,mips[matches]],join_type=u'outer')
 		else:
 			phot_out = phot[matches]
 			fast_out = fast[matches]
 			rf_out = rf[matches]
-			lineinfo_out = lineinfo[matches]
+			lineinfo_out = lineinfo_temp
 			mips_out = mips[matches]
 	
-	ascii.write(phot_out, output=phot_str_out, 
+	print 'n_galaxies = ' + str(len(phot_out))
+	
+	# note that we're filling masked values in the phot out with -99
+	# this means that COSMOS bands have -99 for UDS objects, and vice versa
+	ascii.write(phot_out.filled(-99), output=phot_str_out, 
 	            delimiter=' ', format='commented_header')
 	ascii.write(fast_out, output=fast_str_out, 
 	            delimiter=' ', format='commented_header',
 	            include_names=fast.keys()[:11])
-	ascii.write(lineinfo, output=ancil_str_out, 
+	ascii.write(lineinfo_out, output=ancil_str_out, 
 	            delimiter=' ', format='commented_header')
 	ascii.write([np.array(phot_out['id'],dtype='int')], output=id_str_out, Writer=ascii.NoHeader)
-	print 1/0		
+
