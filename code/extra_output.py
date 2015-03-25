@@ -9,7 +9,6 @@ from astropy import constants
 
 def calc_emp_ha(mass,tage,tau,sf_start,tuniv,dust2,dustindex,ncomp=1):
 
-	ncomp = len(mass)
 	ha_flux=0.0
 	oiii_flux=0.0
 	for kk in xrange(ncomp):
@@ -126,9 +125,14 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 		# calculate half-mass assembly time, sfr
 		half_time[jj] = halfmass_assembly_time(mass,tage,tau,sf_start,tuniv)
 
+		if np.sum(dust_index_index) > 0:
+			dindex = sample_results['flatchain'][jj,dust_index_index]
+		else:
+			dindex = None
+
 		# empirical halpha
 		emp_ha[jj],emp_oiii[jj] = calc_emp_ha(mass,tage,tau,sf_start,tuniv,
-			                                  sample_results['flatchain'][jj,dust2_index],sample_results['flatchain'][jj,dust_index_index],
+			                                  sample_results['flatchain'][jj,dust2_index],dindex,
 			                                  ncomp=sample_results['ncomp'])
 
 		# calculate sfr
