@@ -564,7 +564,7 @@ def dynsamp_plot(runname, scale=False):
 	ax_prosp.text(0.04,0.85, 'scatter='+"{:.2f}".format(scat)+' dex',transform = ax_prosp.transAxes,color='blue')
 	ax_prosp.text(0.04,0.8, 'mean offset='+"{:.2f}".format(mean_offset)+' dex',transform = ax_prosp.transAxes,color='blue')
 
-	print 1/0
+	plt.savefig(outname_cent,dpi=300)
 
 def photerr_plot(runname, scale=False):
 

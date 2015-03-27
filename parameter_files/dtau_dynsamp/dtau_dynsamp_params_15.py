@@ -273,7 +273,7 @@ model_params.append({'name': 'duste_qpah', 'N': 1,
 ###### Nebular Emission ###########
 model_params.append({'name': 'add_neb_emission', 'N': 1,
                         'isfree': False,
-                        'init': False,
+                        'init': 2,
                         'units': r'log Z/Z_\odot',
                         'prior_function_name': None,
                         'prior_args': None})
