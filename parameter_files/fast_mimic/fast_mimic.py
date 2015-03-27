@@ -33,14 +33,7 @@ run_params = {'verbose':True,
               'mipsname':os.getenv('APPS')+'/threedhst_bsfh/data/MIPS/cosmos_3dhst.v4.1.4.sfr',
               'objname':'15431',
               }
-
-############
-# OBS
-#############
-
-obs = threed_dutils.load_obs_3dhst(run_params['photname'], run_params['objname'],
-									mips=run_params['mipsname'], min_error=run_params['min_error'],
-                                    abs_error=run_params['abs_error'])
+              
 
 #############
 # MODEL_PARAMS
@@ -251,49 +244,3 @@ model_params.append({'name': 'phot_jitter', 'N': 1,
                         'units': 'mags',
                         'prior_function': tophat,
                         'prior_args': {'mini':0.0, 'maxi':0.2}})
-
-####### SET INITIAL PARAMETERS ##########
-fastvalues,fastfields = threed_dutils.load_fast_3dhst(run_params['fastname'],
-                                                      run_params['objname'])
-parmlist = [p['name'] for p in model_params]
-
-if run_params['set_init_params'] == 'fast':
-
-	# translate
-	fparams = {}
-	translate = {#'zred': ('z', lambda x: x),
-                 'tau':  ('ltau', lambda x: (10**x)/1e9),
-                 #'tage': ('lage', lambda x:  (10**x)/1e9),
-                 'dust2':('Av', lambda x: x),
-                 'mass': ('lmass', lambda x: (10**x))}
-	for k, v in translate.iteritems():		
-		fparams[k] = v[1](fastvalues[np.array(fastfields) == v[0]][0])
-
-	for par in model_params:
-		if (par['name'] in fparams):
-			par['init'] = fparams[par['name']]
-if run_params['set_init_params'] == 'random':
-	import random
-	for ii in xrange(len(model_params)):
-		if model_params[ii]['isfree'] == True:
-			max = model_params[ii]['prior_args']['maxi']
-			min = model_params[ii]['prior_args']['mini']
-			model_params[ii]['init'] = random.random()*(max-min)+min
-
-######## LOAD ANCILLARY INFORMATION ########
-# name outfiles based on halpha eqw
-ancildat = threed_dutils.load_ancil_data(run_params['ancilname'],run_params['objname'])
-halpha_eqw_txt = "%04d" % int(ancildat['Ha_EQW_obs'])
-run_params['outfile'] = run_params['outfile']+'_'+halpha_eqw_txt+'_'+run_params['objname']
-
-# use zbest, not whatever's in the fast run
-zbest = ancildat['z']
-model_params[parmlist.index('zred')]['init'] = zbest
-			
-####### RESET AGE PRIORS TO MATCH AGE OF UNIVERSE ##########
-tuniv = WMAP9.age(model_params[0]['init']).value
-
-# set tage
-# set max on sf_start
-model_params[parmlist.index('tage')]['init'] = np.zeros(len(np.atleast_1d(model_params[parmlist.index('tage')]['init'])))+tuniv
-model_params[parmlist.index('sf_start')]['prior_args']['maxi'] = np.zeros(len(np.atleast_1d(model_params[parmlist.index('sf_start')]['prior_args']['maxi'])))+ 0.9*tuniv

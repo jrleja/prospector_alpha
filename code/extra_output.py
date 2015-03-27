@@ -92,7 +92,8 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 	indexes = np.array(indexes,dtype='bool')
 
     # initialize output arrays for SFH parameters
-	nchain = sample_results['flatchain'].shape[0]
+	#nchain = sample_results['flatchain'].shape[0]
+	nchain = 2000
 	half_time,sfr_10,sfr_100,sfr_1000,ssfr_100,totmass,emp_ha,emp_oiii = [np.zeros(shape=(nchain)) for i in range(8)]
 
     # get constants for SFH calculation [MODEL DEPENDENT]
@@ -100,11 +101,15 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 	tuniv = WMAP9.age(z).value
 	deltat=[0.01,0.1,1.0] # in Gyr
     
-	##### TEMPORARY CALCULATION TO DO EMPIRICAL EMISSION LINES IN CHAIN ######
+	##### DO EMPIRICAL EMISSION LINES IN CHAIN ######
 	dust2_index = np.array([True if (x[:-sample_results['ncomp']] == 'dust2') or 
 		                            (x == 'dust2') else 
 		                            False for x in parnames])
 	dust_index_index = np.array([True if x == 'dust_index' else False for x in parnames])
+
+	# use randomized, flattened, thinned chain for posterior draws
+	flatchain = copy(sample_results['flatchain'])
+	np.random.shuffle(flatchain)
 
 	######## SFH parameters #########
 	for jj in xrange(nchain):
@@ -114,7 +119,7 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 		sfh_parms = []
 		for ll in xrange(len(str_sfh_parms)):
 			if np.sum(indexes[ll]) > 0:
-				sfh_parms.append(sample_results['flatchain'][jj,indexes[ll]])
+				sfh_parms.append(flatchain[jj,indexes[ll]])
 			else:
 				_ = [x['init'] for x in sample_results['model'].config_list if x['name'] == str_sfh_parms[ll]][0]
 				if len(np.atleast_1d(_)) != np.sum(indexes[0]):
@@ -126,13 +131,13 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 		half_time[jj] = halfmass_assembly_time(mass,tage,tau,sf_start,tuniv)
 
 		if np.sum(dust_index_index) > 0:
-			dindex = sample_results['flatchain'][jj,dust_index_index]
+			dindex = flatchain[jj,dust_index_index]
 		else:
 			dindex = None
 
 		# empirical halpha
 		emp_ha[jj],emp_oiii[jj] = calc_emp_ha(mass,tage,tau,sf_start,tuniv,
-			                                  sample_results['flatchain'][jj,dust2_index],dindex,
+			                                  flatchain[jj,dust2_index],dindex,
 			                                  ncomp=sample_results['ncomp'])
 
 		# calculate sfr
@@ -169,7 +174,6 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 	neb_em = sample_results['model'].params.get('add_neb_emission', np.array(False))
 	con_em = sample_results['model'].params.get('add_neb_continuum', np.array(False))
 	met_save = sample_results['model'].params.get('logzsol', np.array(0.0))
-	#sample_results['model'].params['logzsol'] = 0.0
 
     # use randomized, flattened, thinned chain for posterior draws
 	flatchain = copy(sample_results['flatchain'])

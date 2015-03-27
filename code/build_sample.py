@@ -379,7 +379,7 @@ def build_sample_dynamics():
 			catalog = ICRS(bez['RAdeg'][nn], bez['DEdeg'][nn], unit=(u.degree, u.degree))
 			close_mass = np.logical_and(
 				         (np.abs(fast['lmass']-bez[nn]['logM']) < matching_mass),
-			             (np.abs((morph['re']-arcsec_size[nn])/arcsec_size[nn]) < matching_size))
+			             (fast['z'] < 2.0))
 			threed_cat = ICRS(phot['ra'][close_mass], phot['dec'][close_mass], unit=(u.degree, u.degree))
 			idx, d2d, d3d = catalog.match_to_catalog_sky(threed_cat)
 			if d2d.value*3600 < matching_radius:
@@ -395,6 +395,9 @@ def build_sample_dynamics():
 			      fast[matches[kk]]['z'],bez[kk]['z'],\
 			      morph[matches[kk]]['re'],arcsec_size[kk],\
 			      distance[kk]
+
+			if fast[matches[kk]]['z'] > 2:
+				print 1/0
 
 		# define useful things
 		lineinfo['uvj_flag'] = calc_uvj_flag(rf)

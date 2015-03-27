@@ -142,6 +142,24 @@ def generate_basenames(runname):
 	parm=[]
 	ancilname='COSMOS_testsamp.dat'
 
+	if runname == 'dtau_dynsamp':
+
+		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/twofield_dynsamp.ids"
+		ids = np.loadtxt(id_list, dtype='|S20')
+		ngals = len(ids)
+
+		basename = "dtau_dynsamp"
+		parm_basename = "dtau_dynsamp_params"
+		ancilname='twofield_dynsamp.dat'
+
+		for jj in xrange(ngals):
+			ancildat = load_ancil_data(os.getenv('APPS')+
+			                           '/threedhst_bsfh/data/twofield_dynsamp.dat',
+			                           ids[jj])
+			heqw_txt = "%04d" % int(ancildat['Ha_EQW_obs']) 
+			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+basename+'_'+heqw_txt+'_'+ids[jj])
+			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
+
 	if runname == 'dtau_genpop':
 
 		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/COSMOS_gensamp.ids"

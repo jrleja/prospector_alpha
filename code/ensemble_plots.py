@@ -453,6 +453,119 @@ def plot_driver(runname):
  		plt.savefig(outname, dpi=300)
 		plt.close()
 
+def offset_and_scatter(x,y):
+
+	n = len(x)
+	mean_offset = np.sum(x-y)/n
+	scat=np.sqrt(np.sum((x-y-mean_offset)**2.)/(n-2))
+
+	return mean_offset,scat
+
+def dynsamp_plot(runname, scale=False):
+
+	inname = os.getenv('APPS')+'/threedhst_bsfh/results/'+runname+'/'+runname+'_ensemble.pickle'
+	outname_cent = os.getenv('APPS') + '/threedhst_bsfh/plots/ensemble_plots/'+runname+'/dyn_comp.png'
+
+	# if the save file doesn't exist, make it
+	if not os.path.isfile(inname):
+		collate_output(runname,inname)
+
+	with open(inname, "rb") as f:
+		ensemble=pickle.load(f)
+
+	# identify rachel's stellar masses, uvj flag
+	r_smass= np.array([x['logM'][0] for x in ensemble['ancildat']])
+	uvj    = np.array([x['uvj_flag'][0] for x in ensemble['ancildat']])
+	red  = uvj == 3
+	blue = uvj != 3
+
+	# get structural parameters (km/s, kpc)
+	sigmaRe = np.array([x['sigmaRe'][0] for x in ensemble['ancildat']])
+	e_sigmaRe = np.array([x['e_sigmaRe'][0] for x in ensemble['ancildat']])
+	Re      = np.array([x['Re'][0] for x in ensemble['ancildat']])*1e3
+	nserc   = np.array([x['n'][0] for x in ensemble['ancildat']])
+	G      = 4.302e-3 # pc Msun**-1 (km/s)**2
+
+	# dynamical masses
+	# bezanson 2014, eqn 13+14
+	k              = 5.0
+	mdyn_cnst      = k*Re*sigmaRe**2/G
+	mdyn_cnst_err  = 2*k*Re*sigmaRe*e_sigmaRe/G
+	mdyn_cnst_lerr = asym_errors(np.log10(mdyn_cnst),np.log10(mdyn_cnst+mdyn_cnst_err)-np.log10(mdyn_cnst),np.log10(mdyn_cnst)-np.log10(mdyn_cnst-mdyn_cnst_err))
+	
+	k              = 8.87 - 0.831*nserc + 0.0241*nserc**2
+	mdyn_serc      = k*Re*sigmaRe**2/G
+	mdyn_serc_err  = 2*k*Re*sigmaRe*e_sigmaRe/G
+	mdyn_serc_lerr = asym_errors(np.log10(mdyn_serc),np.log10(mdyn_serc+mdyn_serc_err)-np.log10(mdyn_serc),np.log10(mdyn_serc)-np.log10(mdyn_serc-mdyn_serc_err))
+
+	#mdyn_serc = mdyn_cnst
+	#mdyn_serc_letter = mdyn_cnst_lerr
+	
+	# Prospector stellar masses
+	valid_comp = ensemble['z'] > 0
+	mass = np.log10(ensemble['q50'][ensemble['parname'] == 'totmass'][0,valid_comp])
+	masserrs = asym_errors(ensemble['q50'][ensemble['parname'] == 'totmass'][0,valid_comp],
+		                   ensemble['q84'][ensemble['parname'] == 'totmass'][0,valid_comp], 
+		                   ensemble['q16'][ensemble['parname'] == 'totmass'][0,valid_comp],log=True)
+
+	gs = gridspec.GridSpec(1,2)
+	fig = plt.figure(figsize = (9,4.5))
+	gs.update(wspace=0.0, hspace=0.35)
+
+	##### rachel masses #####
+	ax_rachel = plt.subplot(gs[0])
+	ax_rachel.errorbar(r_smass[blue],np.log10(mdyn_serc[blue]), 
+					   yerr=[mdyn_serc_lerr[0][blue],mdyn_serc_lerr[1][blue]],
+		               fmt='bo', linestyle=' ', alpha=0.7)
+	ax_rachel.errorbar(r_smass[red],np.log10(mdyn_serc[red]), 
+					   yerr=[mdyn_serc_lerr[0][red],mdyn_serc_lerr[1][red]],
+		               fmt='ro', linestyle=' ', alpha=0.7)
+
+	# equality line + axis limits
+	ax_rachel.errorbar([9,13],[9,13],linestyle='--',color='0.1',alpha=0.8)
+	ax_rachel.axis((9.7,11.7,9.7,11.7))
+
+	# labels
+	ax_rachel.set_ylabel(r'log(M$_{dyn}$/M$_{\odot}$)')
+	ax_rachel.set_xlabel(r'log(M$_{FAST}$/M$_{\odot}$)')
+
+	# offset and scatter
+	mean_offset,scat = offset_and_scatter(np.log10(mdyn_serc[red]),r_smass[red])
+	ax_rachel.text(0.04,0.95, 'scatter='+"{:.2f}".format(scat)+' dex',transform = ax_rachel.transAxes,color='red')
+	ax_rachel.text(0.04,0.9, 'mean offset='+"{:.2f}".format(mean_offset)+' dex',transform = ax_rachel.transAxes,color='red')
+
+	mean_offset,scat = offset_and_scatter(np.log10(mdyn_serc[blue]),r_smass[blue])
+	ax_rachel.text(0.04,0.85, 'scatter='+"{:.2f}".format(scat)+' dex',transform = ax_rachel.transAxes,color='blue')
+	ax_rachel.text(0.04,0.8, 'mean offset='+"{:.2f}".format(mean_offset)+' dex',transform = ax_rachel.transAxes,color='blue')
+
+	#### prospectr masses ####
+	ax_prosp = plt.subplot(gs[1])
+	ax_prosp.errorbar(r_smass[blue],mass[blue], 
+					   yerr=[masserrs[0][blue],masserrs[1][blue]],
+		               fmt='bo', linestyle=' ', alpha=0.7)
+	ax_prosp.errorbar(r_smass[red],mass[red], 
+					   yerr=[masserrs[0][red],masserrs[1][red]],
+		               fmt='ro', linestyle=' ', alpha=0.7)
+	
+	# equality line + axis limits
+	ax_prosp.errorbar([9,13],[9,13],linestyle='--',color='0.1',alpha=0.8)
+	ax_prosp.axis((9.7,11.7,9.7,11.7))
+
+	# labels
+	ax_prosp.set_yticklabels([])
+	ax_prosp.set_xlabel(r'log(M$_{prosp}$/M$_{\odot}$)')
+
+	# offset and scatter
+	mean_offset,scat = offset_and_scatter(np.log10(mdyn_serc[red]),mass[red])
+	ax_prosp.text(0.04,0.95, 'scatter='+"{:.2f}".format(scat)+' dex',transform = ax_prosp.transAxes,color='red')
+	ax_prosp.text(0.04,0.9, 'mean offset='+"{:.2f}".format(mean_offset)+' dex',transform = ax_prosp.transAxes,color='red')
+
+	mean_offset,scat = offset_and_scatter(np.log10(mdyn_serc[blue]),mass[blue])
+	ax_prosp.text(0.04,0.85, 'scatter='+"{:.2f}".format(scat)+' dex',transform = ax_prosp.transAxes,color='blue')
+	ax_prosp.text(0.04,0.8, 'mean offset='+"{:.2f}".format(mean_offset)+' dex',transform = ax_prosp.transAxes,color='blue')
+
+	print 1/0
+
 def photerr_plot(runname, scale=False):
 
 	inname = os.getenv('APPS')+'/threedhst_bsfh/results/'+runname+'/'+runname+'_ensemble.pickle'
