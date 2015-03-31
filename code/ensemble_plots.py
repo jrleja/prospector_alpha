@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from astropy.cosmology import WMAP9
 from astropy import constants
+from matplotlib import cm
 
 # minimum flux: no model emission line has strength of 0!
 pc2cm = 3.08567758e18
@@ -453,13 +454,111 @@ def plot_driver(runname):
  		plt.savefig(outname, dpi=300)
 		plt.close()
 
-def offset_and_scatter(x,y):
+def offset_and_scatter(x,y,biweight=True):
 
 	n = len(x)
 	mean_offset = np.sum(x-y)/n
-	scat=np.sqrt(np.sum((x-y-mean_offset)**2.)/(n-2))
+
+	if biweight:
+		diff = y-x
+		Y0  = np.median(diff)
+
+		# calculate MAD
+		MAD = np.median(np.abs(diff-Y0))/0.6745
+
+		# biweighted value
+		U   = (diff-Y0)/(6.*MAD)
+		UU  = U*U
+		Q   = UU <= 1.0
+		if np.sum(Q) < 3:
+			print 'distribution is TOO WEIRD, returning -1'
+			scat=-1
+
+		N = len(diff)
+		numerator = np.sum( (diff[Q]-Y0)**2 * (1-UU[Q])**4)
+		den1      = np.sum( (1.-UU[Q])*(1.-5.*UU[Q]))
+		siggma    = N*numerator/(den1*(den1-1.))
+
+		scat      = np.sqrt(siggma)
+
+	else:
+		scat=np.sqrt(np.sum((x-y-mean_offset)**2.)/(n-2))
 
 	return mean_offset,scat
+
+def av_to_sfr(runname, scale=False):
+
+	inname = os.getenv('APPS')+'/threedhst_bsfh/results/'+runname+'/'+runname+'_ensemble.pickle'
+	outname_cent = os.getenv('APPS') + '/threedhst_bsfh/plots/ensemble_plots/'+runname+'/av_to_sfr_comp.png'
+
+	# if the save file doesn't exist, make it
+	if not os.path.isfile(inname):
+		collate_output(runname,inname)
+
+	with open(inname, "rb") as f:
+		ensemble=pickle.load(f)
+
+	# pull out info
+	valid_comp = ensemble['z'] > 0
+	mass1 = ensemble['q50'][ensemble['parname'] == 'mass_1'][0,valid_comp]
+	mass2 = ensemble['q50'][ensemble['parname'] == 'mass_2'][0,valid_comp]
+
+	tau1 = ensemble['q50'][ensemble['parname'] == 'tau_1'][0,valid_comp]
+	tau2 = ensemble['q50'][ensemble['parname'] == 'tau_2'][0,valid_comp]
+
+	sfstart1 = ensemble['q50'][ensemble['parname'] == 'sf_start_1'][0,valid_comp]
+	sfstart2 = ensemble['q50'][ensemble['parname'] == 'sf_start_2'][0,valid_comp]
+
+	dust2_1 = ensemble['q50'][ensemble['parname'] == 'dust2_1'][0,valid_comp]
+	dust2_2 = ensemble['q50'][ensemble['parname'] == 'dust2_2'][0,valid_comp]
+
+	dustindex = ensemble['q50'][ensemble['parname'] == 'dust_index'][0,valid_comp]
+	tage = WMAP9.age(ensemble['z'][valid_comp]).value
+
+	# calculate SFRs
+	deltat = 0.1
+	sfr_100_1 = threed_dutils.integrate_sfh(tage-deltat,tage,mass1,tage,tau1,
+                                            sfstart1)*mass1/(deltat*1e9)
+	sfr_100_2 = threed_dutils.integrate_sfh(tage-deltat,tage,mass2,tage,tau2,
+                                            sfstart2)*mass2/(deltat*1e9)
+
+	sfr_100_1 = np.log10(sfr_100_1)
+	sfr_100_2 = np.log10(sfr_100_2)
+
+	# sort
+	big_dust    = dust2_1 > dust2_2
+	little_dust = dust2_1 < dust2_2
+
+	# plot
+	fig = plt.figure()
+	ax = fig.add_subplot(111)
+	axmin = -3
+	axmax = 3
+	vmin  = -3.0
+	vmax  = -0.4
+	jcmap = cm.seismic
+
+	cobar=ax.scatter(np.clip(dust2_1[big_dust] - dust2_2[big_dust],axmin,axmax), 
+		    np.clip(sfr_100_2[big_dust] - sfr_100_1[big_dust],axmin,axmax), 
+		    alpha=0.8, c=dustindex[big_dust],cmap=jcmap,vmin=vmin,vmax=vmax,s=50.0)
+
+	ax.scatter(np.clip(dust2_2[little_dust] - dust2_1[little_dust],axmin,axmax), 
+		    np.clip(sfr_100_1[little_dust] - sfr_100_2[little_dust],axmin,axmax), 
+		    alpha=0.8, c=dustindex[little_dust],cmap=jcmap,vmin=vmin,vmax=vmax,s=50.0)
+
+	cbar = fig.colorbar(cobar, pad=0.1)
+	cbar.set_label('dust index')
+
+	ax.axis((0,axmax,axmin,axmax))
+	ax.set_xlabel(r'dust2$_1$-dust2$_2$')
+	ax.set_ylabel(r'log(SFR$_1$)-log(SFR$_2$)')
+
+	ax.hlines(0.0,ax.get_xlim()[0],ax.get_xlim()[1], linestyle='--',colors='k')
+
+
+	plt.savefig(outname_cent,dpi=300)
+	plt.close()
+
 
 def dynsamp_plot(runname, scale=False):
 
@@ -531,21 +630,21 @@ def dynsamp_plot(runname, scale=False):
 
 	# offset and scatter
 	mean_offset,scat = offset_and_scatter(np.log10(mdyn_serc[red]),r_smass[red])
-	ax_rachel.text(0.04,0.95, 'scatter='+"{:.2f}".format(scat)+' dex',transform = ax_rachel.transAxes,color='red')
-	ax_rachel.text(0.04,0.9, 'mean offset='+"{:.2f}".format(mean_offset)+' dex',transform = ax_rachel.transAxes,color='red')
+	ax_rachel.text(0.96,0.20, 'scatter='+"{:.2f}".format(scat)+' dex',transform = ax_rachel.transAxes,color='red',horizontalalignment='right')
+	ax_rachel.text(0.96,0.15, 'mean offset='+"{:.2f}".format(mean_offset)+' dex',transform = ax_rachel.transAxes,color='red',horizontalalignment='right')
 
 	mean_offset,scat = offset_and_scatter(np.log10(mdyn_serc[blue]),r_smass[blue])
-	ax_rachel.text(0.04,0.85, 'scatter='+"{:.2f}".format(scat)+' dex',transform = ax_rachel.transAxes,color='blue')
-	ax_rachel.text(0.04,0.8, 'mean offset='+"{:.2f}".format(mean_offset)+' dex',transform = ax_rachel.transAxes,color='blue')
+	ax_rachel.text(0.96,0.10, 'scatter='+"{:.2f}".format(scat)+' dex',transform = ax_rachel.transAxes,color='blue',horizontalalignment='right')
+	ax_rachel.text(0.96,0.05, 'mean offset='+"{:.2f}".format(mean_offset)+' dex',transform = ax_rachel.transAxes,color='blue',horizontalalignment='right')
 
 	#### prospectr masses ####
 	ax_prosp = plt.subplot(gs[1])
-	ax_prosp.errorbar(r_smass[blue],mass[blue], 
-					   yerr=[masserrs[0][blue],masserrs[1][blue]],
-		               fmt='bo', linestyle=' ', alpha=0.7)
-	ax_prosp.errorbar(r_smass[red],mass[red], 
-					   yerr=[masserrs[0][red],masserrs[1][red]],
-		               fmt='ro', linestyle=' ', alpha=0.7)
+	ax_prosp.errorbar(mass[blue],np.log10(mdyn_serc[blue]),
+					  yerr=[masserrs[0][blue],masserrs[1][blue]],
+		              fmt='bo', linestyle=' ', alpha=0.7)
+	ax_prosp.errorbar(mass[red],np.log10(mdyn_serc[red]), 
+					  yerr=[masserrs[0][red],masserrs[1][red]],
+		              fmt='ro', linestyle=' ', alpha=0.7)
 	
 	# equality line + axis limits
 	ax_prosp.errorbar([9,13],[9,13],linestyle='--',color='0.1',alpha=0.8)
@@ -557,12 +656,12 @@ def dynsamp_plot(runname, scale=False):
 
 	# offset and scatter
 	mean_offset,scat = offset_and_scatter(np.log10(mdyn_serc[red]),mass[red])
-	ax_prosp.text(0.04,0.95, 'scatter='+"{:.2f}".format(scat)+' dex',transform = ax_prosp.transAxes,color='red')
-	ax_prosp.text(0.04,0.9, 'mean offset='+"{:.2f}".format(mean_offset)+' dex',transform = ax_prosp.transAxes,color='red')
+	ax_prosp.text(0.96,0.20, 'scatter='+"{:.2f}".format(scat)+' dex',transform = ax_prosp.transAxes,color='red',horizontalalignment='right')
+	ax_prosp.text(0.96,0.15, 'mean offset='+"{:.2f}".format(mean_offset)+' dex',transform = ax_prosp.transAxes,color='red',horizontalalignment='right')
 
 	mean_offset,scat = offset_and_scatter(np.log10(mdyn_serc[blue]),mass[blue])
-	ax_prosp.text(0.04,0.85, 'scatter='+"{:.2f}".format(scat)+' dex',transform = ax_prosp.transAxes,color='blue')
-	ax_prosp.text(0.04,0.8, 'mean offset='+"{:.2f}".format(mean_offset)+' dex',transform = ax_prosp.transAxes,color='blue')
+	ax_prosp.text(0.96,0.10, 'scatter='+"{:.2f}".format(scat)+' dex',transform = ax_prosp.transAxes,color='blue',horizontalalignment='right')
+	ax_prosp.text(0.96,0.05, 'mean offset='+"{:.2f}".format(mean_offset)+' dex',transform = ax_prosp.transAxes,color='blue',horizontalalignment='right')
 
 	plt.savefig(outname_cent,dpi=300)
 
