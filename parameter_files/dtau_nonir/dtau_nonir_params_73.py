@@ -11,7 +11,7 @@ tophat = priors.tophat
 #############
 
 run_params = {'verbose':True,
-              'outfile':os.getenv('APPS')+'/threedhst_bsfh/results/dtau_intmet/dtau_intmet',
+              'outfile':os.getenv('APPS')+'/threedhst_bsfh/results/dtau_nonir/dtau_nonir',
               'ftol':0.5e-5, 
               'maxfev':5000,
               'nwalkers':248,

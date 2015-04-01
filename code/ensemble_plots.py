@@ -1146,8 +1146,11 @@ def plot_residuals(runname):
 			sps = threed_dutils.setup_sps(zcontinuous=2)
 			print 'using the MDF'
 		else:
-			sps = threed_dutils.setup_sps(zcontinuous=2)
-			print 'using the MDF'
+			sps = threed_dutils.setup_sps(zcontinuous=1)
+			print 'using interpolated metallicities'
+
+		# where is metallicity
+		met_ind = np.array(sample_results['model'].theta_labels()) == 'logzsol'
 
 		# generate figure
 		thetas = sample_results['quantiles']['maxprob_params']
@@ -1160,10 +1163,6 @@ def plot_residuals(runname):
 		# grab obs + obs errors
 		# start with mask
 		mask = sample_results['obs']['phot_mask']
-		# restore irac
-		good = np.logical_and((sample_results['obs']['maggies'] > -9.8e-9),
-		                      (sample_results['obs']['maggies'] != sample_results['obs']['maggies_unc']))
-		mask = good
 
 		# define obs things
 		obs_mags = sample_results['obs']['maggies'][mask]
@@ -1179,7 +1178,7 @@ def plot_residuals(runname):
 			residuals[mask,jj]    = tempresid
 			percentresid[mask,jj] = tempresid_perc
 			restlam[mask,jj]      = np.log10(obs_lam/(1+sample_results['model'].params['zred']))
-			bestmet[jj]           = thetas[1]
+			bestmet[jj]           = thetas[met_ind]
 
 		except:
 			nfilters = len(sample_results['obs']['filters'])
@@ -1192,7 +1191,7 @@ def plot_residuals(runname):
 			residuals[mask,jj]    = tempresid
 			percentresid[mask,jj] = tempresid_perc
 			restlam[mask,jj]      = np.log10(obs_lam/(1+sample_results['model'].params['zred']))
-			bestmet[jj]           = thetas[1]
+			bestmet[jj]           = thetas[met_ind]
 
 		print bestmet[jj]
 
