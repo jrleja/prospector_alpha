@@ -42,9 +42,6 @@ obs = threed_dutils.load_obs_3dhst(run_params['photname'], run_params['objname']
 									mips=run_params['mipsname'], min_error=run_params['min_error'],
                                     abs_error=run_params['abs_error'])
 
-masked = (obs['wave_effective'] > 9000) & (obs['wave_effective'] < 80000)
-obs['phot_mask'][masked] = False
-
 #############
 # MODEL_PARAMS
 #############
@@ -358,3 +355,7 @@ tuniv = WMAP9.age(model_params[0]['init']).value
 # set max on sf_start
 model_params[parmlist.index('tage')]['init'] = np.zeros(len(np.atleast_1d(model_params[parmlist.index('tage')]['init'])))+tuniv
 model_params[parmlist.index('sf_start')]['prior_args']['maxi'] = np.zeros(len(np.atleast_1d(model_params[parmlist.index('sf_start')]['prior_args']['maxi'])))+ 0.9*tuniv
+
+
+masked = (obs['wave_effective']/(1+zbest) > 9000) & (obs['wave_effective']/(1+zbest) < 80000)
+obs['phot_mask'][masked] = False
