@@ -480,18 +480,6 @@ def sed_figure(sample_results, sps, model,
 		if lage < 0.1:
 			tagecolor='red'
 
-		# get structural parameters (km/s, kpc)
-		sigmaRe = ancildat['sigmaRe'][0]
-		e_sigmaRe = ancildat['e_sigmaRe'][0]
-		Re      = ancildat['Re'][0]*1e3
-		nserc   = ancildat['n'][0]
-		G      = 4.302e-3 # pc Msun**-1 (km/s)**2
-
-		# dynamical masses
-		# bezanson 2014, eqn 13+14
-		k              = 8.87 - 0.831*nserc + 0.0241*nserc**2
-		mdyn_serc      = k*Re*sigmaRe**2/G
-
 		phot.text(textx_f, texty, r'M$_{fast}$='+"{:.3f}".format(np.log10(fmass))+' ('+"{:.3f}".format(totmass)+')',
 			  fontsize=10)
 		phot.text(textx_f, texty-deltay, 'Av='+"{:.3f}".format(av),
@@ -502,8 +490,23 @@ def sed_figure(sample_results, sps, model,
 			  fontsize=10,color=tagecolor)
 		phot.text(textx_f, texty-deltay*4, 'z='+"{:.3f}".format(zf),
 			  fontsize=10)
-		phot.text(textx_f, texty+deltay, 'Mdyn='+"{:.3f}".format(np.log10(mdyn_serc)),
-			  fontsize=10)
+		
+		try:
+			# get structural parameters (km/s, kpc)
+			sigmaRe = ancildat['sigmaRe'][0]
+			e_sigmaRe = ancildat['e_sigmaRe'][0]
+			Re      = ancildat['Re'][0]*1e3
+			nserc   = ancildat['n'][0]
+			G      = 4.302e-3 # pc Msun**-1 (km/s)**2
+
+			# dynamical masses
+			# bezanson 2014, eqn 13+14
+			k              = 8.87 - 0.831*nserc + 0.0241*nserc**2
+			mdyn_serc      = k*Re*sigmaRe**2/G
+			phot.text(textx_f, texty+deltay, 'Mdyn='+"{:.3f}".format(np.log10(mdyn_serc)),
+			  		  fontsize=10)
+		except:
+			pass
 		
 	# galaxy text
 	phot.text(textx, texty-2*deltay, 'z='+"{:.2f}".format(z_txt),

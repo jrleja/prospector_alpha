@@ -128,7 +128,7 @@ def running_median(x,y,nbins=10):
 	delta = bins[1]-bins[0]
 	idx  = np.digitize(x,bins)
 	running_median = np.array([np.median(y[idx-1==k]) for k in range(nbins)])
-	bins = bins-delta/2.
+	bins = bins+delta/2.
 
 	# remove empty
 	empty = np.isnan(running_median) == 1
@@ -141,6 +141,23 @@ def generate_basenames(runname):
 	filebase=[]
 	parm=[]
 	ancilname='COSMOS_testsamp.dat'
+
+	if runname == 'dtau_nonir':
+
+		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/COSMOS_testsamp.ids"
+		ids = np.loadtxt(id_list, dtype='|S20')
+		ngals = len(ids)
+
+		basename = "dtau_nonir"
+		parm_basename = "dtau_nonir_params"
+
+		for jj in xrange(ngals):
+			ancildat = load_ancil_data(os.getenv('APPS')+
+			                           '/threedhst_bsfh/data/COSMOS_testsamp.dat',
+			                           ids[jj])
+			heqw_txt = "%04d" % int(ancildat['Ha_EQW_obs']) 
+			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+basename+'_'+heqw_txt+'_'+ids[jj])
+			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
 
 	if runname == 'dtau_dynsamp':
 

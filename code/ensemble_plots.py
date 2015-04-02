@@ -1151,6 +1151,7 @@ def plot_residuals(runname):
 
 		# where is metallicity
 		met_ind = np.array(sample_results['model'].theta_labels()) == 'logzsol'
+		ssfr_ind = np.array(sample_results['extras']['parnames']) == 'ssfr_100'
 
 		# generate figure
 		thetas = sample_results['quantiles']['maxprob_params']
@@ -1179,6 +1180,7 @@ def plot_residuals(runname):
 			percentresid[mask,jj] = tempresid_perc
 			restlam[mask,jj]      = np.log10(obs_lam/(1+sample_results['model'].params['zred']))
 			bestmet[jj]           = thetas[met_ind]
+			bestssfr[jj]          = sample_results['extras']['q50'][ssfr_ind]
 
 		except:
 			nfilters = len(sample_results['obs']['filters'])
@@ -1187,13 +1189,15 @@ def plot_residuals(runname):
 			restlam      = np.zeros(shape=(nfilters,ngals)) + np.nan
 			percentresid = np.zeros(shape=(nfilters,ngals)) + np.nan
 			bestmet      = np.zeros(ngals) + np.nan
+			bestssfr     = np.zeros(ngals) + np.nan
 
 			residuals[mask,jj]    = tempresid
 			percentresid[mask,jj] = tempresid_perc
 			restlam[mask,jj]      = np.log10(obs_lam/(1+sample_results['model'].params['zred']))
 			bestmet[jj]           = thetas[met_ind]
+			bestssfr[jj]          = sample_results['extras']['q50'][ssfr_ind]
 
-		print bestmet[jj]
+		print bestmet[jj],bestssfr[jj]
 
 	# take mean
 	meanresid = np.nanmean(residuals,axis=1)
@@ -1276,6 +1280,30 @@ def plot_residuals(runname):
 	plt.savefig(outdir+'residuals_by_err_metsplit.png', dpi=300)
 	plt.close()
 
+	# plot normalized by obs
+	fig = plt.figure()
+	ax = fig.add_subplot(111)
+
+	xlam    = restlam.reshape(ngals*nfilters)
+	yval    = percentresid.reshape(ngals*nfilters)
+
+	good = np.isfinite(xlam) == True
+	xlam = xlam[good]
+	yval = yval[good]
+
+	bins, median = threed_dutils.running_median(xlam,yval,nbins=20)
+
+	ax.scatter(xlam,yval, marker='o', facecolor='black', alpha=0.2,lw=0,s=8.0)
+	plt.plot(bins,median,color='red',lw=3)
+
+	ax.set_ylabel('(obs-model)/obs')
+	ax.set_xlabel('rest-frame wavelength')
+	ax.set_ylim(-1.0,1.0)
+	ax.set_xlim(3.0,5.5)
+	ax.hlines(0.0,ax.get_xlim()[0],ax.get_xlim()[1], linestyle='--',colors='k')
+	plt.savefig(outdir+'residuals_by_obs_metsplit.png', dpi=300)
+	plt.close()
+	print 1/0
 	# average by metallicity, in rest-frame
 	# plot normalized by errors
 	fig = plt.figure()
@@ -1310,6 +1338,63 @@ def plot_residuals(runname):
 	ax.set_xlim(3.0,5.5)
 	ax.hlines(0.0,ax.get_xlim()[0],ax.get_xlim()[1], linestyle='--',colors='k')
 	plt.savefig(outdir+'residuals_by_err_metsplit_rf.png', dpi=300)
+	plt.close()
+
+	# average by sSFR
+	# take mean
+	meanssfr = np.nanmean(bestssfr)
+	topssfr = bestssfr > meanssfr
+	ntopssfr = np.sum(topssfr)
+	botssfr = bestssfr <= meanssfr
+	nbotssfr = np.sum(botssfr)
+	meanresid_topssfr = np.nanmean(residuals[:,topssfr],axis=1)
+	meanpercent_topssfr = np.nanmean(percentresid[:,topssfr],axis=1)
+
+	stdresid_topssfr = np.nanstd(residuals[:,topssfr],axis=1)
+	stdpercent_topssfr = np.nanstd(percentresid[:,topssfr],axis=1)
+
+	meanresid_botssfr = np.nanmean(residuals[:,botssfr],axis=1)
+	meanpercent_botssfr = np.nanmean(percentresid[:,botssfr],axis=1)
+
+	stdresid_botssfr = np.nanstd(residuals[:,botssfr],axis=1)
+	stdpercent_botssfr = np.nanstd(percentresid[:,botssfr],axis=1)
+
+	# average by sSFR, in rest-frame
+	# plot normalized by errors
+	fig = plt.figure()
+	ax = fig.add_subplot(111)
+	topssfr_resid = residuals[:,topssfr].reshape(ntopssfr*nfilters)
+	topssfr_restlam = restlam[:,topssfr].reshape(ntopssfr*nfilters)
+
+	nonan = np.isfinite(topssfr_resid)
+	topssfr_resid = topssfr_resid[nonan]
+	topssfr_restlam = topssfr_restlam[nonan]
+
+	plt.scatter(topssfr_restlam, topssfr_resid, marker='o', facecolor='blue', alpha=0.2,lw=0,s=8.0)
+
+	bins, median = threed_dutils.running_median(topssfr_restlam,topssfr_resid,nbins=20)
+	plt.plot(bins,median,color='blue',lw=5)
+
+	botssfr_resid = residuals[:,botssfr].reshape(nbotssfr*nfilters)
+	botssfr_restlam = restlam[:,botssfr].reshape(nbotssfr*nfilters)
+
+	nonan = np.isfinite(botssfr_resid)
+	botssfr_resid = botssfr_resid[nonan]
+	botssfr_restlam = botssfr_restlam[nonan]
+
+	plt.scatter(botssfr_restlam, botssfr_resid, marker='o', facecolor='red', alpha=0.2,lw=0,s=8.0)
+
+	bins, median = threed_dutils.running_median(botssfr_restlam,botssfr_resid,nbins=20)
+	plt.plot(bins,median,color='red',lw=5)
+
+	ax.set_ylabel('(obs-model)/errors')
+	ax.set_xlabel('rest-frame wavelength')
+	ax.set_ylim(-7.0,7.0)
+	ax.set_xlim(3.0,5.5)
+	ax.hlines(0.0,ax.get_xlim()[0],ax.get_xlim()[1], linestyle='--',colors='k')
+	ax.text(0.04,0.95, 'sSFR>'+"{:.2f}".format(meanssfr),transform = ax.transAxes,color='blue')
+	ax.text(0.04,0.95, 'sSFR<'+"{:.2f}".format(meanssfr),transform = ax.transAxes,color='red')
+	plt.savefig(outdir+'residuals_by_err_ssfrsplit_rf.png', dpi=300)
 	plt.close()
 
 	print 1/0
