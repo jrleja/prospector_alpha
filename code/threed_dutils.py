@@ -777,7 +777,12 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None, measure_ir 
 
 		# revert to proper redshift, calculate redshifted mips magnitudes
 		model.params['zred'] = np.atleast_1d(z)
-		mips = mags_neboff[mips_index][0]*1e10 # comes out in maggies, convert to flux such that AB zeropoint is 25 mags
+		
+		# if no MIPS flux...
+		try:
+			mips = mags_neboff[mips_index][0]*1e10 # comes out in maggies, convert to flux such that AB zeropoint is 25 mags
+		else:
+			mips = np.nan
 
 		out = {'emline_flux': emline_flux,
 		       'emline_name': emline,
