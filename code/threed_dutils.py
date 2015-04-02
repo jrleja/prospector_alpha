@@ -781,7 +781,7 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None, measure_ir 
 		# if no MIPS flux...
 		try:
 			mips = mags_neboff[mips_index][0]*1e10 # comes out in maggies, convert to flux such that AB zeropoint is 25 mags
-		else:
+		except:
 			mips = np.nan
 
 		out = {'emline_flux': emline_flux,
