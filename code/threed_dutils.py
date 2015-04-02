@@ -104,7 +104,7 @@ def synthetic_emlines(mass,sfr,dust1,dust2,dust_index):
 
 	# correct for dust
 	# if dust_index == None, use Calzetti
-	if dust_index != None:
+	if dust_index is not None:
 		tau2 = ((lam.reshape(len(lam),1)/5500.)**dust_index)*dust2
 		tau1 = ((lam.reshape(len(lam),1)/5500.)**dust_index)*dust1
 		tautot = tau2+tau1
