@@ -31,7 +31,7 @@ run_params = {'verbose':True,
               'fastname':os.getenv('APPS')+'/threedhst_bsfh/data/COSMOS_gensamp.fout',
               'ancilname':os.getenv('APPS')+'/threedhst_bsfh/data/COSMOS_gensamp.dat',
               'mipsname':os.getenv('APPS')+'/threedhst_bsfh/data/MIPS/cosmos_3dhst.v4.1.4.sfr',
-              'objname':'12658',
+              'objname':'22801',
               }
 
 ############
@@ -340,11 +340,11 @@ if run_params['set_init_params'] == 'random':
 
 ######## LOAD ANCILLARY INFORMATION ########
 # name outfiles based on halpha eqw
-ancildat = threed_dutils.load_ancil_data(run_params['ancilname'],run_params['objname'])
-halpha_eqw_txt = "%04d" % int(ancildat['Ha_EQW_obs'])
-run_params['outfile'] = run_params['outfile']+'_'+halpha_eqw_txt+'_'+run_params['objname']
+logzsol_txt = "{:.2f}".format(model_params[parmlist.index('logzsol')]['init'])
+run_params['outfile'] = run_params['outfile']+'_'+logzsol_txt+'_'+run_params['objname']
 
 # use zbest, not whatever's in the fast run
+ancildat = threed_dutils.load_ancil_data(run_params['ancilname'],run_params['objname'])
 zbest = ancildat['zbest']
 model_params[parmlist.index('zred')]['init'] = zbest
 			

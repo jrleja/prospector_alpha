@@ -9,10 +9,10 @@ PARAMEXT=".py"
 echo 'Base parameter file:'$PARAMBASE
 
 # get number of IDs
-NIDS=13
+NIDS=26
 
 # loop
-for ((  i = 1 ;  i <= $NIDS;  i++  ))
+for ((  i = 14 ;  i <= $NIDS;  i++  ))
 do
   # create new file
   cp $PARAMBASE$PARAMEXT $PARAMBASE"_$i"$PARAMEXT

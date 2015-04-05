@@ -340,11 +340,12 @@ if run_params['set_init_params'] == 'random':
 
 ######## LOAD ANCILLARY INFORMATION ########
 # name outfiles based on halpha eqw
-ancildat = threed_dutils.load_ancil_data(run_params['ancilname'],run_params['objname'])
-halpha_eqw_txt = "%04d" % int(ancildat['Ha_EQW_obs'])
-run_params['outfile'] = run_params['outfile']+'_'+halpha_eqw_txt+'_'+run_params['objname']
+logzsol_txt = "{:.2f}".format(model_params[parmlist.index('logzsol')]['init'])
+run_params['outfile'] = run_params['outfile']+'_'+logzsol_txt+'_'+run_params['objname']
+print run_params['outfile']
 
 # use zbest, not whatever's in the fast run
+ancildat = threed_dutils.load_ancil_data(run_params['ancilname'],run_params['objname'])
 zbest = ancildat['zbest']
 model_params[parmlist.index('zred')]['init'] = zbest
 			
