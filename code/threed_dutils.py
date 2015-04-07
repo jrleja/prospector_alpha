@@ -459,12 +459,13 @@ def load_zp_offsets(field):
 	dtype = [np.dtype((str, 35)),np.dtype((str, 35)),np.float,np.float]
 	dat = np.loadtxt(filename, comments = '#',dtype = np.dtype([(hdr[n+1], dtype[n]) for n in xrange(len(hdr)-1)]))
 
-	good = dat['Field'] == field
-	if np.sum(good) == 0:
-		print 'Not an acceptable field name! Returning None'
-		return None
-	else:
-		dat = dat[good]
+	if field is not None:
+		good = dat['Field'] == field
+		if np.sum(good) == 0:
+			print 'Not an acceptable field name! Returning None'
+			return None
+		else:
+			dat = dat[good]
 
 	return dat
 
@@ -496,7 +497,7 @@ def load_mips_data(filename,objnum=None):
 
 	return dat
 
-def load_obs_3dhst(filename, objnum, mips=None, min_error = None, abs_error=False):
+def load_obs_3dhst(filename, objnum, mips=None, min_error = None, abs_error=False,zperr=False):
 	"""
 	Load 3D-HST photometry file, return photometry for a particular object.
 	min_error: set the minimum photometric uncertainty to be some fraction
@@ -533,6 +534,15 @@ def load_obs_3dhst(filename, objnum, mips=None, min_error = None, abs_error=Fals
 			under = maggies_unc < min_error*maggies
 			maggies_unc[under] = min_error*maggies[under]
 	
+	if zperr is True:
+		zp_offsets = load_zp_offsets(None)
+		band_names = np.array([x['Band'].lower()+'_'+x['Field'].lower() for x in zp_offsets])
+		
+		for kk in xrange(len(filters)):
+			match = band_names == filters[kk]
+			if np.sum(match) > 0:
+				unc[kk] = ( (unc[kk]**2) + (flux[kk]*(1-zp_offsets[match]['Flux-Correction']))**2 ) **0.5
+
 	# sort outputs based on effective wavelength
 	points = zip(wave_effective,filters,phot_mask,maggies,maggies_unc)
 	sorted_points = sorted(points)
