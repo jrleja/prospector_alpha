@@ -38,7 +38,7 @@ run_params = {'verbose':True,
 #############
 
 obs = threed_dutils.load_obs_3dhst(run_params['photname'], run_params['objname'],
-									mips=run_params['mipsname'], min_error=run_params['min_error'],
+									min_error=run_params['min_error'],
                                     abs_error=run_params['abs_error'])
 
 #############
