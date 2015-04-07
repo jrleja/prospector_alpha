@@ -589,9 +589,11 @@ def make_all_plots(filebase=None, parm_file=None,
 		# load results
 		mcmc_filename=filebase+'_'+max(times)+"_mcmc"
 		model_filename=filebase+'_'+max(times)+"_model"
+
 		try:
 			sample_results, powell_results, model = read_results.read_pickles(mcmc_filename, model_file=model_filename,inmod=None)
-		except:
+		except (EOFError,ValueError) as e:
+			print e
 			print 'Failed to open '+ mcmc_filename +','+model_filename
 			return 0
 
@@ -646,7 +648,8 @@ def plot_all_driver():
 
 	runname = 'dtau_intmet'
 	runname = 'dtau_genpop'
-	runname = 'dtau_nonir'
+	#runname = 'dtau_nonir'
+	runname = 'dtau_genpop_fixedmet'
 
 	filebase, parm_basename, ancilname=threed_dutils.generate_basenames(runname)
 	for jj in xrange(len(filebase)):

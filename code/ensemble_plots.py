@@ -1091,6 +1091,172 @@ def vary_logzsol(runname):
 		plt.savefig(outdir+outname+'_metsed.png', dpi=300)
 		plt.close()
 
+def plot_residuals_fixedmet(runname):
+
+	'''
+	special version for when metallicity is fixed
+	'''
+	runname = 'dtau_genpop_fixedmet'
+
+	filebase,params,ancilname=threed_dutils.generate_basenames(runname)
+	ngals = len(filebase)
+
+	nfail = 0
+
+	# make output folder
+	outdir = os.getenv('APPS')+'/threedhst_bsfh/plots/ensemble_plots/'+runname+'/'
+	if not os.path.exists(outdir):
+		os.makedirs(outdir)
+
+	for jj in xrange(ngals):
+
+		# find most recent output file
+		# with the objname
+		folder = "/".join(filebase[jj].split('/')[:-1])
+		filename = filebase[jj].split("/")[-1]
+		files = [f for f in os.listdir(folder) if "_".join(f.split('_')[:-2]) == filename]	
+		times = [f.split('_')[-2] for f in files]
+
+		# if we found no files, skip this object
+		if len(times) == 0:
+			print 'Failed to find any files in '+folder+' of type ' +filename+' to extract times'
+			nfail+=1
+			continue
+
+		# load results
+		mcmc_filename=filebase[jj]+'_'+max(times)+"_mcmc"
+		model_filename=filebase[jj]+'_'+max(times)+"_model"
+
+		try:
+			sample_results, powell_results, model = read_results.read_pickles(mcmc_filename, model_file=model_filename,inmod=None)
+		except (ValueError,EOFError,KeyError):
+			print mcmc_filename + ' failed during output writing'
+			nfail+=1
+			continue
+		except IOError:
+			print mcmc_filename + ' does not exist!'
+			nfail+=1
+			continue
+
+		# check for existence of extra information
+		try:
+			sample_results['quantiles']
+		except:
+			print 'Generating extra information for '+mcmc_filename+', '+model_filename
+			extra_output.post_processing(params[jj])
+			sample_results, powell_results, model = read_results.read_pickles(mcmc_filename, model_file=model_filename,inmod=None)
+
+		# check to see if we want zcontinuous=2 (i.e., the MDF)
+		if np.sum([1 for x in sample_results['model'].config_list if x['name'] == 'pmetals']) > 0:
+			sps = threed_dutils.setup_sps(zcontinuous=2)
+			print 'using the MDF'
+		else:
+			sps = threed_dutils.setup_sps(zcontinuous=1)
+			print 'using interpolated metallicities'
+
+		# save metallicity, obj number
+		met      = [x['init'] for x in sample_results['model'].config_list if x['name'] == 'logzsol'][0]
+		obj_name = sample_results['run_params']['objname']
+
+		# generate figure
+		thetas = sample_results['quantiles']['maxprob_params']
+		theta_names = np.array(model.theta_labels())
+		metind = theta_names == 'logzsol'
+
+		# grab best-fit magnitudes
+		specmax,magsmax,w = sample_results['model'].mean_model(thetas, sample_results['obs'], sps=sps,norm_spec=True)
+
+		# grab obs + obs errors
+		# start with mask
+		mask = sample_results['obs']['phot_mask']
+
+		# define obs things
+		obs_mags = sample_results['obs']['maggies'][mask]
+		obs_lam  = sample_results['obs']['wave_effective'][mask]
+		obs_err  = sample_results['obs']['maggies_unc'][mask]
+
+
+		# residuals
+		tempresid = (obs_mags - magsmax[mask]) / obs_err
+		tempresid_perc = (obs_mags - magsmax[mask]) / obs_mags
+
+		try:
+			residuals[mask,jj]    = tempresid
+			percentresid[mask,jj] = tempresid_perc
+			restlam[mask,jj]      = np.log10(obs_lam/(1+sample_results['model'].params['zred']))
+			bestmet[jj]           = met
+			obj_names[jj]         = obj_name
+			maxprob[jj]           = sample_results['quantiles']['maxprob']
+
+		except:
+			nfilters = len(sample_results['obs']['filters'])
+			lam = np.log10(sample_results['obs']['wave_effective'])
+			residuals    = np.zeros(shape=(nfilters,ngals)) + np.nan 
+			restlam      = np.zeros(shape=(nfilters,ngals)) + np.nan
+			percentresid = np.zeros(shape=(nfilters,ngals)) + np.nan
+			bestmet      = np.zeros(ngals) + np.nan
+			obj_names    = np.zeros(ngals) + np.nan
+			maxprob      = np.zeros(ngals) + np.nan
+
+			residuals[mask,jj]    = tempresid
+			percentresid[mask,jj] = tempresid_perc
+			restlam[mask,jj]      = np.log10(obs_lam/(1+sample_results['model'].params['zred']))
+			bestmet[jj]           = met
+			obj_names[jj]         = obj_name
+			maxprob[jj]           = sample_results['quantiles']['maxprob']
+
+		print bestmet[jj],obj_names[jj], maxprob[jj]
+
+	# how many objects?
+	objs = np.unique(obj_names)
+	objs = objs[np.isfinite(objs)]
+
+	for objname in objs:
+
+		# which are of this object?
+		good = obj_names == objname
+		ngood = np.sum(good)
+
+		# lnprob plot
+		fig = plt.figure()
+		ax = fig.add_subplot(111)
+
+		ax.plot(bestmet[good],maxprob[good],'ro', linestyle='-',alpha=0.6)
+		ax.set_xlabel('logzsol')
+		ax.set_ylabel('max ln(probability)')
+
+		plt.savefig(outdir+'maxprob_vs_met_'+str(int(objname))+'.png', dpi=300)
+		plt.close()
+
+		# residual plot
+		fig = plt.figure()
+		ax = fig.add_subplot(111)
+
+		# initialize colors
+		NUM_COLORS = ngood
+		NUM_COLORS = 4
+		cm = pylab.get_cmap('cool')
+		plt.rcParams['axes.color_cycle'] = [cm(1.*i/NUM_COLORS) for i in range(NUM_COLORS)] 
+
+		xlam    = restlam[:,good]
+		yval    = residuals[:,good]
+
+		met_to_plot = ['-1.0','-0.9','-0.6','0.0','0.19']
+		for kk in xrange(ngood): 
+			if str(bestmet[good][kk]) in met_to_plot:
+				ax.plot(xlam[:,kk],yval[:,kk],lw=1,label=bestmet[good][kk],alpha=0.9)
+
+		ax.set_ylabel('(obs-model)/err')
+		ax.set_xlabel(r'log($\lambda_{rest}$) [$\AA$]')
+		ax.set_ylim(-6.0,6.0)
+		ax.set_xlim(3.0,5.5)
+		ax.legend(loc=1,prop={'size':10},
+                  frameon=False,
+                  title='logzsol')
+		ax.hlines(0.0,ax.get_xlim()[0],ax.get_xlim()[1], linestyle='--',colors='k')
+		plt.savefig(outdir+'rf_resid_'+str(int(objname))+'.png', dpi=300)
+		plt.close()
+
 def plot_residuals(runname):
 
 	filebase,params,ancilname=threed_dutils.generate_basenames(runname)

@@ -177,6 +177,23 @@ def generate_basenames(runname):
 			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+basename+'_'+heqw_txt+'_'+ids[jj])
 			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
 
+	if runname == 'dtau_genpop_fixedmet':
+
+		ids = np.array(['12658','22801'])
+		met_list = os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+"/met.dat"
+		mets = np.loadtxt(met_list, dtype='|S20')
+		ngals = len(mets)*len(ids)
+
+		basename = "dtau_genpop_fixedmet"
+		parm_basename = "dtau_genpop_fixedmet_params"
+
+		for nn in xrange(len(ids)):
+			for mm in xrange(len(mets)/2):
+				logzsol_txt = mets[mm]
+				num = nn*len(mets)/2+mm+1
+				filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+basename+'_'+logzsol_txt+'_'+ids[nn])
+				parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(num)+'.py')	
+
 	if runname == 'dtau_genpop_nonir':
 
 		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/COSMOS_gensamp.ids"
@@ -434,6 +451,23 @@ def return_mwave_custom(filters):
 
 	return lameff_return
 
+def load_zp_offsets(field):
+
+	filename = os.getenv('APPS')+'/threedhst_bsfh/data/zp_offsets_tbl11_skel14.txt'
+	with open(filename, 'r') as f:
+		for jj in range(1): hdr = f.readline().split()
+	dtype = [np.dtype((str, 35)),np.dtype((str, 35)),np.float,np.float]
+	dat = np.loadtxt(filename, comments = '#',dtype = np.dtype([(hdr[n+1], dtype[n]) for n in xrange(len(hdr)-1)]))
+
+	good = dat['Field'] == field
+	if np.sum(good) == 0:
+		print 'Not an acceptable field name! Returning None'
+		return None
+	else:
+		dat = dat[good]
+
+	return dat
+
 def load_ancil_data(filename,objnum):
 
 	'''
@@ -443,7 +477,7 @@ def load_ancil_data(filename,objnum):
 	with open(filename, 'r') as f:
 		for jj in range(1): hdr = f.readline().split()
 	dat = np.loadtxt(filename, comments = '#',dtype = np.dtype([(n, np.float) for n in hdr[1:]]))
-	
+
 	if objnum:
 		objdat = dat[dat['id'] == float(objnum)]
 		return objdat

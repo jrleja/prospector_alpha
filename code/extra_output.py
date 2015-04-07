@@ -246,22 +246,18 @@ def post_processing(param_name, add_extra=True, nsamp_mc=1000):
 	
 	print 'begun post-processing'
 	parmfile = model_setup.import_module_from_file(param_name)
-	print 'loaded param file'
 	outname = parmfile.run_params['outfile']
 	outfolder = os.getenv('APPS')+'/threedhst_bsfh/plots/'+outname.split('/')[-2]+'/'
-	print 'defined outfolder'
 
 	# thin and chop the chain?
 	thin=1
 	chop_chain=1.666
 
-	print 'about to check output folder existence'
 	# make sure the output folder exists
 	try:
 		os.makedirs(outfolder)
 	except OSError:
 		pass
-	print 'checked output folder existence'
 
 	# find most recent output file
 	# with the objname
@@ -275,7 +271,6 @@ def post_processing(param_name, add_extra=True, nsamp_mc=1000):
 		print 'Failed to find any files in ' + folder + ' of form ' + filename
 		return 0
 
-	print 'found files'
 	# load results
 	mcmc_filename=outname+'_'+max(times)+"_mcmc"
 	model_filename=outname+'_'+max(times)+"_model"

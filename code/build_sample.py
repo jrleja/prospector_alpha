@@ -198,7 +198,19 @@ def build_sample_general():
 	ascii.write([np.array(phot_out['id'],dtype='int')], output=id_str_out, Writer=ascii.NoHeader)
 	print 1/0
 
-def build_sample_halpha():
+def remove_zp_offsets(field,phot):
+
+	zp_offsets = threed_dutils.load_zp_offsets(field)
+	nbands     = len(zp_offsets)
+
+	for kk in xrange(nbands):
+		filter = zp_offsets[kk]['Band'].lower()+'_'+field.lower()
+		phot['f_'+filter] = phot['f_'+filter]/zp_offsets[kk]['Flux-Correction']
+		phot['e_'+filter] = phot['e_'+filter]/zp_offsets[kk]['Flux-Correction']
+
+	return phot
+
+def build_sample_halpha(rm_zp_offsets=True):
 
 	'''
 	selects a sample of galaxies "randomly"
@@ -212,6 +224,12 @@ def build_sample_halpha():
 	ancil_str_out = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_'+basename+'.dat'
 	phot_str_out = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_'+basename+'.cat'
 	id_str_out   = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_'+basename+'.ids'
+
+	if rm_zp_offsets:
+		fast_str_out = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_'+basename+'_zp.fout'
+		ancil_str_out = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_'+basename+'_zp.dat'
+		phot_str_out = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_'+basename+'_zp.cat'
+		id_str_out   = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_'+basename+'_zp.ids'
 
 	# load data
 	# use grism redshift
@@ -296,6 +314,10 @@ def build_sample_halpha():
 	# artificially add "z" to ancillary outputs
 	# later, will draw z from zbest
 	# later still, will do PDF...
+
+	if rm_zp_offsets:
+		phot_out = remove_zp_offsets(field,phot_out)
+
 	ascii.write(phot_out, output=phot_str_out, 
 	            delimiter=' ', format='commented_header')
 	ascii.write(fast_out, output=fast_str_out, 
