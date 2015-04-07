@@ -541,7 +541,7 @@ def load_obs_3dhst(filename, objnum, mips=None, min_error = None, abs_error=Fals
 		for kk in xrange(len(filters)):
 			match = band_names == filters[kk]
 			if np.sum(match) > 0:
-				unc[kk] = ( (unc[kk]**2) + (flux[kk]*(1-zp_offsets[match]['Flux-Correction']))**2 ) **0.5
+				maggies_unc[kk] = ( (maggies_unc[kk]**2) + (maggies[kk]*(1-zp_offsets[match]['Flux-Correction'][0]))**2 ) **0.5
 
 	# sort outputs based on effective wavelength
 	points = zip(wave_effective,filters,phot_mask,maggies,maggies_unc)
