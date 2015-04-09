@@ -188,6 +188,8 @@ def build_sample_general():
 		if column[:2] == 'f_' or column[:2] == 'e_':
 			phot_out.rename_column(column, column.lower()+'_'+field.lower())	
 
+	print 1/0
+
 	ascii.write(phot_out, output=phot_str_out, 
 	            delimiter=' ', format='commented_header')
 	ascii.write(fast_out, output=fast_str_out, 

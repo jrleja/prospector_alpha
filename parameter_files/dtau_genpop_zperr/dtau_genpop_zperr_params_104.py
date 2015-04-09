@@ -351,7 +351,7 @@ halpha_eqw_txt = "%04d" % int(ancildat['Ha_EQW_obs'])
 run_params['outfile'] = run_params['outfile']+'_'+halpha_eqw_txt+'_'+run_params['objname']
 
 # use zbest, not whatever's in the fast run
-zbest = ancildat['z']
+zbest = ancildat['zbest']
 model_params[parmlist.index('zred')]['init'] = zbest
 			
 ####### RESET AGE PRIORS TO MATCH AGE OF UNIVERSE ##########
