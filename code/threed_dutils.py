@@ -822,7 +822,6 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None, measure_ir 
 		# switch to flam
 		factor = 3e18 / w**2
 		spec *= factor
-		spec_neboff *= factor
 
 		model.params['zred'] = z
 
@@ -830,10 +829,6 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None, measure_ir 
 		sps.params['add_neb_emission'] = True
 		sps.params['add_neb_continuum'] = True
 		w, spec = sps.get_spectrum(tage=sps.params['tage'], peraa=True)
-
-		sps.params['add_neb_emission'] = False
-		sps.params['add_neb_continuum'] = False
-		w, spec_neboff = sps.get_spectrum(tage=sps.params['tage'], peraa=True)
 
 	emline_flux = np.zeros(len(wavelength))
 
