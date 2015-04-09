@@ -212,6 +212,45 @@ def generate_basenames(runname):
 			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+basename+'_'+heqw_txt+'_'+ids[jj])
 			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
 
+	if runname == 'dtau_ha_zp':
+
+		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/COSMOS_testsamp_zp.ids"
+		ids = np.loadtxt(id_list, dtype='|S20')
+		ngals = len(ids)
+
+		basename = "dtau_ha_zp"
+		parm_basename = "dtau_ha_zp_params"
+		ancilname='COSMOS_testsamp_zp.dat'
+
+		for jj in xrange(ngals):
+			ancildat = load_ancil_data(os.getenv('APPS')+
+			                           '/threedhst_bsfh/data/COSMOS_testsamp_zp.dat',
+			                           ids[jj])
+			heqw_txt = "%04d" % int(ancildat['Ha_EQW_obs']) 
+			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+basename+'_'+heqw_txt+'_'+ids[jj])
+			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
+
+
+	if runname == 'dtau_ha_zperr':
+
+		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/COSMOS_testsamp.ids"
+		ids = np.loadtxt(id_list, dtype='|S20')
+		ngals = len(ids)
+
+		basename = "dtau_ha_zperr"
+		parm_basename = "dtau_ha_zperr_params"
+
+		for jj in xrange(ngals):
+			ancildat = load_ancil_data(os.getenv('APPS')+
+			                           '/threedhst_bsfh/data/COSMOS_testsamp.dat',
+			                           ids[jj])
+			heqw_txt = "%04d" % int(ancildat['Ha_EQW_obs']) 
+			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+basename+'_'+heqw_txt+'_'+ids[jj])
+			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
+
+
+
+
 	if runname == 'dtau_genpop':
 
 		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/COSMOS_gensamp.ids"
@@ -765,14 +804,14 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None, measure_ir 
     # define emission lines
 	emline = np.array(['[OII]','Hbeta','[OIII]1','[OIII]2','Halpha','[SII]'])
 	wavelength = np.array([3728,4861.33,4959,5007,6562,6732.71])
-	sideband   = np.array([  10,     10,  10,  10,  10,     10])
+	sideband   = [(3723,3736),(4857,4868),(4954,4968),(5001,5015),(6556,6573),(6710,6728)]
 	nline = len(emline)
 
 	# get spectrum
 	if model:
 
 		# save redshift
-		z      = model.params.get('zred', np.array(0.0))
+		z      = model.params.get('zred', np.array(0.0))+0.0
 		model.params['zred'] = np.array(0.0)
 
 		# nebon
@@ -780,15 +819,12 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None, measure_ir 
 		model.params['add_neb_continuum'] = np.array(True)
 		spec,mags,w = model.mean_model(thetas, obs, sps=sps, norm_spec=False)
 		
-		# neboff
-		model.params['add_neb_emission'] = np.array(False)
-		model.params['add_neb_continuum'] = np.array(False)
-		spec_neboff,mags_neboff,w = model.mean_model(thetas, obs, sps=sps, norm_spec=False)
-
 		# switch to flam
 		factor = 3e18 / w**2
 		spec *= factor
 		spec_neboff *= factor
+
+		model.params['zred'] = z
 
 	else:
 		sps.params['add_neb_emission'] = True
@@ -799,18 +835,17 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None, measure_ir 
 		sps.params['add_neb_continuum'] = False
 		w, spec_neboff = sps.get_spectrum(tage=sps.params['tage'], peraa=True)
 
-	# diff
-	spec = spec-spec_neboff
 	emline_flux = np.zeros(len(wavelength))
 
 	for jj in xrange(len(wavelength)):
-		integrate_lam = (w > wavelength[jj]-sideband[jj]) & (w < wavelength[jj]+sideband[jj])
-		emline_flux[jj] = np.trapz(spec[integrate_lam], w[integrate_lam])
+		integrate_lam = (w > sideband[jj][0]) & (w < sideband[jj][1])
+		baseline      = spec[np.abs(w-sideband[jj][0]) == np.min(np.abs(w-sideband[jj][0]))][0]
+		emline_flux[jj] = np.trapz(spec[integrate_lam]-baseline, w[integrate_lam])
 
 		if saveplot and jj==4:
 			plt.plot(w,spec,'ro',linestyle='-')
 			plt.plot(w[integrate_lam], spec[integrate_lam], 'bo',linestyle=' ')
-			plt.xlim(wavelength[jj]-200,wavelength[jj]+200)
+			plt.xlim(wavelength[jj]-40,wavelength[jj]+40)
 			plt.ylim(-np.max(spec[integrate_lam])*0.2,np.max(spec[integrate_lam])*1.2)
 			
 			plotlines=['[SIII]','[NII]','Halpha','[SII]']

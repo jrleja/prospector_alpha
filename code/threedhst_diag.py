@@ -650,6 +650,7 @@ def plot_all_driver():
 	runname = 'dtau_genpop'
 	#runname = 'dtau_nonir'
 	runname = 'dtau_genpop_fixedmet'
+	runname = 'dtau_ha_zperr'
 
 	filebase, parm_basename, ancilname=threed_dutils.generate_basenames(runname)
 	for jj in xrange(len(filebase)):

@@ -1386,7 +1386,7 @@ def plot_residuals(runname):
 
 	ax.set_ylabel('(obs-model)/errors')
 	ax.set_xlabel('observed wavelength')
-	ax.set_ylim(-7.0,7.0)
+	ax.set_ylim(-2.0,2.0)
 	ax.set_xlim(3.0,5.5)
 	ax.hlines(0.0,ax.get_xlim()[0],ax.get_xlim()[1], linestyle='--',colors='k')
 	plt.savefig(outdir+'residuals_by_err.png', dpi=300)
@@ -1406,7 +1406,7 @@ def plot_residuals(runname):
 
 	ax.set_ylabel('(obs-model)/obs')
 	ax.set_xlabel('observed wavelength')
-	ax.set_ylim(-3,3)
+	ax.set_ylim(-1.5,1.5)
 	ax.set_xlim(3.0,5.5)
 	ax.hlines(0.0,ax.get_xlim()[0],ax.get_xlim()[1], linestyle='--',colors='k')
 
