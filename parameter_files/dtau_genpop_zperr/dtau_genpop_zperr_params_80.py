@@ -11,7 +11,7 @@ tophat = priors.tophat
 #############
 
 run_params = {'verbose':True,
-              'outfile':os.getenv('APPS')+'/threedhst_bsfh/results/dtau_ha_zperr/dtau_ha_zperr',
+              'outfile':os.getenv('APPS')+'/threedhst_bsfh/results/dtau_genpop_zperr/dtau_genpop_zperr',
               'ftol':0.5e-5, 
               'maxfev':5000,
               'nwalkers':248,
@@ -27,9 +27,9 @@ run_params = {'verbose':True,
               'abs_error': False,
               'spec': False, 
               'phot':True,
-              'photname':os.getenv('APPS')+'/threedhst_bsfh/data/COSMOS_testsamp.cat',
-              'fastname':os.getenv('APPS')+'/threedhst_bsfh/data/COSMOS_testsamp.fout',
-              'ancilname':os.getenv('APPS')+'/threedhst_bsfh/data/COSMOS_testsamp.dat',
+              'photname':os.getenv('APPS')+'/threedhst_bsfh/data/COSMOS_gensamp.cat',
+              'fastname':os.getenv('APPS')+'/threedhst_bsfh/data/COSMOS_gensamp.fout',
+              'ancilname':os.getenv('APPS')+'/threedhst_bsfh/data/COSMOS_gensamp.dat',
               'objname':'33152',
               }
 
