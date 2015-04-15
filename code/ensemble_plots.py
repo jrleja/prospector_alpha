@@ -486,6 +486,103 @@ def offset_and_scatter(x,y,biweight=True):
 
 	return mean_offset,scat
 
+def ml_vs_color(runname):
+
+	filebase,params,ancilname=threed_dutils.generate_basenames(runname)
+	ngals = len(filebase)
+
+	nfail = 0
+
+	# name output
+	outname = os.getenv('APPS')+'/threedhst_bsfh/plots/ensemble_plots/'+runname+'/ml_vs_color.png'
+	outname_2 = os.getenv('APPS')+'/threedhst_bsfh/plots/ensemble_plots/'+runname+'/ml_vs_color_twoml.png'
+
+	# filler arrays
+	br_color = np.zeros(ngals)
+	ml_b     = np.zeros(ngals)
+	ml_k     = np.zeros(ngals)
+
+	for jj in xrange(ngals):
+
+		# find most recent output file
+		# with the objname
+		folder = "/".join(filebase[jj].split('/')[:-1])
+		filename = filebase[jj].split("/")[-1]
+		files = [f for f in os.listdir(folder) if "_".join(f.split('_')[:-2]) == filename]	
+		times = [f.split('_')[-2] for f in files]
+
+		# if we found no files, skip this object
+		if len(times) == 0:
+			print 'Failed to find any files in '+folder+' of type ' +filename+' to extract times'
+			nfail+=1
+			continue
+
+		# load results
+		mcmc_filename=filebase[jj]+'_'+max(times)+"_mcmc"
+		model_filename=filebase[jj]+'_'+max(times)+"_model"
+
+		try:
+			sample_results, powell_results, model = read_results.read_pickles(mcmc_filename, model_file=model_filename,inmod=None)
+		except (ValueError,EOFError,KeyError):
+			print mcmc_filename + ' failed during output writing'
+			nfail+=1
+			continue
+		except IOError:
+			print mcmc_filename + ' does not exist!'
+			nfail+=1
+			continue
+
+		# check for existence of extra information
+		try:
+			sample_results['quantiles']
+		except:
+			print 'Generating extra information for '+mcmc_filename+', '+model_filename
+			extra_output.post_processing(params[jj])
+			sample_results, powell_results, model = read_results.read_pickles(mcmc_filename, model_file=model_filename,inmod=None)
+
+		# check to see if we want zcontinuous=2 (i.e., the MDF)
+		if np.sum([1 for x in sample_results['model'].config_list if x['name'] == 'pmetals']) > 0:
+			sps = threed_dutils.setup_sps(zcontinuous=2)
+			print 'using the MDF'
+		else:
+			sps = threed_dutils.setup_sps(zcontinuous=1)
+			print 'using interpolated metallicities'
+
+		# grab best-fit parameters at z=0
+		thetas = sample_results['quantiles']['maxprob_params']		
+		specmax,magsmax,w = sample_results['model'].mean_model(thetas, sample_results['obs'], sps=sps,norm_spec=False)
+
+		bmag,blum=threed_dutils.integrate_mag(w,specmax,'b_cosmos')
+		rmag,rlum=threed_dutils.integrate_mag(w,specmax,'r_cosmos')
+		kmag,klum=threed_dutils.integrate_mag(w,specmax,'k_cosmos')
+
+		bmag_sun = 5.47
+		kmag_sun = 3.33
+
+		ab_to_vega_b = 0.09
+		ab_to_vega_r = -0.21
+		ab_to_vega_k = -1.9
+
+		ml_b[jj] = (thetas[0]+thetas[1]) / (10**((bmag_sun-(bmag+ab_to_vega_b))/2.5))
+		ml_k[jj] = (thetas[0]+thetas[1]) / (10**((kmag_sun-(kmag+ab_to_vega_k))/2.5))
+		br_color[jj] = (bmag+ab_to_vega_b) - (rmag+ab_to_vega_r)
+	
+	plt.plot(br_color,np.log10(ml_b),'bo',alpha=0.5)
+	plt.ylim(-0.4,1.4)
+	plt.xlim(0.0,2.22)
+	plt.savefig(outname,dpi=300)
+	plt.close()
+	plt.plot(br_color,np.log10(ml_b),'bo',alpha=0.5)
+	plt.plot(br_color,np.log10(ml_k),'ko',alpha=0.5)
+	plt.ylim(-0.7,0.8)
+	plt.xlim(0.5,1.7)
+	plt.savefig(outname_2,dpi=300)
+	plt.close()
+	print 1/0
+
+
+
+
 def av_to_sfr(runname, scale=False):
 
 	inname = os.getenv('APPS')+'/threedhst_bsfh/results/'+runname+'/'+runname+'_ensemble.pickle'

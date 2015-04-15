@@ -42,14 +42,14 @@ def test_likelihood(param_file=None, sps=None, model=None, obs=None, thetas=None
 
 	return lnp_phot
 
-def setup_sps(zcontinuous=2):
+def setup_sps(zcontinuous=2,compute_vega_magnitudes=False):
 
 	'''
 	easy way to define an SPS
 	'''
 
 	# load stellar population, set up custom filters
-	sps = fsps.StellarPopulation(zcontinuous=zcontinuous, compute_vega_mags=False)
+	sps = fsps.StellarPopulation(zcontinuous=zcontinuous, compute_vega_mags=compute_vega_magnitudes)
 	custom_filter_keys = os.getenv('APPS')+'/threedhst_bsfh/filters/filter_keys_threedhst.txt'
 	fsps.filters.FILTERS = model_setup.custom_filter_dict(custom_filter_keys)
 
@@ -141,6 +141,24 @@ def generate_basenames(runname):
 	filebase=[]
 	parm=[]
 	ancilname='COSMOS_testsamp.dat'
+
+	if runname == 'dtau_genpop_zperr':
+
+		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/COSMOS_gensamp.ids"
+		ids = np.loadtxt(id_list, dtype='|S20')
+		ngals = len(ids)
+
+		basename = "dtau_genpop_zperr"
+		parm_basename = "dtau_genpop_zperr_params"
+		ancilname='COSMOS_gensamp.dat'
+
+		for jj in xrange(ngals):
+			ancildat = load_ancil_data(os.getenv('APPS')+
+			                           '/threedhst_bsfh/data/COSMOS_gensamp.dat',
+			                           ids[jj])
+			heqw_txt = "%04d" % int(ancildat['Ha_EQW_obs']) 
+			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+basename+'_'+heqw_txt+'_'+ids[jj])
+			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
 
 	if runname == 'dtau_nonir':
 

@@ -11,11 +11,11 @@ tophat = priors.tophat
 #############
 
 run_params = {'verbose':True,
-              'outfile':os.getenv('APPS')+'/threedhst_bsfh/results/dtau_genpop/dtau_genpop',
+              'outfile':os.getenv('APPS')+'/threedhst_bsfh/results/testsed/testsed',
               'ftol':0.5e-5, 
               'maxfev':5000,
               'nwalkers':248,
-              'nburn':[32,64,128,128], 
+              'nburn':[32], 
               'niter': 2048,
               'initial_disp':0.1,
               'debug': False,
@@ -27,20 +27,67 @@ run_params = {'verbose':True,
               'abs_error': False,
               'spec': False, 
               'phot':True,
-              'photname':os.getenv('APPS')+'/threedhst_bsfh/data/COSMOS_gensamp.cat',
-              'fastname':os.getenv('APPS')+'/threedhst_bsfh/data/COSMOS_gensamp.fout',
-              'ancilname':os.getenv('APPS')+'/threedhst_bsfh/data/COSMOS_gensamp.dat',
-              'mipsname':os.getenv('APPS')+'/threedhst_bsfh/data/MIPS/cosmos_3dhst.v4.1.4.sfr',
-              'objname':'9287',
+              'photname':os.getenv('APPS')+'/threedhst_bsfh/data/testsed.cat',
+              'truename':os.getenv('APPS')+'/threedhst_bsfh/data/testsed.dat',
+              'objname':'18',
               }
 
 ############
 # OBS
 #############
 
-obs = threed_dutils.load_obs_3dhst(run_params['photname'], run_params['objname'],
-									mips=run_params['mipsname'], min_error=run_params['min_error'],
-                                    abs_error=run_params['abs_error'])
+def load_obs_3dhst(filename, objnum, zperr=False):
+    """
+    Load 3D-HST photometry file, return photometry for a particular object.
+    min_error: set the minimum photometric uncertainty to be some fraction
+    of the flux. if not set, use default errors.
+    """
+    obs ={}
+
+    with open(filename, 'r') as f:
+        hdr = f.readline().split()
+    dat = np.loadtxt(filename, comments = '#',
+                     dtype = np.dtype([(n, np.float) for n in hdr[1:]]))
+    obj_ind = np.where(dat['id'] == int(objnum))[0][0]
+    
+    # extract fluxes+uncertainties for all objects and all filters
+    flux_fields = [f for f in dat.dtype.names if f[0:2] == 'f_']
+    unc_fields = [f for f in dat.dtype.names if f[0:2] == 'e_']
+    filters = [f[2:] for f in flux_fields]
+
+    # extract fluxes for particular object, converting from record array to numpy array
+    flux = dat[flux_fields].view(float).reshape(len(dat),-1)[obj_ind]
+    unc  = dat[unc_fields].view(float).reshape(len(dat),-1)[obj_ind]
+
+    # define all outputs
+    wave_effective = np.array(threed_dutils.return_mwave_custom(filters))
+    phot_mask = np.logical_or(np.logical_or((flux != unc),(flux > 0)),flux != -99.0)
+
+    if zperr is True:
+        zp_offsets = threed_dutils.load_zp_offsets(None)
+        band_names = np.array([x['Band'].lower()+'_'+x['Field'].lower() for x in zp_offsets])
+        
+        for kk in xrange(len(filters)):
+            match = band_names == filters[kk]
+            if np.sum(match) > 0:
+                maggies_unc[kk] = ( (maggies_unc[kk]**2) + (maggies[kk]*(1-zp_offsets[match]['Flux-Correction'][0]))**2 ) **0.5
+
+    # sort outputs based on effective wavelength
+    points = zip(wave_effective,filters,phot_mask,flux,unc)
+    sorted_points = sorted(points)
+
+    # build output dictionary
+    obs['wave_effective'] = np.array([point[0] for point in sorted_points])
+    obs['filters'] = np.array([point[1] for point in sorted_points])
+    obs['phot_mask'] =  np.array([point[2] for point in sorted_points])
+    obs['maggies'] = np.array([point[3] for point in sorted_points])
+    obs['maggies_unc'] =  np.array([point[4] for point in sorted_points])
+    obs['wavelength'] = None
+    obs['spectrum'] = None
+
+    return obs
+
+obs = load_obs_3dhst(run_params['photname'], run_params['objname'], zperr=False)
 
 #############
 # MODEL_PARAMS
@@ -121,6 +168,13 @@ model_params.append({'name': 'mass', 'N': 2,
                         'prior_args': {'mini':np.array([1e7, 1e7]),
                                        'maxi':np.array([1e14, 1e14])}})
 
+model_params.append({'name': 'pmetals', 'N': 1,
+                        'isfree': False,
+                        'init': -99,
+                        'units': '',
+                        'prior_function': None,
+                        'prior_args': {'mini':-3, 'maxi':-1}})
+
 model_params.append({'name': 'logzsol', 'N': 1,
                         'isfree': True,
                         'init': -0.2,
@@ -149,7 +203,7 @@ model_params.append({'name': 'tau', 'N': 2,
 
 model_params.append({'name': 'tage', 'N': 1,
                         'isfree': False,
-                        'init': 1.0,
+                        'init': 14.0,
                         'units': 'Gyr',
                         'prior_function': tophat,
                         'prior_args': {'mini':0.1, 'maxi':14.0}})
@@ -274,7 +328,14 @@ model_params.append({'name': 'duste_qpah', 'N': 1,
 ###### Nebular Emission ###########
 model_params.append({'name': 'add_neb_emission', 'N': 1,
                         'isfree': False,
-                        'init': False,
+                        'init': 2,
+                        'units': r'log Z/Z_\odot',
+                        'prior_function_name': None,
+                        'prior_args': None})
+
+model_params.append({'name': 'add_neb_continuum', 'N': 1,
+                        'isfree': False,
+                        'init': True,
                         'units': r'log Z/Z_\odot',
                         'prior_function_name': None,
                         'prior_args': None})
@@ -303,48 +364,6 @@ model_params.append({'name': 'phot_jitter', 'N': 1,
                         'prior_function': tophat,
                         'prior_args': {'mini':0.0, 'maxi':0.2}})
 
-####### SET INITIAL PARAMETERS ##########
-fastvalues,fastfields = threed_dutils.load_fast_3dhst(run_params['fastname'],
-                                                      run_params['objname'])
-parmlist = [p['name'] for p in model_params]
 
-if run_params['set_init_params'] == 'fast':
-
-	# translate
-	fparams = {}
-	translate = {#'zred': ('z', lambda x: x),
-                 'tau':  ('ltau', lambda x: (10**x)/1e9),
-                 #'tage': ('lage', lambda x:  (10**x)/1e9),
-                 'dust2':('Av', lambda x: x),
-                 'mass': ('lmass', lambda x: (10**x))}
-	for k, v in translate.iteritems():		
-		fparams[k] = v[1](fastvalues[np.array(fastfields) == v[0]][0])
-
-	for par in model_params:
-		if (par['name'] in fparams):
-			par['init'] = fparams[par['name']]
-if run_params['set_init_params'] == 'random':
-	import random
-	for ii in xrange(len(model_params)):
-		if model_params[ii]['isfree'] == True:
-			max = model_params[ii]['prior_args']['maxi']
-			min = model_params[ii]['prior_args']['mini']
-			model_params[ii]['init'] = random.random()*(max-min)+min
-
-######## LOAD ANCILLARY INFORMATION ########
-# name outfiles based on halpha eqw
-ancildat = threed_dutils.load_ancil_data(run_params['ancilname'],run_params['objname'])
-halpha_eqw_txt = "%04d" % int(ancildat['Ha_EQW_obs'])
-run_params['outfile'] = run_params['outfile']+'_'+halpha_eqw_txt+'_'+run_params['objname']
-
-# use zbest, not whatever's in the fast run
-zbest = ancildat['zbest']
-model_params[parmlist.index('zred')]['init'] = zbest
-			
-####### RESET AGE PRIORS TO MATCH AGE OF UNIVERSE ##########
-tuniv = WMAP9.age(model_params[0]['init']).value
-
-# set tage
-# set max on sf_start
-model_params[parmlist.index('tage')]['init'] = np.zeros(len(np.atleast_1d(model_params[parmlist.index('tage')]['init'])))+tuniv
-model_params[parmlist.index('sf_start')]['prior_args']['maxi'] = np.zeros(len(np.atleast_1d(model_params[parmlist.index('sf_start')]['prior_args']['maxi'])))+ 0.9*tuniv
+# name outfile
+run_params['outfile'] = run_params['outfile']+'_'+run_params['objname']

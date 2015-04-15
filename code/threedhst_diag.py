@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import triangle, os, math, copy, threed_dutils
-from bsfh import model_setup, read_results
+from bsfh import read_results
 import matplotlib.image as mpimg
 from astropy.cosmology import WMAP9
 import fsps
@@ -649,8 +649,8 @@ def plot_all_driver():
 	runname = 'dtau_intmet'
 	runname = 'dtau_genpop'
 	#runname = 'dtau_nonir'
-	runname = 'dtau_genpop_fixedmet'
-	runname = 'dtau_ha_zperr'
+	#runname = 'dtau_genpop_fixedmet'
+	#runname = 'dtau_ha_zperr'
 
 	filebase, parm_basename, ancilname=threed_dutils.generate_basenames(runname)
 	for jj in xrange(len(filebase)):

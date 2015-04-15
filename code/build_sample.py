@@ -122,6 +122,132 @@ def calc_uvj_flag(rf):
 	
 	return uvj_flag
 
+def build_sample_test(add_zp_err=False):
+
+	'''
+	Generate model SEDs and add noise
+	'''
+
+	from bsfh import model_setup
+
+	#### output names ####
+	basename = 'testsed_noisy_offset'
+	outname = '/Users/joel/code/python/threedhst_bsfh/data/'+basename
+
+	#### generation parameters ####
+	ngals          = 20
+	noise          = 0.05            # add errors
+	reported_noise = 1.0*noise       # under-report the noise?
+	noise = 0.25
+	reported_noise = 0.05
+
+	#### load test model, build sps  ####
+	parmfile = '/Users/joel/code/python/threedhst_bsfh/parameter_files/testsed/testsed_params.py'
+	model = model_setup.load_model(parmfile)
+	obs   = model_setup.load_obs(parmfile)
+	sps = threed_dutils.setup_sps()
+
+	#### generate random model parameters ####
+	nparams = len(model.initial_theta)
+	testparms = np.zeros(shape=(ngals,nparams))
+	parnames = np.array(model.theta_labels())
+	for ii in xrange(nparams):
+		
+		# random in logspace
+		# also enforce priors
+		if parnames[ii][:-2] == 'mass' or parnames[ii][:-2] == 'tau':
+			min = np.log10(model.theta_bounds()[ii][0])
+			max = np.log10(model.theta_bounds()[ii][1])
+			
+			# ensure that later priors CAN be enforced
+			if parnames[ii] == 'mass_1': max = np.log10(10**max/20)
+			if parnames[ii] == 'tau_1': min = np.log10(10**min*2)
+
+			# enforce priors on mass and tau
+			if parnames[ii] == 'mass_2':
+				max = np.log10(testparms[:,parnames == 'mass_1']*20)
+				for kk in xrange(ngals): testparms[kk,ii] = 10**(random.random()*(max[kk]-min)+min)
+			elif parnames[ii] == 'tau_2':
+				max = np.log10(testparms[:,parnames == 'tau_1']/2.)
+				for kk in xrange(ngals): testparms[kk,ii] = 10**(random.random()*(max[kk]-min)+min)
+			else:
+				for kk in xrange(ngals): testparms[kk,ii] = 10**(random.random()*(max-min)+min)
+		else:
+			min = model.theta_bounds()[ii][0]
+			max = model.theta_bounds()[ii][1]
+			for kk in xrange(ngals): testparms[kk,ii] = random.random()*(max-min)+min
+
+           #tau[0]/2 > tau[1] 
+
+	#### make sure priors are satisfied
+	for ii in xrange(ngals):
+		assert np.isfinite(model.prior_product(testparms[ii,:]))
+
+	#### set up photometry output ####
+	nfilters = len(obs['filters'])
+	maggies     = np.zeros(shape=(ngals,nfilters))
+	maggies_unc = np.zeros(shape=(ngals,nfilters))
+
+	#### generate photometry, add noise ####
+	for ii in xrange(ngals):
+		model.initial_theta = testparms[ii,:]
+		_,maggiestemp,_ = model.mean_model(model.initial_theta, obs, sps=sps,norm_spec=False)
+		maggies[ii,:] = maggiestemp
+
+		#### add noise ####
+		for kk in xrange(nfilters): maggies[ii,kk] += random.gauss(0, noise)*maggies[ii,kk]
+
+		#### record noise ####
+		maggies_unc[ii,:] = maggies[ii,:]*reported_noise
+
+	#### add zeropoint offsets ####
+	if add_zp_err:
+		zp_offsets = threed_dutils.load_zp_offsets('COSMOS')
+		for kk in xrange(len(zp_offsets)):
+			filter = zp_offsets[kk]['Band'].lower()+'_cosmos'
+			index  = obs['filters'] == filter
+			maggies[:,index] = maggies[:,index]*zp_offsets[kk]['Flux-Correction']
+			if np.sum(index) == 0:
+				print 1/0
+
+	#### output ####
+	#### ids first ####
+	ids =  np.arange(ngals)+1
+	with open(outname+'.ids', 'w') as f:
+	    for id in ids:
+	        f.write(str(id)+'\n')
+
+	#### photometry ####
+	with open(outname+'.cat', 'w') as f:
+		
+		### header ###
+		f.write('# id ')
+		for filter in obs['filters']:
+			f.write('f_'+filter+' e_' +filter+' ')
+		f.write('\n')
+
+		### data ###
+		for ii in xrange(ngals):
+			f.write(str(ids[ii])+' ')
+			for kk in xrange(nfilters):
+				f.write(str(maggies[ii,kk])+' '+str(maggies_unc[ii,kk]) + ' ')
+			f.write('\n')
+
+	#### thetas ####
+	with open(outname+'.dat', 'w') as f:
+		
+		### header ###
+		f.write('# ')
+		for theta in model.theta_labels():
+			f.write(theta+' ')
+		f.write('\n')
+
+		### data ###
+		for ii in xrange(ngals):
+			for kk in xrange(nparams):
+				f.write(str(testparms[ii,kk])+' ')
+			f.write('\n')
+
 def build_sample_general():
 
 	'''
