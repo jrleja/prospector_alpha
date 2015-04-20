@@ -12,7 +12,7 @@ logarithmic = priors.logarithmic
 #############
 
 run_params = {'verbose':True,
-              'outfile':os.getenv('APPS')+'/threedhst_bsfh/results/testsed/testsed',
+              'outfile':os.getenv('APPS')+'/threedhst_bsfh/results/testsed_new/testsed_new',
               'ftol':0.5e-5, 
               'maxfev':5000,
               'nwalkers':248,
@@ -28,8 +28,8 @@ run_params = {'verbose':True,
               'abs_error': False,
               'spec': False, 
               'phot':True,
-              'photname':os.getenv('APPS')+'/threedhst_bsfh/data/testsed.cat',
-              'truename':os.getenv('APPS')+'/threedhst_bsfh/data/testsed.dat',
+              'photname':os.getenv('APPS')+'/threedhst_bsfh/data/testsed_new.cat',
+              'truename':os.getenv('APPS')+'/threedhst_bsfh/data/testsed_new.dat',
               'objname':'11',
               }
 
