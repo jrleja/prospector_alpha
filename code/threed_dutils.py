@@ -122,6 +122,51 @@ def synthetic_emlines(mass,sfr,dust1,dust2,dust_index):
 	          'flux': flux}
 	return output
 
+def load_truths(truthname,objname,sample_results):
+
+	'''
+	loads truths
+	generates plotvalues
+	'''
+
+	# load truths
+	nextra = 2
+	truth = np.loadtxt(truthname)
+	truths = truth[int(sample_results['run_params']['objname'])-1,:]
+	parnames = np.array(sample_results['model'].theta_labels())
+
+	# create totmass and totsfr        
+	mass = truths[np.array([True if 'mass' in x else False for x in parnames])]
+	totmass = np.log10(np.sum(mass))
+
+	tau = truths[np.array([True if 'tau' in x else False for x in parnames])]
+	sf_start = truths[np.array([True if 'sf_start' in x else False for x in parnames])]
+	tage = np.zeros(len(tau))+sample_results['model'].params['tage'][0]
+	deltat=0.1
+	totsfr=np.log10(integrate_sfh(np.atleast_1d(tage)[0]-deltat,np.atleast_1d(tage)[0],mass,tage,tau,sf_start)*np.sum(mass)/(deltat*1e9))
+
+	# convert truths to plotting parameters
+	plot_truths = truths+0.0
+	for kk in xrange(len(parnames)):
+		# reset age
+		if parnames[kk] == 'sf_start' or parnames[kk][:-2] == 'sf_start':
+			plot_truths[kk] = sample_results['model'].params['tage'][0]-plot_truths[kk]
+
+		# log parameters
+		if parnames[kk] == 'mass' or parnames[kk][:-2] == 'mass' or \
+           parnames[kk] == 'tau' or parnames[kk][:-2] == 'tau' or \
+           parnames[kk] == 'sf_start' or parnames[kk][:-2] == 'sf_start':
+
+			plot_truths[kk] = np.log10(plot_truths[kk])
+
+    
+	truths_dict = {'parnames':parnames,
+				   'truths':truths,
+				   'plot_truths':plot_truths,
+				   'extra_parnames':np.array(['totmass','totsfr']),
+				   'extra_truths':np.array([totmass,totsfr])}
+	return truths_dict
+
 def running_median(x,y,nbins=10):
 
 	bins = np.linspace(x.min(),x.max(), nbins)
@@ -141,6 +186,20 @@ def generate_basenames(runname):
 	filebase=[]
 	parm=[]
 	ancilname='COSMOS_testsamp.dat'
+
+	if runname == 'testsed':
+
+		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/testsed.ids"
+		ids = np.loadtxt(id_list, dtype='|S20')
+		ngals = len(ids)
+
+		basename = "testsed"
+		parm_basename = "testsed_params"
+		ancilname=None
+
+		for jj in xrange(ngals):
+			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+basename+'_'+ids[jj])
+			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
 
 	if runname == 'dtau_genpop_zperr':
 

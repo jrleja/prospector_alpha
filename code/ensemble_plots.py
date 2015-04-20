@@ -148,7 +148,7 @@ def collate_output(runname,outname):
 		              						 np.concatenate((sample_results['quantiles']['q84'],sample_results['extras']['q84']))
 		
 		# miscellaneous output
-		z[jj] = sample_results['model_params'][0]['init'][0]
+		z[jj] = np.atleast_1d(sample_results['model_params'][0]['init'])[0]
 		mips_sn[jj] = sample_results['obs']['maggies'][-1]/sample_results['obs']['maggies_unc'][-1]
 		output_name=np.append(output_name,filename)
 
@@ -167,8 +167,11 @@ def collate_output(runname,outname):
 		# save dictionary lists
 		obs.append(sample_results['obs'])
 		model_emline.append(sample_results['model_emline'])
-		ancildat.append(threed_dutils.load_ancil_data(os.getenv('APPS')+'/threedhst_bsfh/data/'+ancilname,
+		try:
+			ancildat.append(threed_dutils.load_ancil_data(os.getenv('APPS')+'/threedhst_bsfh/data/'+ancilname,
 			            							  sample_results['run_params']['objname']))
+		except TypeError:
+			pass
 
 		print jj
 
@@ -1718,10 +1721,176 @@ def plot_residuals(runname):
 	print 1/0
 
 
+def testsed_truthplots(runname):
 
+	'''
+	prototype for generating useful output balls
+	currently saves q16, q50, q84, maxprob, and parmlist for each galaxy
 
+	in the future, want it to include:
+	maximum likelihood fit (both parameters and likelihood)
+	mean acceptance fraction
+	also output information about the powell minimization process
+	pri[0].x = min([p.fun for p in pr])   <--- if this is true, then the minimization process chose the processor with initial conditions
+	np.array([p.x for p in pr])
+	'''
 
+	filebase,params,ancilname=threed_dutils.generate_basenames(runname)
+	ngals = len(filebase)
+	output = '/Users/joel/code/python/threedhst_bsfh/plots/ensemble_plots/testsed/truthplots.png'
 
+	nfail = 0
+	for jj in xrange(ngals):
+
+		# find most recent output file
+		# with the objname
+		folder = "/".join(filebase[jj].split('/')[:-1])
+		filename = filebase[jj].split("/")[-1]
+		files = [f for f in os.listdir(folder) if "_".join(f.split('_')[:-2]) == filename]	
+		times = [f.split('_')[-2] for f in files]
+
+		# if we found no files, skip this object
+		if len(times) == 0:
+			print 'Failed to find any files in '+folder+' of type ' +filename+' to extract times'
+			nfail+=1
+			continue
+
+		# load results
+		mcmc_filename=filebase[jj]+'_'+max(times)+"_mcmc"
+		model_filename=filebase[jj]+'_'+max(times)+"_model"
+
+		try:
+			sample_results, powell_results, model = read_results.read_pickles(mcmc_filename, model_file=model_filename,inmod=None)
+		except (ValueError,EOFError,KeyError):
+			print mcmc_filename + ' failed during output writing'
+			nfail+=1
+			continue
+		except IOError:
+			print mcmc_filename + ' does not exist!'
+			nfail+=1
+			continue
+
+		# check for existence of extra information
+		try:
+			sample_results['quantiles']
+		except:
+			print 'Generating extra information for '+mcmc_filename+', '+model_filename
+			extra_output.post_processing(params[jj])
+			sample_results, powell_results, model = read_results.read_pickles(mcmc_filename, model_file=model_filename,inmod=None)
+			
+		# load truths
+		truths = threed_dutils.load_truths(os.getenv('APPS')+'/threed'+sample_results['run_params']['truename'].split('/threed')[1],
+		                                   sample_results['run_params']['objname'],
+		                                   sample_results)
+		
+		# define outputs
+		try:
+			nextra
+		except NameError:
+			# output truths vector
+			nextra=len(truths['extra_parnames'])
+			parnames = np.append(truths['parnames'],truths['extra_parnames'])
+			fulltruths = np.zeros(shape=(ngals,len(parnames))) + np.nan
+			models = np.zeros(shape=(ngals,len(parnames),3)) + np.nan
+			
+
+			# find mass, sfr vectors
+			massind = sample_results['extras']['parnames'] == 'totmass'
+			sfrind = sample_results['extras']['parnames'] == 'sfr_100'
+
+		#### calculate TRUE total mass, total sfr, all TRUE params #####
+		fulltruths[jj,:] = np.append(truths['plot_truths'],truths['extra_truths'])
+
+		#### calculate MODEL total mass, total sfr, all MODEL params #####
+		models[jj,:-nextra,0] = sample_results['quantiles']['q16']
+		models[jj,:-nextra,1] = sample_results['quantiles']['q50']
+		models[jj,:-nextra,2] = sample_results['quantiles']['q84']
+
+		models[jj,-nextra,0] = sample_results['extras']['q16'][massind]
+		models[jj,-nextra,1] = sample_results['extras']['q50'][massind]
+		models[jj,-nextra,2] = sample_results['extras']['q84'][massind]
+
+		models[jj,-nextra+1,0] = sample_results['extras']['q16'][sfrind]
+		models[jj,-nextra+1,1] = sample_results['extras']['q50'][sfrind]
+		models[jj,-nextra+1,2] = sample_results['extras']['q84'][sfrind]
+    
+
+	# format for plotting
+	for kk in xrange(len(parnames)):
+
+		if parnames[kk] == 'sf_start' or parnames[kk][:-2] == 'sf_start':
+			models[:,kk,:] = sample_results['model'].params['tage'][0]-models[:,kk,:]
+
+		# log parameters
+		if parnames[kk] == 'mass' or parnames[kk][:-2] == 'mass' or \
+           parnames[kk] == 'tau' or parnames[kk][:-2] == 'tau' or \
+           parnames[kk] == 'sf_start' or parnames[kk][:-2] == 'sf_start' or \
+           parnames[kk] == 'totsfr' or parnames[kk] == 'totmass':
+
+			models[:,kk,:] = np.log10(models[:,kk,:])
+			parnames[kk] = 'log('+parnames[kk]+')'
+
+	# find 3sigma deviations
+	sigcut=3
+
+	true_totmass = fulltruths[:,-2]
+	model_totmass = models[:,-2,1]
+	model_totmasserrs = asym_errors(models[:,-2,1],models[:,-2,2],models[:,-2,0])
+	bad_totmass = np.logical_or( (true_totmass-model_totmass) > sigcut*model_totmasserrs[1] ,\
+		                         (model_totmass-true_totmass) > sigcut*model_totmasserrs[0] )
+
+	true_totsfr = fulltruths[:,-1]
+	model_totsfr = models[:,-1,1]
+	model_totsfrerrs = asym_errors(models[:,-1,1],models[:,-1,2],models[:,-1,0])
+	bad_totsfr = np.logical_or( (true_totsfr-model_totsfr) > sigcut*model_totsfrerrs[1] ,\
+		                         (model_totsfr-true_totsfr) > sigcut*model_totsfrerrs[0] )
+
+    # set up plot
+	gs = gridspec.GridSpec(4,3)
+	fig = plt.figure(figsize = (9.8,12.6))
+	gs.update(wspace=0.35, hspace=0.35)
+
+	for kk in xrange(len(parnames)):
+		ax = plt.subplot(gs[kk])
+		
+		x = fulltruths[:,kk]
+		y = models[:,kk,1]
+		errs = asym_errors(models[:,kk,1],models[:,kk,2],models[:,kk,0])
+
+		# plot
+		ax.errorbar(x,y, 
+			        fmt='wo', linestyle=' ', alpha=0.5)
+		ax.errorbar(x[bad_totmass],y[bad_totmass], 
+			        fmt='ro', linestyle=' ', alpha=0.3)
+		ax.errorbar(x[bad_totsfr],y[bad_totsfr], 
+			        fmt='bo', linestyle=' ', alpha=0.3)
+		ax.errorbar(x,y, 
+			        fmt=' ', ecolor='0.75', alpha=0.5,
+			        yerr=errs,linestyle=' ',
+			        zorder=-32)
+
+		# label
+		ax.set_xlabel('true '+parnames[kk])
+		ax.set_ylabel('fit '+parnames[kk])
+
+		# axis limits
+		dynx, dyny = (np.nanmax(x)-np.nanmin(x))*0.05,\
+		             (np.nanmax(y)-np.nanmin(y))*0.05
+		if np.nanmin(x)-dynx > np.nanmin(y)-dyny:
+			pmin = np.nanmin(y)-dyny*3
+		else:
+			pmin = np.nanmin(x)-dynx*3
+		if np.nanmax(x)+dynx > np.nanmax(y)+dyny:
+			pmax = np.nanmax(x)+dynx*3
+		else:
+			pmax = np.nanmax(y)+dyny*3
+		ax.axis((pmin,pmax,pmin,pmax))
+
+		# add 1:1 line
+		ax.errorbar(ax.get_xlim(),ax.get_ylim(),linestyle='--',color='0.1',alpha=0.8)
+
+	plt.savefig(truthplots,dpi=300)
+	os.system('open '+truthplots)
 
 
 

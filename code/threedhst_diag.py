@@ -6,9 +6,9 @@ import matplotlib.image as mpimg
 from astropy.cosmology import WMAP9
 import fsps
 
-tiny_number = 1e-90
+tiny_number = 1e-3
 big_number = 1e90
-plt_chain_figure = 1
+plt_chain_figure = 0
 plt_triangle_plot = 1
 plt_sed_figure = 1
 
@@ -30,6 +30,30 @@ def plot_sfh_fast(tau,tage,mass,tuniv=None):
 		t = t[::-1]
 
 	return t,sfr
+
+def plot_sfh_single(truths,tage,parnames,ncomp=2):
+
+	parnames = np.array(parnames)
+
+	# initialize output variables
+	nt = 50
+	intsfr = np.zeros(shape=(nt,ncomp+1))
+	deltat=0.001
+	t=np.linspace(0,np.max(tage),num=50)
+
+	# define input variables
+	mass = truths[np.array([True if 'mass' in x else False for x in parnames])]
+	tau = truths[np.array([True if 'tau' in x else False for x in parnames])]
+	sf_start = truths[np.array([True if 'sf_start' in x else False for x in parnames])]
+	tage = np.zeros(ncomp)+tage
+
+	for jj in xrange(nt): intsfr[jj,0] = threed_dutils.integrate_sfh(t[jj]-deltat,t[jj],mass,
+		                                                                    tage,tau,sf_start)*np.sum(mass)/(deltat*1e9)
+	for kk in xrange(ncomp):
+		for jj in xrange(nt): intsfr[jj,kk+1] = threed_dutils.integrate_sfh(t[jj]-deltat,t[jj],mass[kk],
+                                                                    tage[kk],tau[kk],sf_start[kk])*mass[kk]/(deltat*1e9)
+
+	return t, intsfr
 
 def plot_sfh(sample_results,nsamp=1000,ncomp=2):
 
@@ -311,6 +335,7 @@ def comp_samples(thetas, sample_results, sps, inlog=True, photflag=0):
 def sed_figure(sample_results, sps, model,
                 alpha=0.3, samples = [-1],
                 maxprob=0, outname=None, plot_init = 0, fast=True,
+                truths = None,
                 **kwargs):
 	"""
 	Plot the photometry for the model and data (with error bars), and
@@ -382,6 +407,17 @@ def sed_figure(sample_results, sps, model,
 			     color=fastcolor, marker='o', linestyle=' ', label='fast', 
 			     ms=ms,alpha=alpha,markeredgewidth=0.7,zorder=-1)
 
+	if truths is not None:
+		mwave_truth, mospec_truth, mounc_truth, specvecs_truth = comp_samples([truths['truths']], sample_results, sps, photflag=1)
+		
+		#phot.plot(np.log10(mwave_truth), np.log10(specvecs_truth[0][0]*(c/(mwave_truth/1e10))), 
+		#	      color='blue', marker='o', ms=ms, linestyle=' ', label='truths', 
+		#	      alpha=alpha, markeredgewidth=0.7,**kwargs)
+	
+		res.plot(np.log10(mwave_truth), specvecs_truth[0][-1], 
+			     color='blue', marker='o', linestyle=' ', label='truths', 
+			     ms=ms,alpha=0.3,markeredgewidth=0.7,**kwargs)
+
 	# add SFH plot
 	t, perc = plot_sfh(sample_results, ncomp=sample_results.get('ncomp',2))
 	minsfr = 0.005
@@ -392,30 +428,48 @@ def sed_figure(sample_results, sps, model,
 	
 	# plot whole SFH
 	ax_inset.plot(t, perc[:,0,1],'-',color='black')
-	#ax_inset.fill_between(t, perc[:,0,0], perc[:,0,2], color='0.75')
-	colors=['blue','red']
-	for aa in xrange(1,perc.shape[1]):
-		ax_inset.plot(t, perc[:,aa,1],'-',color=colors[aa-1],alpha=0.4)
-		ax_inset.text(0.08,0.83-0.07*(aa-1), 'tau'+str(aa),transform = ax_inset.transAxes,color=colors[aa-1],fontsize=axfontsize*1.4)
+	
+	##### FAST + normal fit SFH #####
+	if truths is None:
+	
+		colors=['blue','red']
+		for aa in xrange(1,perc.shape[1]):
+			ax_inset.plot(t, perc[:,aa,1],'-',color=colors[aa-1],alpha=0.4)
+			ax_inset.text(0.08,0.83-0.07*(aa-1), 'tau'+str(aa),transform = ax_inset.transAxes,color=colors[aa-1],fontsize=axfontsize*1.4)
 
-	# FAST SFH
-	if fast:
-		ltau = 10**fastparms[fastfields=='ltau'][0]/1e9
-		lage = 10**fastparms[fastfields=='lage'][0]/1e9
-		fmass = 10**fastparms[fastfields=='lmass'][0]
-		tuniv = WMAP9.age(fastparms[fastfields=='z'][0]).value
+		# FAST SFH
+		if fast:
+			ltau = 10**fastparms[fastfields=='ltau'][0]/1e9
+			lage = 10**fastparms[fastfields=='lage'][0]/1e9
+			fmass = 10**fastparms[fastfields=='lmass'][0]
+			tuniv = WMAP9.age(fastparms[fastfields=='z'][0]).value
 
-		tf, pf = plot_sfh_fast(ltau,lage,fmass,tuniv)
-		pf = np.log10(np.clip(pf,minsfr,maxsfr))
-		ax_inset.plot(tf, pf,'-',color='k')
-		ax_inset.plot(tf, pf,'-',color=fastcolor,alpha=1.0,linewidth=0.75)
-		ax_inset.text(0.08,0.83-0.07*(perc.shape[1]-1), 'fast',transform = ax_inset.transAxes,color=fastcolor,fontsize=axfontsize*1.4)
+			tf, pf = plot_sfh_fast(ltau,lage,fmass,tuniv)
+			pf = np.log10(np.clip(pf,minsfr,maxsfr))
+			ax_inset.plot(tf, pf,'-',color='k')
+			ax_inset.plot(tf, pf,'-',color=fastcolor,alpha=1.0,linewidth=0.75)
+			ax_inset.text(0.08,0.83-0.07*(perc.shape[1]-1), 'fast',transform = ax_inset.transAxes,color=fastcolor,fontsize=axfontsize*1.4)
+			
+			# for setting limits
+			# WARNING: THIS IS A HACK
+			# possible since not using q16 part of perc
+			perc[:,0,0] = pf
+
+	##### TRUTHS + 50th percentile SFH #####
+	else:
 		
-		# for setting limits
-		# WARNING: THIS IS A HACK
-		# possible since not using q16 part of perc
-		perc[:,0,0] = pf
+		ax_inset.fill_between(t, perc[:,0,0], perc[:,0,2], color='0.75')
 
+		parnames = sample_results['model'].theta_labels()
+		tage = sample_results['model'].params['tage'][0]
+		tt,pt = plot_sfh_single(truths['truths'],tage,parnames,ncomp=sample_results.get('ncomp',2))
+
+		pt = np.log10(np.clip(pt,minsfr,maxsfr))
+		#tcolors=['steelblue','maroon']
+		#for aa in xrange(sample_results.get('ncomp',2)):
+		#	ax_inset.plot(tt, pt[:,aa+1],'-',color=tcolors[aa],alpha=0.5,linewidth=0.75)
+		ax_inset.plot(tt, pt[:,0],'-',color='blue')
+		ax_inset.text(0.08,0.83, 'truth',transform = ax_inset.transAxes,color='blue',fontsize=axfontsize*1.4)
 
 	dynrange = (np.max(perc)-np.min(perc))*0.1
 	axlim_sfh=[np.min(t),
@@ -443,28 +497,40 @@ def sed_figure(sample_results, sps, model,
 	except:
 		print 'no RGB image'
 
-	# calculate reduced chi-squared
-	chisq=np.sum(specvecs[0][-1]**2)
-	ndof = np.sum(sample_results['obs']['phot_mask']) - len(sample_results['model'].free_params)-1
-	reduced_chisq = chisq/(ndof-1)
-	
 	# diagnostic text
 	textx = (phot.get_xlim()[1]-phot.get_xlim()[0])*0.975+phot.get_xlim()[0]
 	texty = (phot.get_ylim()[1]-phot.get_ylim()[0])*0.2+phot.get_ylim()[0]
 	deltay = (phot.get_ylim()[1]-phot.get_ylim()[0])*0.038
 
-	phot.text(textx, texty, r'best-fit $\chi^2_n$='+"{:.2f}".format(reduced_chisq),
+	# calculate reduced chi-squared
+	chisq=np.sum(specvecs[0][-1]**2)
+	ndof = np.sum(sample_results['obs']['phot_mask']) - len(sample_results['model'].free_params)-1
+	reduced_chisq = chisq/(ndof-1)
+
+	# also calculate for truths if truths exist
+	if truths is not None:
+		chisq_truth=np.sum(specvecs_truth[0][-1]**2)
+		reduced_chisq_truth = chisq_truth/(ndof-1)
+		phot.text(textx, texty, r'best-fit $\chi^2_n$='+"{:.2f}".format(reduced_chisq)+' (true='
+			      +"{:.2f}".format(reduced_chisq_truth)+')',
+			      fontsize=10, ha='right')
+	else:
+		phot.text(textx, texty, r'best-fit $\chi^2_n$='+"{:.2f}".format(reduced_chisq),
 			  fontsize=10, ha='right')
+	
 	phot.text(textx, texty-deltay, r'avg acceptance='+"{:.2f}".format(np.mean(sample_results['acceptance'])),
 				 fontsize=10, ha='right')
 		
 	# load ancil data
-	if 'ancilname' not in sample_results['run_params'].keys():
-		sample_results['run_params']['ancilname'] = os.getenv('APPS')+'/threedhst_bsfh/data/COSMOS_testsamp.dat'
-	ancildat = threed_dutils.load_ancil_data(os.getenv('APPS')+'/threedh'+sample_results['run_params']['ancilname'].split('/threedh')[1],sample_results['run_params']['objname'])
-	sn_txt = ancildat['sn_F160W'][0]
-	uvj_txt = ancildat['uvj_flag'][0]
-	z_txt = sample_results['model'].params['zred'][0]
+	if 'ancilname' in sample_results['run_params'].keys():
+		ancildat = threed_dutils.load_ancil_data(os.getenv('APPS')+'/threedh'+sample_results['run_params']['ancilname'].split('/threedh')[1],sample_results['run_params']['objname'])
+		sn_txt = ancildat['sn_F160W'][0]
+		uvj_txt = ancildat['uvj_flag'][0]
+		z_txt = sample_results['model'].params['zred'][0]
+	else:
+		sn_txt = -99.0
+		uvj_txt = -99.0
+		z_txt = -99.0
 
 	# FAST text
 	if fast:
@@ -612,6 +678,14 @@ def make_all_plots(filebase=None, parm_file=None,
 	sample_results = create_plotquant(sample_results)
 	sample_results['extents'] = return_extent(sample_results)
 
+	# do we know the truths?
+	try:
+		truths = threed_dutils.load_truths(os.getenv('APPS')+'/threed'+sample_results['run_params']['truename'].split('/threed')[1],
+			                              sample_results['run_params']['objname'],
+			                              sample_results)
+	except KeyError:
+		truths=None
+
     # chain plot
 	if plt_chain_figure: 
 		print 'MAKING CHAIN PLOT'
@@ -623,21 +697,24 @@ def make_all_plots(filebase=None, parm_file=None,
 	if plt_triangle_plot: 
 		print 'MAKING TRIANGLE PLOT'
 		chopped_sample_results = copy.deepcopy(sample_results)
-		#chopped_sample_results['plotchain'] = threed_dutils.chop_chain(sample_results['plotchain'])
-		#chopped_sample_results['chain'] = threed_dutils.chop_chain(sample_results['chain'])
 
 		read_results.subtriangle(sample_results, sps, copy.deepcopy(sample_results['model']),
 							 outname=outfolder+filename+'_'+max(times),
 							 showpars=None,start=0,
-							 show_titles=True)
+							 show_titles=True, truths=truths)
 
 	# sed plot
 	# MANY UNNECESSARY CALCULATIONS
 	if plt_sed_figure:
 		print 'MAKING SED PLOT'
+		try:
+			sample_results['run_params']['fastname']
+			fast=1
+		except:
+			fast=0
  		# plot
  		pfig = sed_figure(sample_results, sps, copy.deepcopy(sample_results['model']),
- 						  maxprob=1, 
+ 						  maxprob=1,fast=fast,truths=truths,
  						  outname=outfolder+filename+'_'+max(times)+'.sed.png')
  		
 def plot_all_driver():
@@ -651,6 +728,7 @@ def plot_all_driver():
 	#runname = 'dtau_nonir'
 	#runname = 'dtau_genpop_fixedmet'
 	#runname = 'dtau_ha_zperr'
+	runname = 'testsed'
 
 	filebase, parm_basename, ancilname=threed_dutils.generate_basenames(runname)
 	for jj in xrange(len(filebase)):

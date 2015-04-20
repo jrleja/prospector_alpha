@@ -131,18 +131,18 @@ def build_sample_test(add_zp_err=False):
 	from bsfh import model_setup
 
 	#### output names ####
-	basename = 'testsed_noisy_offset'
+	basename = 'testsed_new'
 	outname = '/Users/joel/code/python/threedhst_bsfh/data/'+basename
 
 	#### generation parameters ####
 	ngals          = 20
 	noise          = 0.05            # add errors
 	reported_noise = 1.0*noise       # under-report the noise?
-	noise = 0.25
-	reported_noise = 0.05
+	#noise = 0.25
+	#reported_noise = 0.05
 
 	#### load test model, build sps  ####
-	parmfile = '/Users/joel/code/python/threedhst_bsfh/parameter_files/testsed/testsed_params.py'
+	parmfile = '/Users/joel/code/python/threedhst_bsfh/parameter_files/testsed/testsed_new_params.py'
 	model = model_setup.load_model(parmfile)
 	obs   = model_setup.load_obs(parmfile)
 	sps = threed_dutils.setup_sps()
@@ -172,6 +172,12 @@ def build_sample_test(add_zp_err=False):
 				for kk in xrange(ngals): testparms[kk,ii] = 10**(random.random()*(max[kk]-min)+min)
 			else:
 				for kk in xrange(ngals): testparms[kk,ii] = 10**(random.random()*(max-min)+min)
+		
+		elif parnames[ii][:-2] == 'dust2':
+			min = model.theta_bounds()[ii][0]
+			max = model.theta_bounds()[ii][1]
+			for kk in xrange(ngals): testparms[kk,ii] = np.clip(random.gauss(0.5, 0.5),min,max)
+
 		else:
 			min = model.theta_bounds()[ii][0]
 			max = model.theta_bounds()[ii][1]
