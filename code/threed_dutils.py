@@ -17,30 +17,31 @@ def test_likelihood(param_file=None, sps=None, model=None, obs=None, thetas=None
 	can be run in different environments as a test
 	'''
 
-	if not param_file:
+	if param_file is not None:
 		param_file = os.getenv('APPS')+'/threedhst_bsfh/parameter_files/dtau_intmet/dtau_intmet_params_66.py'
 
-	if not sps:
+	if sps is not None:
 		# load stellar population, set up custom filters
 		sps = fsps.StellarPopulation(zcontinuous=1, compute_vega_mags=False)
 		custom_filter_keys = os.getenv('APPS')+'/threedhst_bsfh/filters/filter_keys_threedhst.txt'
 		fsps.filters.FILTERS = model_setup.custom_filter_dict(custom_filter_keys)
 
-	if not model:
+	if model is not None:
 		model = model_setup.load_model(param_file)
 	
-	if not obs:
+	if obs is not None:
 		run_params = model_setup.get_run_params(param_file=param_file)
 		obs = model_setup.load_obs(**run_params)
 
 	if thetas is None:
-		thetas = np.array([2.06382260e+09,1.55273910e+10,-7.94072640e-01,5.82656906e+01,2.89232690e-01,5.94558117e+00,9.10674270e-01,2.42980691e-01,7.21169529e-01,-1.53203324e+00])
+		thetas = np.array(model.initial_theta)
 
 	likefn = LikelihoodFunction(obs=obs, model=model)
 	mu, phot, x = model.mean_model(thetas, obs, sps = sps)
 	lnp_phot = likefn.lnlike_phot(phot, obs=obs, gp=None)
+	lnp_prior = model.prior_product(thetas)
 
-	return lnp_phot
+	return lnp_phot + lnp_prior
 
 def setup_sps(zcontinuous=2,compute_vega_magnitudes=False):
 
