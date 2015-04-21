@@ -17,19 +17,19 @@ def test_likelihood(param_file=None, sps=None, model=None, obs=None, thetas=None
 	can be run in different environments as a test
 	'''
 
-	if param_file is not None:
+	if param_file is None:
 		param_file = os.getenv('APPS')+'/threedhst_bsfh/parameter_files/dtau_intmet/dtau_intmet_params_66.py'
 
-	if sps is not None:
+	if sps is None:
 		# load stellar population, set up custom filters
 		sps = fsps.StellarPopulation(zcontinuous=1, compute_vega_mags=False)
 		custom_filter_keys = os.getenv('APPS')+'/threedhst_bsfh/filters/filter_keys_threedhst.txt'
 		fsps.filters.FILTERS = model_setup.custom_filter_dict(custom_filter_keys)
 
-	if model is not None:
+	if model is None:
 		model = model_setup.load_model(param_file)
 	
-	if obs is not None:
+	if obs is None:
 		run_params = model_setup.get_run_params(param_file=param_file)
 		obs = model_setup.load_obs(**run_params)
 
