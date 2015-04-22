@@ -1737,7 +1737,7 @@ def testsed_truthplots(runname):
 
 	filebase,params,ancilname=threed_dutils.generate_basenames(runname)
 	ngals = len(filebase)
-	output = '/Users/joel/code/python/threedhst_bsfh/plots/ensemble_plots/testsed/truthplots.png'
+	output = '/Users/joel/code/python/threedhst_bsfh/plots/ensemble_plots/'+runname+'/truthplots.png'
 
 	nfail = 0
 	for jj in xrange(ngals):
@@ -1889,8 +1889,8 @@ def testsed_truthplots(runname):
 		# add 1:1 line
 		ax.errorbar(ax.get_xlim(),ax.get_ylim(),linestyle='--',color='0.1',alpha=0.8)
 
-	plt.savefig(truthplots,dpi=300)
-	os.system('open '+truthplots)
+	plt.savefig(output,dpi=300)
+	os.system('open '+output)
 
 
 
