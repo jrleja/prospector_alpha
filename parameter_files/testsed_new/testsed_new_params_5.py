@@ -357,14 +357,11 @@ model_params.append({'name': 'gas_logu', 'N': 1,
 
 
 ####### Calibration ##########
-
 model_params.append({'name': 'phot_jitter', 'N': 1,
-                        'isfree': False,
-                        'init': 0.0,
-                        'units': 'mags',
-                        'prior_function': tophat,
-                        'prior_args': {'mini':0.0, 'maxi':0.2}})
-
-
+                        'isfree': True,
+                        'init': 5e-2,
+                        'units': 'fractional maggies (mags/1.086)',
+                        'prior_function':tophat,
+                        'prior_args': {'mini':0.0, 'maxi':0.5}})
 # name outfile
 run_params['outfile'] = run_params['outfile']+'_'+run_params['objname']
