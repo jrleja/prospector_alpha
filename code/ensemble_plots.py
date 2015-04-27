@@ -11,6 +11,46 @@ from matplotlib import cm
 pc2cm = 3.08567758e18
 minmodel_flux = 2e-1
 
+def age_vs_mass():
+	'''
+	one-off plot, delta(mass) versus delta(t_half)
+	'''
+
+	outname = os.getenv('APPS')+'/threedhst_bsfh/results/dtau_ha_zperr/dtau_ha_zperr_ensemble.pickle'
+	with open(outname, "rb") as f:
+		ensemble_zperr=pickle.load(f)
+
+	outname = os.getenv('APPS')+'/threedhst_bsfh/results/dtau_ha_plog/dtau_ha_plog_ensemble.pickle'
+	with open(outname, "rb") as f:
+		ensemble_plog=pickle.load(f)
+
+	valid_comp = (ensemble_zperr['z'] > 0) & (ensemble_plog['z'] > 0)
+
+	mass_plog = np.log10(ensemble_plog['q50'][ensemble_plog['parname'] == 'totmass'][0,valid_comp])
+	mass_zperr = np.log10(ensemble_zperr['q50'][ensemble_zperr['parname'] == 'totmass'][0,valid_comp])
+
+	sfr_plog = np.log10(ensemble_plog['q50'][ensemble_plog['parname'] == 'sfr_100'][0,valid_comp])
+	sfr_zperr = np.log10(ensemble_zperr['q50'][ensemble_zperr['parname'] == 'sfr_100'][0,valid_comp])
+
+	thalf_plog = ensemble_plog['q50'][ensemble_plog['parname'] == 'half_time'][0,valid_comp]
+	thalf_zperr = ensemble_zperr['q50'][ensemble_zperr['parname'] == 'half_time'][0,valid_comp]
+
+	plt.plot(mass_plog-mass_zperr,thalf_plog-thalf_zperr,'bo',alpha=0.5)
+	plt.xlabel(r'log(M$_{\rm ltau}$)-log(M)')
+	plt.ylabel(r't$_{\rm half,ltau}$-t$_{\rm half}$ [Gyr]')
+	plt.hlines(0,plt.xlim()[0],plt.xlim()[1],linestyle='--')
+	plt.vlines(0,plt.ylim()[0],plt.ylim()[1],linestyle='--')
+	plt.savefig('/Users/joel/code/python/threedhst_bsfh/plots/mass_vs_halftime.png',dpi=300)
+	plt.close()
+
+	plt.plot(sfr_plog-sfr_zperr,thalf_plog-thalf_zperr,'bo',alpha=0.5)
+	plt.xlabel(r'log(SFR$_{\rm ltau})$-log(SFR)')
+	plt.ylabel(r't$_{\rm half,ltau}$-t$_{\rm half}$ [Gyr]')
+	plt.hlines(0,plt.xlim()[0],plt.xlim()[1],linestyle='--')
+	plt.vlines(0,plt.ylim()[0],plt.ylim()[1],linestyle='--')
+	plt.savefig('/Users/joel/code/python/threedhst_bsfh/plots/sfr_vs_halftime.png',dpi=300)
+	plt.close()
+
 def asym_errors(center, up, down, log=False):
 
 	if log:
@@ -213,7 +253,10 @@ def plot_driver(runname):
 	# get SFR_observed
 	sfrmin = 1e-2
 	sfrmax = 1e4
-	sfr_obs = np.clip(np.array([x['sfr'][0] for x in ensemble['ancildat']]),sfrmin,sfrmax)
+	sfr_obs = np.array([x['sfr'][0] for x in ensemble['ancildat']])
+	sfr_obs_uv = np.array([x['sfr_UV'][0] for x in ensemble['ancildat']])
+	nodet = sfr_obs == -99
+	sfr_obs[nodet] = sfr_obs_uv[nodet]
 	z_sfr = np.array([x['z_sfr'] for x in ensemble['ancildat']])
 	valid_comp = ensemble['z'] > 0
 

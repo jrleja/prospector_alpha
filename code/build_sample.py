@@ -138,6 +138,7 @@ def build_sample_test(add_zp_err=False):
 	ngals          = 20
 	noise          = 0.05            # add errors
 	reported_noise = 1.0*noise       # under-report the noise?
+	band_specific_noise = 0.18
 	#noise = 0.25
 	#reported_noise = 0.05
 
@@ -178,6 +179,12 @@ def build_sample_test(add_zp_err=False):
 			max = model.theta_bounds()[ii][1]
 			for kk in xrange(ngals): testparms[kk,ii] = np.clip(random.gauss(0.5, 0.5),min,max)
 
+		elif parnames[ii] == 'phot_jitter':
+			for kk in xrange(ngals): testparms[kk,ii] = noise
+	
+		elif parnames[ii] == 'gp_phot_amps' or parnames[ii][:-2] == 'gp_phot_amps':
+			for kk in xrange(ngals): testparms[kk,ii] = band_specific_noise
+
 		else:
 			min = model.theta_bounds()[ii][0]
 			max = model.theta_bounds()[ii][1]
@@ -201,7 +208,14 @@ def build_sample_test(add_zp_err=False):
 		maggies[ii,:] = maggiestemp
 
 		#### add noise ####
-		for kk in xrange(nfilters): maggies[ii,kk] += random.gauss(0, noise)*maggies[ii,kk]
+		for kk in xrange(nfilters): 
+			tnoise = random.gauss(0, noise)
+			##### linked filter noise
+			for gp_phot_loc in model.params.get('gp_phot_locs',None):
+				if obs['filters'][kk].lower() in gp_phot_loc:
+					tnoise = (tnoise**2+random.gauss(0, band_specific_noise)**2)**0.5
+
+			maggies[ii,kk] += tnoise*maggies[ii,kk]
 
 		#### record noise ####
 		maggies_unc[ii,:] = maggies[ii,:]*reported_noise

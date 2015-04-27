@@ -5,12 +5,13 @@ from bsfh import read_results
 import matplotlib.image as mpimg
 from astropy.cosmology import WMAP9
 import fsps
+plt.ioff() # don't pop up a window for each plot
 
 tiny_number = 1e-3
 big_number = 1e90
-plt_chain_figure = 0
+plt_chain_figure = 1
 plt_triangle_plot = 1
-plt_sed_figure = 0
+plt_sed_figure = 1
 
 def plot_sfh_fast(tau,tage,mass,tuniv=None):
 
@@ -728,6 +729,7 @@ def plot_all_driver():
 	#runname = 'dtau_nonir'
 	#runname = 'dtau_genpop_fixedmet'
 	#runname = 'dtau_ha_zperr'
+	runname = 'dtau_ha_plog'
 	runname = 'testsed_new'
 
 	filebase, parm_basename, ancilname=threed_dutils.generate_basenames(runname)

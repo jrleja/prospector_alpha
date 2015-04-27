@@ -363,5 +363,27 @@ model_params.append({'name': 'phot_jitter', 'N': 1,
                         'units': 'fractional maggies (mags/1.086)',
                         'prior_function':tophat,
                         'prior_args': {'mini':0.0, 'maxi':0.5}})
+
+# Here we define groups of filters to which we will add additional
+# uncertainty above and beyond the stated uncertainty and the
+# additional jitter.
+gp_filts = np.array([['irac1_cosmos','irac2_cosmos','irac3_cosmos','irac4_cosmos'],
+                     ['f606w_cosmos','f814w_cosmos','f125w_cosmos','f140w_cosmos','f160w_cosmos']])
+ngpf = gp_filts.shape[0]
+
+model_params.append({'name': 'gp_phot_amps','N': ngpf,
+                        'isfree': True,
+                        'init': [1e-1],
+                        'units': 'fractional maggies (mags/1.086)',
+                        'prior_function':tophat,
+                        'prior_args': {'mini':0.0, 'maxi':0.2}})
+
+model_params.append({'name': 'gp_phot_locs','N': ngpf,
+                        'isfree': False,
+                        'init': gp_filts,
+                        'units': 'filter names or filter_indices',
+                        'prior_function':None,
+                        'prior_args': None})
+
 # name outfile
 run_params['outfile'] = run_params['outfile']+'_'+run_params['objname']
