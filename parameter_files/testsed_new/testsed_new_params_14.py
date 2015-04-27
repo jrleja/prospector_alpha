@@ -376,7 +376,7 @@ model_params.append({'name': 'gp_phot_amps','N': ngpf,
                         'init': [1e-1],
                         'units': 'fractional maggies (mags/1.086)',
                         'prior_function':tophat,
-                        'prior_args': {'mini':0.0, 'maxi':0.2}})
+                        'prior_args': {'mini':np.zeros(ngpf), 'maxi':np.zeros(ngpf)+0.2}})
 
 model_params.append({'name': 'gp_phot_locs','N': ngpf,
                         'isfree': False,
