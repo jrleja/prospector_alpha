@@ -123,6 +123,13 @@ class BurstyModel(sedmodel.CSPModel):
             if (mass[1]/mass[0] > 20):
                 return -np.inf
 
+        # implement uniqueness of outliers
+        if 'gp_outlier_locs' in self.theta_index:
+            start,end = self.theta_index['gp_outlier_locs']
+            outlier_locs = theta[start:end]
+            if len(np.unique(np.round(outlier_locs))) != len(outlier_locs):
+                return -np.inf
+
         for k, v in self.theta_index.iteritems():
             start, end = v
             lnp_prior += np.sum(self._config_dict[k]['prior_function']
@@ -395,7 +402,7 @@ model_params.append({'name': 'gp_outlier_amps','N': noutliers,
                         'init_disp': 0.5,
                         'units': 'fractional maggies (mags/1.086)',
                         'prior_function':tophat,
-                        'prior_args': {'mini':0.0, 'maxi':6.0}})
+                        'prior_args': {'mini':np.zeros(noutliers), 'maxi':np.zeros(noutliers)+6.0}})
 
 model_params.append({'name': 'gp_outlier_locs','N': noutliers,
                         'isfree': True,
@@ -403,7 +410,7 @@ model_params.append({'name': 'gp_outlier_locs','N': noutliers,
                         'init_disp': 0.5,
                         'units': 'filter_indices',
                         'prior_function':tophat,
-                        'prior_args': {'mini':0.0, 'maxi': np.sum(obs['phot_mask'])-1}})
+                        'prior_args': {'mini':np.zeros(noutliers), 'maxi': np.zeros(noutliers)+np.sum(obs['phot_mask'])-1}})
 
 # name outfile
 run_params['outfile'] = run_params['outfile']+'_'+run_params['objname']
