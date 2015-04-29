@@ -131,19 +131,21 @@ def build_sample_test(add_zp_err=False):
 	from bsfh import model_setup
 
 	#### output names ####
-	basename = 'testsed_new'
+	basename = 'testsed_outliers'
 	outname = '/Users/joel/code/python/threedhst_bsfh/data/'+basename
 
 	#### generation parameters ####
-	ngals          = 20
-	noise          = 0.05            # add errors
-	reported_noise = 1.0*noise       # under-report the noise?
-	band_specific_noise = 0.18
+	ngals               = 20
+	noise               = 0.05            # add errors
+	reported_noise      = 1.0*noise       # under-report the noise?
+	band_specific_noise = 0.18            # add band-specific noise?
+	outliers_noise      = 4.0             # add outlier noise
+	outliers_bands      = [15,21,29]
 	#noise = 0.25
 	#reported_noise = 0.05
 
 	#### load test model, build sps  ####
-	parmfile = '/Users/joel/code/python/threedhst_bsfh/parameter_files/testsed/testsed_new_params.py'
+	parmfile = '/Users/joel/code/python/threedhst_bsfh/parameter_files/testsed_outliers/testsed_outliers_params.py'
 	model = model_setup.load_model(parmfile)
 	obs   = model_setup.load_obs(parmfile)
 	sps = threed_dutils.setup_sps()
@@ -174,16 +176,25 @@ def build_sample_test(add_zp_err=False):
 			else:
 				for kk in xrange(ngals): testparms[kk,ii] = 10**(random.random()*(max-min)+min)
 		
+		#### tone down the dust a bit-- flat in prior means lots of Av = 3.0 galaxies! ####
 		elif parnames[ii][:-2] == 'dust2':
 			min = model.theta_bounds()[ii][0]
 			max = model.theta_bounds()[ii][1]
 			for kk in xrange(ngals): testparms[kk,ii] = np.clip(random.gauss(0.5, 0.5),min,max)
 
+		#### general photometric jitter ####
 		elif parnames[ii] == 'phot_jitter':
 			for kk in xrange(ngals): testparms[kk,ii] = noise
 	
-		elif parnames[ii] == 'gp_phot_amps' or parnames[ii][:-2] == 'gp_phot_amps':
+		#### linked filter noise ####
+		elif parnames[ii] == 'gp_filter_amps' or parnames[ii][:-2] == 'gp_filter_amps':
 			for kk in xrange(ngals): testparms[kk,ii] = band_specific_noise
+
+		#### outliers ####
+		elif parnames[ii] == 'gp_outlier_amps' or parnames[ii][:-2] == 'gp_outlier_amps':
+			for kk in xrange(ngals): testparms[kk,ii] = outliers_noise
+		elif parnames[ii] == 'gp_outlier_locs' or parnames[ii][:-2] == 'gp_outlier_locs':
+			for kk in xrange(ngals): testparms[kk,ii] = outliers_bands[int(parnames[ii][-1])-1]
 
 		else:
 			min = model.theta_bounds()[ii][0]
@@ -209,13 +220,16 @@ def build_sample_test(add_zp_err=False):
 
 		#### add noise ####
 		for kk in xrange(nfilters): 
-			tnoise = random.gauss(0, noise)
+			tnoise = noise
 			##### linked filter noise
-			for gp_phot_loc in model.params.get('gp_phot_locs',None):
-				if obs['filters'][kk].lower() in gp_phot_loc:
-					tnoise = (tnoise**2+random.gauss(0, band_specific_noise)**2)**0.5
-
-			maggies[ii,kk] += tnoise*maggies[ii,kk]
+			#for gp_filter_loc in model.params.get('gp_filter_locs',None):
+			if obs['filters'][kk].lower() in model.params.get('gp_filter_locs'):
+				tnoise = (tnoise**2+band_specific_noise**2)**0.5
+			##### outlier noise
+			if kk in outliers_bands:
+				tnoise = (tnoise**2+outliers_noise**2)**0.5
+			add_noise = random.gauss(0, tnoise)
+			maggies[ii,kk] += add_noise*maggies[ii,kk]
 
 		#### record noise ####
 		maggies_unc[ii,:] = maggies[ii,:]*reported_noise
