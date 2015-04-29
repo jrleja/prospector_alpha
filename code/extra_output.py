@@ -80,7 +80,8 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 	thetas, maxprob = maxprob_model(sample_results,sps)
 
 	# calculate number of components
-	sample_results['ncomp'] = np.max([len(np.atleast_1d(x['init'])) for x in sample_results['model'].config_list if x['isfree'] == True])
+	#sample_results['ncomp'] =[len(np.atleast_1d(x['init'])) for x in sample_results['model'].config_list if x['isfree'] == True]
+	sample_results['ncomp'] = np.sum(['mass' in x for x in sample_results['model'].theta_labels()])
 
     # find SFH parameters that are variables in the chain
     # save their indexes for future use

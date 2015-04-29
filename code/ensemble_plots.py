@@ -2039,9 +2039,12 @@ def recover_phot_jitter(runname):
 		ptruth = truths['truths'][parnames==phot_params[ii]]
 		ax.axvline(ptruth,color='r',alpha=0.9,linewidth=lw)
 
+		# range
+		ax.xlim(np.min(edges[:,ii]),np.max(edges[:,ii]))
+
 		# rough percentages
 		cumsum = np.cumsum(output[:,ii])/np.sum(output[:,ii])
-		cumsum_interp = interp1d(edges[:,ii],cumsum, bounds_error = False, fill_value = 0)
+		cumsum_interp = interp1d(cumsum,edges[:,ii], bounds_error = False, fill_value = 0)
 		q16,q50,q84 = cumsum_interp(0.16),cumsum_interp(0.5),cumsum_interp(0.84)
 
 		ax.axvline(q16, ls="dashed", color='k',linewidth=lw)

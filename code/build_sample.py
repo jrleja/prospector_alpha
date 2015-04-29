@@ -184,7 +184,7 @@ def build_sample_test(add_zp_err=False):
 
 		#### general photometric jitter ####
 		elif parnames[ii] == 'phot_jitter':
-			for kk in xrange(ngals): testparms[kk,ii] = noise
+			for kk in xrange(ngals): testparms[kk,ii] = 0.0
 	
 		#### linked filter noise ####
 		elif parnames[ii] == 'gp_filter_amps' or parnames[ii][:-2] == 'gp_filter_amps':
