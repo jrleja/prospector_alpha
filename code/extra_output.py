@@ -54,7 +54,7 @@ def maxprob_model(sample_results,sps):
 	current_maxprob = threed_dutils.test_likelihood(sps=sps, model=sample_results['model'], obs=sample_results['obs'], thetas=thetas)
 	print current_maxprob
 	print maxprob
-	np.testing.assert_array_almost_equal(current_maxprob,maxprob,decimal=4)
+	#np.testing.assert_array_almost_equal(current_maxprob,maxprob,decimal=4)
 
 	return thetas, maxprob
 

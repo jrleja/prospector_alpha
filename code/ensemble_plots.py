@@ -6,6 +6,7 @@ import matplotlib.gridspec as gridspec
 from astropy.cosmology import WMAP9
 from astropy import constants
 from matplotlib import cm
+from scipy.interpolate import interp1d
 
 # minimum flux: no model emission line has strength of 0!
 pc2cm = 3.08567758e18
@@ -1936,8 +1937,121 @@ def testsed_truthplots(runname):
 	os.system('open '+output)
 
 
+def recover_phot_jitter(runname):
+
+	'''
+	given a run, for each galaxy, load the output, and
+	construct the sum of the PDF for the photometric error terms
+	'''
+
+	filebase,params,ancilname=threed_dutils.generate_basenames(runname)
+	ngals = len(filebase)
+	outname = '/Users/joel/code/python/threedhst_bsfh/plots/ensemble_plots/'+runname+'/phot_jitter_pdf.png'
+
+	nfail = 0
+	for jj in xrange(ngals):
+
+		# find most recent output file
+		# with the objname
+		folder = "/".join(filebase[jj].split('/')[:-1])
+		filename = filebase[jj].split("/")[-1]
+		files = [f for f in os.listdir(folder) if "_".join(f.split('_')[:-2]) == filename]	
+		times = [f.split('_')[-2] for f in files]
+
+		# if we found no files, skip this object
+		if len(times) == 0:
+			print 'Failed to find any files in '+folder+' of type ' +filename+' to extract times'
+			nfail+=1
+			continue
+
+		# load results
+		mcmc_filename=filebase[jj]+'_'+max(times)+"_mcmc"
+		model_filename=filebase[jj]+'_'+max(times)+"_model"
+
+		try:
+			sample_results, powell_results, model = read_results.read_pickles(mcmc_filename, model_file=model_filename,inmod=None)
+		except (ValueError,EOFError,KeyError):
+			print mcmc_filename + ' failed during output writing'
+			nfail+=1
+			continue
+		except IOError:
+			print mcmc_filename + ' does not exist!'
+			nfail+=1
+			continue
+
+		# check for existence of extra information
+		try:
+			sample_results['quantiles']
+		except:
+			print 'Generating extra information for '+mcmc_filename+', '+model_filename
+			extra_output.post_processing(params[jj])
+			sample_results, powell_results, model = read_results.read_pickles(mcmc_filename, model_file=model_filename,inmod=None)
+
+		# generate output buckets for photometric terms
+		try:
+			parnames
+		except:
+			
+			# load truths
+			truths = threed_dutils.load_truths(os.getenv('APPS')+'/threed'+sample_results['run_params']['truename'].split('/threed')[1],
+		                                       sample_results['run_params']['objname'],
+		                                       sample_results)
+
+			# define relevant parameters
+			parnames = np.array(sample_results['model'].theta_labels())
+			phot_params = [x for x in parnames if 'phot' in x]
+
+			# define outputs
+			nphot = len(phot_params)
+			nbins = 50
+			histbounds = []
+			output = np.zeros(shape=(nbins,nphot))
+			edges = np.zeros(shape=(nbins,nphot))
+
+			# create boundaries
+			for param in phot_params:
+				histbounds.append(sample_results['model'].theta_bounds()[np.where(parnames==param)[0][0]])
+
+		# fill outputs
+		for ii in xrange(nphot):
+			out,edge = np.histogram(sample_results['flatchain'][:,parnames==phot_params[ii]][:,0],
+				                    range=histbounds[ii],bins=nbins)
+			output[:,ii] += out
+			edges[:, ii] = (edge[:-1]+edge[1:])/2.
+	
+	
+	# make plots
+	gs = gridspec.GridSpec(1,nphot)
+	fig = plt.figure(figsize = (nphot*6,5))
+	gs.update(wspace=0.35, hspace=0.35)
+	lw = 1.2
+
+	for ii in xrange(nphot):
+		ax = plt.subplot(gs[ii])
+		ax.bar(edges[:,ii],output[:,ii],width=edges[1,ii]-edges[0,ii]
+			  ,alpha=0.5,linewidth=0.0,edgecolor='grey',color='blue')
+
+		# labels
+		ax.set_yticklabels([])
+		ax.set_xlabel(phot_params[ii])
+
+		# truth
+		ptruth = truths['truths'][parnames==phot_params[ii]]
+		ax.axvline(ptruth,color='r',alpha=0.9,linewidth=lw)
+
+		# rough percentages
+		cumsum = np.cumsum(output[:,ii])/np.sum(output[:,ii])
+		cumsum_interp = interp1d(edges[:,ii],cumsum, bounds_error = False, fill_value = 0)
+		q16,q50,q84 = cumsum_interp(0.16),cumsum_interp(0.5),cumsum_interp(0.84)
+
+		ax.axvline(q16, ls="dashed", color='k',linewidth=lw)
+		ax.axvline(q50, color='k',linewidth=lw)
+		ax.axvline(q84, ls="dashed", color='k',linewidth=lw)
 
 
+	plt.savefig(outname,dpi=300)
+	os.system('open '+outname)
+	print 1/0
 
 
 
