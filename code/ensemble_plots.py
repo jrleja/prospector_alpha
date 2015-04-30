@@ -1949,6 +1949,7 @@ def recover_phot_jitter(runname):
 	outname = '/Users/joel/code/python/threedhst_bsfh/plots/ensemble_plots/'+runname+'/phot_jitter_pdf.png'
 
 	nfail = 0
+	gs = gridspec.GridSpec(4,5)
 	for jj in xrange(ngals):
 
 		# find most recent output file
@@ -2017,13 +2018,19 @@ def recover_phot_jitter(runname):
 		for ii in xrange(nphot):
 			out,edge = np.histogram(sample_results['flatchain'][:,parnames==phot_params[ii]][:,0],
 				                    range=histbounds[ii],bins=nbins)
-			output[:,ii] += out
-			edges[:, ii] = (edge[:-1]+edge[1:])/2.
+			if ii == 1:
+				ax = plt.subplot(gs[jj])
+				ax.bar((edge[:-1]+edge[1:])/2.,out,width=edge[1]-edge[0])
+
+				#if np.sum(out > 20000) > 0:
+				#	print 1/0
+
+			output[:,ii] += out/(np.sum(out)*1.0)
+			edges[:,ii] = (edge[:-1]+edge[1:])/2.
 	
 	
 	# if we have outliers, combine them into one plot
 	vars_to_plot = [True if (x[:10] != 'gp_outlier') or (x[-1] == '1') else False for x in phot_params ]
-
 	# make plots
 	gs = gridspec.GridSpec(1,nphot)
 	fig = plt.figure(figsize = (nphot*6,5))

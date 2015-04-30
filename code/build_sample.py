@@ -224,11 +224,14 @@ def build_sample_test(add_zp_err=False):
 			##### linked filter noise
 			#for gp_filter_loc in model.params.get('gp_filter_locs',None):
 			if obs['filters'][kk].lower() in np.concatenate(model.params.get('gp_filter_locs')):
+				print obs['filters'][kk].lower()
 				tnoise = (tnoise**2+band_specific_noise**2)**0.5
 			##### outlier noise
 			if kk in outliers_bands:
+				print kk
 				tnoise = (tnoise**2+outliers_noise**2)**0.5
 			add_noise = random.gauss(0, tnoise)
+			print add_noise
 			maggies[ii,kk] += add_noise*maggies[ii,kk]
 
 		#### record noise ####

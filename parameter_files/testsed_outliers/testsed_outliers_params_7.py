@@ -384,7 +384,7 @@ model_params.append({'name': 'gp_filter_amps','N': ngpf,
                         'init_disp': 0.5,
                         'units': 'fractional maggies (mags/1.086)',
                         'prior_function':tophat,
-                        'prior_args': {'mini':np.zeros(ngpf), 'maxi':np.zeros(ngpf)+0.2}})
+                        'prior_args': {'mini':np.zeros(ngpf), 'maxi':np.zeros(ngpf)+0.4}})
 
 model_params.append({'name': 'gp_filter_locs','N': ngpf,
                         'isfree': False,
@@ -402,7 +402,7 @@ model_params.append({'name': 'gp_outlier_amps','N': noutliers,
                         'init_disp': 0.5,
                         'units': 'fractional maggies (mags/1.086)',
                         'prior_function':tophat,
-                        'prior_args': {'mini':np.zeros(noutliers), 'maxi':np.zeros(noutliers)+6.0}})
+                        'prior_args': {'mini':np.zeros(noutliers), 'maxi':np.zeros(noutliers)+1.0}})
 
 model_params.append({'name': 'gp_outlier_locs','N': noutliers,
                         'isfree': True,
