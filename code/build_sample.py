@@ -223,7 +223,7 @@ def build_sample_test(add_zp_err=False):
 			tnoise = noise
 			##### linked filter noise
 			#for gp_filter_loc in model.params.get('gp_filter_locs',None):
-			if obs['filters'][kk].lower() in model.params.get('gp_filter_locs'):
+			if obs['filters'][kk].lower() in np.concatenate(model.params.get('gp_filter_locs')):
 				tnoise = (tnoise**2+band_specific_noise**2)**0.5
 			##### outlier noise
 			if kk in outliers_bands:

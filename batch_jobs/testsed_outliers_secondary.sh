@@ -9,7 +9,7 @@
 ### Partition or queue name
 #SBATCH -p conroy,general
 ### memory per cpu, in MB
-#SBATCH --mem-per-cpu=3000
+#SBATCH --mem-per-cpu=5000
 ### Job name
 #SBATCH -J 'dtausec'
 ### output and error logs

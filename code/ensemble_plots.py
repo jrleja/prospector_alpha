@@ -1999,10 +1999,11 @@ def recover_phot_jitter(runname):
 
 			# define relevant parameters
 			parnames = np.array(sample_results['model'].theta_labels())
-			phot_params = [x for x in parnames if 'phot' in x]
+			phot_params = [x for x in parnames if ('gp' in x) or ('phot' in x)]
 
 			# define outputs
 			nphot = len(phot_params)
+			noutliers = len([x for x in parnames if 'gp_outlier_amps' in x])
 			nbins = 50
 			histbounds = []
 			output = np.zeros(shape=(nbins,nphot))
@@ -2020,6 +2021,9 @@ def recover_phot_jitter(runname):
 			edges[:, ii] = (edge[:-1]+edge[1:])/2.
 	
 	
+	# if we have outliers, combine them into one plot
+	vars_to_plot = [True if (x[:10] != 'gp_outlier') or (x[-1] == '1') else False for x in phot_params ]
+
 	# make plots
 	gs = gridspec.GridSpec(1,nphot)
 	fig = plt.figure(figsize = (nphot*6,5))
@@ -2027,29 +2031,44 @@ def recover_phot_jitter(runname):
 	lw = 1.2
 
 	for ii in xrange(nphot):
-		ax = plt.subplot(gs[ii])
-		ax.bar(edges[:,ii],output[:,ii],width=edges[1,ii]-edges[0,ii]
-			  ,alpha=0.5,linewidth=0.0,edgecolor='grey',color='blue')
+		if vars_to_plot[ii] == True:
 
-		# labels
-		ax.set_yticklabels([])
-		ax.set_xlabel(phot_params[ii])
+			# gather terms
+			if 'gp_outlier' in phot_params[ii]:
+				histplot = np.sum(output[:,ii:ii+noutliers],axis=1)
+			else:
+				histplot = output[:,ii]
 
-		# truth
-		ptruth = truths['truths'][parnames==phot_params[ii]]
-		ax.axvline(ptruth,color='r',alpha=0.9,linewidth=lw)
+			# plot
+			ax = plt.subplot(gs[ii])
+			ax.bar(edges[:,ii],histplot,width=edges[1,ii]-edges[0,ii]
+				  ,alpha=0.5,linewidth=0.0,edgecolor='grey',color='blue')
 
-		# range
-		ax.xlim(np.min(edges[:,ii]),np.max(edges[:,ii]))
+			# labels
+			ax.set_yticklabels([])
+			ax.set_xlabel(phot_params[ii])
 
-		# rough percentages
-		cumsum = np.cumsum(output[:,ii])/np.sum(output[:,ii])
-		cumsum_interp = interp1d(cumsum,edges[:,ii], bounds_error = False, fill_value = 0)
-		q16,q50,q84 = cumsum_interp(0.16),cumsum_interp(0.5),cumsum_interp(0.84)
+			# truth
+			if 'gp_outlier' in phot_params[ii]:
+				ind = np.where(parnames==phot_params[ii])[0][0]
+				for gg in xrange(noutliers):
+					ptruth = truths['truths'][ind+gg]
+					ax.axvline(ptruth,color='r',alpha=0.9,linewidth=lw)
+			else:
+				ptruth = truths['truths'][parnames==phot_params[ii]]
+				ax.axvline(ptruth,color='r',alpha=0.9,linewidth=lw)
 
-		ax.axvline(q16, ls="dashed", color='k',linewidth=lw)
-		ax.axvline(q50, color='k',linewidth=lw)
-		ax.axvline(q84, ls="dashed", color='k',linewidth=lw)
+			# range
+			ax.set_xlim(np.min(edges[:,ii]),np.max(edges[:,ii]))
+
+			# rough percentages
+			cumsum = np.cumsum(output[:,ii])/np.sum(output[:,ii])
+			cumsum_interp = interp1d(cumsum,edges[:,ii], bounds_error = False, fill_value = 0)
+			q16,q50,q84 = cumsum_interp(0.16),cumsum_interp(0.5),cumsum_interp(0.84)
+
+			ax.axvline(q16, ls="dashed", color='k',linewidth=lw)
+			ax.axvline(q50, color='k',linewidth=lw)
+			ax.axvline(q84, ls="dashed", color='k',linewidth=lw)
 
 
 	plt.savefig(outname,dpi=300)
