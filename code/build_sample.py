@@ -138,9 +138,9 @@ def build_sample_test(add_zp_err=False):
 	ngals               = 20
 	noise               = 0.05            # add errors
 	reported_noise      = 1.0*noise       # under-report the noise?
-	band_specific_noise = 0.18            # add band-specific noise?
+	band_specific_noise = [0.0,0.15,0.25] # add band-specific noise?
 	outliers_noise      = 0.5             # add outlier noise
-	outliers_bands      = [15,21,29]
+	outliers_bands      = [5,22,29]
 	#noise = 0.25
 	#reported_noise = 0.05
 
@@ -176,7 +176,7 @@ def build_sample_test(add_zp_err=False):
 			else:
 				for kk in xrange(ngals): testparms[kk,ii] = 10**(random.random()*(max-min)+min)
 		
-		#### tone down the dust a bit-- flat in prior means lots of Av = 3.0 galaxies! ####
+		#### tone down the dust a bit-- flat in prior means lots of Av = 2.0 galaxies! ####
 		elif parnames[ii][:-2] == 'dust2':
 			min = model.theta_bounds()[ii][0]
 			max = model.theta_bounds()[ii][1]
@@ -188,7 +188,7 @@ def build_sample_test(add_zp_err=False):
 	
 		#### linked filter noise ####
 		elif parnames[ii] == 'gp_filter_amps' or parnames[ii][:-2] == 'gp_filter_amps':
-			for kk in xrange(ngals): testparms[kk,ii] = band_specific_noise
+			for kk in xrange(ngals): testparms[kk,ii] = band_specific_noise[int(parnames[ii][-1])-1]
 
 		#### outliers ####
 		elif parnames[ii] == 'gp_outlier_amps' or parnames[ii][:-2] == 'gp_outlier_amps':
@@ -200,8 +200,6 @@ def build_sample_test(add_zp_err=False):
 			min = model.theta_bounds()[ii][0]
 			max = model.theta_bounds()[ii][1]
 			for kk in xrange(ngals): testparms[kk,ii] = random.random()*(max-min)+min
-
-           #tau[0]/2 > tau[1] 
 
 	#### make sure priors are satisfied
 	for ii in xrange(ngals):
@@ -220,17 +218,22 @@ def build_sample_test(add_zp_err=False):
 
 		#### add noise ####
 		for kk in xrange(nfilters): 
+			
+			###### general noise
 			tnoise = noise
+			
 			##### linked filter noise
-			#for gp_filter_loc in model.params.get('gp_filter_locs',None):
-			if obs['filters'][kk].lower() in np.concatenate(model.params.get('gp_filter_locs')):
-				print obs['filters'][kk].lower()
-				tnoise = (tnoise**2+band_specific_noise**2)**0.5
+			filtlist = model.params.get('gp_filter_locs')			
+			for mm in xrange(len(filtlist)):
+				if obs['filters'][kk].lower() in filtlist[mm]:
+					print 'adding linked noise'
+					tnoise = (tnoise**2+band_specific_noise[mm]**2)**0.5
+
 			##### outlier noise
 			if kk in outliers_bands:
-				print kk
 				tnoise = (tnoise**2+outliers_noise**2)**0.5
 			add_noise = random.gauss(0, tnoise)
+			print obs['filters'][kk].lower()
 			print add_noise
 			maggies[ii,kk] += add_noise*maggies[ii,kk]
 

@@ -2032,10 +2032,12 @@ def recover_phot_jitter(runname):
 	# if we have outliers, combine them into one plot
 	vars_to_plot = [True if (x[:10] != 'gp_outlier') or (x[-1] == '1') else False for x in phot_params ]
 	# make plots
-	gs = gridspec.GridSpec(1,nphot)
-	fig = plt.figure(figsize = (nphot*6,5))
+	nplot = np.sum(vars_to_plot)
+	gs = gridspec.GridSpec(1,nplot)
+	fig = plt.figure(figsize = (nplot*6,5))
 	gs.update(wspace=0.35, hspace=0.35)
 	lw = 1.2
+	plotted=0
 
 	for ii in xrange(nphot):
 		if vars_to_plot[ii] == True:
@@ -2047,7 +2049,8 @@ def recover_phot_jitter(runname):
 				histplot = output[:,ii]
 
 			# plot
-			ax = plt.subplot(gs[ii])
+			ax = plt.subplot(gs[plotted])
+			plotted+=1
 			ax.bar(edges[:,ii],histplot,width=edges[1,ii]-edges[0,ii]
 				  ,alpha=0.5,linewidth=0.0,edgecolor='grey',color='blue')
 
