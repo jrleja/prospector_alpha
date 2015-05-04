@@ -12,12 +12,12 @@ logarithmic = priors.logarithmic
 #############
 
 run_params = {'verbose':True,
-              'outfile':os.getenv('APPS')+'/threedhst_bsfh/results/testsed_outliers_fixedamp/testsed_fixedamp_outliers',
+              'outfile':os.getenv('APPS')+'/threedhst_bsfh/results/testsed_outliers_fixedamp/testsed_outliers_fixedamp',
               'ftol':0.5e-5, 
               'maxfev':5000,
               'nwalkers':248,
               'nburn':[32,64,128,256], 
-              'niter': 3500,
+              'niter': 4000,
               'initial_disp':0.1,
               'edge_trunc':0.3,
               'debug': False,
