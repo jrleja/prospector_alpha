@@ -3,8 +3,8 @@
 # for multiple galaxy IDs
 # set location of ID file, base parameter file
 IDFILE=$APPS"/threedhst_bsfh/data/testsed.ids"
-PARAMFOLDER=$APPS"/threedhst_bsfh/parameter_files/testsed_outliers/"
-PARAMBASE="testsed_outliers_params"
+PARAMFOLDER=$APPS"/threedhst_bsfh/parameter_files/testsed_linked/"
+PARAMBASE="testsed_linked_params"
 PARAMEXT=".py"
 
 echo 'ID file:'$IDFILE
