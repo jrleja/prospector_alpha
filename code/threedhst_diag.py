@@ -334,7 +334,7 @@ def comp_samples(thetas, sample_results, sps, inlog=True, photflag=0):
     return wave, mospec, mounc, specvecs	
 
 def sed_figure(sample_results, sps, model,
-                alpha=0.3, samples = [-1],
+                alpha=0.3, samples = [-1], powell=None,
                 maxprob=0, outname=None, plot_init = 0, fast=True,
                 truths = None,
                 **kwargs):
@@ -408,6 +408,7 @@ def sed_figure(sample_results, sps, model,
 			     color=fastcolor, marker='o', linestyle=' ', label='fast', 
 			     ms=ms,alpha=alpha,markeredgewidth=0.7,zorder=-1)
 
+	# plot truths
 	if truths is not None:
 		mwave_truth, mospec_truth, mounc_truth, specvecs_truth = comp_samples([truths['truths']], sample_results, sps, photflag=1)
 		
@@ -418,6 +419,18 @@ def sed_figure(sample_results, sps, model,
 		res.plot(np.log10(mwave_truth), specvecs_truth[0][-1], 
 			     color='blue', marker='o', linestyle=' ', label='truths', 
 			     ms=ms,alpha=0.3,markeredgewidth=0.7,**kwargs)
+
+	# plot Powell minimization answer
+	if powell is not None:
+		mwave_powell, mospec_powell, mounc_powell, specvecs_powell = comp_samples([powell], sample_results, sps, photflag=1)
+		
+		phot.plot(np.log10(mwave_powell), np.log10(specvecs_powell[0][0]*(c/(mwave_powell/1e10))), 
+			      color='purple', marker='o', ms=ms, linestyle=' ', label='powell', 
+			      alpha=alpha, markeredgewidth=0.7,**kwargs)
+
+		#res.plot(np.log10(mwave_powell), specvecs_powell[0][-1], 
+		#	     color='purple', marker='o', linestyle=' ', label='powell', 
+		#	     ms=ms,alpha=0.3,markeredgewidth=0.7,**kwargs)
 
 	# add SFH plot
 	t, perc = plot_sfh(sample_results, ncomp=sample_results.get('ncomp',2))
@@ -664,7 +677,6 @@ def make_all_plots(filebase=None, parm_file=None,
 			print 'Failed to open '+ mcmc_filename +','+model_filename
 			return 0
 
-	
 	if not sps:
 		# load stellar population, set up custom filters
 		if np.sum([1 for x in sample_results['model'].config_list if x['name'] == 'pmetals']) > 0:
@@ -705,17 +717,24 @@ def make_all_plots(filebase=None, parm_file=None,
 							 show_titles=True, truths=truths)
 
 	# sed plot
-	# MANY UNNECESSARY CALCULATIONS
 	if plt_sed_figure:
 		print 'MAKING SED PLOT'
+		
+		# FAST fit?
 		try:
 			sample_results['run_params']['fastname']
 			fast=1
 		except:
 			fast=0
+		
+		# powell guess?
+		#bestpowell=np.argmin([p.fun for p in powell_results])
+		#pguess = powell_results[bestpowell].x
+		pguess = None
+
  		# plot
  		pfig = sed_figure(sample_results, sps, copy.deepcopy(sample_results['model']),
- 						  maxprob=1,fast=fast,truths=truths,
+ 						  maxprob=1,fast=fast,truths=truths,powell=pguess,
  						  outname=outfolder+filename+'_'+max(times)+'.sed.png')
  		
 def plot_all_driver():
@@ -730,7 +749,7 @@ def plot_all_driver():
 	#runname = 'dtau_genpop_fixedmet'
 	#runname = 'dtau_ha_zperr'
 	runname = 'dtau_ha_plog'
-	runname = 'testsed_new'
+	runname = 'testsed_outliers'
 
 	filebase, parm_basename, ancilname=threed_dutils.generate_basenames(runname)
 	for jj in xrange(len(filebase)):

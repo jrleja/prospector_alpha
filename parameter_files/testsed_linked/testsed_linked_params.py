@@ -12,7 +12,7 @@ logarithmic = priors.logarithmic
 #############
 
 run_params = {'verbose':True,
-              'outfile':os.getenv('APPS')+'/threedhst_bsfh/results/testsed_outliers/testsed_outliers',
+              'outfile':os.getenv('APPS')+'/threedhst_bsfh/results/testsed_linked/testsed_linked',
               'ftol':0.5e-5, 
               'maxfev':5000,
               'nwalkers':496,
@@ -29,8 +29,8 @@ run_params = {'verbose':True,
               'abs_error': False,
               'spec': False, 
               'phot':True,
-              'photname':os.getenv('APPS')+'/threedhst_bsfh/data/testsed_outliers.cat',
-              'truename':os.getenv('APPS')+'/threedhst_bsfh/data/testsed_outliers.dat',
+              'photname':os.getenv('APPS')+'/threedhst_bsfh/data/testsed_linked.cat',
+              'truename':os.getenv('APPS')+'/threedhst_bsfh/data/testsed_linked.dat',
               'objname':'1',
               }
 
@@ -373,25 +373,41 @@ model_params.append({'name': 'phot_jitter', 'N': 1,
                         'prior_function':tophat,
                         'prior_args': {'mini':0.0, 'maxi':0.5}})
 
-##### OUTLIERS #####
-noutliers=3
-model_params.append({'name': 'gp_outlier_amps','N': noutliers,
-                        'isfree': False,
-                        'init': np.zeros(noutliers)+100.0,
+# Here we define groups of filters to which we will add additional
+# uncertainty above and beyond the stated uncertainty and the
+# additional jitter.
+gp_filts = np.array([['u_cosmos', 'ia427_cosmos', 'b_cosmos', 'ia464_cosmos',\
+                      'ia484_cosmos', 'g_cosmos', 'ia505_cosmos', 'ia527_cosmos',\
+                      'v_cosmos', 'ia574_cosmos', 'ia624_cosmos',\
+                      'r_cosmos', 'rp_cosmos', 'ia679_cosmos', 'ia709_cosmos',\
+                      'ia738_cosmos', 'ip_cosmos', 'i_cosmos', 'ia767_cosmos',\
+                      'ia827_cosmos', 'z_cosmos', 'zp_cosmos',\
+                      'uvista_y_cosmos', 'j1_cosmos', 'j2_cosmos',\
+                      'uvista_j_cosmos', 'j_cosmos', 'j3_cosmos',\
+                      'h1_cosmos', 'h_cosmos', 'uvista_h_cosmos',\
+                      'h2_cosmos', 'uvista_ks_cosmos', 'ks_cosmos', 'k_cosmos',\
+                      'mips_24um_cosmos'],\
+                     ['irac1_cosmos','irac2_cosmos','irac3_cosmos','irac4_cosmos'],\
+                     ['f606w_cosmos','f814w_cosmos','f125w_cosmos','f140w_cosmos','f160w_cosmos']])
+ngpf = gp_filts.shape[0]
+
+model_params.append({'name': 'gp_filter_amps','N': ngpf,
+                        'isfree': True,
+                        'init': [0.0],
                         'init_disp': 0.5,
+                        'nuisance': 1,
                         'reinit': True,
                         'units': 'fractional maggies (mags/1.086)',
                         'prior_function':tophat,
-                        'prior_args': {'mini':np.zeros(noutliers), 'maxi':np.zeros(noutliers)+100.0}})
+                        'prior_args': {'mini':np.zeros(ngpf), 'maxi':np.zeros(ngpf)+0.4}})
 
-model_params.append({'name': 'gp_outlier_locs','N': noutliers,
-                        'isfree': True,
-                        'init': np.linspace(noutliers,noutliers**2,noutliers),
+model_params.append({'name': 'gp_filter_locs','N': ngpf,
+                        'isfree': False,
+                        'init': gp_filts,
                         'init_disp': 0.5,
-                        'nuisance': 1,
-                        'units': 'filter_indices',
-                        'prior_function':tophat,
-                        'prior_args': {'mini':np.zeros(noutliers), 'maxi': np.zeros(noutliers)+np.sum(obs['phot_mask'])-1}})
+                        'units': 'filter names or filter_indices',
+                        'prior_function':None,
+                        'prior_args': None})
 
 # name outfile
 run_params['outfile'] = run_params['outfile']+'_'+run_params['objname']
