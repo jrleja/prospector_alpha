@@ -393,7 +393,7 @@ ngpf = gp_filts.shape[0]
 
 model_params.append({'name': 'gp_filter_amps','N': ngpf,
                         'isfree': True,
-                        'init': np.zeros(ngpf),
+                        'init': np.zeros(ngpf)+0.1,
                         'init_disp': 0.5,
                         'nuisance': 1,
                         'reinit': True,
