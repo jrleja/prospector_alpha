@@ -155,8 +155,7 @@ def load_truths(truthname,objname,sample_results):
 
 		# log parameters
 		if parnames[kk] == 'mass' or parnames[kk][:-2] == 'mass' or \
-           parnames[kk] == 'tau' or parnames[kk][:-2] == 'tau' or \
-           parnames[kk] == 'sf_start' or parnames[kk][:-2] == 'sf_start':
+           parnames[kk] == 'tau' or parnames[kk][:-2] == 'tau':
 
 			plot_truths[kk] = np.log10(plot_truths[kk])
 

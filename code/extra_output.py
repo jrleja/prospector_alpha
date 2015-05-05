@@ -80,7 +80,6 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 	thetas, maxprob = maxprob_model(sample_results,sps)
 
 	# calculate number of components
-	#sample_results['ncomp'] =[len(np.atleast_1d(x['init'])) for x in sample_results['model'].config_list if x['isfree'] == True]
 	sample_results['ncomp'] = np.sum(['mass' in x for x in sample_results['model'].theta_labels()])
 
     # find SFH parameters that are variables in the chain
@@ -101,6 +100,8 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 	z = sample_results['model'].params['zred'][0]
 	tuniv = WMAP9.age(z).value
 	deltat=[0.01,0.1,1.0] # in Gyr
+	if sample_results['run_params'].get('truename') is not None:
+		tuniv = 14.0
     
 	##### DO EMPIRICAL EMISSION LINES IN CHAIN ######
 	dust2_index = np.array([True if (x[:-sample_results['ncomp']] == 'dust2') or 

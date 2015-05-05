@@ -120,7 +120,7 @@ def plot_sfh(sample_results,nsamp=1000,ncomp=2):
 
 	return t, q
 
-def create_plotquant(sample_results, logplot = ['mass', 'tau', 'tage', 'sf_start']):
+def create_plotquant(sample_results, logplot = ['mass', 'tau', 'tage'], truths=None):
     
 	'''
 	creates plottable versions of chain and sets up new plotnames
@@ -134,10 +134,12 @@ def create_plotquant(sample_results, logplot = ['mass', 'tau', 'tage', 'sf_start
 	# will have to redefine after inserting p(z)
 	# note that we switch prior min/max here!!
 	tuniv = WMAP9.age(sample_results['model'].params['zred'][0]).value
+	if truths is not None:
+		tuniv = 14.0
 	redefine = ['sf_start']
 
 	# check for multiple stellar populations
-	for ii in xrange(len(parnames)):    	
+	for ii in xrange(len(parnames)):   	
 		if parnames[ii] in redefine:
 			priors = [f['prior_args'] for f in sample_results['model'].config_list if f['name'] == parnames[ii]][0]
 			min = priors['mini']
@@ -234,7 +236,7 @@ def return_extent(sample_results):
 	
 	return extents
 
-def show_chain(sample_results,outname=None,alpha=0.6):
+def show_chain(sample_results,outname=None,alpha=0.6,truths=None):
 	
 	'''
 	plot the MCMC chain for all parameters
@@ -284,6 +286,10 @@ def show_chain(sample_results,outname=None,alpha=0.6):
 			axarr[jj,ii].set_ylim(sample_results['extents'][jj])
 			axarr[jj,ii].yaxis.get_major_ticks()[0].label1On = False # turn off bottom ticklabel
 
+			# add truths
+			if truths is not None:
+				axarr[jj,ii].axhline(truths['plot_truths'][jj], linestyle='-',color='r')
+
 		# plot lnprob
 		for kk in xrange(walkerstart,walkerend): 
 			axarr[jj+1,ii].plot(sample_results['lnprobability'][kk,:],'-',
@@ -301,7 +307,7 @@ def show_chain(sample_results,outname=None,alpha=0.6):
 		testable = np.isfinite(sample_results['lnprobability'])
 		max = np.amax(sample_results['lnprobability'][testable])
 		stddev = np.std(sample_results['lnprobability'][testable])
-		axarr[jj+1,ii].set_ylim(max-stddev, max)
+		axarr[jj+1,ii].set_ylim(max-4*stddev, max)
 		
 		axarr[jj+1,ii].yaxis.get_major_ticks()[0].label1On = False # turn off bottom ticklabel
 
@@ -687,10 +693,6 @@ def make_all_plots(filebase=None, parm_file=None,
 	# BEGIN PLOT ROUTINE
 	print 'MAKING PLOTS FOR ' + filename + ' in ' + outfolder
 	
-	# define nice plotting quantities
-	sample_results = create_plotquant(sample_results)
-	sample_results['extents'] = return_extent(sample_results)
-
 	# do we know the truths?
 	try:
 		truths = threed_dutils.load_truths(os.getenv('APPS')+'/threed'+sample_results['run_params']['truename'].split('/threed')[1],
@@ -699,12 +701,16 @@ def make_all_plots(filebase=None, parm_file=None,
 	except KeyError:
 		truths=None
 
+	# define nice plotting quantities
+	sample_results = create_plotquant(sample_results, truths=truths)
+	sample_results['extents'] = return_extent(sample_results)
+
     # chain plot
 	if plt_chain_figure: 
 		print 'MAKING CHAIN PLOT'
 		show_chain(sample_results,
 	               outname=outfolder+filename+'_'+max(times)+".chain.png",
-			       alpha=0.3)
+			       alpha=0.3,truths=truths)
 
 	# triangle plot
 	if plt_triangle_plot: 
