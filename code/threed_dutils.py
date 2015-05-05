@@ -188,6 +188,20 @@ def generate_basenames(runname):
 	parm=[]
 	ancilname='COSMOS_testsamp.dat'
 
+	if runname == 'testsed_linked':
+
+		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/testsed.ids"
+		ids = np.loadtxt(id_list, dtype='|S20')
+		ngals = len(ids)
+
+		basename = "testsed_linked"
+		parm_basename = "testsed_linked_params"
+		ancilname=None
+
+		for jj in xrange(ngals):
+			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+basename+'_'+ids[jj])
+			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
+
 	if runname == 'testsed_outliers':
 
 		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/testsed.ids"
