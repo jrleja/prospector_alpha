@@ -2004,7 +2004,7 @@ def recover_phot_jitter(runname):
 
 			# define outputs
 			nphot = len(phot_params)
-			noutliers = len([x for x in parnames if 'gp_outlier_amps' in x])
+			noutliers = len([x for x in parnames if 'gp_outlier_locs' in x])
 			nbins = 50
 			histbounds = []
 			output = np.zeros(shape=(nbins,nphot))
