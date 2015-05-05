@@ -231,6 +231,9 @@ def build_sample_test(add_zp_err=False,
 		_,maggiestemp,_ = model.mean_model(model.initial_theta, obs, sps=sps,norm_spec=False)
 		maggies[ii,:] = maggiestemp
 
+		#### record noise ####
+		maggies_unc[ii,:] = maggies[ii,:]*reported_noise
+
 		#### add noise ####
 		for kk in xrange(nfilters): 
 			
@@ -249,9 +252,6 @@ def build_sample_test(add_zp_err=False,
 			add_noise = random.gauss(0, tnoise)
 			print obs['filters'][kk].lower()+': ' + "{:.2f}".format(add_noise)
 			maggies[ii,kk] += add_noise*maggies[ii,kk]
-
-		#### record noise ####
-		maggies_unc[ii,:] = maggies[ii,:]*reported_noise
 
 	#### add zeropoint offsets ####
 	if add_zp_err:
