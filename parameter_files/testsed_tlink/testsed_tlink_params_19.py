@@ -375,7 +375,7 @@ model_params.append({'name': 'phot_jitter', 'N': 1,
 # Here we define groups of filters to which we will add additional
 # uncertainty above and beyond the stated uncertainty and the
 # additional jitter.
-gp_filts = np.array(['u_cosmos', 'ia427_cosmos', 'b_cosmos', 'ia464_cosmos',\
+gp_filts = np.array([['u_cosmos', 'ia427_cosmos', 'b_cosmos', 'ia464_cosmos',\
                      'ia484_cosmos', 'g_cosmos', 'ia505_cosmos', 'ia527_cosmos',\
                      'v_cosmos', 'ia574_cosmos', 'ia624_cosmos',\
                      'r_cosmos', 'rp_cosmos', 'ia679_cosmos', 'ia709_cosmos',\
@@ -386,7 +386,7 @@ gp_filts = np.array(['u_cosmos', 'ia427_cosmos', 'b_cosmos', 'ia464_cosmos',\
                      'h1_cosmos', 'h_cosmos', 'uvista_h_cosmos',\
                      'h2_cosmos', 'uvista_ks_cosmos', 'ks_cosmos', 'k_cosmos',\
                      'mips_24um_cosmos','irac1_cosmos','irac2_cosmos','irac3_cosmos','irac4_cosmos',\
-                     'f606w_cosmos','f814w_cosmos','f125w_cosmos','f140w_cosmos','f160w_cosmos'])
+                     'f606w_cosmos','f814w_cosmos','f125w_cosmos','f140w_cosmos','f160w_cosmos']])
 ngpf = 1
 
 model_params.append({'name': 'gp_filter_amps','N': ngpf,
