@@ -704,7 +704,7 @@ def make_all_plots(filebase=None, parm_file=None,
 	# define nice plotting quantities
 	sample_results = create_plotquant(sample_results, truths=truths)
 	sample_results['extents'] = return_extent(sample_results)
-
+	print 1/0
     # chain plot
 	if plt_chain_figure: 
 		print 'MAKING CHAIN PLOT'
@@ -755,10 +755,10 @@ def plot_all_driver():
 	#runname = 'dtau_genpop_fixedmet'
 	#runname = 'dtau_ha_zperr'
 	runname = 'dtau_ha_plog'
-	runname = 'testsed_outliers'
+	runname = 'testsed_tlink'
 
 	filebase, parm_basename, ancilname=threed_dutils.generate_basenames(runname)
-	for jj in xrange(len(filebase)):
+	for jj in xrange(17,len(filebase)):
 		print 'iteration '+str(jj) 
 		make_all_plots(filebase=filebase[jj],\
 		               parm_file=parm_basename[jj],\

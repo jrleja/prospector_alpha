@@ -2063,7 +2063,7 @@ def recover_phot_jitter(runname):
 				ind = np.where(parnames==phot_params[ii])[0][0]
 				for gg in xrange(noutliers):
 					ptruth = truths['truths'][ind+gg]
-					ax.axvline(ptruth,color='r',alpha=0.9,linewidth=lw)
+					ax.axvline(ptruth+1,color='r',alpha=0.9,linewidth=lw)
 			else:
 				ptruth = truths['truths'][parnames==phot_params[ii]]
 				ax.axvline(ptruth,color='r',alpha=0.9,linewidth=lw)
