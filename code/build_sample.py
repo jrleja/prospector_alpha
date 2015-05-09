@@ -122,11 +122,53 @@ def calc_uvj_flag(rf):
 	
 	return uvj_flag
 
-# build_sample_test(basename='testsed_linked'), build_sample_test(basename='testsed_all')
+def return_test_sfhs(test_sfhs):
 
+	if test_sfhs == 1:
+		tau_bounds      = np.array([[50,100],[50,100]])
+		sf_start_bounds = np.array([[0,4],[0,4]])
+		descriptor      = 'constant sfh'
+
+	elif test_sfhs == 2:
+		tau_bounds      = np.array([[0.1,3],[0.1,3]])
+		sf_start_bounds = np.array([[0,4],[0,4]])
+		descriptor      = 'quiescent'		
+
+	elif test_sfhs == 3:
+		tau_bounds      = np.array([[0.1,3],[0.1,3]])
+		sf_start_bounds = np.array([[12,14],[12,14]])
+		descriptor      = 'burst'
+
+	elif test_sfhs == 4:
+		tau_bounds      = np.array([[0.1,7],[0.1,3]])
+		sf_start_bounds = np.array([[0,3],[12,14]])
+		descriptor      = 'old+burst'
+
+	return tau_bounds,sf_start_bounds,descriptor
+
+def return_bounds(parname,model,i,test_sfhs=None):
+
+	if parname[:-2] == 'tau' and test_sfhs is not None:
+		bounds,_,_=return_test_sfhs(test_sfhs)
+		bounds = bounds[int(parname[-1])-1]
+	elif parname[:-2] == 'sf_start' and test_sfhs is not None:
+		_,bounds,_=return_test_sfhs(test_sfhs)
+		bounds = bounds[int(parname[-1])-1]
+	else:
+		bounds = model.theta_bounds()[i]
+
+	return bounds[0],bounds[1]
+
+
+# build_sample_test(basename='testsed_linked'), build_sample_test(basename='testsed_all')
+# build_sample.build_sample_test(basename='testsed_constant', test_sfhs=1)
+# build_sample.build_sample_test(basename='testsed_quiescent', test_sfhs=2)
+# build_sample.build_sample_test(basename='testsed_burst', test_sfhs=3)
+# build_sample.build_sample_test(basename='testsed_oldburst', test_sfhs=4)
 
 def build_sample_test(add_zp_err=False,
-	                  basename='testsed_outliers'):
+	                  basename='testsed_outliers',
+	                  test_sfhs=False):
 
 	'''
 	Generate model SEDs and add noise
@@ -168,9 +210,11 @@ def build_sample_test(add_zp_err=False,
 		# random in logspace
 		# also enforce priors
 		if parnames[ii][:-2] == 'mass' or parnames[ii][:-2] == 'tau':
-			min = np.log10(model.theta_bounds()[ii][0])
-			max = np.log10(model.theta_bounds()[ii][1])
 			
+			min,max = np.log10(return_bounds(parnames[ii],model,ii,test_sfhs=test_sfhs))
+			if parnames[ii][:-2] == 'tau':
+				print min,max
+
 			# ensure that later priors CAN be enforced
 			if parnames[ii] == 'mass_1': max = np.log10(10**max/20)
 			if parnames[ii] == 'tau_1': min = np.log10(10**min*2)
@@ -185,6 +229,12 @@ def build_sample_test(add_zp_err=False,
 			else:
 				for kk in xrange(ngals): testparms[kk,ii] = 10**(random.random()*(max-min)+min)
 		
+		#### generate specific SFHs if necessary ####
+		elif parnames[ii][:-2] == 'sf_start':
+			min,max = return_bounds(parnames[ii],model,ii,test_sfhs=test_sfhs)
+			print min,max
+			for kk in xrange(ngals): testparms[kk,ii] = random.random()*(max-min)+min
+
 		#### tone down the dust a bit-- flat in prior means lots of Av = 2.0 galaxies! ####
 		elif parnames[ii][:-2] == 'dust2':
 			min = model.theta_bounds()[ii][0]
