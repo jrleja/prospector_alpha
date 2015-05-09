@@ -366,12 +366,31 @@ model_params.append({'name': 'gas_logu', 'N': 1,
 ####### Calibration ##########
 model_params.append({'name': 'phot_jitter', 'N': 1,
                         'isfree': False,
-                        'init': 0.1,
+                        'init': 0.0,
                         'init_disp': 0.5,
                         'units': 'fractional maggies (mags/1.086)',
                         'prior_function':tophat,
                         'prior_args': {'mini':0.0, 'maxi':0.5}})
 
+##### OUTLIERS #####
+noutliers=3
+model_params.append({'name': 'gp_outlier_amps','N': noutliers,
+                        'isfree': False,
+                        'init': np.zeros(noutliers),
+                        'init_disp': 0.5,
+                        'reinit': True,
+                        'units': 'fractional maggies (mags/1.086)',
+                        'prior_function':tophat,
+                        'prior_args': {'mini':np.zeros(noutliers), 'maxi':np.zeros(noutliers)+100.0}})
+
+model_params.append({'name': 'gp_outlier_locs','N': noutliers,
+                        'isfree': False,
+                        'init': np.linspace(noutliers,noutliers**2,noutliers),
+                        'init_disp': 0.5,
+                        'nuisance': 1,
+                        'units': 'filter_indices',
+                        'prior_function':tophat,
+                        'prior_args': {'mini':np.zeros(noutliers), 'maxi': np.zeros(noutliers)+np.sum(obs['phot_mask'])-1}})
 
 # name outfile
 run_params['outfile'] = run_params['outfile']+'_'+run_params['objname']
