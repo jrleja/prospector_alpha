@@ -704,7 +704,6 @@ def make_all_plots(filebase=None, parm_file=None,
 	# define nice plotting quantities
 	sample_results = create_plotquant(sample_results, truths=truths)
 	sample_results['extents'] = return_extent(sample_results)
-	print 1/0
     # chain plot
 	if plt_chain_figure: 
 		print 'MAKING CHAIN PLOT'
