@@ -1,0 +1,18 @@
+#!/bin/bash
+### Name of the job 
+### Requested number of nodes
+#SBATCH -n 32
+### Requested computing time in minutes
+#SBATCH -t 2:00:00
+###partition
+#SBATCH -p normal
+### Job name
+#SBATCH -J '3Drun'
+### output and error logs
+#SBATCH -o onek_run_%a.out
+#SBATCH -e onek_run_%a.err
+### mail
+#SBATCH --mail-type=END
+#SBATCH --mail-user=joel.leja@gmail.com
+ibrun -np 32 python $APPS/bsfh/demo/prospectr.py --param_file=$APPS/threedhst_bsfh/parameter_files/onek_run/onek_run_params_1.py  --sps=fsps --custom_filter_keys=$APPS/threedhst_bsfh/filte
+rs/filter_keys_threedhst.txt 

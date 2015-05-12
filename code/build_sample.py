@@ -124,6 +124,12 @@ def calc_uvj_flag(rf):
 
 def return_test_sfhs(test_sfhs):
 
+	'''
+	return special constraints on sf_start and tau
+	custom-built for SFH recovery tests
+	'''
+
+
 	if test_sfhs == 1:
 		tau_bounds      = np.array([[50,100],[50,100]])
 		sf_start_bounds = np.array([[0,4],[0,4]])
@@ -147,6 +153,13 @@ def return_test_sfhs(test_sfhs):
 	return tau_bounds,sf_start_bounds,descriptor
 
 def return_bounds(parname,model,i,test_sfhs=None):
+
+	'''
+	returns parameter boundaries
+	if test_sfhs is on, puts special constraints on sf_start and tau
+	these special constraints are defined in return_test_sfhs
+	'''
+
 
 	if parname[:-2] == 'tau' and test_sfhs is not None:
 		bounds,_,_=return_test_sfhs(test_sfhs)
@@ -351,6 +364,105 @@ def build_sample_test(add_zp_err=False,
 				f.write(str(testparms[ii,kk])+' ')
 			f.write('\n')
 
+def build_sample_onekrun(rm_zp_offsets=True):
+
+	'''
+	selects a sample of galaxies for 1k run
+	evenly spaced in five redshift bins out to z=3
+	'''
+
+	zbins = [(0.4,0.8),(0.8,1.2),(1.2,1.6),(1.6,2.0),(2.0,2.5)]
+
+	# output
+	field = 'COSMOS'
+	basename = 'onek'
+	fast_str_out = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_'+basename+'.fout'
+	ancil_str_out = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_'+basename+'.dat'
+	phot_str_out = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_'+basename+'.cat'
+	id_str_out   = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_'+basename+'.ids'
+
+	# load data
+	# use grism redshift
+	phot = read_sextractor.load_phot_v41(field)
+	fast = read_sextractor.load_fast_v41(field)
+	rf = read_sextractor.load_rf_v41(field)
+	lineinfo = load_linelist()
+	mips = threed_dutils.load_mips_data(os.getenv('APPS')+'/threedhst_bsfh/data/MIPS/cosmos_3dhst.v4.1.4.sfr')
+	
+	# remove junk
+	# 153, 155, 161 are U, V, J
+	good = (phot['use_phot'] == 1) & \
+	       (phot['f_IRAC4'] < 1e7) & (phot['f_IRAC3'] < 1e7) & (phot['f_IRAC2'] < 1e7) & (phot['f_IRAC1'] < 1e7) & \
+	       (fast['lmass'] > 10.3)
+
+	phot = phot[good]
+	fast = fast[good]
+	rf = rf[good]
+	lineinfo = lineinfo[good]
+	mips = mips[good]
+	
+	# define UVJ flag, S/N, HA EQW
+	uvj_flag = calc_uvj_flag(rf)
+	sn_F160W = phot['f_F160W']/phot['e_F160W']
+	Ha_EQW_obs = lineinfo['Ha_EQW_obs']
+	lineinfo.rename_column('zgris' , 'z')
+	lineinfo['uvj_flag'] = uvj_flag
+	lineinfo['sn_F160W'] = sn_F160W
+
+	# mips
+	phot['f_MIPS_24um'] = mips['f24tot']
+	phot['e_MIPS_24um'] = mips['ef24tot']
+
+	for i in xrange(len(mips.dtype.names)):
+		tempname=mips.dtype.names[i]
+		if tempname != 'z_best' and tempname != 'id':
+			lineinfo[tempname] = mips[tempname]
+		elif tempname == 'z_best':
+			lineinfo['z_sfr'] = mips[tempname]
+	
+	# split into bins
+	ngal = 1000
+	n_per_bin = ngal / len(zbins)
+	
+	for z in zbins:
+		selection = np.where((lineinfo['zbest'] >= z[0]) & (lineinfo['zbest'] < z[1]))[0]
+
+		if np.sum(selection) < n_per_bin:
+			print 'ERROR: Not enough galaxies in bin!'
+			print np.sum(selection),n_per_bin
+				
+		# choose random set of indices
+		random_index = random.sample(xrange(len(selection)), n_per_bin)
+		if z[0] != zbins[0][0]:
+			fast_out = vstack([fast_out,fast[selection[random_index]]])
+			phot_out = vstack([phot_out,phot[selection[random_index]]])
+			lineinfo_out = vstack([lineinfo_out,lineinfo[selection[random_index]]])
+		else:
+			fast_out = fast[selection[random_index]]
+			phot_out = phot[selection[random_index]]
+			lineinfo_out = lineinfo[selection[random_index]]
+	
+	# rename bands in photometric catalogs
+	for column in phot_out.colnames:
+		if column[:2] == 'f_' or column[:2] == 'e_':
+			phot_out.rename_column(column, column.lower()+'_'+field.lower())	
+
+	if rm_zp_offsets:
+		bands_exempt = ['irac1_cosmos','irac2_cosmos','irac3_cosmos','irac4_cosmos',\
+                        'f606w_cosmos','f814w_cosmos','f125w_cosmos','f140w_cosmos',\
+                        'f160w_cosmos','mips_24um_cosmos']
+		phot_out = remove_zp_offsets(field,phot_out,bands_exempt=bands_exempt)
+
+	ascii.write(phot_out, output=phot_str_out, 
+	            delimiter=' ', format='commented_header')
+	ascii.write(fast_out, output=fast_str_out, 
+	            delimiter=' ', format='commented_header',
+	            include_names=fast.keys()[:11])
+	ascii.write(lineinfo_out, output=ancil_str_out, 
+	            delimiter=' ', format='commented_header')
+	ascii.write([np.array(phot_out['id'],dtype='int')], output=id_str_out, Writer=ascii.NoHeader)
+	print 1/0
+
 def build_sample_general():
 
 	'''
@@ -417,8 +529,6 @@ def build_sample_general():
 		if column[:2] == 'f_' or column[:2] == 'e_':
 			phot_out.rename_column(column, column.lower()+'_'+field.lower())	
 
-	print 1/0
-
 	ascii.write(phot_out, output=phot_str_out, 
 	            delimiter=' ', format='commented_header')
 	ascii.write(fast_out, output=fast_str_out, 
@@ -429,15 +539,17 @@ def build_sample_general():
 	ascii.write([np.array(phot_out['id'],dtype='int')], output=id_str_out, Writer=ascii.NoHeader)
 	print 1/0
 
-def remove_zp_offsets(field,phot):
+def remove_zp_offsets(field,phot,bands_exempt=None):
 
 	zp_offsets = threed_dutils.load_zp_offsets(field)
 	nbands     = len(zp_offsets)
 
 	for kk in xrange(nbands):
 		filter = zp_offsets[kk]['Band'].lower()+'_'+field.lower()
-		phot['f_'+filter] = phot['f_'+filter]/zp_offsets[kk]['Flux-Correction']
-		phot['e_'+filter] = phot['e_'+filter]/zp_offsets[kk]['Flux-Correction']
+		if filter not in bands_exempt:
+			print filter
+			phot['f_'+filter] = phot['f_'+filter]/zp_offsets[kk]['Flux-Correction']
+			phot['e_'+filter] = phot['e_'+filter]/zp_offsets[kk]['Flux-Correction']
 
 	return phot
 
