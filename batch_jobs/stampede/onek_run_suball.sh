@@ -14,5 +14,4 @@
 ### mail
 #SBATCH --mail-type=END
 #SBATCH --mail-user=joel.leja@gmail.com
-ibrun -np 32 python $APPS/bsfh/demo/prospectr.py --param_file=$APPS/threedhst_bsfh/parameter_files/onek_run/onek_run_params_1.py  --sps=fsps --custom_filter_keys=$APPS/threedhst_bsfh/filte
-rs/filter_keys_threedhst.txt 
+ibrun -np 32 python $APPS/bsfh/demo/prospectr.py --param_file=$APPS/threedhst_bsfh/parameter_files/onek_run/onek_run_params_$SLURM_ARRAY_TASK_ID.py  --sps=fsps --custom_filter_keys=$APPS/threedhst_bsfh/filters/filter_keys_threedhst.txt 

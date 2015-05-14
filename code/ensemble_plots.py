@@ -2085,6 +2085,56 @@ def recover_phot_jitter(runname):
 	os.system('open '+outname)
 	print 1/0
 
+def plot_sfh_ensemble(runname):
+
+	'''
+	given a run, for each galaxy, load the output, and
+	construct the sum of the PDF for the photometric error terms
+	'''
+
+	filebase,params,ancilname=threed_dutils.generate_basenames(runname)
+	ngals = len(filebase)
+	outname = '/Users/joel/code/python/threedhst_bsfh/plots/ensemble_plots/'+runname+'/phot_jitter_pdf.png'
+
+	nfail = 0
+	gs = gridspec.GridSpec(4,5)
+	for jj in xrange(ngals):
+
+		# find most recent output file
+		# with the objname
+		folder = "/".join(filebase[jj].split('/')[:-1])
+		filename = filebase[jj].split("/")[-1]
+		files = [f for f in os.listdir(folder) if "_".join(f.split('_')[:-2]) == filename]	
+		times = [f.split('_')[-2] for f in files]
+
+		# if we found no files, skip this object
+		if len(times) == 0:
+			print 'Failed to find any files in '+folder+' of type ' +filename+' to extract times'
+			nfail+=1
+			continue
+
+		# load results
+		mcmc_filename=filebase[jj]+'_'+max(times)+"_mcmc"
+		model_filename=filebase[jj]+'_'+max(times)+"_model"
+
+		try:
+			sample_results, powell_results, model = read_results.read_pickles(mcmc_filename, model_file=model_filename,inmod=None)
+		except (ValueError,EOFError,KeyError):
+			print mcmc_filename + ' failed during output writing'
+			nfail+=1
+			continue
+		except IOError:
+			print mcmc_filename + ' does not exist!'
+			nfail+=1
+			continue
+
+		# check for existence of extra information
+		try:
+			sample_results['quantiles']
+		except:
+			print 'Generating extra information for '+mcmc_filename+', '+model_filename
+			extra_output.post_processing(params[jj])
+			sample_results, powell_results, model = read_results.read_pickles(mcmc_filename, model_file=model_filename,inmod=None)
 
 
 

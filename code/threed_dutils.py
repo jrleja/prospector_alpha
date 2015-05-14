@@ -201,7 +201,7 @@ def generate_basenames(runname):
 			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+basename+'_'+ids[jj])
 			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
 
-	if runname == 'testsed_tlink':
+	elif runname == 'testsed_tlink':
 
 		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/testsed.ids"
 		ids = np.loadtxt(id_list, dtype='|S20')
@@ -215,7 +215,7 @@ def generate_basenames(runname):
 			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+basename+'_'+ids[jj])
 			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
 
-	if runname == 'testsed_linked':
+	elif runname == 'testsed_linked':
 
 		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/testsed.ids"
 		ids = np.loadtxt(id_list, dtype='|S20')
@@ -229,7 +229,7 @@ def generate_basenames(runname):
 			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+basename+'_'+ids[jj])
 			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
 
-	if runname == 'testsed_outliers':
+	elif runname == 'testsed_outliers':
 
 		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/testsed.ids"
 		ids = np.loadtxt(id_list, dtype='|S20')
@@ -243,7 +243,7 @@ def generate_basenames(runname):
 			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+basename+'_'+ids[jj])
 			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
 
-	if runname == 'dtau_ha_plog':
+	elif runname == 'dtau_ha_plog':
 
 		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/COSMOS_testsamp.ids"
 		ids = np.loadtxt(id_list, dtype='|S20')
@@ -260,7 +260,7 @@ def generate_basenames(runname):
 			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+basename+'_'+heqw_txt+'_'+ids[jj])
 			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
 
-	if runname == 'testsed_new':
+	elif runname == 'testsed_new':
 
 		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/testsed.ids"
 		ids = np.loadtxt(id_list, dtype='|S20')
@@ -274,7 +274,7 @@ def generate_basenames(runname):
 			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+basename+'_'+ids[jj])
 			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
 
-	if runname == 'testsed':
+	elif runname == 'testsed':
 
 		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/testsed.ids"
 		ids = np.loadtxt(id_list, dtype='|S20')
@@ -288,7 +288,7 @@ def generate_basenames(runname):
 			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+basename+'_'+ids[jj])
 			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
 
-	if runname == 'dtau_genpop_zperr':
+	elif runname == 'dtau_genpop_zperr':
 
 		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/COSMOS_gensamp.ids"
 		ids = np.loadtxt(id_list, dtype='|S20')
@@ -306,7 +306,7 @@ def generate_basenames(runname):
 			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+basename+'_'+heqw_txt+'_'+ids[jj])
 			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
 
-	if runname == 'dtau_nonir':
+	elif runname == 'dtau_nonir':
 
 		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/COSMOS_testsamp.ids"
 		ids = np.loadtxt(id_list, dtype='|S20')
@@ -323,7 +323,7 @@ def generate_basenames(runname):
 			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+basename+'_'+heqw_txt+'_'+ids[jj])
 			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
 
-	if runname == 'dtau_dynsamp':
+	elif runname == 'dtau_dynsamp':
 
 		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/twofield_dynsamp.ids"
 		ids = np.loadtxt(id_list, dtype='|S20')
@@ -341,7 +341,7 @@ def generate_basenames(runname):
 			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+basename+'_'+heqw_txt+'_'+ids[jj])
 			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
 
-	if runname == 'dtau_genpop_fixedmet':
+	elif runname == 'dtau_genpop_fixedmet':
 
 		ids = np.array(['12658','22801'])
 		met_list = os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+"/met.dat"
@@ -358,7 +358,7 @@ def generate_basenames(runname):
 				filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+basename+'_'+logzsol_txt+'_'+ids[nn])
 				parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(num)+'.py')	
 
-	if runname == 'dtau_genpop_nonir':
+	elif runname == 'dtau_genpop_nonir':
 
 		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/COSMOS_gensamp.ids"
 		ids = np.loadtxt(id_list, dtype='|S20')
@@ -376,7 +376,7 @@ def generate_basenames(runname):
 			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+basename+'_'+heqw_txt+'_'+ids[jj])
 			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
 
-	if runname == 'dtau_ha_zp':
+	elif runname == 'dtau_ha_zp':
 
 		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/COSMOS_testsamp_zp.ids"
 		ids = np.loadtxt(id_list, dtype='|S20')
@@ -395,7 +395,7 @@ def generate_basenames(runname):
 			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
 
 
-	if runname == 'dtau_ha_zperr':
+	elif runname == 'dtau_ha_zperr':
 
 		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/COSMOS_testsamp.ids"
 		ids = np.loadtxt(id_list, dtype='|S20')
@@ -415,7 +415,7 @@ def generate_basenames(runname):
 
 
 
-	if runname == 'dtau_genpop':
+	elif runname == 'dtau_genpop':
 
 		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/COSMOS_gensamp.ids"
 		ids = np.loadtxt(id_list, dtype='|S20')
@@ -434,7 +434,7 @@ def generate_basenames(runname):
 			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
 
 
-	if runname == 'dtau_calzetti':
+	elif runname == 'dtau_calzetti':
 
 		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/COSMOS_testsamp.ids"
 		ids = np.loadtxt(id_list, dtype='|S20')
@@ -451,7 +451,7 @@ def generate_basenames(runname):
 			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+basename+'_'+heqw_txt+'_'+ids[jj])
 			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
 
-	if runname == 'stau':
+	elif runname == 'stau':
 
 		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/COSMOS_testsamp.ids"
 		ids = np.loadtxt(id_list, dtype='|S20')
@@ -469,7 +469,7 @@ def generate_basenames(runname):
 			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
 
 
-	if runname == 'stau_iracoff':
+	elif runname == 'stau_iracoff':
 
 		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/COSMOS_testsamp.ids"
 		ids = np.loadtxt(id_list, dtype='|S20')
@@ -486,7 +486,7 @@ def generate_basenames(runname):
 			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+basename+'_'+heqw_txt+'_'+ids[jj])
 			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
 
-	if runname == 'stau_intmet':
+	elif runname == 'stau_intmet':
 
 		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/COSMOS_testsamp.ids"
 		ids = np.loadtxt(id_list, dtype='|S20')
@@ -503,7 +503,7 @@ def generate_basenames(runname):
 			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+basename+'_'+heqw_txt+'_'+ids[jj])
 			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
 
-	if runname == 'dtau_intmet':
+	elif runname == 'dtau_intmet':
 
 		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/COSMOS_testsamp.ids"
 		ids = np.loadtxt(id_list, dtype='|S20')
@@ -520,7 +520,7 @@ def generate_basenames(runname):
 			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+basename+'_'+heqw_txt+'_'+ids[jj])
 			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
 
-	if runname == 'dtau_neboff':
+	elif runname == 'dtau_neboff':
 
 		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/COSMOS_testsamp.ids"
 		ids = np.loadtxt(id_list, dtype='|S20')
@@ -537,7 +537,7 @@ def generate_basenames(runname):
 			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+basename+'_'+heqw_txt+'_'+ids[jj])
 			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')		
 
-	if runname == 'dtau_nebon':
+	elif runname == 'dtau_nebon':
 
 		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/COSMOS_testsamp.ids"
 		ids = np.loadtxt(id_list, dtype='|S20')
@@ -554,7 +554,7 @@ def generate_basenames(runname):
 			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+basename+'_'+heqw_txt+'_'+ids[jj])
 			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
 
-	if runname == 'neboff_oiii':
+	elif runname == 'neboff_oiii':
 
 		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/COSMOS_oiii_em.ids"
 		ids = np.loadtxt(id_list, dtype='|S20')
@@ -572,7 +572,7 @@ def generate_basenames(runname):
 			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+basename+'_'+heqw_txt+'_'+ids[jj])
 			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')		
 
-	if runname == 'nebon':
+	elif runname == 'nebon':
 
 		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/COSMOS_testsamp.ids"
 		ids = np.loadtxt(id_list, dtype='|S20')
@@ -589,7 +589,7 @@ def generate_basenames(runname):
 			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+basename+'_'+heqw_txt+'_'+ids[jj])
 			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+parm_basename+'_'+str(jj+1)+'.py')
 
-	if runname == 'neboff':
+	elif runname == 'neboff':
 
 		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/COSMOS_testsamp.ids"
 		ids = np.loadtxt(id_list, dtype='|S20')
@@ -606,7 +606,7 @@ def generate_basenames(runname):
 			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+basename+'_'+heqw_txt+'_'+ids[jj])
 			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')
 
-	if runname == 'photerr':
+	elif runname == 'photerr':
 		
 		id = '19723'
 		basename = 'photerr/photerr'
@@ -615,6 +615,19 @@ def generate_basenames(runname):
 		for jj in xrange(len(errnames)): 
 			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+basename+'_'+str(errnames[jj])+'_'+id)
 			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/photerr/photerr_params_"+str(jj+1)+'.py')
+
+	elif 'testsed' in runname:
+		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/testsed.ids"
+		ids = np.loadtxt(id_list, dtype='|S20')
+		ngals = len(ids)
+
+		basename = runname
+		parm_basename = runname+'_params'
+		ancilname=None
+
+		for jj in xrange(ngals):
+			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+basename+'_'+ids[jj])
+			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
 
 	return filebase,parm,ancilname
 
