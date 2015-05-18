@@ -2089,15 +2089,25 @@ def plot_sfh_ensemble(runname):
 
 	'''
 	given a run, for each galaxy, load the output, and
-	construct the sum of the PDF for the photometric error terms
+	plot all SFHs versus the truth. also plot average versus
+	the truth, and mass/SFR offsets.
 	'''
+
+	from threedhst_diag import add_sfh_plot
 
 	filebase,params,ancilname=threed_dutils.generate_basenames(runname)
 	ngals = len(filebase)
-	outname = '/Users/joel/code/python/threedhst_bsfh/plots/ensemble_plots/'+runname+'/phot_jitter_pdf.png'
+	outname = '/Users/joel/code/python/threedhst_bsfh/plots/ensemble_plots/'+runname+'/sfh_ensemble.png'
 
 	nfail = 0
+	fig = plt.figure()
 	gs = gridspec.GridSpec(4,5)
+	gs.update(hspace=0.16,wspace=0.13)
+
+	# define outputs
+	diff    = np.zeros(shape=(ngals,2))
+	sigdiff = np.zeros(shape=(ngals,2))
+
 	for jj in xrange(ngals):
 
 		# find most recent output file
@@ -2136,6 +2146,52 @@ def plot_sfh_ensemble(runname):
 			extra_output.post_processing(params[jj])
 			sample_results, powell_results, model = read_results.read_pickles(mcmc_filename, model_file=model_filename,inmod=None)
 
+		# load truths
+		truths = threed_dutils.load_truths(os.getenv('APPS')+'/threed'+sample_results['run_params']['truename'].split('/threed')[1],
+			                                sample_results['run_params']['objname'],
+			                                sample_results)
+
+		# plot SFH
+		ax_loc = plt.subplot(gs[jj],zorder=-32+jj)
+		add_sfh_plot(sample_results,None,ax_loc,truths=truths,fast=None)
+
+		# calculate mass + SFR offset
+		mass_loc = sample_results['extras']['parnames'] == 'totmass'
+		sfr_loc = sample_results['extras']['parnames'] == 'sfr_100'
+
+		mass50 = np.log10(sample_results['extras']['q50'][mass_loc])
+		sfr50  = np.log10(sample_results['extras']['q50'][sfr_loc])
+
+		tmass = truths['extra_truths'][0]
+		tsfr = truths['extra_truths'][1]
+
+		# calculate sigma differences
+		diff[jj,:] = np.squeeze([mass50-tmass,sfr50-tsfr])
+		if diff[jj,0] > 0:
+			sigdiff[jj,0] = (tmass-mass50)/(mass50-np.log10(sample_results['extras']['q16'][mass_loc]))
+		else:
+			sigdiff[jj,0] = (tmass-mass50)/(np.log10(sample_results['extras']['q84'][mass_loc])-mass50)
+		if diff[jj,1] > 0:
+			sigdiff[jj,1] = (tsfr-sfr50)/(sfr50-np.log10(sample_results['extras']['q16'][sfr_loc]))
+		else:
+			sigdiff[jj,1] = (tsfr-sfr50)/(np.log10(sample_results['extras']['q84'][sfr_loc])-sfr50)
+
+		# add text
+		axfontsize=4
+		ax_loc.text(0.95,0.9, 'M='+'%.2f' % mass50+' ('+'%.2f' % tmass+','+'%.2f' % sigdiff[jj,0]+'$\sigma$)',
+			        transform = ax_loc.transAxes, horizontalalignment='right',fontsize=axfontsize*0.9)
+		ax_loc.text(0.95,0.8, 'SFR='+'%.2f' % sfr50+' ('+'%.2f' % tsfr+','+'%.2f' % sigdiff[jj,1]+'$\sigma$)',
+			        transform = ax_loc.transAxes, horizontalalignment='right',fontsize=axfontsize*0.9)
+	
+	# define average quantities
+	nsuccess = np.sum(diff[:,0] != 0.0)
+	av_diff     = np.sum(diff,axis=0)/nsuccess
+	av_sigdiff  = np.sum(diff**2/nsuccess,axis=0)**0.5
+	plt.suptitle(runname)
+	plt.text(0.16, 0.92,'$\Delta$M$_{avg}$='+'%.2f' % av_diff[0] + ' dex, RMS='+'%.2f' % av_sigdiff[0]+' dex',transform=fig.transFigure)
+	plt.text(0.57, 0.92,'$\Delta$SFR$_{avg}$='+'%.2f' % av_diff[1] + ' dex, RMS='+'%.2f' % av_sigdiff[1]+' dex',transform=fig.transFigure)
+	plt.savefig(outname,dpi=300)
+	os.system('open '+outname)
 
 
 

@@ -13,6 +13,84 @@ plt_chain_figure = 1
 plt_triangle_plot = 1
 plt_sed_figure = 1
 
+def add_sfh_plot(sample_results,fig,ax_loc,truths=None,fast=None):
+	
+	'''
+	add a small SFH plot at ax_loc
+	'''
+
+	# minimum and maximum SFRs to plot
+	minsfr = 0.005
+	maxsfr = 10000
+
+	t, perc = plot_sfh(sample_results, ncomp=sample_results.get('ncomp',2))
+	perc = np.log10(np.clip(perc,minsfr,maxsfr))
+	axfontsize=4
+	
+	# set up plotting
+	if fig is not None:
+		ax_inset=fig.add_axes(ax_loc,zorder=32)
+	else:
+		ax_inset = ax_loc
+	
+	# plot whole SFH
+	ax_inset.plot(t, perc[:,0,1],'-',color='black')
+	
+	##### FAST + normal fit SFH #####
+	if truths is None:
+	
+		colors=['blue','red']
+		for aa in xrange(1,perc.shape[1]):
+			ax_inset.plot(t, perc[:,aa,1],'-',color=colors[aa-1],alpha=0.4)
+			ax_inset.text(0.08,0.83-0.07*(aa-1), 'tau'+str(aa),transform = ax_inset.transAxes,color=colors[aa-1],fontsize=axfontsize*1.4)
+
+		# FAST SFH
+		if fast:
+			ltau = 10**fastparms[fastfields=='ltau'][0]/1e9
+			lage = 10**fastparms[fastfields=='lage'][0]/1e9
+			fmass = 10**fastparms[fastfields=='lmass'][0]
+			tuniv = WMAP9.age(fastparms[fastfields=='z'][0]).value
+
+			tf, pf = plot_sfh_fast(ltau,lage,fmass,tuniv)
+			pf = np.log10(np.clip(pf,minsfr,maxsfr))
+			ax_inset.plot(tf, pf,'-',color='k')
+			ax_inset.plot(tf, pf,'-',color=fastcolor,alpha=1.0,linewidth=0.75)
+			ax_inset.text(0.08,0.83-0.07*(perc.shape[1]-1), 'fast',transform = ax_inset.transAxes,color=fastcolor,fontsize=axfontsize*1.4)
+			
+			# for setting limits
+			# WARNING: THIS IS A HACK
+			# possible since not using q16 part of perc
+			perc[:,0,0] = pf
+
+	##### TRUTHS + 50th percentile SFH #####
+	else:
+		
+		ax_inset.fill_between(t, perc[:,0,0], perc[:,0,2], color='0.75')
+
+		parnames = sample_results['model'].theta_labels()
+		tage = sample_results['model'].params['tage'][0]
+		tt,pt = plot_sfh_single(truths['truths'],tage,parnames,ncomp=sample_results.get('ncomp',2))
+
+		pt = np.log10(np.clip(pt,minsfr,maxsfr))
+		#tcolors=['steelblue','maroon']
+		#for aa in xrange(sample_results.get('ncomp',2)):
+		#	ax_inset.plot(tt, pt[:,aa+1],'-',color=tcolors[aa],alpha=0.5,linewidth=0.75)
+		ax_inset.plot(tt, pt[:,0],'-',color='blue')
+		ax_inset.text(0.08,0.83, 'truth',transform = ax_inset.transAxes,color='blue',fontsize=axfontsize*1.4)
+
+	dynrange = (np.max(perc)-np.min(perc))*0.1
+	axlim_sfh=[np.min(t),
+	           np.max(t)+0.08*(np.max(t)-np.min(t)),
+	           np.min(perc)-dynrange,np.max(perc)+dynrange]
+	ax_inset.axis(axlim_sfh)
+
+	ax_inset.set_ylabel('log(SFH)',fontsize=axfontsize,weight='bold')
+	ax_inset.set_xlabel('t [Gyr]',fontsize=axfontsize,weight='bold')
+	ax_inset.tick_params(labelsize=axfontsize)
+
+	# label
+	ax_inset.text(0.08,0.9, 'tot',transform = ax_inset.transAxes,fontsize=axfontsize*1.4)
+
 def plot_sfh_fast(tau,tage,mass,tuniv=None):
 
 	'''
@@ -439,70 +517,8 @@ def sed_figure(sample_results, sps, model,
 		#	     ms=ms,alpha=0.3,markeredgewidth=0.7,**kwargs)
 
 	# add SFH plot
-	t, perc = plot_sfh(sample_results, ncomp=sample_results.get('ncomp',2))
-	minsfr = 0.005
-	maxsfr = 10000
-	perc = np.log10(np.clip(perc,minsfr,maxsfr))
-	axfontsize=4
-	ax_inset=fig.add_axes([0.2,0.35,0.12,0.14],zorder=32)
-	
-	# plot whole SFH
-	ax_inset.plot(t, perc[:,0,1],'-',color='black')
-	
-	##### FAST + normal fit SFH #####
-	if truths is None:
-	
-		colors=['blue','red']
-		for aa in xrange(1,perc.shape[1]):
-			ax_inset.plot(t, perc[:,aa,1],'-',color=colors[aa-1],alpha=0.4)
-			ax_inset.text(0.08,0.83-0.07*(aa-1), 'tau'+str(aa),transform = ax_inset.transAxes,color=colors[aa-1],fontsize=axfontsize*1.4)
-
-		# FAST SFH
-		if fast:
-			ltau = 10**fastparms[fastfields=='ltau'][0]/1e9
-			lage = 10**fastparms[fastfields=='lage'][0]/1e9
-			fmass = 10**fastparms[fastfields=='lmass'][0]
-			tuniv = WMAP9.age(fastparms[fastfields=='z'][0]).value
-
-			tf, pf = plot_sfh_fast(ltau,lage,fmass,tuniv)
-			pf = np.log10(np.clip(pf,minsfr,maxsfr))
-			ax_inset.plot(tf, pf,'-',color='k')
-			ax_inset.plot(tf, pf,'-',color=fastcolor,alpha=1.0,linewidth=0.75)
-			ax_inset.text(0.08,0.83-0.07*(perc.shape[1]-1), 'fast',transform = ax_inset.transAxes,color=fastcolor,fontsize=axfontsize*1.4)
-			
-			# for setting limits
-			# WARNING: THIS IS A HACK
-			# possible since not using q16 part of perc
-			perc[:,0,0] = pf
-
-	##### TRUTHS + 50th percentile SFH #####
-	else:
-		
-		ax_inset.fill_between(t, perc[:,0,0], perc[:,0,2], color='0.75')
-
-		parnames = sample_results['model'].theta_labels()
-		tage = sample_results['model'].params['tage'][0]
-		tt,pt = plot_sfh_single(truths['truths'],tage,parnames,ncomp=sample_results.get('ncomp',2))
-
-		pt = np.log10(np.clip(pt,minsfr,maxsfr))
-		#tcolors=['steelblue','maroon']
-		#for aa in xrange(sample_results.get('ncomp',2)):
-		#	ax_inset.plot(tt, pt[:,aa+1],'-',color=tcolors[aa],alpha=0.5,linewidth=0.75)
-		ax_inset.plot(tt, pt[:,0],'-',color='blue')
-		ax_inset.text(0.08,0.83, 'truth',transform = ax_inset.transAxes,color='blue',fontsize=axfontsize*1.4)
-
-	dynrange = (np.max(perc)-np.min(perc))*0.1
-	axlim_sfh=[np.min(t),
-	           np.max(t)+0.08*(np.max(t)-np.min(t)),
-	           np.min(perc)-dynrange,np.max(perc)+dynrange]
-	ax_inset.axis(axlim_sfh)
-
-	ax_inset.set_ylabel('log(SFH)',fontsize=axfontsize,weight='bold')
-	ax_inset.set_xlabel('t [Gyr]',fontsize=axfontsize,weight='bold')
-	ax_inset.tick_params(labelsize=axfontsize)
-
-	# label
-	ax_inset.text(0.08,0.9, 'tot',transform = ax_inset.transAxes,fontsize=axfontsize*1.4)
+	ax_loc = [0.2,0.35,0.12,0.14]
+	add_sfh_plot(sample_results,fig,ax_loc,truths=truths,fast=fast)
 
 	# add RGB
 	try:
@@ -757,7 +773,7 @@ def plot_all_driver():
 	runname = 'testsed_tlink'
 
 	filebase, parm_basename, ancilname=threed_dutils.generate_basenames(runname)
-	for jj in xrange(17,len(filebase)):
+	for jj in xrange(len(filebase)):
 		print 'iteration '+str(jj) 
 		make_all_plots(filebase=filebase[jj],\
 		               parm_file=parm_basename[jj],\

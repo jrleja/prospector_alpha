@@ -364,6 +364,7 @@ model_params.append({'name': 'gp_filter_locs','N': ngpf,
 
 ##### OUTLIERS #####
 noutliers=3
+not_allowed = ['u_cosmos','f606w_cosmos','f814w_cosmos','f125w_cosmos','f140w_cosmos','f160w_cosmos','mips_24um_cosmos']
 model_params.append({'name': 'gp_outlier_amps','N': noutliers,
                         'isfree': False,
                         'init': np.zeros(noutliers)+100.0,
@@ -381,6 +382,13 @@ model_params.append({'name': 'gp_outlier_locs','N': noutliers,
                         'units': 'filter_indices',
                         'prior_function':tophat,
                         'prior_args': {'mini':np.zeros(noutliers), 'maxi': np.zeros(noutliers)+np.sum(obs['phot_mask'])-1}})
+
+model_params.append({'name': 'gp_outlier_allowed','N': 1,
+                        'isfree': False,
+                        'init':  [x for x in obs['filters'] if x not in not_allowed],
+                        'units': 'filter_names',
+                        'prior_function':None,
+                        'prior_args': None})
 
 # name outfile
 run_params['outfile'] = run_params['outfile']+'_'+run_params['objname']
