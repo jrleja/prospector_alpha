@@ -110,20 +110,6 @@ class BurstyModel(sedmodel.CSPModel):
         """  
         lnp_prior = 0
         
-        # check to make sure tau models are separated
-        if 'tau' in self.theta_index:
-            start,end = self.theta_index['tau']
-            tau = theta[start:end]
-            if (tau[0] < 2*tau[1]):
-                return -np.inf
-
-        # implement mass ratio
-        if 'mass' in self.theta_index:
-            start,end = self.theta_index['mass']
-            mass = theta[start:end]
-            if (mass[1]/mass[0] > 20):
-                return -np.inf
-
         # implement uniqueness of outliers
         if 'gp_outlier_locs' in self.theta_index:
             start,end = self.theta_index['gp_outlier_locs']
