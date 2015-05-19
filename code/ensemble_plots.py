@@ -2211,6 +2211,11 @@ def delta_versus_ssfr():
 	tssfr          = np.zeros(shape=(0))
 	sfr            = np.zeros(shape=(0))
 	mass           = np.zeros(shape=(0))
+	tmips_chi      = np.zeros(shape=(0))
+	mips_chi       = np.zeros(shape=(0))
+
+	# initialize sps
+	sps = threed_dutils.setup_sps()
 
 	# grab masses and star formation rates
 	for run in runnames:
@@ -2271,6 +2276,15 @@ def delta_versus_ssfr():
 
 			# calculate true ssfr
 			tssfr=np.append(tssfr,np.log10(10**tsfr[-1]/10**tmass[-1]))
+
+			# calculate best-fit MIPS flux
+			#thetas = [x for x in sample_results['quantiles']['q50']]
+			#spec,mags,w = sample_results['model'].mean_model(thetas, sample_results['obs'], sps=sps,norm_spec=False)
+			#tspec,tmags,tw = sample_results['model'].mean_model(truths['truths'], sample_results['obs'], sps=sps,norm_spec=False)
+			#tmips_chi = np.append(tmips_chi,(tmags[-1]-sample_results['obs']['maggies'][-1])/sample_results['obs']['maggies_unc'][-1])
+			#mips_chi = np.append(mips_chi,(mags[-1]-sample_results['obs']['maggies'][-1])/sample_results['obs']['maggies_unc'][-1])
+			#tmips_chi = np.append(tmips_chi,tmags[-1])
+			#mips_chi = np.append(mips_chi,mags[-1])
 
 	# plot
 	gs = gridspec.GridSpec(3,1)
@@ -2336,9 +2350,19 @@ def delta_versus_ssfr():
 	plt.savefig(outname, dpi=300)
 	os.system('open '+outname)
 
+	#### PLOT DELTA(MIPS FLUX)
+	#fig = plt.figure(figsize = (6.5,6.5))
+	#ax = fig.add_subplot(111)
+	#ax.plot((mips_chi-tmips_chi)/tmips_chi,deltasfr,'go')
+	#ax.plot(tmips_chi,deltasfr,'bo')
+	#ax.axis([-0.5,0.5,-2,2])
+	#plt.show()
+	print 1/0
+
 	#### DELTAM VERSUS DELTASSFR ####
 	fig = plt.figure(figsize = (6.5,6.5))
 	ax = fig.add_subplot(111)
 	ax.plot(deltam,deltasfr,'go')
+	ax.axlim([-0.5,0.5,-0.5,0.5])
 	print 1/0
 

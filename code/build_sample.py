@@ -174,14 +174,17 @@ def return_bounds(parname,model,i,test_sfhs=None):
 
 
 # build_sample_test(basename='testsed_linked'), build_sample_test(basename='testsed_all')
-# build_sample.build_sample_test(basename='testsed_constant', test_sfhs=1)
-# build_sample.build_sample_test(basename='testsed_quiescent', test_sfhs=2)
-# build_sample.build_sample_test(basename='testsed_burst', test_sfhs=3)
-# build_sample.build_sample_test(basename='testsed_oldburst', test_sfhs=4)
+#build_sample.build_sample_test(basename='testsed_constant_nonoise', test_sfhs=1)
+#build_sample.build_sample_test(basename='testsed_quiescent_nonoise', test_sfhs=2)
+#build_sample.build_sample_test(basename='testsed_burst_nonoise', test_sfhs=3)
+#build_sample.build_sample_test(basename='testsed_nonoise')
+
+# Must rewrite this such that a single parameter file talks to all the test galaxies.
+# Loop through all versions of test_sfhs, load into single data file.
+#
 
 def build_sample_test(add_zp_err=False,
-	                  basename='testsed_outliers',
-	                  test_sfhs=False):
+	                  basename='testsed_outliers'):
 
 	'''
 	Generate model SEDs and add noise
@@ -199,9 +202,12 @@ def build_sample_test(add_zp_err=False,
 	sps = threed_dutils.setup_sps()
 
 	#### basic parameters ####
-	ngals               = 20
-	noise               = 0.05            # add errors
-	reported_noise      = 1.0*noise       # under-report the noise?
+	ngals_per_model     = 20
+	noise               = 0.00            # add errors
+	reported_noise      = 0.01            # under-report the noise?
+	test_sfhs           = [1,2,3,4]       # which test sfhs to use?
+	ntest               = len(test_sfhs)
+	ngals               = ntest*ngals_per_model
 	
 	#### band-specific noise ####
 	if 'gp_filter_amps' in model.free_params:
@@ -218,66 +224,68 @@ def build_sample_test(add_zp_err=False,
 	nparams = len(model.initial_theta)
 	testparms = np.zeros(shape=(ngals,nparams))
 	parnames = np.array(model.theta_labels())
-	for ii in xrange(nparams):
-		
-		# random in logspace
-		# also enforce priors
-		if parnames[ii][:-2] == 'mass' or parnames[ii][:-2] == 'tau':
+
+	for jj in xrange(ntest):
+		for ii in xrange(nparams):
 			
-			min,max = np.log10(return_bounds(parnames[ii],model,ii,test_sfhs=test_sfhs))
-			if parnames[ii][:-2] == 'tau':
+			# random in logspace for mass + tau
+			# also enforce priors
+			if parnames[ii][:-2] == 'mass' or parnames[ii][:-2] == 'tau':
+				
+				min,max = np.log10(return_bounds(parnames[ii],model,ii,test_sfhs=test_sfhs[jj]))
+				if parnames[ii][:-2] == 'tau':
+					print min,max
+
+				# ensure that later priors CAN be enforced
+				if parnames[ii] == 'mass_1': max = np.log10(10**max/20)
+				if parnames[ii] == 'tau_1': min = np.log10(10**min*2)
+
+				# enforce priors on mass and tau
+				if parnames[ii] == 'mass_2':
+					max = np.log10(testparms[:,parnames == 'mass_1']*20)
+					for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): testparms[kk,ii] = 10**(random.random()*(max[kk]-min)+min)
+				elif parnames[ii] == 'tau_2':
+					max = np.log10(testparms[:,parnames == 'tau_1']/2.)
+					for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): testparms[kk,ii] = 10**(random.random()*(max[kk]-min)+min)
+				else:
+					for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): testparms[kk,ii] = 10**(random.random()*(max-min)+min)
+			
+			#### generate specific SFHs if necessary ####
+			elif parnames[ii][:-2] == 'sf_start':
+				min,max = return_bounds(parnames[ii],model,ii,test_sfhs=test_sfhs[jj])
 				print min,max
+				for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): testparms[kk,ii] = random.random()*(max-min)+min
 
-			# ensure that later priors CAN be enforced
-			if parnames[ii] == 'mass_1': max = np.log10(10**max/20)
-			if parnames[ii] == 'tau_1': min = np.log10(10**min*2)
+			#### tone down the dust a bit-- flat in prior means lots of Av = 2.0 galaxies ####
+			elif parnames[ii][:-2] == 'dust2':
+				min = model.theta_bounds()[ii][0]
+				max = model.theta_bounds()[ii][1]
+				for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): testparms[kk,ii] = np.clip(random.gauss(0.5, 0.5),min,max)
 
-			# enforce priors on mass and tau
-			if parnames[ii] == 'mass_2':
-				max = np.log10(testparms[:,parnames == 'mass_1']*20)
-				for kk in xrange(ngals): testparms[kk,ii] = 10**(random.random()*(max[kk]-min)+min)
-			elif parnames[ii] == 'tau_2':
-				max = np.log10(testparms[:,parnames == 'tau_1']/2.)
-				for kk in xrange(ngals): testparms[kk,ii] = 10**(random.random()*(max[kk]-min)+min)
-			else:
-				for kk in xrange(ngals): testparms[kk,ii] = 10**(random.random()*(max-min)+min)
+			#### apply dust_index prior! ####
+			elif parnames[ii][:-2] == 'dust_index':
+				min = model.theta_bounds()[ii][0]
+				max = model.theta_bounds()[ii][1]
+				for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): testparms[kk,ii] = np.clip(random.gauss(-0.7, 0.5),min,max)
+
+			#### general photometric jitter ####
+			elif parnames[ii] == 'phot_jitter':
+				for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): testparms[kk,ii] = 0.0
 		
-		#### generate specific SFHs if necessary ####
-		elif parnames[ii][:-2] == 'sf_start':
-			min,max = return_bounds(parnames[ii],model,ii,test_sfhs=test_sfhs)
-			print min,max
-			for kk in xrange(ngals): testparms[kk,ii] = random.random()*(max-min)+min
+			#### linked filter noise ####
+			elif parnames[ii] == 'gp_filter_amps' or parnames[ii][:-2] == 'gp_filter_amps':
+				for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): testparms[kk,ii] = band_specific_noise[int(parnames[ii][-1])-1]
 
-		#### tone down the dust a bit-- flat in prior means lots of Av = 2.0 galaxies! ####
-		elif parnames[ii][:-2] == 'dust2':
-			min = model.theta_bounds()[ii][0]
-			max = model.theta_bounds()[ii][1]
-			for kk in xrange(ngals): testparms[kk,ii] = np.clip(random.gauss(0.5, 0.5),min,max)
+			#### outliers ####
+			elif parnames[ii] == 'gp_outlier_amps' or parnames[ii][:-2] == 'gp_outlier_amps':
+				for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): testparms[kk,ii] = outliers_noise
+			elif parnames[ii] == 'gp_outlier_locs' or parnames[ii][:-2] == 'gp_outlier_locs':
+				for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): testparms[kk,ii] = outliers_bands[int(parnames[ii][-1])-1]
 
-		#### apply dust_index prior! ####
-		elif parnames[ii][:-2] == 'dust_index':
-			min = model.theta_bounds()[ii][0]
-			max = model.theta_bounds()[ii][1]
-			for kk in xrange(ngals): testparms[kk,ii] = np.clip(random.gauss(-0.7, 0.5),min,max)
-
-		#### general photometric jitter ####
-		elif parnames[ii] == 'phot_jitter':
-			for kk in xrange(ngals): testparms[kk,ii] = 0.0
-	
-		#### linked filter noise ####
-		elif parnames[ii] == 'gp_filter_amps' or parnames[ii][:-2] == 'gp_filter_amps':
-			for kk in xrange(ngals): testparms[kk,ii] = band_specific_noise[int(parnames[ii][-1])-1]
-
-		#### outliers ####
-		elif parnames[ii] == 'gp_outlier_amps' or parnames[ii][:-2] == 'gp_outlier_amps':
-			for kk in xrange(ngals): testparms[kk,ii] = outliers_noise
-		elif parnames[ii] == 'gp_outlier_locs' or parnames[ii][:-2] == 'gp_outlier_locs':
-			for kk in xrange(ngals): testparms[kk,ii] = outliers_bands[int(parnames[ii][-1])-1]
-
-		else:
-			min = model.theta_bounds()[ii][0]
-			max = model.theta_bounds()[ii][1]
-			for kk in xrange(ngals): testparms[kk,ii] = random.random()*(max-min)+min
+			else:
+				min = model.theta_bounds()[ii][0]
+				max = model.theta_bounds()[ii][1]
+				for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): testparms[kk,ii] = random.random()*(max-min)+min
 
 	#### make sure priors are satisfied
 	for ii in xrange(ngals):

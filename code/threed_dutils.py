@@ -167,12 +167,15 @@ def load_truths(truthname,objname,sample_results):
 				   'extra_truths':np.array([totmass,totsfr])}
 	return truths_dict
 
-def running_median(x,y,nbins=10):
+def running_median(x,y,nbins=10,avg=False):
 
 	bins = np.linspace(x.min(),x.max(), nbins)
 	delta = bins[1]-bins[0]
 	idx  = np.digitize(x,bins)
-	running_median = np.array([np.median(y[idx-1==k]) for k in range(nbins)])
+	if avg == False:
+		running_median = np.array([np.median(y[idx-1==k]) for k in range(nbins)])
+	else:
+		running_median = np.array([np.mean(y[idx-1==k]) for k in range(nbins)])
 	bins = bins+delta/2.
 
 	# remove empty
