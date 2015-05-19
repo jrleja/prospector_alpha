@@ -2193,5 +2193,152 @@ def plot_sfh_ensemble(runname):
 	plt.savefig(outname,dpi=300)
 	os.system('open '+outname)
 
+def delta_versus_ssfr():
 
+	'''
+	given N testruns, for each galaxy, load the output, and
+	plot all SFHs versus the truth. also plot average versus
+	the truth, and mass/SFR offsets.
+	'''
+
+	runnames = ['testsed_quiescent','testsed_oldburst','testsed_burst','testsed_constant']
+	outname = os.getenv('APPS')+'/threedhst_bsfh/plots/ensemble_plots/'+runnames[0]+'/delta_versus_ssfr.png'
+	outname = os.getenv('APPS')+'/threedhst_bsfh/plots/ensemble_plots/'+runnames[0]+'/deltam_versus_deltasfr.png'
+
+	# define outputs
+	tmass          = np.zeros(shape=(0))
+	tsfr           = np.zeros(shape=(0))
+	tssfr          = np.zeros(shape=(0))
+	sfr            = np.zeros(shape=(0))
+	mass           = np.zeros(shape=(0))
+
+	# grab masses and star formation rates
+	for run in runnames:
+
+		filebase,params,ancilname=threed_dutils.generate_basenames(run)
+		ngals = len(filebase)
+
+		for jj in xrange(ngals):
+
+			# find most recent output file
+			# with the objname
+			folder = "/".join(filebase[jj].split('/')[:-1])
+			filename = filebase[jj].split("/")[-1]
+			files = [f for f in os.listdir(folder) if "_".join(f.split('_')[:-2]) == filename]	
+			times = [f.split('_')[-2] for f in files]
+
+			# if we found no files, skip this object
+			if len(times) == 0:
+				print 'Failed to find any files in '+folder+' of type ' +filename+' to extract times'
+				continue
+
+			# load results
+			mcmc_filename=filebase[jj]+'_'+max(times)+"_mcmc"
+			model_filename=filebase[jj]+'_'+max(times)+"_model"
+
+			try:
+				sample_results, powell_results, model = read_results.read_pickles(mcmc_filename, model_file=model_filename,inmod=None)
+			except (ValueError,EOFError,KeyError):
+				print mcmc_filename + ' failed during output writing'
+				continue
+			except IOError:
+				print mcmc_filename + ' does not exist!'
+				continue
+
+			# check for existence of extra information
+			try:
+				sample_results['quantiles']
+			except:
+				print 'Generating extra information for '+mcmc_filename+', '+model_filename
+				extra_output.post_processing(params[jj])
+				sample_results, powell_results, model = read_results.read_pickles(mcmc_filename, model_file=model_filename,inmod=None)
+
+			# load truths
+			truths = threed_dutils.load_truths(os.getenv('APPS')+'/threed'+sample_results['run_params']['truename'].split('/threed')[1],
+				                                sample_results['run_params']['objname'],
+				                                sample_results)
+
+			# calculate fit masses + SFRs
+			mass_loc = sample_results['extras']['parnames'] == 'totmass'
+			sfr_loc = sample_results['extras']['parnames'] == 'sfr_100'
+
+			mass=np.append(mass, np.log10(sample_results['extras']['q50'][mass_loc]))
+			sfr=np.append(sfr, np.log10(sample_results['extras']['q50'][sfr_loc]))
+
+			# calculate true masses + sfrs
+			tmass=np.append(tmass,truths['extra_truths'][0])
+			tsfr =np.append(tsfr,truths['extra_truths'][1])
+
+			# calculate true ssfr
+			tssfr=np.append(tssfr,np.log10(10**tsfr[-1]/10**tmass[-1]))
+
+	# plot
+	gs = gridspec.GridSpec(3,1)
+	fig = plt.figure(figsize = (6.5,15.5))
+	gs.update(wspace=0.0, hspace=0.0)
+	ms = 8 # marker size
+	lw = 1.5 # line width
+	axlim = [-13.5,-7,-0.5,0.5]
+
+	# clip sSFRs
+	tssfr = np.clip(tssfr,-13,-5)
+	ssfr  = np.clip(np.log10(10**sfr/10**mass),-13,-5)
+
+	#### PLOT DELTA MASS #### 
+	ax = plt.subplot(gs[0])
+	deltam = mass-tmass
+	ax.plot(tssfr,deltam,'ro',alpha=0.5,ms=ms)
+
+	# plot running median
+	bins,running_median = threed_dutils.running_median(tssfr,deltam,nbins=10)
+	ax.plot(bins,running_median,'k-',linewidth=lw)
+
+	# labels, width, helpful lines
+	ax.axis(axlim)
+	ax.hlines(0.0,ax.get_xlim()[0],ax.get_xlim()[1], linestyle='--',colors='grey',alpha=0.5)
+	ax.set_ylabel('$\Delta$log(M)')
+
+	# turn off bottom ticklabel
+	ax.xaxis.get_major_ticks()[0].label1On = False
+
+	#### PLOT DELTA SFR #### 
+	ax = plt.subplot(gs[1])
+	deltasfr = sfr-tsfr
+	ax.plot(tssfr,deltasfr,'bo',alpha=0.5,ms=ms)
+
+	# plot running median
+	bins,running_median = threed_dutils.running_median(tssfr,deltasfr,nbins=10)
+	ax.plot(bins,running_median,'k-',linewidth=lw)
+
+	# labels, width, helpful lines
+	ax.axis(axlim)
+	ax.hlines(0.0,ax.get_xlim()[0],ax.get_xlim()[1], linestyle='--',colors='grey',alpha=0.5)
+	ax.set_ylabel('$\Delta$log(SFR)')
+
+	# turn off bottom ticklabel
+	ax.xaxis.get_major_ticks()[0].label1On = False
+
+	#### PLOT DELTA SSFR #### 
+	ax = plt.subplot(gs[2])
+	deltassfr = ssfr-tssfr
+	ax.plot(tssfr,deltassfr,'go',alpha=0.5,ms=ms)
+
+	# plot running median
+	bins,running_median = threed_dutils.running_median(tssfr,deltassfr,nbins=10)
+	ax.plot(bins,running_median,'k-',linewidth=lw)
+
+	# labels, width, helpful lines
+	ax.axis(axlim)
+	ax.hlines(0.0,ax.get_xlim()[0],ax.get_xlim()[1], linestyle='--',colors='grey',alpha=0.5)
+	ax.set_ylabel('$\Delta$log(sSFR)')
+	ax.set_xlabel('log(sSFR$_{true}$) [yr$^{-1}$]')
+
+	plt.savefig(outname, dpi=300)
+	os.system('open '+outname)
+
+	#### DELTAM VERSUS DELTASSFR ####
+	fig = plt.figure(figsize = (6.5,6.5))
+	ax = fig.add_subplot(111)
+	ax.plot(deltam,deltasfr,'go')
+	print 1/0
 
