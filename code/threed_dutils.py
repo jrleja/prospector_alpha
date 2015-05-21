@@ -22,7 +22,7 @@ def test_likelihood(param_file=None, sps=None, model=None, obs=None, thetas=None
 
 	if sps is None:
 		# load stellar population, set up custom filters
-		sps = fsps.StellarPopulation(zcontinuous=1, compute_vega_mags=False)
+		sps = fsps.StellarPopulation(zcontinuous=2, compute_vega_mags=False)
 		custom_filter_keys = os.getenv('APPS')+'/threedhst_bsfh/filters/filter_keys_threedhst.txt'
 		fsps.filters.FILTERS = model_setup.custom_filter_dict(custom_filter_keys)
 
@@ -36,9 +36,21 @@ def test_likelihood(param_file=None, sps=None, model=None, obs=None, thetas=None
 	if thetas is None:
 		thetas = np.array(model.initial_theta)
 
+	# setup gp
+	from bsfh import gp
+	gp_phot = gp.PhotOutlier()
+	try:
+		s, a, l = model.phot_gp_params(obs=obs)
+		print 'phot gp parameters'
+		print s, a, l
+		gp_phot.kernel = np.array( list(a) + list(l) + [s])
+	except(AttributeError):
+		#There was no phot_gp_params method
+		pass
+
 	likefn = LikelihoodFunction(obs=obs, model=model)
 	mu, phot, x = model.mean_model(thetas, obs, sps = sps)
-	lnp_phot = likefn.lnlike_phot(phot, obs=obs, gp=None)
+	lnp_phot = likefn.lnlike_phot(phot, obs=obs, gp=gp_phot)
 	lnp_prior = model.prior_product(thetas)
 
 	return lnp_phot + lnp_prior
@@ -133,7 +145,7 @@ def load_truths(truthname,objname,sample_results):
 	# load truths
 	nextra = 2
 	truth = np.loadtxt(truthname)
-	truths = truth[int(sample_results['run_params']['objname'])-1,:]
+	truths = truth[int(objname)-1,:]
 	parnames = np.array(sample_results['model'].theta_labels())
 
 	# create totmass and totsfr        
@@ -176,7 +188,7 @@ def running_median(x,y,nbins=10,avg=False):
 		running_median = np.array([np.median(y[idx-1==k]) for k in range(nbins)])
 	else:
 		running_median = np.array([np.mean(y[idx-1==k]) for k in range(nbins)])
-	bins = bins+delta/2.
+	bins = bins-delta/2.
 
 	# remove empty
 	empty = np.isnan(running_median) == 1
@@ -190,7 +202,21 @@ def generate_basenames(runname):
 	parm=[]
 	ancilname='COSMOS_testsamp.dat'
 
-	if runname == 'testsed_all':
+	if runname == 'testsed_nonoise':
+
+		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/testsed_nonoise.ids"
+		ids = np.loadtxt(id_list, dtype='|S20')
+		ngals = len(ids)
+
+		basename = "testsed_nonoise"
+		parm_basename = "testsed_nonoise_params"
+		ancilname=None
+
+		for jj in xrange(ngals):
+			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+basename+'_'+ids[jj])
+			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
+
+	elif runname == 'testsed_all':
 
 		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/testsed.ids"
 		ids = np.loadtxt(id_list, dtype='|S20')
