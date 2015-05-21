@@ -2202,6 +2202,7 @@ def delta_versus_ssfr():
 	'''
 
 	runnames = ['testsed_quiescent','testsed_oldburst','testsed_burst','testsed_constant']
+	runnames = ['testsed_nonoise']
 	outname = os.getenv('APPS')+'/threedhst_bsfh/plots/ensemble_plots/'+runnames[0]+'/delta_versus_ssfr.png'
 	outname = os.getenv('APPS')+'/threedhst_bsfh/plots/ensemble_plots/'+runnames[0]+'/deltam_versus_deltasfr.png'
 
@@ -2211,8 +2212,7 @@ def delta_versus_ssfr():
 	tssfr          = np.zeros(shape=(0))
 	sfr            = np.zeros(shape=(0))
 	mass           = np.zeros(shape=(0))
-	tmips_chi      = np.zeros(shape=(0))
-	mips_chi       = np.zeros(shape=(0))
+	reduced_chisq  = np.zeros(shape=(0))
 
 	# initialize sps
 	sps = threed_dutils.setup_sps()
@@ -2267,8 +2267,24 @@ def delta_versus_ssfr():
 			mass_loc = sample_results['extras']['parnames'] == 'totmass'
 			sfr_loc = sample_results['extras']['parnames'] == 'sfr_100'
 
-			mass=np.append(mass, np.log10(sample_results['extras']['q50'][mass_loc]))
-			sfr=np.append(sfr, np.log10(sample_results['extras']['q50'][sfr_loc]))
+			# q50 mass + SFR
+			m = np.log10(sample_results['extras']['q50'][mass_loc])
+			s = np.log10(sample_results['extras']['q50'][sfr_loc])
+
+			# best-fit model mass+SFR
+			#pars = sample_results['quantiles']['maxprob_params']
+			#parnames = sample_results['model'].theta_labels()      
+			#tempmass = pars[np.array([True if 'mass' in x else False for x in parnames])]
+			#m = np.log10(np.sum(tempmass))
+
+			#tau = pars[np.array([True if 'tau' in x else False for x in parnames])]
+			#sf_start = pars[np.array([True if 'sf_start' in x else False for x in parnames])]
+			#tage = np.zeros(len(tau))+sample_results['model'].params['tage'][0]
+			#deltat=0.1
+			#s=np.log10(threed_dutils.integrate_sfh(np.atleast_1d(tage)[0]-deltat,np.atleast_1d(tage)[0],tempmass,tage,tau,sf_start)*np.sum(tempmass)/(deltat*1e9))
+
+			mass=np.append(mass, m)
+			sfr=np.append(sfr, s)
 
 			# calculate true masses + sfrs
 			tmass=np.append(tmass,truths['extra_truths'][0])
@@ -2277,16 +2293,18 @@ def delta_versus_ssfr():
 			# calculate true ssfr
 			tssfr=np.append(tssfr,np.log10(10**tsfr[-1]/10**tmass[-1]))
 
-			# calculate best-fit MIPS flux
-			#thetas = [x for x in sample_results['quantiles']['q50']]
-			#spec,mags,w = sample_results['model'].mean_model(thetas, sample_results['obs'], sps=sps,norm_spec=False)
-			#tspec,tmags,tw = sample_results['model'].mean_model(truths['truths'], sample_results['obs'], sps=sps,norm_spec=False)
-			#tmips_chi = np.append(tmips_chi,(tmags[-1]-sample_results['obs']['maggies'][-1])/sample_results['obs']['maggies_unc'][-1])
-			#mips_chi = np.append(mips_chi,(mags[-1]-sample_results['obs']['maggies'][-1])/sample_results['obs']['maggies_unc'][-1])
-			#tmips_chi = np.append(tmips_chi,tmags[-1])
-			#mips_chi = np.append(mips_chi,mags[-1])
+			# calculate reduced chi-squared
+			thetas = [x for x in sample_results['quantiles']['q50']]
+			#thetas = sample_results['quantiles']['maxprob_params']
+			spec,mags,w = sample_results['model'].mean_model(thetas, sample_results['obs'], sps=sps,norm_spec=False)
+			
+			chi = (mags-sample_results['obs']['maggies'])/sample_results['obs']['maggies_unc']
 
-	# plot
+			chisq=np.sum(chi**2)
+			ndof = np.sum(sample_results['obs']['phot_mask']) - len(sample_results['model'].free_params)-1
+			reduced_chisq = np.append(reduced_chisq,chisq/(ndof-1))
+
+	#### set up plot parameters
 	gs = gridspec.GridSpec(3,1)
 	fig = plt.figure(figsize = (6.5,15.5))
 	gs.update(wspace=0.0, hspace=0.0)
@@ -2294,17 +2312,24 @@ def delta_versus_ssfr():
 	lw = 1.5 # line width
 	axlim = [-13.5,-7,-0.5,0.5]
 
-	# clip sSFRs
+	#### clip sSFRs
 	tssfr = np.clip(tssfr,-13,-5)
 	ssfr  = np.clip(np.log10(10**sfr/10**mass),-13,-5)
+
+	#### make cut in chisq
+	#plt.hist(reduced_chisq,range=(0,10))
+	chisq_limit   = 10.0
+	bad     = reduced_chisq >  chisq_limit
+	good    = reduced_chisq <= chisq_limit
 
 	#### PLOT DELTA MASS #### 
 	ax = plt.subplot(gs[0])
 	deltam = mass-tmass
-	ax.plot(tssfr,deltam,'ro',alpha=0.5,ms=ms)
+	ax.plot(tssfr[good],deltam[good],'bo',alpha=0.5,ms=ms)
+	ax.plot(tssfr[bad],deltam[bad],'ro',alpha=0.5,ms=ms)
 
 	# plot running median
-	bins,running_median = threed_dutils.running_median(tssfr,deltam,nbins=10)
+	bins,running_median = threed_dutils.running_median(tssfr[good],deltam[good],nbins=10)
 	ax.plot(bins,running_median,'k-',linewidth=lw)
 
 	# labels, width, helpful lines
@@ -2318,10 +2343,11 @@ def delta_versus_ssfr():
 	#### PLOT DELTA SFR #### 
 	ax = plt.subplot(gs[1])
 	deltasfr = sfr-tsfr
-	ax.plot(tssfr,deltasfr,'bo',alpha=0.5,ms=ms)
+	ax.plot(tssfr[good],deltasfr[good],'bo',alpha=0.5,ms=ms)
+	ax.plot(tssfr[bad],deltasfr[bad],'ro',alpha=0.5,ms=ms)
 
 	# plot running median
-	bins,running_median = threed_dutils.running_median(tssfr,deltasfr,nbins=10)
+	bins,running_median = threed_dutils.running_median(tssfr[good],deltasfr[good],nbins=10)
 	ax.plot(bins,running_median,'k-',linewidth=lw)
 
 	# labels, width, helpful lines
@@ -2335,10 +2361,11 @@ def delta_versus_ssfr():
 	#### PLOT DELTA SSFR #### 
 	ax = plt.subplot(gs[2])
 	deltassfr = ssfr-tssfr
-	ax.plot(tssfr,deltassfr,'go',alpha=0.5,ms=ms)
+	ax.plot(tssfr[good],deltassfr[good],'bo',alpha=0.5,ms=ms)
+	ax.plot(tssfr[bad],deltassfr[bad],'ro',alpha=0.5,ms=ms)
 
 	# plot running median
-	bins,running_median = threed_dutils.running_median(tssfr,deltassfr,nbins=10)
+	bins,running_median = threed_dutils.running_median(tssfr[good],deltassfr[good],nbins=10)
 	ax.plot(bins,running_median,'k-',linewidth=lw)
 
 	# labels, width, helpful lines
@@ -2366,3 +2393,35 @@ def delta_versus_ssfr():
 	ax.axlim([-0.5,0.5,-0.5,0.5])
 	print 1/0
 
+def plot_ssfr_prior():
+
+	'''
+	plot distribution of ssfrs for a specific set of test model parameters
+	'''
+
+	#### load a single output. this will be used to gather
+	#### tage and define theta labels
+	mcmc_filename  = '/Users/joel/code/python/threedhst_bsfh/results/testsed_quiescent/testsed_quiescent_16_1431381068_mcmc'
+	model_filename = '/Users/joel/code/python/threedhst_bsfh/results/testsed_quiescent/testsed_quiescent_16_1431381068_model'
+	sample_results, powell_results, model = read_results.read_pickles(mcmc_filename, model_file=model_filename,inmod=None)
+
+	#### define truths file, and ngals
+	truths_file    = '/Users/joel/code/python/threedhst_bsfh/data/sfr_prior_test.dat'
+	ngals          = 10000
+
+	#### load all truths, extract masses + SFRs
+	mass,sfr = [],[]
+	for kk in xrange(ngals):
+		truths = threed_dutils.load_truths(truths_file,
+			                               str(kk),
+			                               sample_results)
+		mass.append(truths['extra_truths'][0])
+		sfr.append(truths['extra_truths'][1])
+
+	ssfr = 10**np.array(sfr)/10**np.array(mass)
+	ssfr = np.clip(ssfr,1e-14,1e-7)
+	plt.hist(np.log10(ssfr),bins=20,color = 'blue',alpha=0.5)
+	plt.xlabel('log(sSFR)')
+	plt.ylabel('N')
+	plt.show()
+	plt.savefig('sSFR_prior.png')
