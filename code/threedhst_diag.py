@@ -710,6 +710,7 @@ def make_all_plots(filebase=None, parm_file=None,
 	print 'MAKING PLOTS FOR ' + filename + ' in ' + outfolder
 	
 	# do we know the truths?
+	print 1/0
 	try:
 		truths = threed_dutils.load_truths(os.getenv('APPS')+'/threed'+sample_results['run_params']['truename'].split('/threed')[1],
 			                              sample_results['run_params']['objname'],
@@ -770,7 +771,7 @@ def plot_all_driver():
 	#runname = 'dtau_genpop_fixedmet'
 	#runname = 'dtau_ha_zperr'
 	runname = 'dtau_ha_plog'
-	runname = 'testsed_burst'
+	runname = 'testsed_nonoise_fast'
 
 	filebase, parm_basename, ancilname=threed_dutils.generate_basenames(runname)
 	for jj in xrange(len(filebase)):

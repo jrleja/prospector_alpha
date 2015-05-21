@@ -128,7 +128,7 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 				_ = [x['init'] for x in sample_results['model'].config_list if x['name'] == str_sfh_parms[ll]][0]
 				if len(np.atleast_1d(_)) != np.sum(indexes[0]):
 					_ = np.zeros(np.sum(indexes[0]))+_
-				sfh_parms.append(_)
+				sfh_parms.append(np.atleast_1d(_))
 		mass,tau,sf_start,tage = sfh_parms
 
 		# calculate half-mass assembly time, sfr
