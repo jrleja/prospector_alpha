@@ -54,7 +54,7 @@ def maxprob_model(sample_results,sps):
 	current_maxprob = threed_dutils.test_likelihood(sps=sps, model=sample_results['model'], obs=sample_results['obs'], thetas=thetas)
 	print current_maxprob
 	print maxprob
-	#np.testing.assert_array_almost_equal(current_maxprob,maxprob,decimal=4)
+	np.testing.assert_array_almost_equal(current_maxprob,maxprob,decimal=4)
 
 	return thetas, maxprob
 
@@ -73,8 +73,10 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 	# check to see if we want zcontinuous=2 (i.e., the MDF)
 	if np.sum([1 for x in sample_results['model'].config_list if x['name'] == 'pmetals']) > 0:
 		sps = threed_dutils.setup_sps(zcontinuous=2)
+		print 'zcontinuous=2'
 	else:
 		sps = threed_dutils.setup_sps(zcontinuous=1)
+		print 'zcontinuous=1'
 
 	# maxprob
 	thetas, maxprob = maxprob_model(sample_results,sps)
