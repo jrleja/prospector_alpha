@@ -129,71 +129,82 @@ def return_test_sfhs(test_sfhs):
 	custom-built for SFH recovery tests
 	'''
 
+	# always implement mass priors
+	if test_sfhs != 0:
+		mass_bounds      = np.array([[1e10,1e11],[1e10,1e11]])
 
 	if test_sfhs == 1:
 		tau_bounds      = np.array([[50,100],[50,100]])
 		sf_start_bounds = np.array([[0,4],[0,4]])
+		dust_bounds     = np.array([[0.0,4.0],[0.0,4.0]])
 		descriptor      = 'constant sfh'
 
 	elif test_sfhs == 2:
 		tau_bounds      = np.array([[0.1,3],[0.1,3]])
 		sf_start_bounds = np.array([[0,4],[0,4]])
+		dust_bounds     = np.array([[0.0,4.0],[0.0,4.0]])
 		descriptor      = 'quiescent'		
 
 	elif test_sfhs == 3:
 		tau_bounds      = np.array([[0.1,3],[0.1,3]])
 		sf_start_bounds = np.array([[12,14],[12,14]])
+		dust_bounds     = np.array([[0.0,4.0],[0.0,4.0]])
 		descriptor      = 'burst'
 
 	elif test_sfhs == 4:
 		tau_bounds      = np.array([[0.1,7],[0.1,3]])
 		sf_start_bounds = np.array([[0,3],[12,14]])
+		dust_bounds     = np.array([[0.0,4.0],[0.0,4.0]])
 		descriptor      = 'old+burst'
 
-	return tau_bounds,sf_start_bounds,descriptor
+	elif test_sfhs == 5:
+		tau_bounds      = np.array([[4.0,20.0],[0.1,3]])
+		sf_start_bounds = np.array([[0,12],[12.5,14]])
+		dust_bounds     = np.array([[0.0,4.0],[3.0,4.0]])
+		descriptor      = 'dusty_burst'
 
-def return_bounds(parname,model,i,test_sfhs=None):
+	parnames = np.array(['mass','tau','sf_start','dust2'])
+	bounds   = np.array([mass_bounds,tau_bounds,sf_start_bounds,dust_bounds])
+
+	return bounds,parnames,descriptor
+
+def return_bounds(parname,model,i,test_sfhs=False):
 
 	'''
 	returns parameter boundaries
-	if test_sfhs is on, puts special constraints on sf_start and tau
+	if test_sfhs is on, puts special constraints on certain variables
 	these special constraints are defined in return_test_sfhs
 	'''
 
-
-	if parname[:-2] == 'tau' and test_sfhs is not None:
-		bounds,_,_=return_test_sfhs(test_sfhs)
-		bounds = bounds[int(parname[-1])-1]
-	elif parname[:-2] == 'sf_start' and test_sfhs is not None:
-		_,bounds,_=return_test_sfhs(test_sfhs)
-		bounds = bounds[int(parname[-1])-1]
-	else:
-		bounds = model.theta_bounds()[i]
+	bounds = model.theta_bounds()[i]
+	if test_sfhs != False:
+		bounds,parnames,descriptor=return_test_sfhs(test_sfhs)
+		if parname[:-2] in parnames:
+			bounds = bounds[parnames == parname[:-2]][0][int(parname[-1])-1]
 
 	return bounds[0],bounds[1]
 
+def parname_strip(parname):
 
-# build_sample_test(basename='testsed_linked'), build_sample_test(basename='testsed_all')
-#build_sample.build_sample_test(basename='testsed_constant_nonoise', test_sfhs=1)
-#build_sample.build_sample_test(basename='testsed_quiescent_nonoise', test_sfhs=2)
-#build_sample.build_sample_test(basename='testsed_burst_nonoise', test_sfhs=3)
-#build_sample.build_sample_test(basename='testsed_nonoise')
+	try:
+		int(parname[-1])
+		return parname[-2:]
+	except:
+		return parname
 
-# Must rewrite this such that a single parameter file talks to all the test galaxies.
-# Loop through all versions of test_sfhs, load into single data file.
-#
-
-def build_sample_test(add_zp_err=False,
-	                  basename='testsed_outliers'):
+def build_sample_test(basename,outname=None,add_zp_err=False):
 
 	'''
 	Generate model SEDs and add noise
+	IMPORTANT: linked+outlier noise will NOT be added if those variables are not free 
+	parameters in the passed parameter file!
 	'''
 
 	from bsfh import model_setup
 
 	#### output names ####
-	outname = '/Users/joel/code/python/threedhst_bsfh/data/'+basename
+	if outname == None:
+		outname = '/Users/joel/code/python/threedhst_bsfh/data/'+basename
 	parmfile='/Users/joel/code/python/threedhst_bsfh/parameter_files/'+basename+'/'+basename+'_params.py'
 
 	#### load test model, build sps  ####
@@ -202,10 +213,11 @@ def build_sample_test(add_zp_err=False,
 	sps = threed_dutils.setup_sps()
 
 	#### basic parameters ####
-	ngals_per_model     = 20
-	noise               = 0.00            # add errors
-	reported_noise      = 0.01            # under-report the noise?
-	test_sfhs           = [1,2,3,4]       # which test sfhs to use?
+	ngals_per_model     = 60
+	noise               = 0.00            # perturb fluxes
+	reported_noise      = 0.01            # reported noise
+	test_sfhs           = [1,2,3,4,5]     # which test sfhs to use?
+	test_sfhs           = [0]
 	ntest               = len(test_sfhs)
 	ngals               = ntest*ngals_per_model
 	
@@ -230,11 +242,11 @@ def build_sample_test(add_zp_err=False,
 			
 			# random in logspace for mass + tau
 			# also enforce priors
-			if parnames[ii][:-2] == 'mass' or parnames[ii][:-2] == 'tau':
+			if parname_strip(parnames[ii]) == 'mass' or parname_strip(parnames[ii]) == 'tau':
 				
 				min,max = np.log10(return_bounds(parnames[ii],model,ii,test_sfhs=test_sfhs[jj]))
-				if parnames[ii][:-2] == 'tau':
-					print min,max
+				print 'mass,tau'
+				print min,max
 
 				# ensure that later priors CAN be enforced
 				if parnames[ii] == 'mass_1': max = np.log10(10**max/20)
@@ -251,35 +263,42 @@ def build_sample_test(add_zp_err=False,
 					for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): testparms[kk,ii] = 10**(random.random()*(max-min)+min)
 			
 			#### generate specific SFHs if necessary ####
-			elif parnames[ii][:-2] == 'sf_start':
+			elif parname_strip(parnames[ii]) == 'sf_start':
 				min,max = return_bounds(parnames[ii],model,ii,test_sfhs=test_sfhs[jj])
+				print 'sf_start'
 				print min,max
 				for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): testparms[kk,ii] = random.random()*(max-min)+min
 
 			#### tone down the dust a bit-- flat in prior means lots of Av = 2.0 galaxies ####
-			elif parnames[ii][:-2] == 'dust2':
-				min = model.theta_bounds()[ii][0]
-				max = model.theta_bounds()[ii][1]
-				for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): testparms[kk,ii] = np.clip(random.gauss(0.5, 0.5),min,max)
+			elif parname_strip(parnames[ii]) == 'dust2':
+				if test_sfhs[jj] != 5:
+					min = model.theta_bounds()[ii][0]
+					max = model.theta_bounds()[ii][1]
+					for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): testparms[kk,ii] = np.clip(random.gauss(0.5, 0.5),min,max)
+				else:
+					min,max = return_bounds(parnames[ii],model,ii,test_sfhs=test_sfhs[jj])
+					for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): testparms[kk,ii] = random.random()*(max-min)+min
+				print 'dust'
+				print min,max
 
 			#### apply dust_index prior! ####
-			elif parnames[ii][:-2] == 'dust_index':
+			elif parname_strip(parnames[ii]):
 				min = model.theta_bounds()[ii][0]
 				max = model.theta_bounds()[ii][1]
 				for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): testparms[kk,ii] = np.clip(random.gauss(-0.7, 0.5),min,max)
 
 			#### general photometric jitter ####
-			elif parnames[ii] == 'phot_jitter':
+			elif parname_strip(parnames[ii]):
 				for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): testparms[kk,ii] = 0.0
 		
 			#### linked filter noise ####
-			elif parnames[ii] == 'gp_filter_amps' or parnames[ii][:-2] == 'gp_filter_amps':
+			elif parname_strip(parnames[ii]) == 'gp_filter_amps':
 				for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): testparms[kk,ii] = band_specific_noise[int(parnames[ii][-1])-1]
 
 			#### outliers ####
-			elif parnames[ii] == 'gp_outlier_amps' or parnames[ii][:-2] == 'gp_outlier_amps':
+			elif parname_strip(parnames[ii]) == 'gp_outlier_amps':
 				for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): testparms[kk,ii] = outliers_noise
-			elif parnames[ii] == 'gp_outlier_locs' or parnames[ii][:-2] == 'gp_outlier_locs':
+			elif parname_strip(parnames[ii]) == 'gp_outlier_locs':
 				for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): testparms[kk,ii] = outliers_bands[int(parnames[ii][-1])-1]
 
 			else:
@@ -290,6 +309,21 @@ def build_sample_test(add_zp_err=False,
 	#### make sure priors are satisfied
 	for ii in xrange(ngals):
 		assert np.isfinite(model.prior_product(testparms[ii,:]))
+
+	#### write out thetas ####
+	with open(outname+'.dat', 'w') as f:
+		
+		### header ###
+		f.write('# ')
+		for theta in model.theta_labels():
+			f.write(theta+' ')
+		f.write('\n')
+
+		### data ###
+		for ii in xrange(ngals):
+			for kk in xrange(nparams):
+				f.write(str(testparms[ii,kk])+' ')
+			f.write('\n')
 
 	#### set up photometry output ####
 	nfilters = len(obs['filters'])
@@ -355,21 +389,6 @@ def build_sample_test(add_zp_err=False,
 			f.write(str(ids[ii])+' ')
 			for kk in xrange(nfilters):
 				f.write(str(maggies[ii,kk])+' '+str(maggies_unc[ii,kk]) + ' ')
-			f.write('\n')
-
-	#### thetas ####
-	with open(outname+'.dat', 'w') as f:
-		
-		### header ###
-		f.write('# ')
-		for theta in model.theta_labels():
-			f.write(theta+' ')
-		f.write('\n')
-
-		### data ###
-		for ii in xrange(ngals):
-			for kk in xrange(nparams):
-				f.write(str(testparms[ii,kk])+' ')
 			f.write('\n')
 
 def build_sample_onekrun(rm_zp_offsets=True):
