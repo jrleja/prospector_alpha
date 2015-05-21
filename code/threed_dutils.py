@@ -142,11 +142,17 @@ def load_truths(truthname,objname,sample_results):
 	generates plotvalues
 	'''
 
-	# load truths
+	# number of extra parameters
 	nextra = 2
-	truth = np.loadtxt(truthname)
-	truths = truth[int(objname)-1,:]
-	parnames = np.array(sample_results['model'].theta_labels())
+
+	# load truths
+	with open(truthname, 'r') as f:
+		hdr = f.readline().split()[1:]
+	truth = np.loadtxt(truthname, comments = '#',
+					   dtype = np.dtype([(n, np.float) for n in hdr]))
+
+	truths = np.array([x for x in truth[int(objname)-1]])
+	parnames = np.array(hdr)
 
 	# create totmass and totsfr        
 	mass = truths[np.array([True if 'mass' in x else False for x in parnames])]

@@ -175,7 +175,7 @@ def plot_sfh(sample_results,nsamp=1000,ncomp=2):
 				_ = [x['init'] for x in sample_results['model'].config_list if x['name'] == str_sfh_parms[ll]][0]
 				if len(np.atleast_1d(_)) != np.sum(indexes[0]):
 					_ = np.zeros(np.sum(indexes[0]))+_
-				sfh_parms.append(_)
+				sfh_parms.append(np.atleast_1d(_))
 		mass,tau,sf_start,tage = sfh_parms
 
 		if mm == 0:
@@ -365,7 +365,7 @@ def show_chain(sample_results,outname=None,alpha=0.6,truths=None):
 			axarr[jj,ii].yaxis.get_major_ticks()[0].label1On = False # turn off bottom ticklabel
 
 			# add truths
-			if truths is not None:
+			if truths is not None and parnames[jj] == truths['parnames'][jj]:
 				axarr[jj,ii].axhline(truths['plot_truths'][jj], linestyle='-',color='r')
 
 		# plot lnprob
@@ -494,15 +494,18 @@ def sed_figure(sample_results, sps, model,
 
 	# plot truths
 	if truths is not None:
-		mwave_truth, mospec_truth, mounc_truth, specvecs_truth = comp_samples([truths['truths']], sample_results, sps, photflag=1)
 		
-		#phot.plot(np.log10(mwave_truth), np.log10(specvecs_truth[0][0]*(c/(mwave_truth/1e10))), 
-		#	      color='blue', marker='o', ms=ms, linestyle=' ', label='truths', 
-		#	      alpha=alpha, markeredgewidth=0.7,**kwargs)
-	
-		res.plot(np.log10(mwave_truth), specvecs_truth[0][-1], 
-			     color='blue', marker='o', linestyle=' ', label='truths', 
-			     ms=ms,alpha=0.3,markeredgewidth=0.7,**kwargs)
+		# if truths are made with a different model than they are fit with,
+		# then this will be passing parameters to the wrong model. pass.
+		# in future, attach a model to the truths file!
+		try:
+			mwave_truth, mospec_truth, mounc_truth, specvecs_truth = comp_samples([truths['truths']], sample_results, sps, photflag=1)
+
+			res.plot(np.log10(mwave_truth), specvecs_truth[0][-1], 
+				     color='blue', marker='o', linestyle=' ', label='truths', 
+				     ms=ms,alpha=0.3,markeredgewidth=0.7,**kwargs)
+		except AssertionError:
+			pass
 
 	# plot Powell minimization answer
 	if powell is not None:
@@ -545,11 +548,14 @@ def sed_figure(sample_results, sps, model,
 
 	# also calculate for truths if truths exist
 	if truths is not None:
-		chisq_truth=np.sum(specvecs_truth[0][-1]**2)
-		reduced_chisq_truth = chisq_truth/(ndof-1)
-		phot.text(textx, texty, r'best-fit $\chi^2_n$='+"{:.2f}".format(reduced_chisq)+' (true='
-			      +"{:.2f}".format(reduced_chisq_truth)+')',
-			      fontsize=10, ha='right')
+		try:
+			chisq_truth=np.sum(specvecs_truth[0][-1]**2)
+			reduced_chisq_truth = chisq_truth/(ndof-1)
+			phot.text(textx, texty, r'best-fit $\chi^2_n$='+"{:.2f}".format(reduced_chisq)+' (true='
+				      +"{:.2f}".format(reduced_chisq_truth)+')',
+				      fontsize=10, ha='right')
+		except NameError:
+			pass
 	else:
 		phot.text(textx, texty, r'best-fit $\chi^2_n$='+"{:.2f}".format(reduced_chisq),
 			  fontsize=10, ha='right')
@@ -710,7 +716,6 @@ def make_all_plots(filebase=None, parm_file=None,
 	print 'MAKING PLOTS FOR ' + filename + ' in ' + outfolder
 	
 	# do we know the truths?
-	print 1/0
 	try:
 		truths = threed_dutils.load_truths(os.getenv('APPS')+'/threed'+sample_results['run_params']['truename'].split('/threed')[1],
 			                              sample_results['run_params']['objname'],
