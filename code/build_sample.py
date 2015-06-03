@@ -237,6 +237,10 @@ def build_sample_test(basename,outname=None,add_zp_err=False):
 	testparms = np.zeros(shape=(ngals,nparams))
 	parnames = np.array(model.theta_labels())
 
+	theta=[1.01980247e+10,-9.92985877e-02,1.15113354e+00,1.76855227e+00,1.73225075e+00,4.76443784e-01,4.45663056e-01,-6.85439689e-01]
+	model.prior_product(theta)
+	print 1/0
+
 	for jj in xrange(ntest):
 		for ii in xrange(nparams):
 			
@@ -262,6 +266,16 @@ def build_sample_test(basename,outname=None,add_zp_err=False):
 			
 			#### generate specific SFHs if necessary ####
 			elif parname_strip(parnames[ii]) == 'sf_start':
+				min,max = return_bounds(parnames[ii],model,ii,test_sfhs=test_sfhs[jj])
+				for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): testparms[kk,ii] = random.random()*(max-min)+min
+
+			#### enforce SFH priors ####
+			elif parname_strip(parnames[ii]) == 'sf_trunc':
+				min,max = return_bounds(parnames[ii],model,ii,test_sfhs=test_sfhs[jj])
+				min = testparms[:,parnames == 'sf_start']
+				for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): testparms[kk,ii] = random.random()*(max-min[kk])+min[kk]
+
+			elif parname_strip(parnames[ii]) == 'sf_theta':
 				min,max = return_bounds(parnames[ii],model,ii,test_sfhs=test_sfhs[jj])
 				for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): testparms[kk,ii] = random.random()*(max-min)+min
 

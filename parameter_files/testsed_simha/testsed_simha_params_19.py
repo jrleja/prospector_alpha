@@ -117,11 +117,14 @@ class BurstyModel(sedmodel.CSPModel):
             if len(np.unique(np.round(outlier_locs))) != len(outlier_locs):
                 return -np.inf
 
-        # implement sf_trunc < tage prior
+        # implement sf_start < sf_trunc < tage
         if 'sf_trunc' in self.theta_index:
             start,end = self.theta_index['sf_trunc']
             sf_trunc = theta[start:end]
-            if sf_trunc >= self.params['tage']:
+            start,end = self.theta_index['sf_start']
+            sf_start = theta[start:end]
+            if (sf_trunc >= self.params['tage']) or \
+               (sf_trunc <= sf_start):
                 return -np.inf
 
 
