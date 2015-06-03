@@ -245,8 +245,6 @@ def build_sample_test(basename,outname=None,add_zp_err=False):
 			if parname_strip(parnames[ii]) == 'mass' or parname_strip(parnames[ii]) == 'tau':
 				
 				min,max = np.log10(return_bounds(parnames[ii],model,ii,test_sfhs=test_sfhs[jj]))
-				print 'mass,tau'
-				print min,max
 
 				# ensure that later priors CAN be enforced
 				if parnames[ii] == 'mass_1': max = np.log10(10**max/20)
@@ -265,8 +263,6 @@ def build_sample_test(basename,outname=None,add_zp_err=False):
 			#### generate specific SFHs if necessary ####
 			elif parname_strip(parnames[ii]) == 'sf_start':
 				min,max = return_bounds(parnames[ii],model,ii,test_sfhs=test_sfhs[jj])
-				print 'sf_start'
-				print min,max
 				for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): testparms[kk,ii] = random.random()*(max-min)+min
 
 			#### tone down the dust a bit-- flat in prior means lots of Av = 2.0 galaxies ####
@@ -278,8 +274,6 @@ def build_sample_test(basename,outname=None,add_zp_err=False):
 				else:
 					min,max = return_bounds(parnames[ii],model,ii,test_sfhs=test_sfhs[jj])
 					for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): testparms[kk,ii] = random.random()*(max-min)+min
-				print 'dust'
-				print min,max
 
 			#### apply dust_index prior! ####
 			elif parname_strip(parnames[ii]):
@@ -305,6 +299,8 @@ def build_sample_test(basename,outname=None,add_zp_err=False):
 				min = model.theta_bounds()[ii][0]
 				max = model.theta_bounds()[ii][1]
 				for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): testparms[kk,ii] = random.random()*(max-min)+min
+			print parname_strip(parnames[ii])
+			print min,max
 
 	#### make sure priors are satisfied
 	for ii in xrange(ngals):

@@ -12,7 +12,7 @@ logarithmic = priors.logarithmic
 #############
 
 run_params = {'verbose':True,
-              'outfile':os.getenv('APPS')+'/threedhst_bsfh/results/testsed_nonoise_fast/testsed_nonoise_fast',
+              'outfile':os.getenv('APPS')+'/threedhst_bsfh/results/testsed_simha/testsed_simha',
               'ftol':0.5e-5, 
               'maxfev':5000,
               'nwalkers':496,
@@ -25,12 +25,12 @@ run_params = {'verbose':True,
               'logify_spectrum': False,
               'normalize_spectrum': False,
               'set_init_params': None,  # DO NOT SET THIS TO TRUE SINCE TAGE == TUNIV*1.2 (fast,random)
-              'min_error': 0.02,
+              'min_error': 0.01,
               'abs_error': False,
               'spec': False, 
               'phot':True,
-              'photname':os.getenv('APPS')+'/threedhst_bsfh/data/testsed_oldburst.cat',
-              'truename':os.getenv('APPS')+'/threedhst_bsfh/data/testsed_oldburst.dat',
+              'photname':os.getenv('APPS')+'/threedhst_bsfh/data/testsed_nonoise.cat',
+              'truename':os.getenv('APPS')+'/threedhst_bsfh/data/testsed_nonoise.dat',
               'objname':'1',
               }
 
@@ -109,13 +109,21 @@ class BurstyModel(sedmodel.CSPModel):
             these parameter values.
         """  
         lnp_prior = 0
-        
+
         # implement uniqueness of outliers
         if 'gp_outlier_locs' in self.theta_index:
             start,end = self.theta_index['gp_outlier_locs']
             outlier_locs = theta[start:end]
             if len(np.unique(np.round(outlier_locs))) != len(outlier_locs):
                 return -np.inf
+
+        # implement sf_trunc < tage prior
+        if 'sf_trunc' in self.theta_index:
+            start,end = self.theta_index['sf_trunc']
+            sf_trunc = theta[start:end]
+            if sf_trunc >= self.params['tage']:
+                return -np.inf
+
 
         for k, v in self.theta_index.iteritems():
             start, end = v
@@ -158,8 +166,7 @@ model_params.append({'name': 'mass', 'N': 1,
                         'init': 1e10,
                         'units': r'M_\odot',
                         'prior_function': tophat,
-                        'prior_args': {'mini':1e7,
-                                       'maxi':1e14}})
+                        'prior_args': {'mini':1e7,'maxi':1e14}})
 
 model_params.append({'name': 'pmetals', 'N': 1,
                         'isfree': False,
@@ -180,19 +187,19 @@ model_params.append({'name': 'logzsol', 'N': 1,
 ###### SFH   ########
 model_params.append({'name': 'sfh', 'N': 1,
                         'isfree': False,
-                        'init': 4,
+                        'init': 5,
                         'units': 'type',
                         'prior_function_name': None,
                         'prior_args': None})
 
 model_params.append({'name': 'tau', 'N': 1,
                         'isfree': True,
-                        'init': 10,
-                        'init_disp': 0.5,
+                        'init': 1.0,
+                        'init_disp': 0.3,
                         'units': 'Gyr',
                         'prior_function':logarithmic,
                         'prior_args': {'mini':0.1,
-                                       'maxi':100.0}})
+                                       'maxi':100}})
 
 model_params.append({'name': 'tage', 'N': 1,
                         'isfree': False,
@@ -231,8 +238,23 @@ model_params.append({'name': 'sf_start', 'N': 1,
                         'init': 1.0,
                         'units': 'Gyr',
                         'prior_function': tophat,
-                        'prior_args': {'mini':0.0,
-                                       'maxi':14.0}})
+                        'prior_args': {'mini':0.0,'maxi':14.0}})
+
+model_params.append({'name': 'sf_trunc', 'N': 1,
+                        'isfree': True,
+                        'reinit': False,
+                        'init': 2.0,
+                        'units': '',
+                        'prior_function': tophat,
+                        'prior_args': {'mini':1.0, 'maxi':14.0}})
+
+model_params.append({'name': 'sf_theta', 'N': 1,
+                        'isfree': True,
+                        'reinit': False,
+                        'init': np.pi/6,
+                        'units': None,
+                        'prior_function': tophat,
+                        'prior_args': {'mini':-np.pi/2.0,'maxi':np.pi/3.0}})
 
 ########    IMF  ##############
 model_params.append({'name': 'imf_type', 'N': 1,
@@ -252,20 +274,20 @@ model_params.append({'name': 'dust_type', 'N': 1,
                         
 model_params.append({'name': 'dust1', 'N': 1,
                         'isfree': False,
-                        'init': 0.35,
+                        'init': 0.0,
                         'init_disp': 0.5,
                         'units': '',
                         'prior_function': tophat,
-                        'prior_args': {'mini':0.0, 'maxi':3.0}})
+                        'prior_args': {'mini':0.0, 'maxi':8.0}})
 
 model_params.append({'name': 'dust2', 'N': 1,
                         'isfree': True,
-                        'init': 0.0,
-                        'init_disp': 0.2,
+                        'init': 0.35,
+                        'reinit': True,
+                        'init_disp': 0.3,
                         'units': '',
                         'prior_function': tophat,
-                        'prior_args': {'mini':0.0,
-                                       'maxi':4.0}})
+                        'prior_args': {'mini':0.0,'maxi':4.0}})
 
 model_params.append({'name': 'dust_index', 'N': 1,
                         'isfree': True,

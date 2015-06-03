@@ -9,8 +9,8 @@ plt.ioff() # don't pop up a window for each plot
 
 tiny_number = 1e-3
 big_number = 1e90
-plt_chain_figure = 1
-plt_triangle_plot = 1
+plt_chain_figure = 0
+plt_triangle_plot = 0
 plt_sed_figure = 1
 
 def add_sfh_plot(sample_results,fig,ax_loc,truths=None,fast=None):
@@ -69,8 +69,7 @@ def add_sfh_plot(sample_results,fig,ax_loc,truths=None,fast=None):
 
 		parnames = sample_results['model'].theta_labels()
 		tage = sample_results['model'].params['tage'][0]
-		tt,pt = plot_sfh_single(truths['truths'],tage,parnames,ncomp=sample_results.get('ncomp',2))
-
+		tt,pt = plot_sfh_single(truths['truths'],tage,truths['parnames'],ncomp=np.sum([1 for x in truths['parnames'] if 'mass' in x]))
 		pt = np.log10(np.clip(pt,minsfr,maxsfr))
 		#tcolors=['steelblue','maroon']
 		#for aa in xrange(sample_results.get('ncomp',2)):

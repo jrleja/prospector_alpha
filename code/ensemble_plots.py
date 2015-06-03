@@ -2202,7 +2202,7 @@ def delta_versus_ssfr():
 	'''
 
 	runnames = ['testsed_quiescent','testsed_oldburst','testsed_burst','testsed_constant']
-	runnames = ['testsed_nonoise']
+	runnames = ['testsed_oldburst']
 	outname = os.getenv('APPS')+'/threedhst_bsfh/plots/ensemble_plots/'+runnames[0]+'/delta_versus_ssfr.png'
 	outname = os.getenv('APPS')+'/threedhst_bsfh/plots/ensemble_plots/'+runnames[0]+'/deltam_versus_deltasfr.png'
 
