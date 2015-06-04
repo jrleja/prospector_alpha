@@ -47,7 +47,7 @@ def test_likelihood(param_file=None, sps=None, model=None, obs=None, thetas=None
 	except(AttributeError):
 		#There was no phot_gp_params method
 		pass
-
+	gp_phot = None
 	likefn = LikelihoodFunction(obs=obs, model=model)
 	mu, phot, x = model.mean_model(thetas, obs, sps = sps)
 	lnp_phot = likefn.lnlike_phot(phot, obs=obs, gp=gp_phot)
