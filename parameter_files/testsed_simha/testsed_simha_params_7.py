@@ -124,7 +124,7 @@ class BurstyModel(sedmodel.CSPModel):
             start,end = self.theta_index['sf_start']
             sf_start = theta[start:end]
             if (sf_trunc >= self.params['tage']) or \
-               (sf_trunc <= sf_start+0.2):
+               (sf_trunc <= sf_start+0.5):
                 return -np.inf
 
 
