@@ -7,6 +7,27 @@ from scipy.integrate import simps
 from calc_ml import load_filter_response
 from bsfh.likelihood import LikelihoodFunction
 
+def find_sfh_params(model,theta):
+
+	str_sfh_parms = ['mass','tau','sf_start','tage','sf_trunc','sf_theta']
+	parnames = model.theta_labels()
+	sfh_out = []
+
+	for string in str_sfh_parms:
+		
+		# find SFH parameters that are variables in the chain
+		index = np.char.find(parnames,string) > -1
+
+		# if not found, look in fixed parameters
+		if np.sum(index[-1]) == 0:
+			sfh_out.append(model.params[string])
+		else:
+			sfh_out.append(theta[index])
+
+	iterable = [(str_sfh_parms[ii],sfh_out[ii]) for ii in xrange(len(sfh_out))]
+	out = {key: value for (key, value) in iterable}
+
+	return out
 
 def test_likelihood(param_file=None, sps=None, model=None, obs=None, thetas=None):
 
@@ -47,7 +68,7 @@ def test_likelihood(param_file=None, sps=None, model=None, obs=None, thetas=None
 	except(AttributeError):
 		#There was no phot_gp_params method
 		pass
-	gp_phot = None
+
 	likefn = LikelihoodFunction(obs=obs, model=model)
 	mu, phot, x = model.mean_model(thetas, obs, sps = sps)
 	lnp_phot = likefn.lnlike_phot(phot, obs=obs, gp=gp_phot)
@@ -158,11 +179,10 @@ def load_truths(truthname,objname,sample_results):
 	mass = truths[np.array([True if 'mass' in x else False for x in parnames])]
 	totmass = np.log10(np.sum(mass))
 
-	tau = truths[np.array([True if 'tau' in x else False for x in parnames])]
-	sf_start = truths[np.array([True if 'sf_start' in x else False for x in parnames])]
-	tage = np.zeros(len(tau))+sample_results['model'].params['tage'][0]
+	# sfh params
+	sfh_params = find_sfh_params(sample_results['model'],truths)
 	deltat=0.1
-	totsfr=np.log10(integrate_sfh(np.atleast_1d(tage)[0]-deltat,np.atleast_1d(tage)[0],mass,tage,tau,sf_start)*np.sum(mass)/(deltat*1e9))
+	totsfr=np.log10(integrate_sfh(sfh_params['tage']-deltat,sfh_params['tage'],sfh_params)*np.sum(sfh_params['mass'])/(deltat*1e9))
 
 	# convert truths to plotting parameters
 	plot_truths = truths+0.0
@@ -182,7 +202,8 @@ def load_truths(truthname,objname,sample_results):
 				   'truths':truths,
 				   'plot_truths':plot_truths,
 				   'extra_parnames':np.array(['totmass','totsfr']),
-				   'extra_truths':np.array([totmass,totsfr])}
+				   'extra_truths':np.array([totmass,totsfr]),
+				   'sfh_params': sfh_params}
 	return truths_dict
 
 def running_median(x,y,nbins=10,avg=False):
@@ -1003,34 +1024,97 @@ def integrate_mag(spec_lam,spectra,filter, z=None, alt_file=None):
 	#print 'maggies: {0}'.format(10**(-0.4*mag)*1e10)
 	return mag, luminosity
 
-def integrate_sfh(t1,t2,mass,tage,tau,sf_start):
+def integrate_delayed_tau(t1,t2,sfh):
+
+	return (np.exp(-t1/sfh['tau'])*(1+t1/sfh['tau']) - \
+	       np.exp(-t2/sfh['tau'])*(1+t2/sfh['tau']))*sfh['tau']**2
+
+def integrate_linramp(t1,t2,sfh):
+
+	c = (sfh['sf_trunc']-sfh['sf_start'])*np.exp(-(sfh['sf_trunc']-sfh['sf_start'])/sfh['tau'])
+	return t2*(0.5*t2*np.tan(sfh['sf_theta'])+c)-t1*(0.5*t1*np.tan(sfh['sf_theta'])+c)
+
+# tests
+		#threed_dutils.integrate_sfh(sfh_params['sf_start'],sfh_params['sf_start'],sfh_params)
+		#threed_dutils.integrate_sfh(sfh_params['sf_start'],sfh_params['sf_trunc'],sfh_params)
+		#threed_dutils.integrate_sfh(sfh_params['sf_start']+0.5,sfh_params['sf_start']-0.5,sfh_params)
+		#threed_dutils.integrate_sfh(sfh_params['sf_start']+3.5,sfh_params['sf_start']+4.5,sfh_params)
+		#threed_dutils.integrate_sfh(sfh_params['sf_start'],sfh_params['tage'],sfh_params)
+
+def integrate_sfh(t1,t2,sfh_params,fsps_sfh5 = False):
 	
 	'''
-	integrate a delayed tau SFH between t1 and t2
+	integrate a delayed tau SFH from t1 to t2
+	sfh = dictionary of SFH parameters
+	ASK CHARLIE: functional form correct?
 	'''
-	t1 = t1-sf_start
-	t2 = t2-sf_start
-	tage = tage-sf_start
 
-	# sanitize inputs
-	ndim = len(np.atleast_1d(mass))
+	# copy over so we don't overwrite values
+	sfh = sfh_params.copy()
+
+	# here is our coordinate transformation, confusing but matches fsps
+	t1 = t1-sfh['sf_start']
+	t2 = t2-sfh['sf_start']
+
+	# match dimensions, if two-tau model
+	ndim = len(np.atleast_1d(sfh['mass']))
 	if len(np.atleast_1d(t2)) != ndim:
 		t2 = np.zeros(ndim)+t2
 	if len(np.atleast_1d(t1)) != ndim:
 		t1 = np.zeros(ndim)+t1
 
-	# if we're outside of the time boundaries, clip to boundary values
-	t1 = np.clip(t1,0,tage)
-	t2 = np.clip(t2,0,tage)
+	# redefine sf_trunc, if not being used for sfh=5 purposes
+	if sfh['sf_trunc'] == 0.0:
+		sfh['sf_trunc'] = sfh['tage']
+		print sfh['sf_trunc']
 
-	# add tau model
-	intsfr =  np.exp(-t1/tau)*(1+t1/tau) - \
-	          np.exp(-t2/tau)*(1+t2/tau)
-	norm =    1.0- np.exp(-tage    /tau)*(1+tage/tau)
-	intsfr = intsfr/norm
+	# if we're outside of the time boundaries, clip to boundary values
+	# this only affects integrals which would have been questionable in the first place
+	t1 = np.clip(t1,0,sfh['tage']-sfh['sf_start'])
+	t2 = np.clip(t2,0,sfh['tage']-sfh['sf_start'])
+
+  	# if we've reset sf_trunc (i.e., sfh != 5)
+  	if sfh['sf_trunc'] == sfh['tage']:
+
+  			# add tau model
+			intsfr =  integrate_delayed_tau(t1,t2,tau)
+			norm =    1.0- np.exp(-(sfh['sf_trunc']-sfh['sf_start'])/sfh['tau'])*(1+(sfh['sf_trunc']-sfh['sf_start'])/sfh['tau'])
+			intsfr = intsfr/(norm*sfh['tau']**2)
+
+			# edge case
+			if t1 > sfh['tage']:
+				intsfr = 0.0
+
+	elif fsps_sfh5 == True:
+		# sfh = 5
+		if (t2+sfh['sf_start'] < sfh['sf_trunc']):
+			intsfr = (np.exp(-t1/sfh['tau'])*(1+t1/sfh['tau']) - \
+	          		  np.exp(-t2/sfh['tau'])*(1+t2/sfh['tau'])) * sfh['tau']**2
+		else:
+			intsfr = np.tan(sfh['sf_theta'])* \
+					 (0.5*(t2**2-t1**2)-(t2-t1)*(sfh['sf_trunc']-sfh['sf_start']))
+		intsfr = np.clip(intsfr,0,np.inf)
+
+	else:
+
+		# by-hand calculation
+		norm1 = integrate_delayed_tau(0,sfh['sf_trunc']-sfh['sf_start'],sfh)
+		norm2 = integrate_linramp(sfh['sf_trunc']-sfh['sf_start'],sfh['tage']-sfh['sf_start'],sfh)
+		
+		if (t1 < sfh['sf_trunc']-sfh['sf_start']) and \
+		   (t2 < sfh['sf_trunc']-sfh['sf_start']):
+			intsfr = integrate_delayed_tau(t1,t2,sfh) / (norm1+norm2)
+		elif (t1 > sfh['sf_trunc']-sfh['sf_start']) and \
+		        (t2 > sfh['sf_trunc']-sfh['sf_start']):
+			intsfr = integrate_linramp(t1,t2,sfh) / (norm1+norm2)
+		else:
+			intsfr = (integrate_delayed_tau(t1,sfh['sf_trunc']-sfh['sf_start'],sfh) + \
+				      integrate_linramp(sfh['sf_trunc']-sfh['sf_start'],t2,sfh)) / \
+                      (norm1+norm2)
+
 
 	# return sum of SFR components
-	tot_sfr = np.sum(intsfr*mass)/np.sum(mass)
+	tot_sfr = np.sum(intsfr*sfh['mass'])/np.sum(sfh['mass']		)
 	return tot_sfr
 
 def measure_emline_lum(sps, model = None, obs = None, thetas = None, measure_ir = False, saveplot = False):

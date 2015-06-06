@@ -9,8 +9,8 @@ plt.ioff() # don't pop up a window for each plot
 
 tiny_number = 1e-3
 big_number = 1e90
-plt_chain_figure = 0
-plt_triangle_plot = 0
+plt_chain_figure = 1
+plt_triangle_plot = 1
 plt_sed_figure = 1
 
 def add_sfh_plot(sample_results,fig,ax_loc,truths=None,fast=None):
@@ -69,7 +69,7 @@ def add_sfh_plot(sample_results,fig,ax_loc,truths=None,fast=None):
 
 		parnames = sample_results['model'].theta_labels()
 		tage = sample_results['model'].params['tage'][0]
-		tt,pt = plot_sfh_single(truths['truths'],tage,truths['parnames'],ncomp=np.sum([1 for x in truths['parnames'] if 'mass' in x]))
+		tt,pt = plot_sfh_single(truths,tage,truths['parnames'],ncomp=np.sum([1 for x in truths['parnames'] if 'mass' in x]))
 		pt = np.log10(np.clip(pt,minsfr,maxsfr))
 		#tcolors=['steelblue','maroon']
 		#for aa in xrange(sample_results.get('ncomp',2)):
@@ -119,17 +119,11 @@ def plot_sfh_single(truths,tage,parnames,ncomp=2):
 	deltat=0.001
 	t=np.linspace(0,np.max(tage),num=50)
 
-	# define input variables
-	mass = truths[np.array([True if 'mass' in x else False for x in parnames])]
-	tau = truths[np.array([True if 'tau' in x else False for x in parnames])]
-	sf_start = truths[np.array([True if 'sf_start' in x else False for x in parnames])]
-	tage = np.zeros(ncomp)+tage
-
-	for jj in xrange(nt): intsfr[jj,0] = threed_dutils.integrate_sfh(t[jj]-deltat,t[jj],mass,
-		                                                                    tage,tau,sf_start)*np.sum(mass)/(deltat*1e9)
+	for jj in xrange(nt): intsfr[jj,0] = threed_dutils.integrate_sfh(t[jj]-deltat,t[jj],truths['sfh_params'])*np.sum(truths['sfh_params']['mass'])/(deltat*1e9)
 	for kk in xrange(ncomp):
-		for jj in xrange(nt): intsfr[jj,kk+1] = threed_dutils.integrate_sfh(t[jj]-deltat,t[jj],mass[kk],
-                                                                    tage[kk],tau[kk],sf_start[kk])*mass[kk]/(deltat*1e9)
+		iterable = [(key,value[kk]) for key, value in truths['sfh_params'].iteritems()]
+		newdict = {key: value for (key, value) in iterable}
+		for jj in xrange(nt): intsfr[jj,kk+1] = threed_dutils.integrate_sfh(t[jj]-deltat,t[jj],newdict)*newdict['mass']/(deltat*1e9)
 
 	return t, intsfr
 
@@ -144,15 +138,6 @@ def plot_sfh(sample_results,nsamp=1000,ncomp=2):
 	third dimension is [q16,q50,q84]
 	'''
 
-	# find SFH parameters that are variables in the chain
-    # save their indexes for future use
-	str_sfh_parms = ['mass','tau','sf_start','tage']
-	parnames = sample_results['model'].theta_labels()
-	indexes = []
-	for string in str_sfh_parms:
-		indexes.append(np.char.find(parnames,string) > -1)
-	indexes = np.array(indexes,dtype='bool')
-
 	# sample randomly from SFH
 	import copy
 	flatchain = copy.copy(sample_results['flatchain'])
@@ -166,26 +151,18 @@ def plot_sfh(sample_results,nsamp=1000,ncomp=2):
 	for mm in xrange(nsamp):
 
 		# combine into an SFH vector that includes non-parameter values
-		sfh_parms = []
-		for ll in xrange(len(str_sfh_parms)):
-			if np.sum(indexes[ll]) > 0:
-				sfh_parms.append(flatchain[mm,indexes[ll]])
-			else:
-				_ = [x['init'] for x in sample_results['model'].config_list if x['name'] == str_sfh_parms[ll]][0]
-				if len(np.atleast_1d(_)) != np.sum(indexes[0]):
-					_ = np.zeros(np.sum(indexes[0]))+_
-				sfh_parms.append(np.atleast_1d(_))
-		mass,tau,sf_start,tage = sfh_parms
+		sfh_params = threed_dutils.find_sfh_params(sample_results['model'],flatchain[mm,:])
 
 		if mm == 0:
-			t=np.linspace(0,np.max(tage),num=50)
+			t=np.linspace(0,np.max(sfh_params['tage']),num=50)
 
-		totmass = np.sum(mass)
-		for jj in xrange(nt): intsfr[mm,jj,0] = threed_dutils.integrate_sfh(t[jj]-deltat,t[jj],mass,
-		                                                                    tage,tau,sf_start)*totmass/(deltat*1e9)
+		totmass = np.sum(sfh_params['mass'])
+		for jj in xrange(nt): intsfr[mm,jj,0] = threed_dutils.integrate_sfh(t[jj]-deltat,t[jj],sfh_params)*totmass/(deltat*1e9)
+		# now for each component
 		for kk in xrange(ncomp):
-			for jj in xrange(nt): intsfr[mm,jj,kk+1] = threed_dutils.integrate_sfh(t[jj]-deltat,t[jj],mass[kk],
-	                                                                    tage[kk],tau[kk],sf_start[kk])*mass[kk]/(deltat*1e9)
+			iterable = [(key,value[kk]) for key, value in sfh_params.iteritems()]
+			newdict = {key: value for (key, value) in iterable}
+			for jj in xrange(nt): intsfr[mm,jj,kk+1] = threed_dutils.integrate_sfh(t[jj]-deltat,t[jj],newdict)*sfh_params['mass'][kk]/(deltat*1e9)
 
 	q = np.zeros(shape=(nt,ncomp+1,3))
 	for kk in xrange(ncomp+1):
@@ -776,9 +753,10 @@ def plot_all_driver():
 	#runname = 'dtau_ha_zperr'
 	runname = 'dtau_ha_plog'
 	runname = 'testsed_nonoise_fast'
+	runname = 'testsed_simha'
 
 	filebase, parm_basename, ancilname=threed_dutils.generate_basenames(runname)
-	for jj in xrange(len(filebase)):
+	for jj in xrange(1,len(filebase)):
 		print 'iteration '+str(jj) 
 		make_all_plots(filebase=filebase[jj],\
 		               parm_file=parm_basename[jj],\

@@ -632,6 +632,14 @@ def ml_vs_color(runname):
 
 def av_to_sfr(runname, scale=False):
 
+	'''
+	this was an attempt to see whether the two-tau model naturally 
+	added extra extinction towards the tau component with the bulk 
+	the star formation
+
+	has many deprecated functions as of 6/5/15
+	'''
+
 	inname = os.getenv('APPS')+'/threedhst_bsfh/results/'+runname+'/'+runname+'_ensemble.pickle'
 	outname_cent = os.getenv('APPS') + '/threedhst_bsfh/plots/ensemble_plots/'+runname+'/av_to_sfr_comp.png'
 
