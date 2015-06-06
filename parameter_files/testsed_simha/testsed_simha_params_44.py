@@ -29,8 +29,8 @@ run_params = {'verbose':True,
               'abs_error': False,
               'spec': False, 
               'phot':True,
-              'photname':os.getenv('APPS')+'/threedhst_bsfh/data/testsed_nonoise.cat',
-              'truename':os.getenv('APPS')+'/threedhst_bsfh/data/testsed_nonoise.dat',
+              'photname':os.getenv('APPS')+'/threedhst_bsfh/data/testsed_simha.cat',
+              'truename':os.getenv('APPS')+'/threedhst_bsfh/data/testsed_simha.dat',
               'objname':'44',
               }
 
