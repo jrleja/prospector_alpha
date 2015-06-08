@@ -287,13 +287,13 @@ def build_sample_test(basename,outname=None,add_zp_err=False):
 					for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): testparms[kk,ii] = random.random()*(max-min)+min
 
 			#### apply dust_index prior! ####
-			elif parname_strip(parnames[ii]):
+			elif parname_strip(parnames[ii]) == 'dust_index':
 				min = model.theta_bounds()[ii][0]
 				max = model.theta_bounds()[ii][1]
 				for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): testparms[kk,ii] = np.clip(random.gauss(-0.7, 0.5),min,max)
 
 			#### general photometric jitter ####
-			elif parname_strip(parnames[ii]):
+			elif parname_strip(parnames[ii])  == 'phot_jitter':
 				for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): testparms[kk,ii] = 0.0
 		
 			#### linked filter noise ####
