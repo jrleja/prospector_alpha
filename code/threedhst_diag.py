@@ -756,7 +756,7 @@ def plot_all_driver():
 	runname = 'testsed_simha'
 
 	filebase, parm_basename, ancilname=threed_dutils.generate_basenames(runname)
-	for jj in xrange(1,len(filebase)):
+	for jj in xrange(len(filebase)):
 		print 'iteration '+str(jj) 
 		make_all_plots(filebase=filebase[jj],\
 		               parm_file=parm_basename[jj],\

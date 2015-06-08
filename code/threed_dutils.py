@@ -19,7 +19,7 @@ def find_sfh_params(model,theta):
 		index = np.char.find(parnames,string) > -1
 
 		# if not found, look in fixed parameters
-		if np.sum(index[-1]) == 0:
+		if np.sum(index) == 0:
 			sfh_out.append(model.params[string])
 		else:
 			sfh_out.append(theta[index])
