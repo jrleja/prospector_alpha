@@ -190,7 +190,7 @@ def create_plotquant(sample_results, logplot = ['mass', 'tau', 'tage'], truths=N
 	tuniv = WMAP9.age(sample_results['model'].params['zred'][0]).value
 	if truths is not None:
 		tuniv = 14.0
-	redefine = ['sf_start']
+	redefine = ['sf_start','sf_trunc']
 
 	# check for multiple stellar populations
 	for ii in xrange(len(parnames)):   	
