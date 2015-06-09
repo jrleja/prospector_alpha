@@ -262,13 +262,20 @@ def chop_chain(chain):
 	'''
 	simple placeholder
 	will someday replace with a test for convergence to determine where to chop
-	JRL 1/5/14
+	JRL 1/5/15
+
+	... haha
+	JRL 6/8/15
 	'''
 	nchop=1.66
 
-	flatchain = chain[:,int(chain.shape[1]/nchop):,:]
-	flatchain = flatchain.reshape(flatchain.shape[0] * flatchain.shape[1],
-                                  flatchain.shape[2])
+	if len(chain.shape) == 3:
+		flatchain = chain[:,int(chain.shape[1]/nchop):,:]
+		flatchain = flatchain.reshape(flatchain.shape[0] * flatchain.shape[1],
+		                              flatchain.shape[2])
+	else:
+		flatchain = chain[:,int(chain.shape[1]/nchop):]
+		flatchain = flatchain.reshape(flatchain.shape[0] * flatchain.shape[1])
 
 	return flatchain
 

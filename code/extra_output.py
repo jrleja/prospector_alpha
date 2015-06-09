@@ -101,7 +101,8 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 	dust_index_index = np.array([True if x == 'dust_index' else False for x in parnames])
 
 	# use randomized, flattened, thinned chain for posterior draws
-	flatchain = copy(sample_results['flatchain'])
+	# don't allow things outside the priors
+	flatchain = copy(sample_results['flatchain'][np.isfinite(threed_dutils.chop_chain(sample_results['lnprobability'])) == True])
 	np.random.shuffle(flatchain)
 
 	######## SFH parameters #########
@@ -159,9 +160,7 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 	con_em = sample_results['model'].params.get('add_neb_continuum', np.array(False))
 	met_save = sample_results['model'].params.get('logzsol', np.array(0.0))
 
-    # use randomized, flattened, thinned chain for posterior draws
-	flatchain = copy(sample_results['flatchain'])
-	np.random.shuffle(flatchain)
+    # use previously-randomized flatchain
 	for jj in xrange(nsamp_mc):
 		thetas = flatchain[jj,:]
 		
