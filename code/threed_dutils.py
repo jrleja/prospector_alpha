@@ -574,7 +574,7 @@ def integrate_delayed_tau(t1,t2,sfh):
 
 def integrate_linramp(t1,t2,sfh):
 
-	c = (sfh['sf_trunc']-sfh['sf_start'])*np.exp(-(sfh['sf_trunc']-sfh['sf_start'])/sfh['tau'])
+	c = (sfh['sf_trunc']-sfh['sf_start'])*(np.exp(-(sfh['sf_trunc']-sfh['sf_start'])/sfh['tau'])-sfh['sf_theta'])
 	return t2*(0.5*t2*np.tan(sfh['sf_theta'])+c)-t1*(0.5*t1*np.tan(sfh['sf_theta'])+c)
 
 # tests
