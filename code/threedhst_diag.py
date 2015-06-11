@@ -19,12 +19,8 @@ def add_sfh_plot(sample_results,fig,ax_loc,truths=None,fast=None):
 	add a small SFH plot at ax_loc
 	'''
 
-	# minimum and maximum SFRs to plot
-	minsfr = 0.005
-	maxsfr = 10000
-
-	t, perc = plot_sfh(sample_results, ncomp=sample_results.get('ncomp',2))
-	perc = np.log10(np.clip(perc,minsfr,maxsfr))
+	t, perc = plot_sfh(sample_results, ncomp=sample_results['ncomp'])
+	perc = np.log10(perc)
 	axfontsize=4
 	
 	# set up plotting
@@ -52,7 +48,7 @@ def add_sfh_plot(sample_results,fig,ax_loc,truths=None,fast=None):
 			tuniv = WMAP9.age(fastparms[fastfields=='z'][0]).value
 
 			tf, pf = plot_sfh_fast(ltau,lage,fmass,tuniv)
-			pf = np.log10(np.clip(pf,minsfr,maxsfr))
+			pf = np.log10(pf)
 			ax_inset.plot(tf, pf,'-',color='k')
 			ax_inset.plot(tf, pf,'-',color=fastcolor,alpha=1.0,linewidth=0.75)
 			ax_inset.text(0.08,0.83-0.07*(perc.shape[1]-1), 'fast',transform = ax_inset.transAxes,color=fastcolor,fontsize=axfontsize*1.4)
@@ -69,21 +65,26 @@ def add_sfh_plot(sample_results,fig,ax_loc,truths=None,fast=None):
 
 		parnames = sample_results['model'].theta_labels()
 		tage = sample_results['model'].params['tage'][0]
-		tt,pt = plot_sfh_single(truths,tage,truths['parnames'],ncomp=np.sum([1 for x in truths['parnames'] if 'mass' in x]))
-		pt = np.log10(np.clip(pt,minsfr,maxsfr))
+		tt,pt = plot_sfh_single(truths,tage,truths['parnames'],ncomp=sample_results['ncomp'])
+		pt = np.log10(pt)
 		#tcolors=['steelblue','maroon']
 		#for aa in xrange(sample_results.get('ncomp',2)):
 		#	ax_inset.plot(tt, pt[:,aa+1],'-',color=tcolors[aa],alpha=0.5,linewidth=0.75)
 		ax_inset.plot(tt, pt[:,0],'-',color='blue')
 		ax_inset.text(0.08,0.83, 'truth',transform = ax_inset.transAxes,color='blue',fontsize=axfontsize*1.4)
 
-	dynrange = (np.max(perc)-np.min(perc))*0.1
+	# set up plotting range
+	# this will have to be retooled once you go back to real data...
+	plotmax = np.maximum(np.max(perc[:,0,1]),np.max(pt[:,0]))
+	plotmin = np.maximum(np.min(perc[:,0,1]),np.min(pt[:,0]))
+
+	dynrange = (plotmax-plotmin)*0.1
 	axlim_sfh=[np.min(t),
 	           np.max(t)+0.08*(np.max(t)-np.min(t)),
-	           np.min(perc)-dynrange,np.max(perc)+dynrange]
+	           plotmin,plotmax+dynrange]
 	ax_inset.axis(axlim_sfh)
 
-	ax_inset.set_ylabel('log(SFH)',fontsize=axfontsize,weight='bold')
+	ax_inset.set_ylabel('log(SFR)',fontsize=axfontsize,weight='bold')
 	ax_inset.set_xlabel('t [Gyr]',fontsize=axfontsize,weight='bold')
 	ax_inset.tick_params(labelsize=axfontsize)
 
@@ -109,25 +110,26 @@ def plot_sfh_fast(tau,tage,mass,tuniv=None):
 
 	return t,sfr
 
-def plot_sfh_single(truths,tage,parnames,ncomp=2):
+def plot_sfh_single(truths,tage,parnames,ncomp=1):
 
 	parnames = np.array(parnames)
 
 	# initialize output variables
 	nt = 50
 	intsfr = np.zeros(shape=(nt,ncomp+1))
-	deltat=0.001
+	deltat=0.0001
 	t=np.linspace(0,np.max(tage),num=50)
 
-	for jj in xrange(nt): intsfr[jj,0] = threed_dutils.integrate_sfh(t[jj]-deltat,t[jj],truths['sfh_params'])*np.sum(truths['sfh_params']['mass'])/(deltat*1e9)
+	for jj in xrange(nt): intsfr[jj,0] = threed_dutils.calculate_sfr(truths['sfh_params'], deltat, tcalc = t[jj])
+
 	for kk in xrange(ncomp):
 		iterable = [(key,value[kk]) for key, value in truths['sfh_params'].iteritems()]
 		newdict = {key: value for (key, value) in iterable}
-		for jj in xrange(nt): intsfr[jj,kk+1] = threed_dutils.integrate_sfh(t[jj]-deltat,t[jj],newdict)*newdict['mass']/(deltat*1e9)
+		for jj in xrange(nt): intsfr[jj,kk+1] = threed_dutils.calculate_sfr(newdict, deltat, tcalc = t[jj])
 
 	return t, intsfr
 
-def plot_sfh(sample_results,nsamp=1000,ncomp=2):
+def plot_sfh(sample_results,nsamp=1000,ncomp=1):
 
 	'''
 	create sfh for plotting purposes
@@ -146,23 +148,24 @@ def plot_sfh(sample_results,nsamp=1000,ncomp=2):
 	# initialize output variables
 	nt = 50
 	intsfr = np.zeros(shape=(nsamp,nt,ncomp+1))
-	deltat=0.001
+	deltat=0.0001
 
 	for mm in xrange(nsamp):
 
-		# combine into an SFH vector that includes non-parameter values
+		# SFH parameter vector
 		sfh_params = threed_dutils.find_sfh_params(sample_results['model'],flatchain[mm,:])
 
 		if mm == 0:
 			t=np.linspace(0,np.max(sfh_params['tage']),num=50)
 
 		totmass = np.sum(sfh_params['mass'])
-		for jj in xrange(nt): intsfr[mm,jj,0] = threed_dutils.integrate_sfh(t[jj]-deltat,t[jj],sfh_params)*totmass/(deltat*1e9)
+		for jj in xrange(nt): intsfr[mm,jj,0] = threed_dutils.calculate_sfr(sfh_params, deltat, tcalc = t[jj])
+
 		# now for each component
 		for kk in xrange(ncomp):
 			iterable = [(key,value[kk]) for key, value in sfh_params.iteritems()]
 			newdict = {key: value for (key, value) in iterable}
-			for jj in xrange(nt): intsfr[mm,jj,kk+1] = threed_dutils.integrate_sfh(t[jj]-deltat,t[jj],newdict)*sfh_params['mass'][kk]/(deltat*1e9)
+			for jj in xrange(nt): intsfr[mm,jj,kk+1] = threed_dutils.calculate_sfr(newdict, deltat, tcalc = t[jj])
 
 	q = np.zeros(shape=(nt,ncomp+1,3))
 	for kk in xrange(ncomp+1):
@@ -190,7 +193,10 @@ def create_plotquant(sample_results, logplot = ['mass', 'tau', 'tage'], truths=N
 	tuniv = WMAP9.age(sample_results['model'].params['zred'][0]).value
 	if truths is not None:
 		tuniv = 14.0
-	redefine = ['sf_start','sf_trunc']
+	# COMMENTED OUT FOR NOW, FOR TRUTH TESTS
+	# MAYBE REINTRODUCE LATER FOR REAL DATA
+	#redefine = ['sf_start','sf_trunc']
+	redefine = []
 
 	# check for multiple stellar populations
 	for ii in xrange(len(parnames)):   	
@@ -254,9 +260,10 @@ def return_extent(sample_results):
 	for ii in xrange(len(parnames)):
 		
 		# set min/max
-		extent = [np.min(sample_results['plotchain'][:,:,ii]),np.max(sample_results['plotchain'][:,:,ii])]
+		extent = [np.percentile(sample_results['plotchain'][:,:,ii],4),
+		          np.percentile(sample_results['plotchain'][:,:,ii],96)]
 
-		# is the chain stuck at one point? if so, set the range equal to the prior range
+		# is the chain stuck at one point? if so, set the range equal to param*0.8,param*1.2
 		# else check if we butting up against the prior? if so, extend by 10%
 		priors = [f['prior_args'] for f in sample_results['model'].config_list if f['name'] == parnames[ii]]
 
@@ -278,7 +285,7 @@ def return_extent(sample_results):
 			maxi = priors['maxi']
 
 		if extent[0] == extent[1]:
-			extent = (mini,maxi)
+			extent = (extent[0]*0.8,extent[0]*1.2)
 		else:
 			extend = (extent[1]-extent[0])*0.12
 			if np.abs(0.5*(mini-extent[0])/(mini+extent[0])) < 1e-4:
@@ -358,10 +365,10 @@ def show_chain(sample_results,outname=None,alpha=0.6,truths=None):
 		else:
 			axarr[jj+1,ii].set_yticklabels([])
 
-		testable = np.isfinite(sample_results['lnprobability'])
-		max = np.amax(sample_results['lnprobability'][testable])
-		stddev = np.std(sample_results['lnprobability'][testable])
-		axarr[jj+1,ii].set_ylim(max-4*stddev, max)
+		finite = np.isfinite(sample_results['lnprobability'])
+		max = np.max(sample_results['lnprobability'][finite])
+		min = np.percentile(sample_results['lnprobability'][finite],10)
+		axarr[jj+1,ii].set_ylim(min, max+np.abs(max)*0.2)
 		
 		axarr[jj+1,ii].yaxis.get_major_ticks()[0].label1On = False # turn off bottom ticklabel
 
@@ -544,11 +551,10 @@ def sed_figure(sample_results, sps, model,
 		ancildat = threed_dutils.load_ancil_data(os.getenv('APPS')+'/threedh'+sample_results['run_params']['ancilname'].split('/threedh')[1],sample_results['run_params']['objname'])
 		sn_txt = ancildat['sn_F160W'][0]
 		uvj_txt = ancildat['uvj_flag'][0]
-		z_txt = sample_results['model'].params['zred'][0]
 	else:
 		sn_txt = -99.0
 		uvj_txt = -99.0
-		z_txt = -99.0
+	z_txt = sample_results['model'].params['zred'][0]
 
 	# FAST text
 	if fast:

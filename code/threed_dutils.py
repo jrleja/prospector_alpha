@@ -156,15 +156,64 @@ def synthetic_emlines(mass,sfr,dust1,dust2,dust_index):
 	          'flux': flux}
 	return output
 
+def sfh_half_time(x,sfh_params,c):
+
+	'''
+	wrapper for use with halfmass assembly time
+	'''
+
+	return integrate_sfh(sfh_params['sf_start'],x,sfh_params)-c
+
+def halfmass_assembly_time(sfh_params,tuniv):
+
+	from scipy.optimize import brentq
+
+	# calculate half-mass assembly time
+	# c = 0.5 if half-mass assembly time occurs before burst
+	half_time = brentq(sfh_half_time, 0,14,
+                       args=(sfh_params,0.5),
+                       rtol=1.48e-08, maxiter=100)
+
+	return tuniv-half_time
+
+def calculate_sfr(sfh_params, timescale, tcalc = None, minsfr = None, maxsfr = None):
+
+	'''
+	standardized SFR calculator. returns SFR averaged over timescale.
+
+	SFH_PARAMS: standard input
+	TIMESCALE: timescale over which to calculate SFR. timescale must be in Gyr.
+	TCALC: at what point in the SFH do we want the SFR? If not specified, TCALC is set to sfh_params['tage']
+	MINSFR: minimum returned SFR. if not specified, minimum is 0.01% of average SFR over lifetime
+	MAXSFR: maximum returned SFR. if not specified, maximum is infinite.
+
+	returns in [Msun/yr]
+
+	'''
+
+	if tcalc is None:
+		tcalc = sfh_params['tage']
+
+	sfr=integrate_sfh(tcalc-timescale,
+		              tcalc,
+		              sfh_params)*np.sum(sfh_params['mass'])/(timescale*1e9)
+
+	if minsfr is None:
+		minsfr = np.sum(sfh_params['mass']) / (sfh_params['tage']*1e9*10000)
+
+	if maxsfr is None:
+		maxsfr = np.inf
+
+	sfr = np.clip(sfr, minsfr, maxsfr)
+
+	return sfr
+
 def load_truths(truthname,objname,sample_results):
 
 	'''
 	loads truths
 	generates plotvalues
 	'''
-
-	# number of extra parameters
-	nextra = 2
 
 	# load truths
 	with open(truthname, 'r') as f:
@@ -175,14 +224,17 @@ def load_truths(truthname,objname,sample_results):
 	truths = np.array([x for x in truth[int(objname)-1]])
 	parnames = np.array(hdr)
 
-	# create totmass and totsfr        
+	#### define extra parameters ####
+	# mass      
 	mass = truths[np.array([True if 'mass' in x else False for x in parnames])]
 	totmass = np.log10(np.sum(mass))
 
-	# sfh params
+	# SFH parameters
 	sfh_params = find_sfh_params(sample_results['model'],truths)
 	deltat=0.1
-	totsfr=np.log10(integrate_sfh(sfh_params['tage']-deltat,sfh_params['tage'],sfh_params)*np.sum(sfh_params['mass'])/(deltat*1e9))
+	sfr_100  = np.log10(calculate_sfr(sfh_params,deltat))
+	ssfr_100 = np.log10(calculate_sfr(sfh_params,deltat) / 10**totmass)
+	halftime = halfmass_assembly_time(sfh_params,sfh_params['tage'])
 
 	# convert truths to plotting parameters
 	plot_truths = truths+0.0
@@ -201,8 +253,8 @@ def load_truths(truthname,objname,sample_results):
 	truths_dict = {'parnames':parnames,
 				   'truths':truths,
 				   'plot_truths':plot_truths,
-				   'extra_parnames':np.array(['totmass','totsfr']),
-				   'extra_truths':np.array([totmass,totsfr]),
+				   'extra_parnames':np.array(['totmass','sfr_100','half_time','ssfr_100']),
+				   'extra_truths':np.array([totmass,sfr_100,halftime,ssfr_100]),
 				   'sfh_params': sfh_params}
 	return truths_dict
 
@@ -581,7 +633,15 @@ def integrate_delayed_tau(t1,t2,sfh):
 
 def integrate_linramp(t1,t2,sfh):
 
-	c = (sfh['sf_trunc']-sfh['sf_start'])*(np.exp(-(sfh['sf_trunc']-sfh['sf_start'])/sfh['tau'])-sfh['sf_theta'])
+	# integration constant: SFR(sf_trunc-sf_start)
+	c = (sfh['sf_trunc']-sfh['sf_start'])*(np.exp(-(sfh['sf_trunc']-sfh['sf_start'])/sfh['tau'])-np.tan(sfh['sf_theta']))
+
+	# enforce positive SFRs
+	# by limiting integration to where SFR > 0
+	t_zero_cross = -c/np.tan(sfh['sf_theta'])
+	t1           = np.clip(t1,-np.inf,t_zero_cross)
+	t2           = np.clip(t2,-np.inf,t_zero_cross)
+
 	return t2*(0.5*t2*np.tan(sfh['sf_theta'])+c)-t1*(0.5*t1*np.tan(sfh['sf_theta'])+c)
 
 # tests
@@ -650,7 +710,6 @@ def integrate_sfh(t1,t2,sfh_params,fsps_sfh5 = False):
 		# by-hand calculation
 		norm1 = integrate_delayed_tau(0,sfh['sf_trunc']-sfh['sf_start'],sfh)
 		norm2 = integrate_linramp(sfh['sf_trunc']-sfh['sf_start'],sfh['tage']-sfh['sf_start'],sfh)
-		
 		if (t1 < sfh['sf_trunc']-sfh['sf_start']) and \
 		   (t2 < sfh['sf_trunc']-sfh['sf_start']):
 			intsfr = integrate_delayed_tau(t1,t2,sfh) / (norm1+norm2)

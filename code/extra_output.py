@@ -3,20 +3,16 @@ import os, threed_dutils, triangle, threedhst_diag, pickle, sys
 import numpy as np
 import matplotlib.pyplot as plt
 from astropy.cosmology import WMAP9
-from scipy.optimize import brentq
 from copy import copy
 from astropy import constants
 
-def calc_emp_ha(sfh_params,dust2,dustindex,ncomp=1):
+def calc_emp_ha(mass,sfr,dust2,dustindex,ncomp=1):
 
 	ha_flux=0.0
 	oiii_flux=0.0
 	for kk in xrange(ncomp):
-		sfr = threed_dutils.integrate_sfh(sfh_params['tage'][kk]-0.1,
-			                              sfh_params['tage'][kk],
-			                              sfh_params)*sfh_params['mass'][kk]/(0.1*1e9)
-		x=threed_dutils.synthetic_emlines(sfh_params['mass'][kk],
-				                          sfr,
+		x=threed_dutils.synthetic_emlines(mass[kk],
+				                          np.atleast_1d(sfr)[kk],
 				                          0.0,
 				                          dust2[kk],
 				                          dustindex)
@@ -24,19 +20,6 @@ def calc_emp_ha(sfh_params,dust2,dustindex,ncomp=1):
 		ha_flux = ha_flux + x['flux'][x['name'] == 'Halpha']
 	
 	return ha_flux,oiii_flux
-
-def sfh_half_time(x,sfh_params,c):
-	 return threed_dutils.integrate_sfh(sfh_params['sf_start'],x,sfh_params)-c
-
-def halfmass_assembly_time(sfh_params,tuniv):
-
-	# calculate half-mass assembly time
-	# c = 0.5 if half-mass assembly time occurs before burst
-	half_time = brentq(sfh_half_time, 0,14,
-                       args=(sfh_params,0.5),
-                       rtol=1.48e-08, maxiter=100)
-
-	return tuniv-half_time
 
 def maxprob_model(sample_results,sps):
 
@@ -113,29 +96,23 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 		sfh_params = threed_dutils.find_sfh_params(sample_results['model'],flatchain[jj,:])
 
 		# calculate half-mass assembly time, sfr
-		half_time[jj] = halfmass_assembly_time(sfh_params,tuniv)
-
-		if np.sum(dust_index_index) > 0:
-			dindex = flatchain[jj,dust_index_index]
-		else:
-			dindex = None
-
-		# empirical halpha
-		emp_ha[jj],emp_oiii[jj] = calc_emp_ha(sfh_params,
-			                                  flatchain[jj,dust2_index],dindex,
-			                                  ncomp=sample_results['ncomp'])
+		half_time[jj] = threed_dutils.halfmass_assembly_time(sfh_params,tuniv)
 
 		# calculate sfr
-		sfr_10[jj] = threed_dutils.integrate_sfh(sfh_params['tage']-deltat[0],sfh_params['tage'],
-			                                     sfh_params)*np.sum(sfh_params['mass'])/(deltat[0]*1e9)
-		sfr_100[jj] = threed_dutils.integrate_sfh(sfh_params['tage']-deltat[1],sfh_params['tage'],
-			                                     sfh_params)*np.sum(sfh_params['mass'])/(deltat[1]*1e9)
-		sfr_1000[jj] = threed_dutils.integrate_sfh(sfh_params['tage']-deltat[2],sfh_params['tage'],
-			                                     sfh_params)*np.sum(sfh_params['mass'])/(deltat[2]*1e9)
+		sfr_10[jj]   = threed_dutils.calculate_sfr(sfh_params, 0.01, minsfr=None, maxsfr=None)
+		sfr_100[jj]  = threed_dutils.calculate_sfr(sfh_params, 0.1,  minsfr=None, maxsfr=None)
+		sfr_1000[jj] = threed_dutils.calculate_sfr(sfh_params, 1.0,  minsfr=None, maxsfr=None)
 
+		# calculate mass, sSFR
 		ssfr_100[jj] = sfr_100[jj] / np.sum(sfh_params['mass'])
-
 		totmass[jj] = np.sum(sfh_params['mass'])
+
+		# empirical halpha
+		emp_ha[jj],emp_oiii[jj] = calc_emp_ha(sfh_params['mass'],sfr_100[jj],
+			                                  flatchain[jj,dust2_index],flatchain[jj,dust_index_index],
+			                                  ncomp=sample_results['ncomp'])
+
+
 
 	# CALCULATE Q16,Q50,Q84 FOR VARIABLE PARAMETERS
 	ntheta = len(sample_results['initial_theta'])

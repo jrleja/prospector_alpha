@@ -1877,7 +1877,7 @@ def testsed_truthplots(runname):
 		if parnames[kk] == 'mass' or parnames[kk][:-2] == 'mass' or \
            parnames[kk] == 'tau' or parnames[kk][:-2] == 'tau' or \
            parnames[kk] == 'sf_start' or parnames[kk][:-2] == 'sf_start' or \
-           parnames[kk] == 'totsfr' or parnames[kk] == 'totmass':
+           parnames[kk] == 'sfr_100' or parnames[kk] == 'totmass':
 
 			models[:,kk,:] = np.log10(models[:,kk,:])
 			parnames[kk] = 'log('+parnames[kk]+')'
