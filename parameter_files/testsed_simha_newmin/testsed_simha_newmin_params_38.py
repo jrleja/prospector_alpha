@@ -18,7 +18,6 @@ run_params = {'verbose':True,
               'nwalkers':496,
               'nburn':[64,64,128], 
               'niter': 1200,
-              'method': 'BFGS',
               'initial_disp':0.1,
               'edge_trunc':0.3,
               'debug': False,
@@ -58,7 +57,7 @@ def load_obs_3dhst(filename, objnum, zperr=False):
 
     # extract fluxes for particular object, converting from record array to numpy array
     flux = dat[flux_fields].view(float).reshape(len(dat),-1)[obj_ind]
-    unc  = dat[unc_fields].view(float).reshape(len(dat),-1)[obj_ind]*5.0
+    unc  = dat[unc_fields].view(float).reshape(len(dat),-1)[obj_ind]*10.0
 
     # define all outputs
     wave_effective = np.array(threed_dutils.return_mwave_custom(filters))
