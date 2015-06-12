@@ -14,17 +14,13 @@ logarithmic = priors.logarithmic
 run_params = {'verbose':True,
               'outfile':os.getenv('APPS')+'/threedhst_bsfh/results/testsed_simha_newmin/testsed_simha_newmin',
               'ftol':0.5e-5, 
-              'maxfev':5000,
+              'maxfev':20,
               'nwalkers':496,
               'nburn':[64,64,128], 
               'niter': 1200,
               'initial_disp':0.1,
               'edge_trunc':0.3,
               'debug': False,
-              'mock': False,
-              'logify_spectrum': False,
-              'normalize_spectrum': False,
-              'set_init_params': None,  # DO NOT SET THIS TO TRUE SINCE TAGE == TUNIV*1.2 (fast,random)
               'min_error': 0.01,
               'abs_error': False,
               'spec': False, 
@@ -57,7 +53,7 @@ def load_obs_3dhst(filename, objnum, zperr=False):
 
     # extract fluxes for particular object, converting from record array to numpy array
     flux = dat[flux_fields].view(float).reshape(len(dat),-1)[obj_ind]
-    unc  = dat[unc_fields].view(float).reshape(len(dat),-1)[obj_ind]*10.0
+    unc  = dat[unc_fields].view(float).reshape(len(dat),-1)[obj_ind]
 
     # define all outputs
     wave_effective = np.array(threed_dutils.return_mwave_custom(filters))
@@ -123,8 +119,8 @@ class BurstyModel(sedmodel.CSPModel):
             sf_trunc = theta[start:end]
             start,end = self.theta_index['sf_start']
             sf_start = theta[start:end]
-            if (sf_trunc >= self.params['tage']) or \
-               (sf_trunc <= sf_start+0.5):
+            if (sf_trunc > self.params['tage']) or \
+               (sf_trunc < sf_start+0.5):
                 return -np.inf
 
 
@@ -180,9 +176,10 @@ model_params.append({'name': 'pmetals', 'N': 1,
 
 model_params.append({'name': 'logzsol', 'N': 1,
                         'isfree': True,
-                        'init': -0.1,
+                        'init': 0.0,
                         'init_disp': 0.2,
                         'prior_disp': True,
+                        'nuisance': 1,
                         'units': r'$\log (Z/Z_\odot)$',
                         'prior_function': tophat,
                         'prior_args': {'mini':-1.98, 'maxi':0.19}})
@@ -243,13 +240,14 @@ model_params.append({'name': 'sf_start', 'N': 1,
                         'init': 5.0,
                         'units': 'Gyr',
                         'prior_function': tophat,
-                        'prior_args': {'mini':0.0,'maxi':14.0}})
+                        'prior_args': {'mini':0.0,'maxi':14.0-0.5}})
 
 model_params.append({'name': 'sf_trunc', 'N': 1,
                         'isfree': True,
                         'reinit': False,
                         'init_disp': 0.3,
                         'prior_disp': True,
+                        'nuisance': 1,
                         'init': 6.0,
                         'units': '',
                         'prior_function': tophat,
@@ -260,7 +258,8 @@ model_params.append({'name': 'sf_theta', 'N': 1,
                         'reinit': False,
                         'init_disp': 0.6,
                         'prior_disp': True,
-                        'init': np.pi/6,
+                        'nuisance': 1,
+                        'init': 0.0,
                         'units': None,
                         'prior_function': tophat,
                         'prior_args': {'mini':-np.pi/2.0,'maxi':np.pi/3.0}})
@@ -303,6 +302,7 @@ model_params.append({'name': 'dust_index', 'N': 1,
                         'isfree': True,
                         'init': -0.7,
                         'prior_disp': True,
+                        'nuisance': 1,
                         'reinit': True,
                         'units': '',
                         'prior_function': priors.normal_clipped,
@@ -386,9 +386,14 @@ model_params.append({'name': 'phot_jitter', 'N': 1,
                         'isfree': False,
                         'init': 0.0,
                         'init_disp': 0.5,
+                        'nuisance': 2,
                         'units': 'fractional maggies (mags/1.086)',
                         'prior_function':tophat,
-                        'prior_args': {'mini':0.0, 'maxi':0.5}})
+                        'prior_args': {'mini':5.0, 'maxi':5.0}})
+
+# reset sf_trunc to be equal to tage
+parmlist = [p['name'] for p in model_params]
+model_params[parmlist.index('sf_trunc')]['init'] = model_params[parmlist.index('tage')]['init']
 
 # name outfile
 run_params['outfile'] = run_params['outfile']+'_'+run_params['objname']
