@@ -662,8 +662,9 @@ def integrate_linramp(t1,t2,sfh):
 	# enforce positive SFRs
 	# by limiting integration to where SFR > 0
 	t_zero_cross = -c/np.tan(sfh['sf_theta'])
-	t1           = np.clip(t1,-np.inf,t_zero_cross)
-	t2           = np.clip(t2,-np.inf,t_zero_cross)
+	if t_zero_cross > sfh['sf_trunc']:
+		t1           = np.clip(t1,sfh['sf_trunc'],t_zero_cross)
+		t2           = np.clip(t2,sfh['sf_trunc'],t_zero_cross)
 
 	return t2*(0.5*t2*np.tan(sfh['sf_theta'])+c)-t1*(0.5*t1*np.tan(sfh['sf_theta'])+c)
 
@@ -727,7 +728,7 @@ def integrate_sfh(t1,t2,sfh_params,fsps_sfh5 = False):
 		   (t2 < sfh['sf_trunc']-sfh['sf_start']):
 			intsfr = integrate_delayed_tau(t1,t2,sfh) / (norm1+norm2)
 		elif (t1 > sfh['sf_trunc']-sfh['sf_start']) and \
-		        (t2 > sfh['sf_trunc']-sfh['sf_start']):
+		     (t2 > sfh['sf_trunc']-sfh['sf_start']):
 			intsfr = integrate_linramp(t1,t2,sfh) / (norm1+norm2)
 		else:
 			intsfr = (integrate_delayed_tau(t1,sfh['sf_trunc']-sfh['sf_start'],sfh) + \
