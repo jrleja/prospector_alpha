@@ -9,7 +9,7 @@ from bsfh.likelihood import LikelihoodFunction
 
 def find_sfh_params(model,theta):
 
-	str_sfh_parms = ['mass','tau','sf_start','tage','sf_trunc','sf_theta']
+	str_sfh_parms = ['sfh','mass','tau','sf_start','tage','sf_trunc','sf_theta']
 	parnames = model.theta_labels()
 	sfh_out = []
 
@@ -20,7 +20,7 @@ def find_sfh_params(model,theta):
 
 		# if not found, look in fixed parameters
 		if np.sum(index) == 0:
-			sfh_out.append(model.params[string])
+			sfh_out.append(np.atleast_1d(model.params.get(string,0.0)))
 		else:
 			sfh_out.append(theta[index])
 
@@ -170,9 +170,19 @@ def halfmass_assembly_time(sfh_params,tuniv):
 
 	# calculate half-mass assembly time
 	# c = 0.5 if half-mass assembly time occurs before burst
-	half_time = brentq(sfh_half_time, 0,14,
-                       args=(sfh_params,0.5),
-                       rtol=1.48e-08, maxiter=100)
+	try:
+		half_time = brentq(sfh_half_time, 0,14,
+	                       args=(sfh_params,0.5),
+	                       rtol=1.48e-08, maxiter=100)
+	except ValueError:
+		
+		# make error only pop up once
+		import warnings
+		warnings.simplefilter('once', UserWarning)
+
+		# big problem
+		warnings.warn("You've passed SFH parameters that don't allow t_half to be calculated. Check for bugs.", UserWarning)
+		half_time = np.nan
 
 	return tuniv-half_time
 
@@ -293,6 +303,19 @@ def generate_basenames(runname):
 
 		for jj in xrange(ngals):
 			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+basename+'_'+ids[jj])
+			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
+
+	elif 'simha' in runname:
+
+		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/testsed_simha.ids"
+		ids = np.loadtxt(id_list, dtype='|S20')
+		ngals = len(ids)
+
+		parm_basename = runname+"_params"
+		ancilname=None
+
+		for jj in xrange(ngals):
+			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+runname+'_'+ids[jj])
 			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
 
 	else:
@@ -644,25 +667,17 @@ def integrate_linramp(t1,t2,sfh):
 
 	return t2*(0.5*t2*np.tan(sfh['sf_theta'])+c)-t1*(0.5*t1*np.tan(sfh['sf_theta'])+c)
 
-# tests
-		#threed_dutils.integrate_sfh(sfh_params['sf_start'],sfh_params['sf_start'],sfh_params)
-		#threed_dutils.integrate_sfh(sfh_params['sf_start'],sfh_params['sf_trunc'],sfh_params)
-		#threed_dutils.integrate_sfh(sfh_params['sf_start']+0.5,sfh_params['sf_start']-0.5,sfh_params)
-		#threed_dutils.integrate_sfh(sfh_params['sf_start']+3.5,sfh_params['sf_start']+4.5,sfh_params)
-		#threed_dutils.integrate_sfh(sfh_params['sf_start'],sfh_params['tage'],sfh_params)
-
 def integrate_sfh(t1,t2,sfh_params,fsps_sfh5 = False):
 	
 	'''
 	integrate a delayed tau SFH from t1 to t2
 	sfh = dictionary of SFH parameters
-	ASK CHARLIE: functional form correct?
 	'''
 
 	# copy over so we don't overwrite values
 	sfh = sfh_params.copy()
 
-	# here is our coordinate transformation, confusing but matches fsps
+	# here is our coordinate transformation to match fsps
 	t1 = t1-sfh['sf_start']
 	t2 = t2-sfh['sf_start']
 
@@ -676,26 +691,22 @@ def integrate_sfh(t1,t2,sfh_params,fsps_sfh5 = False):
 	# redefine sf_trunc, if not being used for sfh=5 purposes
 	if sfh['sf_trunc'] == 0.0:
 		sfh['sf_trunc'] = sfh['tage']
-		print sfh['sf_trunc']
 
 	# if we're outside of the time boundaries, clip to boundary values
 	# this only affects integrals which would have been questionable in the first place
 	t1 = np.clip(t1,0,sfh['tage']-sfh['sf_start'])
 	t2 = np.clip(t2,0,sfh['tage']-sfh['sf_start'])
 
-  	# if we've reset sf_trunc (i.e., sfh != 5)
-  	if sfh['sf_trunc'] == sfh['tage']:
+  	# if we're using a simple delayed tau
+  	if (sfh['sfh'] == 1) or (sfh['sfh'] == 4):
 
   			# add tau model
-			intsfr =  integrate_delayed_tau(t1,t2,tau)
+			intsfr =  integrate_delayed_tau(t1,t2,sfh)
 			norm =    1.0- np.exp(-(sfh['sf_trunc']-sfh['sf_start'])/sfh['tau'])*(1+(sfh['sf_trunc']-sfh['sf_start'])/sfh['tau'])
 			intsfr = intsfr/(norm*sfh['tau']**2)
 
-			# edge case
-			if t1 > sfh['tage']:
-				intsfr = 0.0
-
-	elif fsps_sfh5 == True:
+	# FSPS implementation of SFH = 5
+	elif (sfh['sfh'] == 5) and (fsps_sfh5 == True):
 		# sfh = 5
 		if (t2+sfh['sf_start'] < sfh['sf_trunc']):
 			intsfr = (np.exp(-t1/sfh['tau'])*(1+t1/sfh['tau']) - \
@@ -703,13 +714,15 @@ def integrate_sfh(t1,t2,sfh_params,fsps_sfh5 = False):
 		else:
 			intsfr = np.tan(sfh['sf_theta'])* \
 					 (0.5*(t2**2-t1**2)-(t2-t1)*(sfh['sf_trunc']-sfh['sf_start']))
-		intsfr = np.clip(intsfr,0,np.inf)
+		intsfr = np.clip(intsfr,0,np.inf)/1e10
 
-	else:
+
+	elif (sfh['sfh'] == 5) and (fsps_sfh5 == False):
 
 		# by-hand calculation
 		norm1 = integrate_delayed_tau(0,sfh['sf_trunc']-sfh['sf_start'],sfh)
 		norm2 = integrate_linramp(sfh['sf_trunc']-sfh['sf_start'],sfh['tage']-sfh['sf_start'],sfh)
+
 		if (t1 < sfh['sf_trunc']-sfh['sf_start']) and \
 		   (t2 < sfh['sf_trunc']-sfh['sf_start']):
 			intsfr = integrate_delayed_tau(t1,t2,sfh) / (norm1+norm2)
@@ -721,9 +734,12 @@ def integrate_sfh(t1,t2,sfh_params,fsps_sfh5 = False):
 				      integrate_linramp(sfh['sf_trunc']-sfh['sf_start'],t2,sfh)) / \
                       (norm1+norm2)
 
+	else:
+		print 'no such SFH implemented'
+		print 1/0
 
 	# return sum of SFR components
-	tot_sfr = np.sum(intsfr*sfh['mass'])/np.sum(sfh['mass']		)
+	tot_sfr = np.sum(intsfr*sfh['mass'])/np.sum(sfh['mass'])
 	return tot_sfr
 
 def measure_emline_lum(sps, model = None, obs = None, thetas = None, measure_ir = False, saveplot = False):
