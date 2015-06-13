@@ -706,19 +706,8 @@ def integrate_sfh(t1,t2,sfh_params,fsps_sfh5 = False):
 			norm =    1.0- np.exp(-(sfh['sf_trunc']-sfh['sf_start'])/sfh['tau'])*(1+(sfh['sf_trunc']-sfh['sf_start'])/sfh['tau'])
 			intsfr = intsfr/(norm*sfh['tau']**2)
 
-	# FSPS implementation of SFH = 5
-	elif (sfh['sfh'] == 5) and (fsps_sfh5 == True):
-		# sfh = 5
-		if (t2+sfh['sf_start'] < sfh['sf_trunc']):
-			intsfr = (np.exp(-t1/sfh['tau'])*(1+t1/sfh['tau']) - \
-	          		  np.exp(-t2/sfh['tau'])*(1+t2/sfh['tau'])) * sfh['tau']**2
-		else:
-			intsfr = np.tan(sfh['sf_theta'])* \
-					 (0.5*(t2**2-t1**2)-(t2-t1)*(sfh['sf_trunc']-sfh['sf_start']))
-		intsfr = np.clip(intsfr,0,np.inf)/1e10
-
-
-	elif (sfh['sfh'] == 5) and (fsps_sfh5 == False):
+	# else, add lin-ramp
+	elif (sfh['sfh'] == 5):
 
 		# by-hand calculation
 		norm1 = integrate_delayed_tau(0,sfh['sf_trunc']-sfh['sf_start'],sfh)
