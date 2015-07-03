@@ -272,7 +272,7 @@ def build_sample_test(basename,outname=None,add_zp_err=False):
 				min = testparms[:,parnames == 'sf_start']+0.5
 				for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): testparms[kk,ii] = random.random()*(max-min[kk])+min[kk]
 
-			elif parname_strip(parnames[ii]) == 'sf_theta':
+			elif parname_strip(parnames[ii]) == 'sf_slope':
 				min,max = return_bounds(parnames[ii],model,ii,test_sfhs=test_sfhs[jj])
 				for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): testparms[kk,ii] = random.random()*(max-min)+min
 

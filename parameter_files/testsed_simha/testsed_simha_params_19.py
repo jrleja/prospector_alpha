@@ -255,15 +255,15 @@ model_params.append({'name': 'sf_trunc', 'N': 1,
                         'prior_function': tophat,
                         'prior_args': {'mini':1.0, 'maxi':14.0}})
 
-model_params.append({'name': 'sf_theta', 'N': 1,
+model_params.append({'name': 'sf_slope', 'N': 1,
                         'isfree': True,
                         'reinit': False,
                         'init_disp': 0.6,
                         'prior_disp': True,
-                        'init': np.pi/6,
+                        'init': 0.0,
                         'units': None,
                         'prior_function': tophat,
-                        'prior_args': {'mini':-np.pi/2.0,'maxi':np.pi/3.0}})
+                        'prior_args': {'mini':-10,'maxi':2.0}})
 
 ########    IMF  ##############
 model_params.append({'name': 'imf_type', 'N': 1,
