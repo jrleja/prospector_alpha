@@ -215,7 +215,7 @@ def build_sample_test(basename,outname=None,add_zp_err=False):
 	#### basic parameters ####
 	ngals_per_model     = 60
 	noise               = 0.00            # perturb fluxes
-	reported_noise      = 0.01            # reported noise
+	reported_noise      = 0.05            # reported noise
 	test_sfhs           = [1,2,3,4,5]     # which test sfhs to use?
 	test_sfhs           = [0]
 	ntest               = len(test_sfhs)

@@ -9,7 +9,7 @@ from bsfh.likelihood import LikelihoodFunction
 
 def find_sfh_params(model,theta):
 
-	str_sfh_parms = ['sfh','mass','tau','sf_start','tage','sf_trunc','sf_theta']
+	str_sfh_parms = ['sfh','mass','tau','sf_start','tage','sf_trunc','sf_slope']
 	parnames = model.theta_labels()
 	sfh_out = []
 
@@ -657,16 +657,16 @@ def integrate_delayed_tau(t1,t2,sfh):
 def integrate_linramp(t1,t2,sfh):
 
 	# integration constant: SFR(sf_trunc-sf_start)
-	c = (sfh['sf_trunc']-sfh['sf_start'])*(np.exp(-(sfh['sf_trunc']-sfh['sf_start'])/sfh['tau'])-np.tan(sfh['sf_theta']))
+	c = (sfh['sf_trunc']-sfh['sf_start'])*(np.exp(-(sfh['sf_trunc']-sfh['sf_start'])/sfh['tau'])-np.tan(sfh['sf_slope']))
 
 	# enforce positive SFRs
 	# by limiting integration to where SFR > 0
-	t_zero_cross = -c/np.tan(sfh['sf_theta'])
+	t_zero_cross = -c/sfh['sf_slope']
 	if t_zero_cross > sfh['sf_trunc']:
 		t1           = np.clip(t1,sfh['sf_trunc'],t_zero_cross)
 		t2           = np.clip(t2,sfh['sf_trunc'],t_zero_cross)
 
-	return t2*(0.5*t2*np.tan(sfh['sf_theta'])+c)-t1*(0.5*t1*np.tan(sfh['sf_theta'])+c)
+	return t2*(0.5*t2*sfh['sf_slope']+c)-t1*(0.5*t1*sfh['sf_slope']+c)
 
 def integrate_sfh(t1,t2,sfh_params,fsps_sfh5 = False):
 	
