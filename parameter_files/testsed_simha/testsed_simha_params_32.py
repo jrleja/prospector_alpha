@@ -390,5 +390,11 @@ model_params.append({'name': 'phot_jitter', 'N': 1,
                         'prior_function':tophat,
                         'prior_args': {'mini':0.0, 'maxi':0.5}})
 
+# restrict sf_trunc to be less than tage,
+# and set initial to just less than that value
+parmlist = [p['name'] for p in model_params]
+model_params[parmlist.index('sf_trunc')]['prior_args']['maxi'] = model_params[parmlist.index('tage')]['init']-0.01
+model_params[parmlist.index('sf_trunc')]['init'] = model_params[parmlist.index('tage')]['init']-0.02
+
 # name outfile
 run_params['outfile'] = run_params['outfile']+'_'+run_params['objname']
