@@ -29,7 +29,7 @@ def find_sfh_params(model,theta):
 
 	return out
 
-def test_likelihood(param_file=None, sps=None, model=None, obs=None, thetas=None):
+def test_likelihood(param_file=None, sps=None, model=None, obs=None, thetas=None, verbose=False):
 
 	'''
 	skeleton:
@@ -73,6 +73,12 @@ def test_likelihood(param_file=None, sps=None, model=None, obs=None, thetas=None
 	mu, phot, x = model.mean_model(thetas, obs, sps = sps)
 	lnp_phot = likefn.lnlike_phot(phot, obs=obs, gp=gp_phot)
 	lnp_prior = model.prior_product(thetas)
+
+	if verbose:
+		print 'photometry:'
+		print phot
+		print 'phot likelihood, prior likelihood'
+		print lnp_phot,lnp_prior
 
 	return lnp_phot + lnp_prior
 
