@@ -39,7 +39,7 @@ def test_likelihood(param_file=None, sps=None, model=None, obs=None, thetas=None
 	'''
 
 	if param_file is None:
-		param_file = os.getenv('APPS')+'/threedhst_bsfh/parameter_files/dtau_intmet/dtau_intmet_params_66.py'
+		param_file = os.getenv('APPS')+'/threedhst_bsfh/parameter_files/testsed_simha/testsed_simha_params.py'
 
 	if sps is None:
 		# load stellar population, set up custom filters
