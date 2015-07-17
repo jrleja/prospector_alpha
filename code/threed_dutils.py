@@ -246,18 +246,24 @@ def load_truths(truthname,objname,sample_results):
 	totmass = np.log10(np.sum(mass))
 
 	# SFH parameters
-	sfh_params = find_sfh_params(sample_results['model'],truths)
-	deltat=0.1
-	sfr_100  = np.log10(calculate_sfr(sfh_params,deltat))
-	ssfr_100 = np.log10(calculate_sfr(sfh_params,deltat) / 10**totmass)
-	halftime = halfmass_assembly_time(sfh_params,sfh_params['tage'])
+	if sample_results is not None:
+		sfh_params = find_sfh_params(sample_results['model'],truths)
+		deltat=0.1
+		sfr_100  = np.log10(calculate_sfr(sfh_params,deltat))
+		ssfr_100 = np.log10(calculate_sfr(sfh_params,deltat) / 10**totmass)
+		halftime = halfmass_assembly_time(sfh_params,sfh_params['tage'])
+	else:
+		sfh_params = None
+		sfr_100 = None
+		ssfr_100 = None
+		halftime = None
 
 	# convert truths to plotting parameters
 	plot_truths = truths+0.0
 	for kk in xrange(len(parnames)):
 		# reset age
-		if parnames[kk] == 'sf_start' or parnames[kk][:-2] == 'sf_start':
-			plot_truths[kk] = sample_results['model'].params['tage'][0]-plot_truths[kk]
+		#if parnames[kk] == 'sf_start' or parnames[kk][:-2] == 'sf_start':
+		#	plot_truths[kk] = sample_results['model'].params['tage'][0]-plot_truths[kk]
 
 		# log parameters
 		if parnames[kk] == 'mass' or parnames[kk][:-2] == 'mass' or \
