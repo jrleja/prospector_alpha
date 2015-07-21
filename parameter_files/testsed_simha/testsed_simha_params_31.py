@@ -19,12 +19,7 @@ run_params = {'verbose':True,
               'nburn':[64,64,128], 
               'niter': 1200,
               'initial_disp':0.1,
-              'edge_trunc':0.3,
               'debug': False,
-              'mock': False,
-              'logify_spectrum': False,
-              'normalize_spectrum': False,
-              'set_init_params': None,  # DO NOT SET THIS TO TRUE SINCE TAGE == TUNIV*1.2 (fast,random)
               'min_error': 0.01,
               'abs_error': False,
               'spec': False, 
@@ -123,8 +118,8 @@ class BurstyModel(sedmodel.CSPModel):
             sf_trunc = theta[start:end]
             start,end = self.theta_index['sf_start']
             sf_start = theta[start:end]
-            if (sf_trunc >= self.params['tage']) or \
-               (sf_trunc <= sf_start+1.0):
+            if (sf_trunc > self.params['tage']) or \
+               (sf_trunc < sf_start+1.0):
                 return -np.inf
 
 
@@ -168,7 +163,7 @@ model_params.append({'name': 'mass', 'N': 1,
                         'init': 1e10,
                         'init_disp': 0.4,
                         'units': r'M_\odot',
-                        'prior_function': logarithmic,
+                        'prior_function': tophat,
                         'prior_args': {'mini':1e7,'maxi':1e14}})
 
 model_params.append({'name': 'pmetals', 'N': 1,
@@ -182,7 +177,6 @@ model_params.append({'name': 'logzsol', 'N': 1,
                         'isfree': True,
                         'init': -0.1,
                         'init_disp': 0.2,
-                        'prior_disp': True,
                         'units': r'$\log (Z/Z_\odot)$',
                         'prior_function': tophat,
                         'prior_args': {'mini':-1.98, 'maxi':0.19}})
@@ -198,8 +192,7 @@ model_params.append({'name': 'sfh', 'N': 1,
 model_params.append({'name': 'tau', 'N': 1,
                         'isfree': True,
                         'init': 1.0,
-                        'init_disp': 0.1,
-                        'prior_disp': True,
+                        'init_disp': 0.2,
                         'units': 'Gyr',
                         'prior_function':logarithmic,
                         'prior_args': {'mini':0.1,
@@ -237,19 +230,15 @@ model_params.append({'name': 'fconst', 'N': 1,
 
 model_params.append({'name': 'sf_start', 'N': 1,
                         'isfree': True,
-                        'reinit': True,
-                        'init_disp': 0.5,
-                        'prior_disp': True,
+                        'init_disp': 0.3,
                         'init': 5.0,
                         'units': 'Gyr',
                         'prior_function': tophat,
-                        'prior_args': {'mini':0.0,'maxi':14.0}})
+                        'prior_args': {'mini':0.0,'maxi':13.0}})
 
 model_params.append({'name': 'sf_trunc', 'N': 1,
                         'isfree': True,
-                        'reinit': False,
-                        'init_disp': 0.3,
-                        'prior_disp': True,
+                        'init_disp': 0.4,
                         'init': 6.0,
                         'units': '',
                         'prior_function': tophat,
@@ -257,13 +246,11 @@ model_params.append({'name': 'sf_trunc', 'N': 1,
 
 model_params.append({'name': 'sf_slope', 'N': 1,
                         'isfree': True,
-                        'reinit': False,
-                        'init_disp': 0.6,
-                        'prior_disp': True,
-                        'init': 0.0,
+                        'init_disp': 0.4,
+                        'init': -1.0,
                         'units': None,
                         'prior_function': tophat,
-                        'prior_args': {'mini':-10,'maxi':2.0}})
+                        'prior_args': {'mini':-10.0,'maxi':2.0}})
 
 ########    IMF  ##############
 model_params.append({'name': 'imf_type', 'N': 1,
@@ -292,8 +279,6 @@ model_params.append({'name': 'dust1', 'N': 1,
 model_params.append({'name': 'dust2', 'N': 1,
                         'isfree': True,
                         'init': 1.0,
-                        'reinit': True,
-                        'prior_disp': True,
                         'init_disp': 0.1,
                         'units': '',
                         'prior_function': tophat,
@@ -302,8 +287,6 @@ model_params.append({'name': 'dust2', 'N': 1,
 model_params.append({'name': 'dust_index', 'N': 1,
                         'isfree': True,
                         'init': -0.7,
-                        'prior_disp': True,
-                        'reinit': True,
                         'units': '',
                         'prior_function': priors.normal_clipped,
                         'prior_args': {'mini':-3.0, 'maxi': -0.4,'mean':-0.7,'sigma':0.5}})

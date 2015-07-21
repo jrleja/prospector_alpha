@@ -12,7 +12,7 @@ logarithmic = priors.logarithmic
 #############
 
 run_params = {'verbose':True,
-              'outfile':os.getenv('APPS')+'/threedhst_bsfh/results/testsed_simha/testsed_simha_truth',
+              'outfile':os.getenv('APPS')+'/threedhst_bsfh/results/testsed_simha_truth/testsed_simha_truth',
               'ftol':0.5e-5, 
               'maxfev':5000,
               'nwalkers':496,
