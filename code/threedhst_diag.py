@@ -645,7 +645,7 @@ def sed_figure(sample_results, sps, model,
 		plt.close()
 	#os.system('open '+outname)
 
-def make_all_plots(filebase=None, parm_file=None, 
+def make_all_plots(filebase=None,
 				   outfolder=os.getenv('APPS')+'/threedhst_bsfh/plots/',
 				   sample_results=None,
 				   sps=None):
@@ -670,22 +670,30 @@ def make_all_plots(filebase=None, parm_file=None,
 	files = [f for f in os.listdir(folder) if "_".join(f.split('_')[:-2]) == filename]	
 	times = [f.split('_')[-2] for f in files]
 
+	# if we found no files, skip this object
+	if len(times) == 0:
+		print 'Failed to find any files to extract times in ' + folder + ' of form ' + filename
+		return 0
+
+	# load results
+	mcmc_filename=filebase+'_'+max(times)+"_mcmc"
+	model_filename=filebase+'_'+max(times)+"_model"
+
+	# load if necessary
 	if not sample_results:
-		# if we found no files, skip this object
-		if len(times) == 0:
-			print 'Failed to find any files to extract times in ' + folder + ' of form ' + filename
-			return 0
-
-		# load results
-		mcmc_filename=filebase+'_'+max(times)+"_mcmc"
-		model_filename=filebase+'_'+max(times)+"_model"
-
 		try:
 			sample_results, powell_results, model = read_results.read_pickles(mcmc_filename, model_file=model_filename,inmod=None)
 		except (EOFError,ValueError) as e:
 			print e
 			print 'Failed to open '+ mcmc_filename +','+model_filename
 			return 0
+	else:
+		try:
+            mf = pickle.load( open(model_filename, 'rb'))
+        except(AttributeError):
+            mf = load( open(model_filename, 'rb'))
+       
+        powell_results = mf['powell']
 
 	if not sps:
 		# load stellar population, set up custom filters
@@ -759,12 +767,11 @@ def plot_all_driver():
 	#runname = 'dtau_ha_zperr'
 	runname = 'dtau_ha_plog'
 	runname = 'testsed_nonoise_fast'
-	runname = 'testsed_simha_truth'
+	runname = 'testsed_simha_newmin'
 
 	filebase, parm_basename, ancilname=threed_dutils.generate_basenames(runname)
 	for jj in xrange(len(filebase)):
 		print 'iteration '+str(jj) 
 		make_all_plots(filebase=filebase[jj],\
-		               parm_file=parm_basename[jj],\
 		               outfolder=os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/')
 	
