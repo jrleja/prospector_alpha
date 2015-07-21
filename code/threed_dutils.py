@@ -192,39 +192,7 @@ def halfmass_assembly_time(sfh_params,tuniv):
 
 	return tuniv-half_time
 
-def calculate_sfr(sfh_params, timescale, tcalc = None, minsfr = None, maxsfr = None):
-
-	'''
-	standardized SFR calculator. returns SFR averaged over timescale.
-
-	SFH_PARAMS: standard input
-	TIMESCALE: timescale over which to calculate SFR. timescale must be in Gyr.
-	TCALC: at what point in the SFH do we want the SFR? If not specified, TCALC is set to sfh_params['tage']
-	MINSFR: minimum returned SFR. if not specified, minimum is 0.01% of average SFR over lifetime
-	MAXSFR: maximum returned SFR. if not specified, maximum is infinite.
-
-	returns in [Msun/yr]
-
-	'''
-
-	if tcalc is None:
-		tcalc = sfh_params['tage']
-
-	sfr=integrate_sfh(tcalc-timescale,
-		              tcalc,
-		              sfh_params)*np.sum(sfh_params['mass'])/(timescale*1e9)
-
-	if minsfr is None:
-		minsfr = np.sum(sfh_params['mass']) / (sfh_params['tage']*1e9*10000)
-
-	if maxsfr is None:
-		maxsfr = np.inf
-
-	sfr = np.clip(sfr, minsfr, maxsfr)
-
-	return sfr
-
-def load_truths(truthname,objname,sample_results):
+def load_truths(truthname,objname,sample_results, sps=None):
 
 	'''
 	loads truths
@@ -252,11 +220,13 @@ def load_truths(truthname,objname,sample_results):
 		sfr_100  = np.log10(calculate_sfr(sfh_params,deltat))
 		ssfr_100 = np.log10(calculate_sfr(sfh_params,deltat) / 10**totmass)
 		halftime = halfmass_assembly_time(sfh_params,sfh_params['tage'])
+		lnprob   = test_likelihood(sps=sps,model=sample_results['model'], obs=sample_results['obs'],thetas=truths)
 	else:
 		sfh_params = None
 		sfr_100 = None
 		ssfr_100 = None
 		halftime = None
+		lnprob   = None
 
 	# convert truths to plotting parameters
 	plot_truths = truths+0.0
@@ -274,6 +244,7 @@ def load_truths(truthname,objname,sample_results):
     
 	truths_dict = {'parnames':parnames,
 				   'truths':truths,
+				   'truthprob':lnprob,
 				   'plot_truths':plot_truths,
 				   'extra_parnames':np.array(['totmass','sfr_100','half_time','ssfr_100']),
 				   'extra_truths':np.array([totmass,sfr_100,halftime,ssfr_100]),
@@ -661,6 +632,38 @@ def integrate_mag(spec_lam,spectra,filter, z=None, alt_file=None):
 	#print 'maggies: {0}'.format(10**(-0.4*mag)*1e10)
 	return mag, luminosity
 
+def calculate_sfr(sfh_params, timescale, tcalc = None, minsfr = None, maxsfr = None):
+
+	'''
+	standardized SFR calculator. returns SFR averaged over timescale.
+
+	SFH_PARAMS: standard input
+	TIMESCALE: timescale over which to calculate SFR. timescale must be in Gyr.
+	TCALC: at what point in the SFH do we want the SFR? If not specified, TCALC is set to sfh_params['tage']
+	MINSFR: minimum returned SFR. if not specified, minimum is 0.01% of average SFR over lifetime
+	MAXSFR: maximum returned SFR. if not specified, maximum is infinite.
+
+	returns in [Msun/yr]
+
+	'''
+
+	if tcalc is None:
+		tcalc = sfh_params['tage']
+
+	sfr=integrate_sfh(tcalc-timescale,
+		              tcalc,
+		              sfh_params)*np.sum(sfh_params['mass'])/(timescale*1e9)
+
+	if minsfr is None:
+		minsfr = np.sum(sfh_params['mass']) / (sfh_params['tage']*1e9*10000)
+
+	if maxsfr is None:
+		maxsfr = np.inf
+
+	sfr = np.clip(sfr, minsfr, maxsfr)
+
+	return sfr
+
 def integrate_delayed_tau(t1,t2,sfh):
 
 	return (np.exp(-t1/sfh['tau'])*(1+t1/sfh['tau']) - \
@@ -669,18 +672,18 @@ def integrate_delayed_tau(t1,t2,sfh):
 def integrate_linramp(t1,t2,sfh):
 
 	# integration constant: SFR(sf_trunc-sf_start)
-	c = (sfh['sf_trunc']-sfh['sf_start'])*(np.exp(-(sfh['sf_trunc']-sfh['sf_start'])/sfh['tau'])-np.tan(sfh['sf_slope']))
+	c = (sfh['sf_trunc']-sfh['sf_start'])*(np.exp(-(sfh['sf_trunc']-sfh['sf_start'])/sfh['tau'])-sfh['sf_slope'])
 
 	# enforce positive SFRs
 	# by limiting integration to where SFR > 0
 	t_zero_cross = -c/sfh['sf_slope']
-	if t_zero_cross > sfh['sf_trunc']:
-		t1           = np.clip(t1,sfh['sf_trunc'],t_zero_cross)
-		t2           = np.clip(t2,sfh['sf_trunc'],t_zero_cross)
+	if t_zero_cross > sfh['sf_trunc']-sfh['sf_start']:
+		t1           = np.clip(t1,sfh['sf_trunc']-sfh['sf_start'],t_zero_cross)
+		t2           = np.clip(t2,sfh['sf_trunc']-sfh['sf_start'],t_zero_cross)
 
 	return t2*(0.5*t2*sfh['sf_slope']+c)-t1*(0.5*t1*sfh['sf_slope']+c)
 
-def integrate_sfh(t1,t2,sfh_params,fsps_sfh5 = False):
+def integrate_sfh(t1,t2,sfh_params):
 	
 	'''
 	integrate a delayed tau SFH from t1 to t2
