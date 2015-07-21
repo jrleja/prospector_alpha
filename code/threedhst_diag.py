@@ -701,7 +701,7 @@ def make_all_plots(filebase=None, parm_file=None,
 	try:
 		truths = threed_dutils.load_truths(os.getenv('APPS')+'/threed'+sample_results['run_params']['truename'].split('/threed')[1],
 			                              sample_results['run_params']['objname'],
-			                              sample_results)
+			                              sample_results, sps=sps)
 	except KeyError:
 		truths=None
 
@@ -723,7 +723,7 @@ def make_all_plots(filebase=None, parm_file=None,
 		read_results.subtriangle(sample_results, sps, copy.deepcopy(sample_results['model']),
 							 outname=outfolder+filename+'_'+max(times),
 							 showpars=None,start=0,
-							 show_titles=True, truths=truths)
+							 show_titles=True, truths=truths, powell_results=powell_results)
 
 	# sed plot
 	if plt_sed_figure:
@@ -759,7 +759,7 @@ def plot_all_driver():
 	#runname = 'dtau_ha_zperr'
 	runname = 'dtau_ha_plog'
 	runname = 'testsed_nonoise_fast'
-	runname = 'testsed_simha'
+	runname = 'testsed_simha_truth'
 
 	filebase, parm_basename, ancilname=threed_dutils.generate_basenames(runname)
 	for jj in xrange(len(filebase)):
