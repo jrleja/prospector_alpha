@@ -688,12 +688,13 @@ def make_all_plots(filebase=None,
 			print 'Failed to open '+ mcmc_filename +','+model_filename
 			return 0
 	else:
+		import pickle
 		try:
-            mf = pickle.load( open(model_filename, 'rb'))
-        except(AttributeError):
-            mf = load( open(model_filename, 'rb'))
+			mf = pickle.load( open(model_filename, 'rb'))
+		except(AttributeError):
+			mf = load( open(model_filename, 'rb'))
        
-        powell_results = mf['powell']
+		powell_results = mf['powell']
 
 	if not sps:
 		# load stellar population, set up custom filters
@@ -767,7 +768,7 @@ def plot_all_driver():
 	#runname = 'dtau_ha_zperr'
 	runname = 'dtau_ha_plog'
 	runname = 'testsed_nonoise_fast'
-	runname = 'testsed_simha_newmin'
+	runname = 'testsed_simha'
 
 	filebase, parm_basename, ancilname=threed_dutils.generate_basenames(runname)
 	for jj in xrange(len(filebase)):

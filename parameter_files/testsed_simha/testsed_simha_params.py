@@ -90,6 +90,132 @@ obs = load_obs_3dhst(run_params['photname'], run_params['objname'], zperr=False)
 
 class BurstyModel(sedmodel.CSPModel):
 	
+    def one_sed(self, component_index=0, sps=None, norm_spec=False, filterlist=[]):
+        """Get the SED of one component for a multicomponent composite
+        SFH.  Should set this up to work as an iterator.
+
+        CHANGES: added dust1, log(tau)
+
+        :param component_index:
+            Integer index of the component to calculate the SED for.
+            
+        :params sps:
+            A python-fsps StellarPopulation object to be used for
+            generating the SED.
+
+        :param filterlist:
+            A list of strings giving the (FSPS) names of the filters
+            onto which the spectrum will be projected.
+            
+        :returns spec:
+            The restframe spectrum in units of L_\odot/Hz.
+            
+        :returns maggies:
+            Broadband fluxes through the filters named in
+            ``filterlist``, ndarray.  Units are observed frame
+            absolute maggies: M = -2.5 * log_{10}(maggies).
+            
+        :returns extra:
+            The extra information corresponding to this component.
+        """
+        # Pass the model parameters through to the sps object,
+        # and keep track of the mass of this component
+        mass = 1.0
+        for k, vs in self.params.iteritems():
+            try:
+                v = vs[component_index]
+                #n_param_is_vec += 1
+            except(IndexError, TypeError):
+                v = vs
+            if k in sps.params.all_params:
+                if k == 'zmet':
+                    vv = np.abs(v - (np.arange( len(sps.zlegend))+1)).argmin()+1
+                elif k == 'dust1':
+                    # temporary! replace with smarter function soon
+                    vv = self.params['dust2']*1.86+0.0
+                elif k == 'tau':
+                    vv = 10**self.params['tau']
+                else:
+                    vv = v.copy()
+                sps.params[k] = vv
+            if k == 'mass':
+                mass = v
+        #now get the magnitudes and spectrum
+        w, spec = sps.get_spectrum(tage=sps.params['tage'], peraa=False)
+        mags = sps.get_mags(tage=sps.params['tage'],
+                            bands=filterlist)
+
+        # normalize by (current) stellar mass and get correct units (distance_modulus)
+        mass_norm = mass/sps.stellar_mass
+
+        return (mass_norm * spec ,
+                mass_norm * 10**(-0.4*(mags)),
+                w)
+
+    def theta_disps(self, thetas, initial_disp=0.1):
+        """Get a vector of dispersions for each parameter to use in
+        generating sampler balls for emcee's Ensemble sampler.
+
+        :param initial_disp: (default: 0.1)
+            The default dispersion to use in case the `init_disp` key
+            is not provided in the parameter configuration.  This is
+            in units of the parameter, so e.g. 0.1 will result in a
+            smpler ball with a dispersion that is 10% of the central
+            parameter value.
+        """
+        disp = np.zeros(self.ndim) + initial_disp
+        for par, inds in self.theta_index.iteritems():
+            
+            # fractional dispersion
+            if par == 'mass' or \
+               par == 'tage':
+                disp[inds[0]:inds[1]] = self._config_dict[par].get('init_disp', initial_disp) * thetas[inds[0]:inds[1]]
+
+            # constant (log) dispersion
+            if par == 'tau' or \
+               par == 'metallicity' or \
+               par == 'sf_slope':
+                disp[inds[0]:inds[1]] = self._config_dict[par].get('init_disp', initial_disp)
+
+            # higher dispersion if farther in the past
+            if par == 'sf_trunc':
+                disp[inds[0]:inds[1]] = self._config_dict[par].get('init_disp', initial_disp) * \
+                                        (self._config_dict['tage']['prior_args']['maxi']-thetas[inds[0]:inds[1]])
+
+            # fractional dispersion with artificial floor
+            if par == 'dust2' or \
+               par == 'dust_index':
+                disp[inds[0]:inds[1]] = (self._config_dict[par].get('init_disp', initial_disp) * thetas[inds[0]:inds[1]]**2 + \
+                                         0.1**2)**0.5
+            
+        return disp
+
+    def theta_disp_floor(self, thetas):
+        """Get a vector of dispersions for each parameter to use as
+        a floor for the walker-calculated dispersions.
+        """
+        disp = np.zeros(self.ndim)
+        for par, inds in self.theta_index.iteritems():
+            
+            # constant 1% floor
+            if par == 'mass':
+                disp[inds[0]:inds[1]] = 0.01 * thetas[inds[0]:inds[1]]
+
+            # constant 0.05 floor (log space, sf_slope, dust_index)
+            if par == 'tau' or \
+               par == 'logzsol' or \
+               par == 'sf_slope' or \
+               par == 'dust2' or \
+               par == 'dust_index':
+                disp[inds[0]:inds[1]] = 0.05
+
+            # 100 Myr floor (SFH params)
+            if par == 'tage' or \
+               par == 'sf_trunc':
+                disp[inds[0]:inds[1]] = 0.1
+            
+        return disp
+
     def prior_product(self, theta):
         """
         Return a scalar which is the ln of the product of the prior
@@ -112,22 +238,40 @@ class BurstyModel(sedmodel.CSPModel):
             if len(np.unique(np.round(outlier_locs))) != len(outlier_locs):
                 return -np.inf
 
-        # implement sf_start < sf_trunc < tage
+        # ensure sf_trunc < tage - buffer
         if 'sf_trunc' in self.theta_index:
             start,end = self.theta_index['sf_trunc']
             sf_trunc = theta[start:end]
-            start,end = self.theta_index['sf_start']
-            sf_start = theta[start:end]
-            if (sf_trunc > self.params['tage']) or \
-               (sf_trunc < sf_start+1.0):
-                return -np.inf
+            start,end = self.theta_index['tage']
+            tage = theta[start:end]
 
+            if (sf_trunc+0.05 > tage):
+                return -np.inf
 
         for k, v in self.theta_index.iteritems():
             start, end = v
             lnp_prior += np.sum(self._config_dict[k]['prior_function']
                                 (theta[start:end], **self._config_dict[k]['prior_args']))
         return lnp_prior
+
+#### SET SFH PRIORS #####
+
+#### TUNIV #####
+#tuniv = WMAP9.age(model_params[parmlist.index('zred')]['init']).value
+tuniv  = 14.0
+time_buffer = tuniv*0.05
+run_params['tuniv']       = tuniv
+run_params['time_buffer'] = 0.05
+
+#### TAGE #####
+tage_maxi = tuniv
+tage_init = tuniv/2.
+tage_mini  = 0.11      # FSPS standard
+
+#### SF_TRUNC #####
+sf_trunc_mini  = tage_mini-run_params['time_buffer']
+sf_trunc_init = tuniv/3.
+sf_trunc_max  = tage_maxi-run_params['time_buffer']
 
 model_type = BurstyModel
 model_params = []
@@ -161,6 +305,7 @@ model_params.append({'name': 'add_agb_dust_model', 'N': 1,
 model_params.append({'name': 'mass', 'N': 1,
                         'isfree': True,
                         'init': 1e10,
+                        'init_disp': 0.15,
                         'units': r'M_\odot',
                         'prior_function': tophat,
                         'prior_args': {'mini':1e7,'maxi':1e14}})
@@ -175,6 +320,7 @@ model_params.append({'name': 'pmetals', 'N': 1,
 model_params.append({'name': 'logzsol', 'N': 1,
                         'isfree': True,
                         'init': -0.1,
+                        'init_disp': 0.15,
                         'units': r'$\log (Z/Z_\odot)$',
                         'prior_function': tophat,
                         'prior_args': {'mini':-1.98, 'maxi':0.19}})
@@ -189,18 +335,19 @@ model_params.append({'name': 'sfh', 'N': 1,
 
 model_params.append({'name': 'tau', 'N': 1,
                         'isfree': True,
-                        'init': 1.0,
-                        'units': 'Gyr',
-                        'prior_function':logarithmic,
-                        'prior_args': {'mini':0.1,
-                                       'maxi':100}})
+                        'init': 0.0,
+                        'units': 'log(Gyr)',
+                        'prior_function': tophat,
+                        'prior_args': {'mini':-1,
+                                       'maxi':2}})
 
 model_params.append({'name': 'tage', 'N': 1,
-                        'isfree': False,
-                        'init': 14.0,
+                        'isfree': True,
+                        'init': tage_init,
+                        'init_disp': 0.15,
                         'units': 'Gyr',
                         'prior_function': tophat,
-                        'prior_args': {'mini':0.1, 'maxi':14.0}})
+                        'prior_args': {'mini':tage_mini, 'maxi':tage_maxi}})
 
 model_params.append({'name': 'tburst', 'N': 1,
                         'isfree': False,
@@ -226,22 +373,24 @@ model_params.append({'name': 'fconst', 'N': 1,
                         'prior_args': {'mini':0.0, 'maxi':1.0}})
 
 model_params.append({'name': 'sf_start', 'N': 1,
-                        'isfree': True,
-                        'init': 5.0,
+                        'isfree': False,
+                        'init': 0.0,
                         'units': 'Gyr',
                         'prior_function': tophat,
-                        'prior_args': {'mini':0.0,'maxi':13.0}})
+                        'prior_args': {'mini':0.0,'maxi':14.0}})
 
 model_params.append({'name': 'sf_trunc', 'N': 1,
                         'isfree': True,
-                        'init': 6.0,
+                        'init': sf_trunc_init,
+                        'init_disp': 0.2,
                         'units': '',
                         'prior_function': tophat,
-                        'prior_args': {'mini':1.0, 'maxi':14.0}})
+                        'prior_args': {'mini':sf_trunc_mini, 'maxi':sf_trunc_max}})
 
 model_params.append({'name': 'sf_slope', 'N': 1,
                         'isfree': True,
                         'init': -1.0,
+                        'init_disp': 0.15,
                         'units': None,
                         'prior_function': tophat,
                         'prior_args': {'mini':-10.0,'maxi':2.0}})
@@ -365,12 +514,6 @@ model_params.append({'name': 'phot_jitter', 'N': 1,
                         'units': 'fractional maggies (mags/1.086)',
                         'prior_function':tophat,
                         'prior_args': {'mini':0.0, 'maxi':0.5}})
-
-# restrict sf_trunc to be less than tage,
-# and set initial to just less than that value
-parmlist = [p['name'] for p in model_params]
-model_params[parmlist.index('sf_trunc')]['prior_args']['maxi'] = model_params[parmlist.index('tage')]['init']-0.01
-model_params[parmlist.index('sf_trunc')]['init'] = model_params[parmlist.index('tage')]['init']-0.02
 
 # name outfile
 run_params['outfile'] = run_params['outfile']+'_'+run_params['objname']

@@ -497,7 +497,7 @@ def av_to_dust2(av):
 	# into opacity (fobs = fint * exp(-opacity)) [i.e, dust2]
 	#tau = -np.log(10**(-0.4*A_5500))
 	#return av
-	tau = av/1.086
+	#tau = av/1.086
 	tau = av/1.17
 	return tau
 

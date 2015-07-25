@@ -261,20 +261,23 @@ def build_sample_test(basename,outname=None,add_zp_err=False):
 					for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): testparms[kk,ii] = 10**(random.random()*(max-min)+min)
 			
 			#### generate specific SFHs if necessary ####
-			elif parname_strip(parnames[ii]) == 'sf_start':
+			elif parname_strip(parnames[ii]) == 'tage':
 				min,max = return_bounds(parnames[ii],model,ii,test_sfhs=test_sfhs[jj])
-				max=max-1.0
 				for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): testparms[kk,ii] = random.random()*(max-min)+min
 
 			#### enforce SFH priors ####
 			elif parname_strip(parnames[ii]) == 'sf_trunc':
 				min,max = return_bounds(parnames[ii],model,ii,test_sfhs=test_sfhs[jj])
-				min = testparms[:,parnames == 'sf_start']+1.0
-				for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): testparms[kk,ii] = random.random()*(max-min[kk])+min[kk]
+				max = testparms[:,parnames == 'tage']-0.05
+				for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): testparms[kk,ii] = random.random()*(max[kk]-min)+min
 
 			elif parname_strip(parnames[ii]) == 'sf_slope':
 				min,max = return_bounds(parnames[ii],model,ii,test_sfhs=test_sfhs[jj])
-				for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): testparms[kk,ii] = random.random()*(max-min)+min
+				for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): 
+					if random.random() > 0.5:
+						testparms[kk,ii] = random.random()*max
+					else:
+						testparms[kk,ii] = random.random()*np.abs(min)+min
 
 			#### tone down the dust a bit-- flat in prior means lots of Av = 2.0 galaxies ####
 			elif parname_strip(parnames[ii]) == 'dust2':
