@@ -242,7 +242,7 @@ def build_sample_test(basename,outname=None,add_zp_err=False):
 			
 			# random in logspace for mass + tau
 			# also enforce priors
-			if parname_strip(parnames[ii]) == 'mass' or parname_strip(parnames[ii]) == 'tau':
+			if parname_strip(parnames[ii]) == 'mass':
 				
 				min,max = np.log10(return_bounds(parnames[ii],model,ii,test_sfhs=test_sfhs[jj]))
 
