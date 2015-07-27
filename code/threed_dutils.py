@@ -236,8 +236,7 @@ def load_truths(truthname,objname,sample_results, sps=None):
 		#	plot_truths[kk] = sample_results['model'].params['tage'][0]-plot_truths[kk]
 
 		# log parameters
-		if parnames[kk] == 'mass' or parnames[kk][:-2] == 'mass' or \
-           parnames[kk] == 'tau' or parnames[kk][:-2] == 'tau':
+		if parnames[kk] == 'mass' or parnames[kk][:-2] == 'mass':
 
 			plot_truths[kk] = np.log10(plot_truths[kk])
 
@@ -691,7 +690,9 @@ def integrate_sfh(t1,t2,sfh_params):
 	'''
 
 	# copy over so we don't overwrite values
+	# put tau into linear units
 	sfh = sfh_params.copy()
+	sfh['tau'] = 10**sfh['tau']
 
 	# here is our coordinate transformation to match fsps
 	t1 = t1-sfh['sf_start']
@@ -713,7 +714,7 @@ def integrate_sfh(t1,t2,sfh_params):
 	t1 = np.clip(t1,0,sfh['tage']-sfh['sf_start'])
 	t2 = np.clip(t2,0,sfh['tage']-sfh['sf_start'])
 
-  	# if we're using a simple delayed tau
+  	# if we're using delayed tau
   	if (sfh['sfh'] == 1) or (sfh['sfh'] == 4):
 
   			# add tau model

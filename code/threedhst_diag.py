@@ -64,8 +64,7 @@ def add_sfh_plot(sample_results,fig,ax_loc,truths=None,fast=None):
 		ax_inset.fill_between(t, perc[:,0,0], perc[:,0,2], color='0.75')
 
 		parnames = sample_results['model'].theta_labels()
-		tage = sample_results['model'].params['tage'][0]
-		tt,pt = plot_sfh_single(truths,tage,truths['parnames'],ncomp=sample_results['ncomp'])
+		tt,pt = plot_sfh_single(truths,truths['parnames'],ncomp=sample_results['ncomp'])
 		pt = np.log10(pt)
 		#tcolors=['steelblue','maroon']
 		#for aa in xrange(sample_results.get('ncomp',2)):
@@ -74,13 +73,13 @@ def add_sfh_plot(sample_results,fig,ax_loc,truths=None,fast=None):
 		ax_inset.text(0.08,0.83, 'truth',transform = ax_inset.transAxes,color='blue',fontsize=axfontsize*1.4)
 
 	# set up plotting range
-	# this will have to be retooled once you go back to real data...
+	# this will have to be retooled once we go back to real data...
 	plotmax = np.maximum(np.max(perc[:,0,1]),np.max(pt[:,0]))
 	plotmin = np.maximum(np.min(perc[:,0,1]),np.min(pt[:,0]))
 
 	dynrange = (plotmax-plotmin)*0.1
-	axlim_sfh=[np.min(t),
-	           np.max(t)+0.08*(np.max(t)-np.min(t)),
+	axlim_sfh=[np.max(t)+0.08*(np.max(t)-np.min(t)),
+	           np.min(t),
 	           plotmin,plotmax+dynrange]
 	ax_inset.axis(axlim_sfh)
 
@@ -110,7 +109,7 @@ def plot_sfh_fast(tau,tage,mass,tuniv=None):
 
 	return t,sfr
 
-def plot_sfh_single(truths,tage,parnames,ncomp=1):
+def plot_sfh_single(truths,parnames,ncomp=1):
 
 	parnames = np.array(parnames)
 
@@ -118,7 +117,7 @@ def plot_sfh_single(truths,tage,parnames,ncomp=1):
 	nt = 50
 	intsfr = np.zeros(shape=(nt,ncomp+1))
 	deltat=0.0001
-	t=np.linspace(0,np.max(tage),num=50)
+	t=np.linspace(0,np.max(truths['sfh_params']['tage']),num=50)
 
 	for jj in xrange(nt): intsfr[jj,0] = threed_dutils.calculate_sfr(truths['sfh_params'], deltat, tcalc = t[jj])
 
@@ -127,7 +126,7 @@ def plot_sfh_single(truths,tage,parnames,ncomp=1):
 		newdict = {key: value for (key, value) in iterable}
 		for jj in xrange(nt): intsfr[jj,kk+1] = threed_dutils.calculate_sfr(newdict, deltat, tcalc = t[jj])
 
-	return t, intsfr
+	return t[::-1], intsfr
 
 def plot_sfh(sample_results,nsamp=1000,ncomp=1):
 
@@ -175,9 +174,9 @@ def plot_sfh(sample_results,nsamp=1000,ncomp=1):
 	#if (np.abs(intsfr[:,0,1] - intsfr[:,1,1]-intsfr[:,2,1]) > intsfr[:,0,1]*0.001).any():
 	#	print 1/0
 
-	return t, q
+	return t[::-1], q
 
-def create_plotquant(sample_results, logplot = ['mass', 'tau', 'tage'], truths=None):
+def create_plotquant(sample_results, logplot = ['mass'], truths=None):
     
 	'''
 	creates plottable versions of chain and sets up new plotnames
@@ -260,8 +259,8 @@ def return_extent(sample_results):
 	for ii in xrange(len(parnames)):
 		
 		# set min/max
-		extent = [np.percentile(sample_results['plotchain'][:,:,ii],4),
-		          np.percentile(sample_results['plotchain'][:,:,ii],96)]
+		extent = [np.percentile(sample_results['plotchain'][:,:,ii],0.5),
+		          np.percentile(sample_results['plotchain'][:,:,ii],99.5)]
 
 		# is the chain stuck at one point? if so, set the range equal to param*0.8,param*1.2
 		# else check if we butting up against the prior? if so, extend by 10%
@@ -368,7 +367,7 @@ def show_chain(sample_results,outname=None,alpha=0.6,truths=None):
 		finite = np.isfinite(sample_results['lnprobability'])
 		max = np.max(sample_results['lnprobability'][finite])
 		min = np.percentile(sample_results['lnprobability'][finite],10)
-		axarr[jj+1,ii].set_ylim(min, max+np.abs(max)*0.2)
+		axarr[jj+1,ii].set_ylim(min, max+np.abs(max)*0.01)
 		
 		axarr[jj+1,ii].yaxis.get_major_ticks()[0].label1On = False # turn off bottom ticklabel
 

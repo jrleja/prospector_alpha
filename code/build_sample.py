@@ -213,8 +213,8 @@ def build_sample_test(basename,outname=None,add_zp_err=False):
 	sps = threed_dutils.setup_sps()
 
 	#### basic parameters ####
-	ngals_per_model     = 60
-	noise               = 0.00            # perturb fluxes
+	ngals_per_model     = 500
+	noise               = 0.05            # perturb fluxes
 	reported_noise      = 0.05            # reported noise
 	test_sfhs           = [1,2,3,4,5]     # which test sfhs to use?
 	test_sfhs           = [0]
@@ -240,22 +240,16 @@ def build_sample_test(basename,outname=None,add_zp_err=False):
 	for jj in xrange(ntest):
 		for ii in xrange(nparams):
 			
-			# random in logspace for mass + tau
+			# random in logspace for mass
 			# also enforce priors
 			if parname_strip(parnames[ii]) == 'mass':
 				
 				min,max = np.log10(return_bounds(parnames[ii],model,ii,test_sfhs=test_sfhs[jj]))
 
-				# ensure that later priors CAN be enforced
+				# if double tau, ensure that later priors can be enforced
 				if parnames[ii] == 'mass_1': max = np.log10(10**max/20)
-				if parnames[ii] == 'tau_1': min = np.log10(10**min*2)
-
-				# enforce priors on mass and tau
 				if parnames[ii] == 'mass_2':
 					max = np.log10(testparms[:,parnames == 'mass_1']*20)
-					for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): testparms[kk,ii] = 10**(random.random()*(max[kk]-min)+min)
-				elif parnames[ii] == 'tau_2':
-					max = np.log10(testparms[:,parnames == 'tau_1']/2.)
 					for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): testparms[kk,ii] = 10**(random.random()*(max[kk]-min)+min)
 				else:
 					for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): testparms[kk,ii] = 10**(random.random()*(max-min)+min)
