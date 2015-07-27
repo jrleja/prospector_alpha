@@ -15,9 +15,9 @@ run_params = {'verbose':True,
               'outfile':os.getenv('APPS')+'/threedhst_bsfh/results/testsed_simha/testsed_simha',
               'ftol':0.5e-5, 
               'maxfev':5000,
-              'nwalkers':496,
-              'nburn':[64,64,128], 
-              'niter': 1200,
+              'nwalkers':248,
+              'nburn':[16,16,32], 
+              'niter': 200,
               'initial_disp':0.1,
               'debug': False,
               'min_error': 0.01,
@@ -197,9 +197,9 @@ class BurstyModel(sedmodel.CSPModel):
         disp = np.zeros(self.ndim)
         for par, inds in self.theta_index.iteritems():
             
-            # constant 1% floor
+            # constant 5% floor
             if par == 'mass':
-                disp[inds[0]:inds[1]] = 0.01 * thetas[inds[0]:inds[1]]
+                disp[inds[0]:inds[1]] = 0.05 * thetas[inds[0]:inds[1]]
 
             # constant 0.05 floor (log space, sf_slope, dust_index)
             if par == 'tau' or \
@@ -305,7 +305,7 @@ model_params.append({'name': 'add_agb_dust_model', 'N': 1,
 model_params.append({'name': 'mass', 'N': 1,
                         'isfree': True,
                         'init': 1e10,
-                        'init_disp': 0.15,
+                        'init_disp': 0.25,
                         'units': r'M_\odot',
                         'prior_function': tophat,
                         'prior_args': {'mini':1e7,'maxi':1e14}})
@@ -336,6 +336,7 @@ model_params.append({'name': 'sfh', 'N': 1,
 model_params.append({'name': 'tau', 'N': 1,
                         'isfree': True,
                         'init': 0.0,
+                        'init_disp': 0.25,
                         'units': 'log(Gyr)',
                         'prior_function': tophat,
                         'prior_args': {'mini':-1,
@@ -344,7 +345,7 @@ model_params.append({'name': 'tau', 'N': 1,
 model_params.append({'name': 'tage', 'N': 1,
                         'isfree': True,
                         'init': tage_init,
-                        'init_disp': 0.15,
+                        'init_disp': 0.25,
                         'units': 'Gyr',
                         'prior_function': tophat,
                         'prior_args': {'mini':tage_mini, 'maxi':tage_maxi}})
@@ -382,7 +383,7 @@ model_params.append({'name': 'sf_start', 'N': 1,
 model_params.append({'name': 'sf_trunc', 'N': 1,
                         'isfree': True,
                         'init': sf_trunc_init,
-                        'init_disp': 0.2,
+                        'init_disp': 0.3,
                         'units': '',
                         'prior_function': tophat,
                         'prior_args': {'mini':sf_trunc_mini, 'maxi':sf_trunc_max}})
@@ -390,7 +391,7 @@ model_params.append({'name': 'sf_trunc', 'N': 1,
 model_params.append({'name': 'sf_slope', 'N': 1,
                         'isfree': True,
                         'init': -1.0,
-                        'init_disp': 0.15,
+                        'init_disp': 0.3,
                         'units': None,
                         'prior_function': tophat,
                         'prior_args': {'mini':-10.0,'maxi':2.0}})
@@ -406,7 +407,7 @@ model_params.append({'name': 'imf_type', 'N': 1,
 ######## Dust Absorption ##############
 model_params.append({'name': 'dust_type', 'N': 1,
                         'isfree': False,
-                        'init': 0,
+                        'init': 4,
                         'units': 'index',
                         'prior_function_name': None,
                         'prior_args': None})
