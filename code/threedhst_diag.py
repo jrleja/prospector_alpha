@@ -156,7 +156,7 @@ def plot_sfh(sample_results,nsamp=1000,ncomp=1):
 	        (sample_results['quantiles']['q50'][np.array(sample_results['model'].theta_labels()) == 'tage']*1e9*10000)
 
 	# initialize output variables
-	nt = 70
+	nt = 100
 	intsfr = np.zeros(shape=(nsamp,nt,ncomp+1))
 	deltat=0.0001
 
@@ -790,7 +790,7 @@ def plot_all_driver():
 	runname = 'testsed_simha'
 
 	filebase, parm_basename, ancilname=threed_dutils.generate_basenames(runname)
-	for jj in xrange(34,len(filebase)):
+	for jj in xrange(len(filebase)):
 		print 'iteration '+str(jj) 
 		make_all_plots(filebase=filebase[jj],\
 		               outfolder=os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/')
