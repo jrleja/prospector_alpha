@@ -26,7 +26,7 @@ run_params = {'verbose':True,
               'phot':True,
               'photname':os.getenv('APPS')+'/threedhst_bsfh/data/testsed_simha_truth.cat',
               'truename':os.getenv('APPS')+'/threedhst_bsfh/data/testsed_simha_truth.dat',
-              'objname':'1',
+              'objname':'24',
               }
 
 ############
