@@ -96,7 +96,7 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 		sfh_params = threed_dutils.find_sfh_params(sample_results['model'],flatchain[jj,:])
 
 		# calculate half-mass assembly time, sfr
-		half_time[jj] = threed_dutils.halfmass_assembly_time(sfh_params,tuniv)
+		half_time[jj] = threed_dutils.halfmass_assembly_time(sfh_params,sfh_params['tage'])
 
 		# calculate sfr
 		sfr_10[jj]   = threed_dutils.calculate_sfr(sfh_params, 0.01, minsfr=None, maxsfr=None)

@@ -671,16 +671,19 @@ def integrate_delayed_tau(t1,t2,sfh):
 def integrate_linramp(t1,t2,sfh):
 
 	# integration constant: SFR(sf_trunc-sf_start)
-	c = (sfh['sf_trunc']-sfh['sf_start'])*(np.exp(-(sfh['sf_trunc']-sfh['sf_start'])/sfh['tau'])-sfh['sf_slope'])
+	cs = (sfh['sf_trunc']-sfh['sf_start'])*(np.exp(-(sfh['sf_trunc']-sfh['sf_start'])/sfh['tau']))
 
 	# enforce positive SFRs
 	# by limiting integration to where SFR > 0
-	t_zero_cross = -c/sfh['sf_slope']
+	t_zero_cross = -1.0/sfh['sf_slope'] + sfh['sf_trunc']
 	if t_zero_cross > sfh['sf_trunc']-sfh['sf_start']:
 		t1           = np.clip(t1,sfh['sf_trunc']-sfh['sf_start'],t_zero_cross)
 		t2           = np.clip(t2,sfh['sf_trunc']-sfh['sf_start'],t_zero_cross)
 
-	return t2*(0.5*t2*sfh['sf_slope']+c)-t1*(0.5*t1*sfh['sf_slope']+c)
+	intsfr = cs*(t2-t1)*(1-sfh['sf_trunc']*sfh['sf_slope']) + cs*sfh['sf_slope']*0.5*((t2+sfh['sf_start'])**2-(t1+sfh['sf_start'])**2)
+	#intsfr = (t2-t1)*(c-sfh['sf_slope']*sfh['sf_trunc'])+0.5*sfh['sf_slope']*(t2**2-t1**2)
+
+	return intsfr
 
 def integrate_sfh(t1,t2,sfh_params):
 	

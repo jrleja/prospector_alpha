@@ -74,13 +74,20 @@ def add_sfh_plot(sample_results,fig,ax_loc,truths=None,fast=None):
 
 	# set up plotting range
 	# this will have to be retooled once we go back to real data...
-	plotmax = np.maximum(np.max(perc[:,0,1]),np.max(pt[:,0]))
-	plotmin = np.maximum(np.min(perc[:,0,1]),np.min(pt[:,0]))
+	plotmax_y = np.maximum(np.max(perc[:,0,1]),np.max(pt[:,0]))
+	plotmin_y = np.maximum(np.min(perc[:,0,1]),np.min(pt[:,0]))
 
-	dynrange = (plotmax-plotmin)*0.1
-	axlim_sfh=[np.max(t)+0.08*(np.max(t)-np.min(t)),
+	# the minimum time for which the upper percentile is equal to the minimum SFR
+	# exclude any times before the 50th percentile of tage, since those are 
+	# probably after quenching
+	plotmax_x = t[perc[:,0,2] == np.min(perc[:,0,2])]
+	plotmax_x = np.min(plotmax_x[plotmax_x > sample_results['quantiles']['q50'][np.array(sample_results['model'].theta_labels()) == 'tage']])
+
+	dynrange = (plotmax_y-plotmin_y)*0.1
+	axlim_sfh=[plotmax_x,
 	           np.min(t),
-	           plotmin,plotmax+dynrange]
+	           plotmin_y,
+	           plotmax_y+dynrange]
 	ax_inset.axis(axlim_sfh)
 
 	ax_inset.set_ylabel('log(SFR)',fontsize=axfontsize,weight='bold')
@@ -144,8 +151,12 @@ def plot_sfh(sample_results,nsamp=1000,ncomp=1):
 	flatchain = copy.copy(sample_results['flatchain'])
 	np.random.shuffle(flatchain)
 
+	# calculate minimum SFR for plotting purposes
+	minsfr = sample_results['quantiles']['q50'][np.array(sample_results['model'].theta_labels()) == 'mass'] /  \
+	        (sample_results['quantiles']['q50'][np.array(sample_results['model'].theta_labels()) == 'tage']*1e9*10000)
+
 	# initialize output variables
-	nt = 50
+	nt = 70
 	intsfr = np.zeros(shape=(nsamp,nt,ncomp+1))
 	deltat=0.0001
 
@@ -155,26 +166,35 @@ def plot_sfh(sample_results,nsamp=1000,ncomp=1):
 		sfh_params = threed_dutils.find_sfh_params(sample_results['model'],flatchain[mm,:])
 
 		if mm == 0:
-			t=np.linspace(0,np.max(sfh_params['tage']),num=50)
+			t,step=np.linspace(0,14.0,num=nt,retstep=True)
+
+		# calculate new time vector such that
+		# the spacing from tage back to zero
+		# is identical for each SFH model
+		tcalc = t-sfh_params['tage']
+		tcalc = tcalc[tcalc < 0]*-1
+		#tcalc = tcalc[::-1]
 
 		totmass = np.sum(sfh_params['mass'])
-		for jj in xrange(nt): intsfr[mm,jj,0] = threed_dutils.calculate_sfr(sfh_params, deltat, tcalc = t[jj])
+		for jj in xrange(len(tcalc)): 
+
+			intsfr[mm,jj,0] = threed_dutils.calculate_sfr(sfh_params, deltat, tcalc = tcalc[jj],minsfr=minsfr)
 
 		# now for each component
 		for kk in xrange(ncomp):
 			iterable = [(key,value[kk]) for key, value in sfh_params.iteritems()]
 			newdict = {key: value for (key, value) in iterable}
-			for jj in xrange(nt): intsfr[mm,jj,kk+1] = threed_dutils.calculate_sfr(newdict, deltat, tcalc = t[jj])
+			for jj in xrange(nt): intsfr[mm,jj,kk+1] = threed_dutils.calculate_sfr(newdict, deltat, tcalc = t[jj],minsfr=minsfr)
+
+		# clip to minimum sfr, at 0.01% of average SFR over lifetime
+		# this is only for values that were unfilled by the loop over tcalc
+		intsfr = np.clip(intsfr,minsfr,np.inf)
 
 	q = np.zeros(shape=(nt,ncomp+1,3))
 	for kk in xrange(ncomp+1):
 		for jj in xrange(nt): q[jj,kk,:] = np.percentile(intsfr[:,jj,kk],[16.0,50.0,84.0])
 
-	# check to see if (SFH1 + SFH2) == SFHTOT [should it?]
-	#if (np.abs(intsfr[:,0,1] - intsfr[:,1,1]-intsfr[:,2,1]) > intsfr[:,0,1]*0.001).any():
-	#	print 1/0
-
-	return t[::-1], q
+	return t, q
 
 def create_plotquant(sample_results, logplot = ['mass'], truths=None):
     
@@ -770,7 +790,7 @@ def plot_all_driver():
 	runname = 'testsed_simha'
 
 	filebase, parm_basename, ancilname=threed_dutils.generate_basenames(runname)
-	for jj in xrange(len(filebase)):
+	for jj in xrange(34,len(filebase)):
 		print 'iteration '+str(jj) 
 		make_all_plots(filebase=filebase[jj],\
 		               outfolder=os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/')

@@ -7,42 +7,69 @@ if __name__ == "__main__":
 
     # load model,sps 
     #model = model_setup.load_model('/Users/joel/code/python/threedhst_bsfh/parameter_files/testsed_simha/testsed_simha_params.py')
-    model = model_setup.load_model('/Users/joel/code/python/threedhst_bsfh/parameter_files/testsed_nonoise_fastgen/testsed_nonoise_fastgen_params.py')
+    model = model_setup.load_model('/Users/joel/code/python/threedhst_bsfh/parameter_files/testsed_simha/testsed_simha_params_2.py')
     sps   = threed_dutils.setup_sps(zcontinuous=2,compute_vega_magnitudes=False)
 
     # custom-set parameters
-    #initial_theta = np.array([1e10,-0.81,10**-0.25,14.0-10.83,12.89,-3.08,2.17,-0.40])
-    initial_theta = np.array([1e10,-0.81,10**-0.25,14.0-10.83,2.17,-0.40])
-    model.initial_theta = initial_theta
+    initial_theta_true = np.array([10**11.37,-1.35,-0.31,5.93,2.93,1.07,3.74,-0.4])
+    model.initial_theta = initial_theta_true
     model.set_parameters(model.initial_theta)
 
     # set up arrays
-    sfh_params = threed_dutils.find_sfh_params(model,model.initial_theta)
-    tcalc = np.linspace(sfh_params['sf_start'],14.0, 100)
-    mf1 = np.zeros(len(tcalc))
+    #sfh_params = threed_dutils.find_sfh_params(model,model.initial_theta)
+    #tcalc = np.linspace(0,5.93,100)
+    #mf1 = np.zeros(len(tcalc))
     
     ###### calculate FSPS quantities ######
     # pass parameters to sps object
-    sm = np.empty(0)
-    for tt in tcalc:
-        model.params['tage'] = tt
-        for k, v in model.params.iteritems():
-            if k in sps.params.all_params:
-                if k == 'zmet':
-                    vv = np.abs(v - (np.arange( len(sps.zlegend))+1)).argmin()+1
-                elif k == 'dust1':
-                    # temporary! replace with smarter function soon
-                    vv = model.params['dust2']*1.86+0.0
-                else:
-                    vv = v.copy()
-                sps.params[k] = vv
-            if k == 'mass':
-                mass = v
+    #sm = np.empty(0)
+    #for tt in tcalc:
+    model.params['tage'] = np.atleast_1d(0)
+    for k, v in model.params.iteritems():
+        if k in sps.params.all_params:
+            if k == 'zmet':
+                vv = np.abs(v - (np.arange( len(sps.zlegend))+1)).argmin()+1
+            elif k == 'dust1':
+                # temporary! replace with smarter function soon
+                vv = model.params['dust2']*1.86+0.0
+            elif k == 'tau':
+                vv = 10**v
+            else:
+                vv = v.copy()
+            sps.params[k] = vv
+        if k == 'mass':
+            mass = v
+    sfr_true = sps.sfr
+    lage_true = sps.log_age
 
-        sm = np.append(sm,sps.stellar_mass)
+    # now the best-fit
+    initial_theta_fit = np.array([10**11.34,-1.38,0.43,7.95,7.45,0.92,3.71,-0.4])
+    model.initial_theta = initial_theta_fit
+    model.set_parameters(model.initial_theta)
+
+    model.params['tage'] = np.atleast_1d(0)
+    for k, v in model.params.iteritems():
+        if k in sps.params.all_params:
+            if k == 'zmet':
+                vv = np.abs(v - (np.arange( len(sps.zlegend))+1)).argmin()+1
+            elif k == 'dust1':
+                # temporary! replace with smarter function soon
+                vv = model.params['dust2']*1.86+0.0
+            elif k == 'tau':
+                vv = 10**v
+            else:
+                vv = v.copy()
+            sps.params[k] = vv
+        if k == 'mass':
+            mass = v
+    sfr_fit = sps.sfr
+    lage_fit = sps.log_age
+
 
     fig, ax = plt.subplots()
-    ax.plot(tcalc, sm, 'o', alpha=0.3)
+    ax.plot(10**lage_true, sfr_true, 'bo', alpha=0.3)
+    ax.plot(10**lage_fit, sfr_fit, 'ro', alpha=0.3)
+    print 1/0
 
     y_offset = 0.00
     for k,v in sfh_params.iteritems():
@@ -51,7 +78,7 @@ if __name__ == "__main__":
             y_offset+=0.05
 
 
-    ax.set_ylabel('sps.stellar_mass')
+    ax.set_ylabel('sps.sfr')
     ax.set_xlabel('tage')
     ax.set_ylim(-0.1,5)
     fig.show()

@@ -192,6 +192,180 @@ def parname_strip(parname):
 	except:
 		return parname
 
+def build_sample_constrained(basename,outname=None,add_zp_err=False):
+
+	'''
+	Generate model SEDs and add noise
+	IMPORTANT: linked+outlier noise will NOT be added if those variables are not free 
+	parameters in the passed parameter file!
+	'''
+
+	from bsfh import model_setup
+
+	#### output names ####
+	if outname == None:
+		outname = '/Users/joel/code/python/threedhst_bsfh/data/'+basename
+	parmfile='/Users/joel/code/python/threedhst_bsfh/parameter_files/'+basename+'/'+basename+'_params.py'
+
+	#### load test model, build sps  ####
+	model = model_setup.load_model(parmfile)
+	obs   = model_setup.load_obs(parmfile)
+	sps = threed_dutils.setup_sps()
+
+	#### basic parameters ####
+	ngals_per_model     = 500
+	noise               = 0.00            # perturb fluxes
+	reported_noise      = 0.05            # reported noise
+	test_sfhs           = [1,2,3,4,5]     # which test sfhs to use?
+	test_sfhs           = [0]
+	ntest               = len(test_sfhs)
+	ngals               = ntest*ngals_per_model
+	
+	#### band-specific noise ####
+	if 'gp_filter_amps' in model.free_params:
+		band_specific_noise = [0.0,0.15,0.25] # add band-specific noise?
+
+	#### outlier noise ####
+	if 'gp_outlier_locs' in model.free_params:
+		outliers_noise      = 0.5             # add outlier noise
+		outliers_bands      = [5,22,29]
+	else:
+		outliers_bands=[]
+
+	#### generate random model parameters ####
+	nparams = len(model.initial_theta)
+	testparms = np.zeros(shape=(ngals,nparams))
+	parnames = np.array(model.theta_labels())
+
+	for jj in xrange(ntest):
+		for ii in xrange(nparams):
+
+			# random in logspace for mass
+			# also enforce priors
+			if parname_strip(parnames[ii]) != 'delt_trunc' and \
+			   parname_strip(parnames[ii]) != 'sf_slope' and \
+			   parnames[ii] != 'dust2' and \
+			   parname_strip(parnames[ii]) != 'tage':
+				
+				for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): testparms[kk,ii] = model.params[parnames[ii]] 
+				print model.params[parnames[ii]] 
+			
+			#### generate specific SFHs if necessary ####
+			elif parname_strip(parnames[ii]) == 'tage':
+				min,max = return_bounds(parnames[ii],model,ii,test_sfhs=test_sfhs[jj])
+				for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): testparms[kk,ii] = random.random()*(max-min)+min
+				print min,max
+
+			#### enforce SFH priors ####
+			elif parname_strip(parnames[ii]) == 'delt_trunc':
+				min,max = return_bounds(parnames[ii],model,ii,test_sfhs=test_sfhs[jj])
+				for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): testparms[kk,ii] = random.random()*(max-min)+min
+				print min,max
+
+			elif parname_strip(parnames[ii]) == 'sf_slope':
+				min,max = return_bounds(parnames[ii],model,ii,test_sfhs=test_sfhs[jj])
+				for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): 
+					if random.random() > 0.5:
+						testparms[kk,ii] = random.random()*max
+					else:
+						testparms[kk,ii] = random.random()*np.abs(min)+min
+
+				print min,max
+
+			#### tone down the dust a bit-- flat in prior means lots of Av = 2.0 galaxies ####
+			elif parnames[ii] == 'dust2':
+				min = model.theta_bounds()[ii][0]
+				max = model.theta_bounds()[ii][1]
+				for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): testparms[kk,ii] = np.clip(random.gauss(0.5, 0.5),min,max)
+				print min,max
+
+			
+
+	#### make sure priors are satisfied
+	for ii in xrange(ngals):
+		assert np.isfinite(model.prior_product(testparms[ii,:]))
+
+	#### write out thetas ####
+	with open(outname+'.dat', 'w') as f:
+		
+		### header ###
+		f.write('# ')
+		for theta in model.theta_labels():
+			f.write(theta+' ')
+		f.write('\n')
+
+		### data ###
+		for ii in xrange(ngals):
+			for kk in xrange(nparams):
+				f.write(str(testparms[ii,kk])+' ')
+			f.write('\n')
+
+	#### set up photometry output ####
+	nfilters = len(obs['filters'])
+	maggies     = np.zeros(shape=(ngals,nfilters))
+	maggies_unc = np.zeros(shape=(ngals,nfilters))
+
+	#### generate photometry, add noise ####
+	for ii in xrange(ngals):
+		model.initial_theta = testparms[ii,:]
+		_,maggiestemp,_ = model.mean_model(model.initial_theta, obs, sps=sps,norm_spec=False)
+		maggies[ii,:] = maggiestemp
+
+		#### record noise ####
+		maggies_unc[ii,:] = maggies[ii,:]*reported_noise
+
+		#### add noise ####
+		for kk in xrange(nfilters): 
+			
+			###### general noise
+			tnoise = noise
+			
+			##### linked filter noise
+			filtlist = model.params.get('gp_filter_locs',[])			
+			for mm in xrange(len(filtlist)):
+				if obs['filters'][kk].lower() in filtlist[mm]:
+					tnoise = (tnoise**2+band_specific_noise[mm]**2)**0.5
+
+			##### outlier noise
+			if kk in outliers_bands:
+				tnoise = (tnoise**2+outliers_noise**2)**0.5
+			add_noise = random.gauss(0, tnoise)
+			print obs['filters'][kk].lower()+': ' + "{:.2f}".format(add_noise)
+			maggies[ii,kk] += add_noise*maggies[ii,kk]
+
+	#### add zeropoint offsets ####
+	if add_zp_err:
+		zp_offsets = threed_dutils.load_zp_offsets('COSMOS')
+		for kk in xrange(len(zp_offsets)):
+			filter = zp_offsets[kk]['Band'].lower()+'_cosmos'
+			index  = obs['filters'] == filter
+			maggies[:,index] = maggies[:,index]*zp_offsets[kk]['Flux-Correction']
+			if np.sum(index) == 0:
+				print 1/0
+
+	#### output ####
+	#### ids first ####
+	ids =  np.arange(ngals)+1
+	with open(outname+'.ids', 'w') as f:
+	    for id in ids:
+	        f.write(str(id)+'\n')
+
+	#### photometry ####
+	with open(outname+'.cat', 'w') as f:
+		
+		### header ###
+		f.write('# id ')
+		for filter in obs['filters']:
+			f.write('f_'+filter+' e_' +filter+' ')
+		f.write('\n')
+
+		### data ###
+		for ii in xrange(ngals):
+			f.write(str(ids[ii])+' ')
+			for kk in xrange(nfilters):
+				f.write(str(maggies[ii,kk])+' '+str(maggies_unc[ii,kk]) + ' ')
+			f.write('\n')
+
 def build_sample_test(basename,outname=None,add_zp_err=False):
 
 	'''

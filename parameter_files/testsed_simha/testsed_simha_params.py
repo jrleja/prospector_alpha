@@ -207,7 +207,7 @@ class BurstyModel(sedmodel.CSPModel):
                par == 'sf_slope' or \
                par == 'dust2' or \
                par == 'dust_index':
-                disp[inds[0]:inds[1]] = 0.05
+                disp[inds[0]:inds[1]] = 0.15
 
             # 100 Myr floor (SFH params)
             if par == 'tage' or \
