@@ -34,11 +34,14 @@ def load_filter_response(filter, alt_file=None):
 		for line in f:  # This keeps reading the file
 			if line.find('#') != -1:
 				break
-			
 			# read line, extract data
 			data = line.split()
 			lam = np.append(lam,float(data[0]))
 			res = np.append(res,float(data[1]))
+
+	if len(lam) == 0:
+		print "Couldn't find filter " + filter + ': STOPPING'
+		print 1/0
 
 	return lam, res
 

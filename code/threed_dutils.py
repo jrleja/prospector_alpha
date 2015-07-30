@@ -13,6 +13,9 @@ def find_sfh_params(model,theta):
 	parnames = model.theta_labels()
 	sfh_out = []
 
+	# set parameters, in case of dependencies
+	model.set_parameters(theta)
+
 	for string in str_sfh_parms:
 		
 		# find SFH parameters that are variables in the chain

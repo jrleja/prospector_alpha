@@ -60,6 +60,23 @@ def calc_lameff(lam,res):
 	lam_sum_up = np.sqrt(np.sum(lam*res*dellam)/np.sum(res*dellam/lam))
 	return lam_sum_up
 
+def calc_lameff_for_fsps(fsps_filter_list):
+
+	'''
+	read in FSPS filter names
+	loop over FSPS filters
+		load effective WAVELENGTHS
+		calculate lameff
+	write out to file
+	'''
+	lameff = np.empty(0)
+	for filter in fsps_filter_list:
+		lam,res = load_filter_response(filter, alt_file=None)
+		lameff = np.append(lameff,calc_lameff(lam,res))
+
+	return lameff
+
+
 def main(field=False):
 
 	''' TRANSLATES FAST FILTER DEFINITIONS TO FSPS '''

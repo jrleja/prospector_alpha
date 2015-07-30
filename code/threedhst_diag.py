@@ -82,6 +82,8 @@ def add_sfh_plot(sample_results,fig,ax_loc,truths=None,fast=None):
 	# probably after quenching
 	plotmax_x = t[perc[:,0,2] == np.min(perc[:,0,2])]
 	plotmax_x = np.min(plotmax_x[plotmax_x > sample_results['quantiles']['q50'][np.array(sample_results['model'].theta_labels()) == 'tage']])
+	if truths is not None:
+		plotmax_x = np.max(np.append(plotmax_x,truths['sfh_params']['tage']))
 
 	dynrange = (plotmax_y-plotmin_y)*0.1
 	axlim_sfh=[plotmax_x,
@@ -787,7 +789,7 @@ def plot_all_driver():
 	#runname = 'dtau_ha_zperr'
 	runname = 'dtau_ha_plog'
 	runname = 'testsed_nonoise_fast'
-	runname = 'testsed_simha'
+	runname = 'testsed_simha_truth'
 
 	filebase, parm_basename, ancilname=threed_dutils.generate_basenames(runname)
 	for jj in xrange(len(filebase)):

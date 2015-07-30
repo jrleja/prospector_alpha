@@ -196,8 +196,7 @@ def build_sample_constrained(basename,outname=None,add_zp_err=False):
 
 	'''
 	Generate model SEDs and add noise
-	IMPORTANT: linked+outlier noise will NOT be added if those variables are not free 
-	parameters in the passed parameter file!
+	same as below, but only vary tage, sf_trunc, sf_slope, and dust2
 	'''
 
 	from bsfh import model_setup
@@ -448,7 +447,7 @@ def build_sample_test(basename,outname=None,add_zp_err=False):
 						testparms[kk,ii] = random.random()*np.abs(min)+min
 
 			#### tone down the dust a bit-- flat in prior means lots of Av = 2.0 galaxies ####
-			elif parname_strip(parnames[ii]) == 'dust2':
+			elif parnames[ii] == 'dust2':
 				if test_sfhs[jj] != 5:
 					min = model.theta_bounds()[ii][0]
 					max = model.theta_bounds()[ii][1]
