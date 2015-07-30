@@ -1,4 +1,6 @@
 # loads FSPS filter response curves
+import os
+
 def load_filter_response(filter, alt_file=None):
 	'''READS FILTER RESPONSE CURVES FOR FSPS'''
 	
@@ -7,7 +9,7 @@ def load_filter_response(filter, alt_file=None):
 	import numpy as np
 	
 	if not alt_file:
-		filter_response_curve = '/Users/joel/code/fsps/data/allfilters.dat'
+		filter_response_curve = os.getenv('SPS_HOME')+'/data/allfilters.dat'
 	else:
 		filter_response_curve = alt_file
 
@@ -52,7 +54,7 @@ def load_mag_output(filename):
 
 	# first read in filter names
 	filters = []
-	with open('/Users/joel/code/fsps/data/FILTER_LIST', 'r') as f:
+	with open(os.getenv('SPS_HOME')+'/data/FILTER_LIST', 'r') as f:
 		for line in f:
 			if line.find('(') == -1:
 				str = line[line.find('\t')+1:line.rfind('\n')]
