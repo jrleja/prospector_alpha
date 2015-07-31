@@ -285,7 +285,6 @@ class BurstyModel(sedmodel.CSPModel):
         return lnp_prior
 
 #### SET SFH PRIORS #####
-print 1/0
 ###### REDSHIFT ######
 hdulist = fits.open(run_params['datname'])
 idx = hdulist[1].data['Name'] == run_params['objname']
