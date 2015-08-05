@@ -42,6 +42,8 @@ def translate_filters(bfilters):
     # this is necessary for my code
     # to calculate effective wavelength
     # in threed_dutils
+    # since it reads the filter names directly
+    # from the fsps filter file
     translate = {
     'FUV': 'GALEX FUV',
     'UVW2': 'UVOT w2',

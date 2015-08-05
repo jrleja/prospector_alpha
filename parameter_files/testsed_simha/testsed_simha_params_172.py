@@ -24,14 +24,60 @@ run_params = {'verbose':True,
               'abs_error': False,
               'spec': False, 
               'phot':True,
-              'photname':os.getenv('APPS')+'/threedhst_bsfh/data/testsed_simha.cat',
-              'truename':os.getenv('APPS')+'/threedhst_bsfh/data/testsed_simha.dat',
+              'photname':os.getenv('APPS')+'/threedhst_bsfh/data/testsed_simha_truth.cat',
+              'truename':os.getenv('APPS')+'/threedhst_bsfh/data/testsed_simha_truth.dat',
               'objname':'172',
               }
 
 ############
 # OBS
 #############
+
+def load_fsps_filters():
+
+    # this translates filter names
+    # to names that FSPS recognizes
+    # ripped from brownseds_params.py
+    translate_pfsps = {
+    'FUV': 'GALEX_FUV',
+    'UVW2': 'UVOT_W2',
+    'UVM2': 'UVOT_M2',
+    'NUV': 'GALEX_NUV',
+    'UVW1': 'UVOT_W1',
+    'Umag': np.nan,    # [11.9/15.7]? Swift/UVOT U AB band magnitude
+    'umag': 'SDSS_u',
+    'gmag': 'SDSS_g',
+    'Vmag': np.nan,    # [10.8/15.6]? Swift/UVOT V AB band magnitude
+    'rmag': 'SDSS_r',
+    'imag': 'SDSS_i',
+    'zmag': 'SDSS_z',
+    'Jmag': '2MASS_J',
+    'Hmag': '2MASS_H',
+    'Ksmag': '2MASS_Ks',
+    'W1mag': 'WISE_W1',
+    '[3.6]': 'IRAC_1',
+    '[4.5]': 'IRAC_2',
+    'W2mag': 'WISE_W2',
+    '[5.8]': 'IRAC_3',
+    '[8.0]': 'IRAC_4',
+    'W3mag': 'WISE_W3',
+    'PUIB': np.nan,    # [8.2/15.6]? Spitzer/IRS Blue Peak Up Imaging channel (13.3-18.7um) AB magnitude
+    'W4mag': np.nan,    # two WISE4 magnitudes, what is the correction?
+    "W4'mag": 'WISE_W4',
+    'PUIR': np.nan,    # Spitzer/IRS Red Peak Up Imaging channel (18.5-26.0um) AB magnitude
+    '[24]': 'MIPS_24',
+    'pacs70': 'PACS_70',
+    'pacs100': 'PACS_100',
+    'pacs160': 'PACS_160',
+    'spire250': 'SPIRE_250',
+    'spire350': 'SPIRE_350',
+    'spire500': 'SPIRE_500'
+    }
+
+    filters = translate_pfsps.values()
+    filters = np.array(filters)[np.array(filters) != 'nan']
+
+    return filters
 
 def load_obs_3dhst(filename, objnum, zperr=False):
     """
@@ -80,6 +126,11 @@ def load_obs_3dhst(filename, objnum, zperr=False):
     obs['wavelength'] = None
     obs['spectrum'] = None
 
+    # uncomment this if you want to use build_sample
+    # to create photometry in the brown filter set
+    #obs['filters'] = np.array(load_fsps_filters())
+    #obs['maggies'] = None
+
     return obs
 
 obs = load_obs_3dhst(run_params['photname'], run_params['objname'], zperr=False)
@@ -88,69 +139,19 @@ obs = load_obs_3dhst(run_params['photname'], run_params['objname'], zperr=False)
 # MODEL_PARAMS
 #############
 
+def transform_delt_to_sftrunc(tage=None, delt_trunc=None, **extras):
+
+    return tage*delt_trunc
+
+def transform_logtau_to_tau(tau=None, logtau=None, **extras):
+
+    return 10**logtau
+
+def add_dust1(dust2=None, **extras):
+
+    return 1.86*dust2
+
 class BurstyModel(sedmodel.CSPModel):
-	
-    def one_sed(self, component_index=0, sps=None, norm_spec=False, filterlist=[]):
-        """Get the SED of one component for a multicomponent composite
-        SFH.  Should set this up to work as an iterator.
-
-        CHANGES: added dust1, log(tau)
-
-        :param component_index:
-            Integer index of the component to calculate the SED for.
-            
-        :params sps:
-            A python-fsps StellarPopulation object to be used for
-            generating the SED.
-
-        :param filterlist:
-            A list of strings giving the (FSPS) names of the filters
-            onto which the spectrum will be projected.
-            
-        :returns spec:
-            The restframe spectrum in units of L_\odot/Hz.
-            
-        :returns maggies:
-            Broadband fluxes through the filters named in
-            ``filterlist``, ndarray.  Units are observed frame
-            absolute maggies: M = -2.5 * log_{10}(maggies).
-            
-        :returns extra:
-            The extra information corresponding to this component.
-        """
-        # Pass the model parameters through to the sps object,
-        # and keep track of the mass of this component
-        mass = 1.0
-        for k, vs in self.params.iteritems():
-            try:
-                v = vs[component_index]
-                #n_param_is_vec += 1
-            except(IndexError, TypeError):
-                v = vs
-            if k in sps.params.all_params:
-                if k == 'zmet':
-                    vv = np.abs(v - (np.arange( len(sps.zlegend))+1)).argmin()+1
-                elif k == 'dust1':
-                    # temporary! replace with smarter function soon
-                    vv = self.params['dust2']*1.86+0.0
-                elif k == 'tau':
-                    vv = 10**self.params['tau']
-                else:
-                    vv = v.copy()
-                sps.params[k] = vv
-            if k == 'mass':
-                mass = v
-        #now get the magnitudes and spectrum
-        w, spec = sps.get_spectrum(tage=sps.params['tage'], peraa=False)
-        mags = sps.get_mags(tage=sps.params['tage'],
-                            bands=filterlist)
-
-        # normalize by (current) stellar mass and get correct units (distance_modulus)
-        mass_norm = mass/sps.stellar_mass
-
-        return (mass_norm * spec ,
-                mass_norm * 10**(-0.4*(mags)),
-                w)
 
     def theta_disps(self, thetas, initial_disp=0.1):
         """Get a vector of dispersions for each parameter to use in
@@ -172,15 +173,11 @@ class BurstyModel(sedmodel.CSPModel):
                 disp[inds[0]:inds[1]] = self._config_dict[par].get('init_disp', initial_disp) * thetas[inds[0]:inds[1]]
 
             # constant (log) dispersion
-            if par == 'tau' or \
+            if par == 'logtau' or \
                par == 'metallicity' or \
-               par == 'sf_slope':
+               par == 'sf_slope' or \
+               par == 'delt_trunc':
                 disp[inds[0]:inds[1]] = self._config_dict[par].get('init_disp', initial_disp)
-
-            # higher dispersion if farther in the past
-            if par == 'sf_trunc':
-                disp[inds[0]:inds[1]] = self._config_dict[par].get('init_disp', initial_disp) * \
-                                        (self._config_dict['tage']['prior_args']['maxi']-thetas[inds[0]:inds[1]])
 
             # fractional dispersion with artificial floor
             if par == 'dust2' or \
@@ -202,16 +199,24 @@ class BurstyModel(sedmodel.CSPModel):
                 disp[inds[0]:inds[1]] = 0.05 * thetas[inds[0]:inds[1]]
 
             # constant 0.05 floor (log space, sf_slope, dust_index)
-            if par == 'tau' or \
-               par == 'logzsol' or \
-               par == 'sf_slope' or \
-               par == 'dust2' or \
-               par == 'dust_index':
-                disp[inds[0]:inds[1]] = 0.05
+            if par == 'logzsol':
+                disp[inds[0]:inds[1]] = 0.25
 
-            # 100 Myr floor (SFH params)
-            if par == 'tage' or \
-               par == 'sf_trunc':
+            if par == 'logtau':
+                disp[inds[0]:inds[1]] = 0.25
+
+            if par == 'sf_slope':
+                disp[inds[0]:inds[1]] = 0.6
+
+            if par == 'dust2' or \
+               par == 'dust_index':
+                disp[inds[0]:inds[1]] = 0.15
+
+            # 15% floor
+            if par == 'tage':
+                disp[inds[0]:inds[1]] = 0.15 * thetas[inds[0]:inds[1]]
+
+            if par == 'delt_trunc':
                 disp[inds[0]:inds[1]] = 0.1
             
         return disp
@@ -238,16 +243,6 @@ class BurstyModel(sedmodel.CSPModel):
             if len(np.unique(np.round(outlier_locs))) != len(outlier_locs):
                 return -np.inf
 
-        # ensure sf_trunc < tage - buffer
-        if 'sf_trunc' in self.theta_index:
-            start,end = self.theta_index['sf_trunc']
-            sf_trunc = theta[start:end]
-            start,end = self.theta_index['tage']
-            tage = theta[start:end]
-
-            if (sf_trunc+0.05 > tage):
-                return -np.inf
-
         for k, v in self.theta_index.iteritems():
             start, end = v
             lnp_prior += np.sum(self._config_dict[k]['prior_function']
@@ -259,7 +254,6 @@ class BurstyModel(sedmodel.CSPModel):
 #### TUNIV #####
 #tuniv = WMAP9.age(model_params[parmlist.index('zred')]['init']).value
 tuniv  = 14.0
-time_buffer = tuniv*0.05
 run_params['tuniv']       = tuniv
 run_params['time_buffer'] = 0.05
 
@@ -267,11 +261,6 @@ run_params['time_buffer'] = 0.05
 tage_maxi = tuniv
 tage_init = tuniv/2.
 tage_mini  = 0.11      # FSPS standard
-
-#### SF_TRUNC #####
-sf_trunc_mini  = tage_mini-run_params['time_buffer']
-sf_trunc_init = tuniv/3.
-sf_trunc_max  = tage_maxi-run_params['time_buffer']
 
 model_type = BurstyModel
 model_params = []
@@ -333,14 +322,23 @@ model_params.append({'name': 'sfh', 'N': 1,
                         'prior_function_name': None,
                         'prior_args': None})
 
-model_params.append({'name': 'tau', 'N': 1,
+model_params.append({'name': 'logtau', 'N': 1,
                         'isfree': True,
                         'init': 0.0,
                         'init_disp': 0.25,
                         'units': 'log(Gyr)',
                         'prior_function': tophat,
-                        'prior_args': {'mini':-1,
-                                       'maxi':2}})
+                        'prior_args': {'mini':-1.0,
+                                       'maxi':2.0}})
+
+model_params.append({'name': 'tau', 'N': 1,
+                        'isfree': False,
+                        'init': 1.0,
+                        'depends_on': transform_logtau_to_tau,
+                        'units': 'Gyr',
+                        'prior_function': tophat,
+                        'prior_args': {'mini':0.1,
+                                       'maxi':100}})
 
 model_params.append({'name': 'tage', 'N': 1,
                         'isfree': True,
@@ -380,13 +378,21 @@ model_params.append({'name': 'sf_start', 'N': 1,
                         'prior_function': tophat,
                         'prior_args': {'mini':0.0,'maxi':14.0}})
 
-model_params.append({'name': 'sf_trunc', 'N': 1,
+model_params.append({'name': 'delt_trunc', 'N': 1,
                         'isfree': True,
-                        'init': sf_trunc_init,
-                        'init_disp': 0.3,
+                        'init': 0.5,
+                        'init_disp': 0.1,
                         'units': '',
                         'prior_function': tophat,
-                        'prior_args': {'mini':sf_trunc_mini, 'maxi':sf_trunc_max}})
+                        'prior_args': {'mini':0.0, 'maxi': 1.0}})
+
+model_params.append({'name': 'sf_trunc', 'N': 1,
+                        'isfree': False,
+                        'init': 1.0,
+                        'units': '',
+                        'depends_on': transform_delt_to_sftrunc,
+                        'prior_function': tophat,
+                        'prior_args': {'mini':0, 'maxi':16}})
 
 model_params.append({'name': 'sf_slope', 'N': 1,
                         'isfree': True,
@@ -398,11 +404,11 @@ model_params.append({'name': 'sf_slope', 'N': 1,
 
 ########    IMF  ##############
 model_params.append({'name': 'imf_type', 'N': 1,
-                        	 'isfree': False,
+                             'isfree': False,
                              'init': 1, #1 = chabrier
-                       		 'units': None,
-                       		 'prior_function_name': None,
-                        	 'prior_args': None})
+                             'units': None,
+                             'prior_function_name': None,
+                             'prior_args': None})
 
 ######## Dust Absorption ##############
 model_params.append({'name': 'dust_type', 'N': 1,
@@ -415,7 +421,7 @@ model_params.append({'name': 'dust_type', 'N': 1,
 model_params.append({'name': 'dust1', 'N': 1,
                         'isfree': False,
                         'init': 0.0,
-                        'init_disp': 0.5,
+                        'depends_on': add_dust1,
                         'units': '',
                         'prior_function': tophat,
                         'prior_args': {'mini':0.0, 'maxi':8.0}})
