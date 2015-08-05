@@ -5,13 +5,208 @@ from bsfh import read_results
 import matplotlib.image as mpimg
 from astropy.cosmology import WMAP9
 import fsps
+from matplotlib.ticker import MaxNLocator
+
 plt.ioff() # don't pop up a window for each plot
 
 tiny_number = 1e-3
 big_number = 1e90
-plt_chain_figure = 1
-plt_triangle_plot = 1
-plt_sed_figure = 1
+
+def subtriangle(sample_results,  sps, model,
+                outname=None, showpars=None,
+                start=0, thin=1, truths=None,
+                powell_results=None, 
+                **kwargs):
+    """
+    Make a triangle plot of the (thinned, latter) samples of the posterior
+    parameter space.  Optionally make the plot only for a supplied subset
+    of the parameters.
+    """
+    import triangle
+    # pull out the parameter names and flatten the thinned chains
+    parnames = np.array(sample_results['model'].theta_labels())
+    plotflatchain = threed_dutils.chop_chain(sample_results['plotchain'])
+
+    # restrict to parameters you want to show
+    if showpars is not None:
+        ind_show = np.array([p in showpars for p in parnames], dtype= bool)
+        plotflatchain = plotflatchain[:,ind_show]
+        truths = truths[ind_show]
+        parnames= parnames[ind_show]
+
+    # plot truths
+    if truths is not None:
+        ptruths = [truths['plot_truths'][truths['parnames'][ii] == parnames][0] if truths['parnames'][ii] in parnames \
+                   else None \
+                   for ii in xrange(len(truths['plot_truths']))]
+    else:
+        ptruths = None
+
+    fig = triangle.corner(plotflatchain, labels = sample_results['plotnames'],
+                          quantiles=[0.16, 0.5, 0.84], verbose=False,
+                          truths = ptruths, extents=sample_results['extents'],truth_color='red',**kwargs)
+    
+    fig = add_to_corner(fig, sample_results, sps, model, truths=truths, powell_results=powell_results)
+
+    if outname is not None:
+        fig.savefig('{0}.triangle.png'.format(outname))
+        plt.close(fig)
+    else:
+        return fig
+
+def add_to_corner(fig, sample_results, sps, model,truths=None,maxprob=True,powell_results=None):
+
+    '''
+    adds in posterior distributions for 'select' parameters
+    if we have truths, list them as text
+    '''
+
+	# pull information from triangle to replicate plots
+	# will want to put them in axes[6-8] or something
+    axes = fig.get_axes()
+	
+    plotquant = np.log10(sample_results['extras'].get('flatchain',None))
+    plottit   = sample_results['extras'].get('parnames',None)
+
+    to_show = ['half_time','ssfr_100','sfr_100']
+    if sample_results['ncomp'] > 1:
+        toshow = ['half_time','ssfr_100','sfr_100','totmass']
+    showing = np.array([x in to_show for x in plottit])
+
+    # extra text
+    scale    = len(sample_results['model'].theta_labels())
+    ttop     = 0.88-0.02*(12-scale)
+    fs       = 24-(12-scale)
+    
+    if truths is not None:
+        parnames = np.append(truths['parnames'],'lnprob')
+        parnames = np.append(parnames, truths['extra_parnames'])
+        tvals    = np.append(truths['plot_truths'],truths['truthprob'])
+        tvals    = np.append(tvals, truths['extra_truths'])
+
+        plt.figtext(0.73, ttop, 'truths',weight='bold',
+                       horizontalalignment='right',fontsize=fs)
+        for kk in xrange(len(tvals)):
+            plt.figtext(0.73, ttop-0.02*(kk+1), parnames[kk]+'='+"{:.2f}".format(tvals[kk]),
+                       horizontalalignment='right',fontsize=fs)
+
+    # show maximum probability
+    if maxprob:
+        maxprob_parnames = np.append(sample_results['model'].theta_labels(),'lnprob')
+        plt.figtext(0.75, ttop, 'pmax',weight='bold',
+                       horizontalalignment='left',fontsize=fs)
+        for kk in xrange(len(maxprob_parnames)):
+            if maxprob_parnames[kk] == 'mass':
+               yplot = np.log10(sample_results['quantiles']['maxprob_params'][kk])
+            elif maxprob_parnames[kk] == 'lnprob':
+                yplot = sample_results['quantiles']['maxprob']
+            else:
+                yplot = sample_results['quantiles']['maxprob_params'][kk]
+
+            # add parameter names if not covered by truths
+            if truths is None:
+            	plt.figtext(0.75, ttop-0.02*(kk+1), parnames[kk]+'='+"{:.2f}".format(yplot),
+                       horizontalalignment='left',fontsize=fs)
+            else:
+           		plt.figtext(0.75, ttop-0.02*(kk+1), "{:.2f}".format(yplot),
+                       horizontalalignment='left',fontsize=fs)
+
+    # show burn-in results
+    burn_params = np.append(sample_results['post_burnin_center'],sample_results['post_burnin_prob'])
+    burn_names = np.append(sample_results['model'].theta_labels(), 'lnprobability')
+
+    plt.figtext(0.82, ttop, 'burn-in',weight='bold',
+                   horizontalalignment='left',fontsize=fs)
+
+    for kk in xrange(len(burn_names)):
+        if burn_names[kk] == 'mass':
+           yplot = np.log10(burn_params[kk])
+        else:
+            yplot = burn_params[kk]
+
+        plt.figtext(0.82, ttop-0.02*(kk+1), "{:.2f}".format(yplot),
+                   horizontalalignment='left',fontsize=fs)
+
+    # show powell results
+    if powell_results:
+        best = np.argmin([p.fun for p in powell_results])
+        powell_params = np.append(powell_results[best].x,-1*powell_results[best]['fun'])
+        powell_names = np.append(sample_results['model'].theta_labels(),'lnprob')
+
+        plt.figtext(0.89, ttop, 'powell',weight='bold',
+                       horizontalalignment='left',fontsize=fs)
+
+        for kk in xrange(len(powell_names)):
+            if powell_names[kk] == 'mass':
+               yplot = np.log10(powell_params[kk])
+            else:
+                yplot = powell_params[kk]
+
+            plt.figtext(0.89, ttop-0.02*(kk+1), "{:.2f}".format(yplot),
+                       horizontalalignment='left',fontsize=fs)
+
+
+    plotloc   = 2
+    for jj in xrange(len(plottit)):
+		
+        if showing[jj] == 0:
+            continue
+        plotloc += 1
+
+        axes[plotloc].set_visible(True)
+        axes[plotloc].set_frame_on(True)
+
+        if plottit[jj] == 'half_time':
+            plotquant[:,jj] = 10**plotquant[:,jj]
+
+        # Plot the histograms.
+        try:
+            n, b, p = axes[plotloc].hist(plotquant[:,jj], bins=50,
+                              histtype="step",color='k',
+                              range=[np.min(plotquant[:,jj]),np.max(plotquant[:,jj])])
+        except:
+            plt.close()
+            print np.min(plotquant[:,jj])
+            print np.max(plotquant[:,jj])
+            print 1/0
+
+
+        # plot quantiles
+        qvalues = np.log10([sample_results['extras']['q16'][jj],
+        		            sample_results['extras']['q50'][jj],
+        		            sample_results['extras']['q84'][jj]])
+        if plottit[jj] == 'half_time':
+            qvalues = 10**qvalues
+
+        for q in qvalues:
+        	axes[plotloc].axvline(q, ls="dashed", color='k')
+
+        # display quantiles
+        q_m = qvalues[1]-qvalues[0]
+        q_p = qvalues[2]-qvalues[1]
+
+        # format quantile display
+        fmt = "{{0:{0}}}".format(".2f").format
+        title = r"${{{0}}}_{{-{1}}}^{{+{2}}}$"
+        title = title.format(fmt(qvalues[1]), fmt(q_m), fmt(q_p))
+        if plottit[jj] != 'half_time':
+            title = "{0} = {1}".format('log'+plottit[jj],title)
+        else:
+            title = "{0} = {1}".format(plottit[jj],title)
+        axes[plotloc].set_title(title)
+
+        # axes
+        axes[plotloc].set_ylim(0, 1.1 * np.max(n))
+        axes[plotloc].set_yticklabels([])
+        axes[plotloc].xaxis.set_major_locator(MaxNLocator(5))
+	
+        # truths
+        if truths is not None:
+            if plottit[jj] in parnames:
+                plottruth = tvals[parnames == plottit[jj]]
+                axes[plotloc].axvline(x=plottruth,color='r')
+
+    return fig
 
 def add_sfh_plot(sample_results,fig,ax_loc,truths=None,fast=None):
 	
@@ -35,10 +230,16 @@ def add_sfh_plot(sample_results,fig,ax_loc,truths=None,fast=None):
 	##### FAST + normal fit SFH #####
 	if truths is None:
 	
-		colors=['blue','red']
-		for aa in xrange(1,perc.shape[1]):
-			ax_inset.plot(t, perc[:,aa,1],'-',color=colors[aa-1],alpha=0.4)
-			ax_inset.text(0.08,0.83-0.07*(aa-1), 'tau'+str(aa),transform = ax_inset.transAxes,color=colors[aa-1],fontsize=axfontsize*1.4)
+		ax_inset.fill_between(t, perc[:,0,0], perc[:,0,2], color='0.75')
+
+		#colors=['blue','red']
+		#for aa in xrange(1,perc.shape[1]):
+		#	ax_inset.plot(t, perc[:,aa,1],'-',color=colors[aa-1],alpha=0.4)
+		#	ax_inset.text(0.08,0.83-0.07*(aa-1), 'tau'+str(aa),transform = ax_inset.transAxes,color=colors[aa-1],fontsize=axfontsize*1.4)
+
+		# set up plotting range
+		plotmax_y = np.max(perc[:,0,1])
+		plotmin_y = np.min(perc[:,0,1])
 
 		# FAST SFH
 		if fast:
@@ -72,10 +273,9 @@ def add_sfh_plot(sample_results,fig,ax_loc,truths=None,fast=None):
 		ax_inset.plot(tt, pt[:,0],'-',color='blue')
 		ax_inset.text(0.08,0.83, 'truth',transform = ax_inset.transAxes,color='blue',fontsize=axfontsize*1.4)
 
-	# set up plotting range
-	# this will have to be retooled once we go back to real data...
-	plotmax_y = np.maximum(np.max(perc[:,0,1]),np.max(pt[:,0]))
-	plotmin_y = np.maximum(np.min(perc[:,0,1]),np.min(pt[:,0]))
+		# set up plotting range
+		plotmax_y = np.maximum(np.max(perc[:,0,1]),np.max(pt[:,0]))
+		plotmin_y = np.maximum(np.min(perc[:,0,1]),np.min(pt[:,0]))
 
 	# the minimum time for which the upper percentile is equal to the minimum SFR
 	# exclude any times before the 50th percentile of tage, since those are 
@@ -669,7 +869,9 @@ def sed_figure(sample_results, sps, model,
 def make_all_plots(filebase=None,
 				   outfolder=os.getenv('APPS')+'/threedhst_bsfh/plots/',
 				   sample_results=None,
-				   sps=None):
+				   sps=None,plt_chain_figure=True,
+				   plt_triangle_plot=True,
+				   plt_sed_figure=True):
 
 	'''
 	Driver. Loads output, makes all plots for a given galaxy.
@@ -750,7 +952,7 @@ def make_all_plots(filebase=None,
 		print 'MAKING TRIANGLE PLOT'
 		chopped_sample_results = copy.deepcopy(sample_results)
 
-		read_results.subtriangle(sample_results, sps, copy.deepcopy(sample_results['model']),
+		subtriangle(sample_results, sps, copy.deepcopy(sample_results['model']),
 							 outname=outfolder+filename+'_'+max(times),
 							 showpars=None,start=0,
 							 show_titles=True, truths=truths, powell_results=powell_results)
@@ -776,24 +978,18 @@ def make_all_plots(filebase=None,
  						  maxprob=1,fast=fast,truths=truths,powell=pguess,
  						  outname=outfolder+filename+'_'+max(times)+'.sed.png')
  		
-def plot_all_driver():
+def plot_all_driver(runname=None,**extras):
 
 	'''
 	for a list of galaxies, make all plots
 	'''
-
-	runname = 'dtau_intmet'
-	runname = 'dtau_genpop'
-	#runname = 'dtau_nonir'
-	#runname = 'dtau_genpop_fixedmet'
-	#runname = 'dtau_ha_zperr'
-	runname = 'dtau_ha_plog'
-	runname = 'testsed_nonoise_fast'
-	runname = 'testsed_simha_truth'
+	if runname == None:
+		runname = 'testsed_simha_truth'
 
 	filebase, parm_basename, ancilname=threed_dutils.generate_basenames(runname)
 	for jj in xrange(len(filebase)):
 		print 'iteration '+str(jj) 
 		make_all_plots(filebase=filebase[jj],\
-		               outfolder=os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/')
+		               outfolder=os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/',
+		               **extras)
 	

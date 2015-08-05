@@ -14,9 +14,9 @@ run_params = {'verbose':True,
               'outfile':os.getenv('APPS')+'/threedhst_bsfh/results/brownseds/brownseds',
               'ftol':0.5e-5, 
               'maxfev':5000,
-              'nwalkers':248,
-              'nburn':[16,16,32], 
-              'niter': 200,
+              'nwalkers':496,
+              'nburn':[32,32,64], 
+              'niter': 1000,
               'initial_disp':0.1,
               'debug': False,
               'spec': False, 
@@ -24,6 +24,7 @@ run_params = {'verbose':True,
               'datname':os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/table1.fits',
               'photname':os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/table3.fits',
               'extinctname':os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/table4.fits',
+              'herschname':os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/kingfish.brownapertures.flux.fits',
               'objname':'NGC 4889',
               }
 
@@ -38,6 +39,9 @@ def translate_filters(bfilters):
     suspect there are smarter routines to do this in python-fsps
     '''
 
+    # this is necessary for my code
+    # to calculate effective wavelength
+    # in threed_dutils
     translate = {
     'FUV': 'GALEX FUV',
     'UVW2': 'UVOT w2',
@@ -65,9 +69,17 @@ def translate_filters(bfilters):
     'W4mag': np.nan,    # two WISE4 magnitudes, what is the correction?
     "W4'mag": 'WISE W4',
     'PUIR': np.nan,    # Spitzer/IRS Red Peak Up Imaging channel (18.5-26.0um) AB magnitude
-    '[24]': 'MIPS 24um'
+    '[24]': 'MIPS 24um',
+    'pacs70': 'Herschel PACS 70um',
+    'pacs100': 'Herschel PACS 100um',
+    'pacs160': 'Herschel PACS 160um',
+    'spire250': 'Herschel SPIRE 250um',
+    'spire350': 'Herschel SPIRE 350um',
+    'spire500': 'Herschel SPIRE 500um'
     }
 
+    # this translates filter names
+    # to names that FSPS recognizes
     translate_pfsps = {
     'FUV': 'GALEX_FUV',
     'UVW2': 'UVOT_W2',
@@ -95,12 +107,18 @@ def translate_filters(bfilters):
     'W4mag': np.nan,    # two WISE4 magnitudes, what is the correction?
     "W4'mag": 'WISE_W4',
     'PUIR': np.nan,    # Spitzer/IRS Red Peak Up Imaging channel (18.5-26.0um) AB magnitude
-    '[24]': 'MIPS_24'
+    '[24]': 'MIPS_24',
+    'pacs70': 'PACS_70',
+    'pacs100': 'PACS_100',
+    'pacs160': 'PACS_160',
+    'spire250': 'SPIRE_250',
+    'spire350': 'SPIRE_350',
+    'spire500': 'SPIRE_500'
     }
 
     return np.array([translate[f] for f in bfilters]), np.array([translate_pfsps[f] for f in bfilters])
 
-def load_obs_brown(photname, extinctname, objname):
+def load_obs_brown(photname, extinctname, herschname, objname):
     """
     let's do this
     """
@@ -124,30 +142,51 @@ def load_obs_brown(photname, extinctname, objname):
     extinct = fits.open(extinctname)
     extinctions = np.array([extinct[1].data[f][idx][0] for f in extinct[1].columns.names if f != 'Name'])
 
-    # phot mask
-    phot_mask = mag != 0
-
     # adjust fluxes for extinction
-    #### should almost certainly adjust errors too !! ####
+    # then convert to maggies
     mag_adj = mag + extinctions
+    flux = 10**((-2./5)*mag_adj)
+
+    # convert uncertainty to maggies
+    # this includes dust factor?
+    unc = magunc*flux/1.086
+    #unc = unc * 10**(extinctions/(-2.5))
+
+    #### Herschel photometry
+    herschel = fits.open(herschname)
+    match = herschel[1].data['Name'] == objname.lower().replace(' ','')
+    if np.sum(match) != 1:
+        print 1/0
+
+    hflux_fields = [f for f in herschel[1].columns.names if (('pacs' in f) or ('spire' in f)) and f[-3:] != 'unc']
+    hunc_fields = [f for f in herschel[1].columns.names if (('pacs' in f) or ('spire' in f)) and f[-3:] == 'unc']
+
+    hflux = np.array([herschel[1].data[f][match][0] for f in hflux_fields])
+    hunc = np.array([herschel[1].data[f][match][0] for f in hunc_fields])
+
+    #### combine with brown catalog
+    # convert from Jy to maggies
+    flux = np.append(flux, hflux/3631.)    
+    unc = np.append(unc, hunc/3631.) 
+    mag_fields = np.append(mag_fields,hflux_fields)   
+
+    # phot mask
+    phot_mask = flux != 0
 
     # map brown filters to FSPS filters
     # and remove fields where we don't have filter definitions
     filters,fsps_filters = translate_filters(mag_fields)
     have_definition = np.array(filters) != 'nan'
+
     filters = filters[have_definition]
     fsps_filters = fsps_filters[have_definition]
-    mag_adj = mag_adj[have_definition]
-    magunc = magunc[have_definition]
+    flux = flux[have_definition]
+    unc = unc[have_definition]
     phot_mask = phot_mask[have_definition]
 
     # load wave_effective
     from translate_filter import calc_lameff_for_fsps
     wave_effective = calc_lameff_for_fsps(filters)
-
-    # convert to maggies
-    flux = 10**((-2./5)*mag_adj)
-    unc = magunc*flux/1.086
 
     # build output dictionary
     obs['wave_effective'] = wave_effective
@@ -161,10 +200,12 @@ def load_obs_brown(photname, extinctname, objname):
     # tidy up
     hdulist.close()
     extinct.close()
+    herschel.close()
 
     return obs
 
-obs = load_obs_brown(run_params['photname'], run_params['extinctname'], run_params['objname'])
+obs = load_obs_brown(run_params['photname'], run_params['extinctname'], 
+                     run_params['herschname'],run_params['objname'])
 
 #############
 # MODEL_PARAMS

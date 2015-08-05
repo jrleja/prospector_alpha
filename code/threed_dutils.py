@@ -85,16 +85,18 @@ def test_likelihood(param_file=None, sps=None, model=None, obs=None, thetas=None
 
 	return lnp_phot + lnp_prior
 
-def setup_sps(zcontinuous=2,compute_vega_magnitudes=False):
+def setup_sps(zcontinuous=2,compute_vega_magnitudes=False,filter_key=True):
 
 	'''
 	easy way to define an SPS
+	must rewrite filter_key functionality after update to most recent python-fsps filter functionality (8/3/15)
 	'''
 
 	# load stellar population, set up custom filters
 	sps = fsps.StellarPopulation(zcontinuous=zcontinuous, compute_vega_mags=compute_vega_magnitudes)
-	custom_filter_keys = os.getenv('APPS')+'/threedhst_bsfh/filters/filter_keys_threedhst.txt'
-	fsps.filters.FILTERS = model_setup.custom_filter_dict(custom_filter_keys)
+	if filter_key is None:
+		custom_filter_keys = os.getenv('APPS')+'/threedhst_bsfh/filters/filter_keys_threedhst.txt'
+		fsps.filters.FILTERS = model_setup.custom_filter_dict(custom_filter_keys)
 
 	return sps
 
@@ -195,7 +197,7 @@ def halfmass_assembly_time(sfh_params,tuniv):
 
 	return tuniv-half_time
 
-def load_truths(truthname,objname,sample_results, sps=None):
+def load_truths(truthname,objname,sample_results, sps=None, calc_prob = True):
 
 	'''
 	loads truths
@@ -223,7 +225,8 @@ def load_truths(truthname,objname,sample_results, sps=None):
 		sfr_100  = np.log10(calculate_sfr(sfh_params,deltat))
 		ssfr_100 = np.log10(calculate_sfr(sfh_params,deltat) / 10**totmass)
 		halftime = halfmass_assembly_time(sfh_params,sfh_params['tage'])
-		lnprob   = test_likelihood(sps=sps,model=sample_results['model'], obs=sample_results['obs'],thetas=truths)
+		if calc_prob == True:
+			lnprob   = test_likelihood(sps=sps,model=sample_results['model'], obs=sample_results['obs'],thetas=truths)
 	else:
 		sfh_params = None
 		sfr_100 = None
@@ -246,11 +249,14 @@ def load_truths(truthname,objname,sample_results, sps=None):
     
 	truths_dict = {'parnames':parnames,
 				   'truths':truths,
-				   'truthprob':lnprob,
 				   'plot_truths':plot_truths,
 				   'extra_parnames':np.array(['totmass','sfr_100','half_time','ssfr_100']),
 				   'extra_truths':np.array([totmass,sfr_100,halftime,ssfr_100]),
 				   'sfh_params': sfh_params}
+	
+	if calc_prob == True:
+		truths_dict['truthprob'] = lnprob
+
 	return truths_dict
 
 def running_median(x,y,nbins=10,avg=False):
@@ -289,6 +295,21 @@ def generate_basenames(runname):
 		for jj in xrange(ngals):
 			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+basename+'_'+ids[jj])
 			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
+
+	elif runname == 'brownseds':
+
+		id_list = os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/namelist.txt'
+		ids = np.loadtxt(id_list, dtype='|S20',delimiter=',')
+		ngals = len(ids)
+
+		basename = "brownseds"
+		parm_basename = basename+"_params"
+		ancilname=None
+
+		for jj in xrange(ngals):
+			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+basename+'_'+ids[jj])
+			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
+
 
 	elif 'simha' in runname:
 

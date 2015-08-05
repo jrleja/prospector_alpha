@@ -115,6 +115,94 @@ def restore_mips_info(sample_results):
 	sample_results['mips'] = mips
 	return sample_results
 
+def convergence(runname):
+
+	filebase,params,ancilname=threed_dutils.generate_basenames(runname)
+	ngals = len(filebase)
+
+	for jj in xrange(ngals):
+		# find most recent output file
+		# with the objname
+		folder = "/".join(filebase[jj].split('/')[:-1])
+		filename = filebase[jj].split("/")[-1]
+		files = [f for f in os.listdir(folder) if "_".join(f.split('_')[:-2]) == filename]	
+		times = [f.split('_')[-2] for f in files]
+
+		# if we found no files, skip this object
+		if len(times) == 0:
+			print 'Failed to find any files in '+folder+' of type ' +filename+' to extract times'
+			nfail+=1
+			continue
+
+		# load results
+		mcmc_filename=filebase[jj]+'_'+max(times)+"_mcmc"
+		model_filename=filebase[jj]+'_'+max(times)+"_model"
+
+		try:
+			sample_results, powell_results, model = read_results.read_pickles(mcmc_filename, model_file=model_filename,inmod=None)
+		except (ValueError,EOFError,KeyError):
+			print mcmc_filename + ' failed during output writing'
+			nfail+=1
+			continue
+		except IOError:
+			print mcmc_filename + ' does not exist!'
+			nfail+=1
+			continue
+
+		# load truths
+		truths = threed_dutils.load_truths(os.getenv('APPS')+'/threed'+sample_results['run_params']['truename'].split('/threed')[1],
+ 		                                   sample_results['run_params']['objname'],
+  		                                   sample_results, calc_prob = False)
+
+		# define niter windows
+		niter = sample_results['chain'].shape[1]
+		smoothing = 10
+		npoints = niter/smoothing
+
+		windows = [np.array([(f*niter/npoints),(f*niter/npoints)+smoothing]) for f in xrange(npoints)]
+		windows_center = np.array([f.mean() for f in windows])
+
+		# setup figure and output arrays
+		if jj == 0:
+			
+			# add SFR and half-time
+			extras = ['sfr_100','half_time']
+			nparams = len(sample_results['model'].theta_labels()) + len(extras)
+			labels = np.append(sample_results['model'].theta_labels(),extras)
+
+			fig, axarr = plt.subplots(nparams, 1, figsize = (10, 40))
+			fig.subplots_adjust(wspace=0.000,hspace=0.000)
+
+			median = np.zeros(shape=(nparams,ngals))
+
+		# eight parameters, plus SFR and half-time
+		for ii in xrange(nparams):
+
+			# if we're looking at classic parameters
+			if ii < len(sample_results['model'].theta_labels()):
+				chain = sample_results['chain'][:,:,ii]
+			else:
+				chain = sample_results['chain'][:,:,ii]
+
+			for kk in xrange(len(windows)):
+				median[kk,jj] = np.percentile(chain[:,windows[kk][0]:windows[kk][1]],50)
+
+			axarr[ii].errorbar(windows_center, percentile[:,1]-truths['truths'][ii], 
+				            #yerr=[percentile[:,1]-percentile[:,0],percentile[:,2]-percentile[:,1]],
+				            fmt='o', color='grey', alpha=0.5, capsize=0)
+			
+			# labels
+			if jj ==0:
+				axarr[ii].set_ylabel(labels[ii])
+				axarr[ii].get_xaxis().set_ticks([])
+				axarr[ii].hlines(0.0,axarr[ii].get_xlim()[0],axarr[ii].get_xlim()[1], linestyle='--',colors='k')
+
+		plt.savefig('test.png')
+		os.system('open test.png')
+		print 1/0
+
+
+
 def collate_output(runname,outname):
 
 	'''
