@@ -105,8 +105,8 @@ def add_to_corner(fig, sample_results, sps, model,truths=None,maxprob=True,powel
 
             # add parameter names if not covered by truths
             if truths is None:
-            	plt.figtext(0.75, ttop-0.02*(kk+1), parnames[kk]+'='+"{:.2f}".format(yplot),
-                       horizontalalignment='left',fontsize=fs)
+            	plt.figtext(0.8, ttop-0.02*(kk+1), maxprob_parnames[kk]+'='+"{:.2f}".format(yplot),
+                       horizontalalignment='right',fontsize=fs)
             else:
            		plt.figtext(0.75, ttop-0.02*(kk+1), "{:.2f}".format(yplot),
                        horizontalalignment='left',fontsize=fs)
@@ -600,7 +600,7 @@ def show_chain(sample_results,outname=None,alpha=0.6,truths=None):
 
 def comp_samples(thetas, sample_results, sps, inlog=True, photflag=0):
     specvecs =[]
-    obs, _, marker = read_results.obsdict(sample_results['obs'], photflag)
+    obs, _, marker = obsdict(sample_results['obs'], photflag)
     wave, ospec, mask = obs['wave_effective'], obs['spectrum'], obs['mask']
     mwave, mospec = wave[mask], ospec[mask]
     mounc = obs['maggies_unc'][mask]
@@ -610,7 +610,7 @@ def comp_samples(thetas, sample_results, sps, inlog=True, photflag=0):
          mounc *= mospec
 
     for theta in thetas:
-        mu, cal, delta, mask, wave = read_results.model_comp(theta, sample_results, sps,
+        mu, cal, delta, mask, wave = read_results.model_comp(theta, sample_results['model'],sample_results['obs'], sps,
                                            					 photflag=1)
 
         specvecs += [ [mu, cal, delta, mu,mospec/mu, (mospec-mu) / mounc] ]
@@ -619,7 +619,26 @@ def comp_samples(thetas, sample_results, sps, inlog=True, photflag=0):
     # mospec LOOKS like the observed spectrum, but if phot_flag=1, it's the observed maggies
     # mounc is the observed photometric uncertainty
     # specvecs is: model maggies, nothing, nothing, model maggies, observed maggies/model maggies, observed maggies-model maggies / uncertainties
-    return wave, mospec, mounc, specvecs	
+    return wave, mospec, mounc, specvecs
+
+def obsdict(inobs, photflag):
+    """
+    Return a dictionary of observational data, generated depending on
+    whether you're matching photometry or spectroscopy.
+    """
+    obs = inobs.copy()
+    if photflag == 0:
+        outn = 'spectrum'
+        marker = None
+    elif photflag == 1:
+        outn = 'sed'
+        marker = 'o'
+        obs['wavelength'] = obs['wave_effective']
+        obs['spectrum'] = obs['maggies']
+        obs['unc'] = obs['maggies_unc'] 
+        obs['mask'] = obs['phot_mask'] > 0
+        
+    return obs, outn, marker
 
 def sed_figure(sample_results, sps, model,
                 alpha=0.3, samples = [-1], powell=None,
