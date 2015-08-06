@@ -9,7 +9,7 @@
 ### Partition or queue name
 #SBATCH -p conroy,general
 ### memory per cpu, in MB
-#SBATCH --mem-per-cpu=1500
+#SBATCH --mem-per-cpu=2500
 ### Job name
 #SBATCH -J '3Drun'
 ### output and error logs

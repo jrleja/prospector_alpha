@@ -325,6 +325,14 @@ class BurstyModel(sedmodel.CSPModel):
                                 (theta[start:end], **self._config_dict[k]['prior_args']))
         return lnp_prior
 
+##### if we have KINGFISH imaging,
+##### leave dust parameters free
+if 'SPIRE_500' in obs['filters']:
+    dust_variable = True
+else:
+    dust_variable = False
+
+
 #### SET SFH PRIORS #####
 ###### REDSHIFT ######
 hdulist = fits.open(run_params['datname'])
@@ -549,21 +557,21 @@ model_params.append({'name': 'add_dust_emission', 'N': 1,
                         'prior_args': None})
 
 model_params.append({'name': 'duste_gamma', 'N': 1,
-                        'isfree': False,
+                        'isfree': dust_variable,
                         'init': 0.01,
                         'units': None,
                         'prior_function': tophat,
                         'prior_args': {'mini':0.0, 'maxi':1.0}})
 
 model_params.append({'name': 'duste_umin', 'N': 1,
-                        'isfree': False,
+                        'isfree': dust_variable,
                         'init': 1.0,
                         'units': None,
                         'prior_function': tophat,
                         'prior_args': {'mini':0.1, 'maxi':25.0}})
 
 model_params.append({'name': 'duste_qpah', 'N': 1,
-                        'isfree': False,
+                        'isfree': dust_variable,
                         'init': 3.0,
                         'units': 'percent',
                         'prior_function': tophat,
