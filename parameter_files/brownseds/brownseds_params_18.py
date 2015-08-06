@@ -42,6 +42,8 @@ def translate_filters(bfilters):
     # this is necessary for my code
     # to calculate effective wavelength
     # in threed_dutils
+    # since it reads the filter names directly
+    # from the fsps filter file
     translate = {
     'FUV': 'GALEX FUV',
     'UVW2': 'UVOT w2',
@@ -251,7 +253,7 @@ class BurstyModel(sedmodel.CSPModel):
             # constant (log) dispersion
             if par == 'logtau' or \
                par == 'metallicity' or \
-               par == 'tanslope' or \
+               par == 'sf_tanslope' or \
                par == 'delt_trunc':
                 disp[inds[0]:inds[1]] = self._config_dict[par].get('init_disp', initial_disp)
 
@@ -281,7 +283,7 @@ class BurstyModel(sedmodel.CSPModel):
             if par == 'logtau':
                 disp[inds[0]:inds[1]] = 0.25
 
-            if par == 'tanslope':
+            if par == 'sf_tanslope':
                 disp[inds[0]:inds[1]] = 0.3
 
             if par == 'dust2' or \
