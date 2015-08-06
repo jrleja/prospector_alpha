@@ -598,58 +598,46 @@ def show_chain(sample_results,outname=None,alpha=0.6,truths=None):
 		plt.savefig(outname, bbox_inches='tight',dpi=300)
 		plt.close()
 
-def comp_samples(thetas, sample_results, sps, inlog=True, photflag=0):
-    specvecs =[]
-    obs, _, marker = obsdict(sample_results['obs'], photflag)
-    wave, ospec, mask = obs['wave_effective'], obs['spectrum'], obs['mask']
-    mwave, mospec = wave[mask], ospec[mask]
-    mounc = obs['maggies_unc'][mask]
+def return_sedplot_vars(thetas, sample_results, sps, nufnu=True):
 
-    if inlog and (photflag == 0):
-         mospec = np.exp(mospec)
-         mounc *= mospec
+	'''
+	if nufnu == True: return in units of nu * fnu. Else, return maggies.
+	'''
 
-    for theta in thetas:
-        mu, cal, delta, mask, wave = read_results.model_comp(theta, sample_results['model'],sample_results['obs'], sps,
-                                           					 photflag=1)
+	# observational information
+	mask = sample_results['obs']['phot_mask']
+	wave_eff = sample_results['obs']['wave_effective'][mask]
+	obs_maggies = sample_results['obs']['maggies'][mask]
+	obs_maggies_unc = sample_results['obs']['maggies_unc'][mask]
 
-        specvecs += [ [mu, cal, delta, mu,mospec/mu, (mospec-mu) / mounc] ]
-    
-    # wave = effective wavelength of photometric bands
-    # mospec LOOKS like the observed spectrum, but if phot_flag=1, it's the observed maggies
-    # mounc is the observed photometric uncertainty
-    # specvecs is: model maggies, nothing, nothing, model maggies, observed maggies/model maggies, observed maggies-model maggies / uncertainties
-    return wave, mospec, mounc, specvecs
+	# model information
+	spec, mu ,_ = sample_results['model'].mean_model(thetas, sample_results['obs'], sps=sps)
+	mu = mu[mask]
 
-def obsdict(inobs, photflag):
-    """
-    Return a dictionary of observational data, generated depending on
-    whether you're matching photometry or spectroscopy.
-    """
-    obs = inobs.copy()
-    if photflag == 0:
-        outn = 'spectrum'
-        marker = None
-    elif photflag == 1:
-        outn = 'sed'
-        marker = 'o'
-        obs['wavelength'] = obs['wave_effective']
-        obs['spectrum'] = obs['maggies']
-        obs['unc'] = obs['maggies_unc'] 
-        obs['mask'] = obs['phot_mask'] > 0
-        
-    return obs, outn, marker
+	# output units
+	if nufnu == True:
+		c = 3e8
+		factor = c*1e10
+		mu *= factor/wave_eff
+		spec *= factor/sps.wavelengths
+		obs_maggies *= factor/wave_eff
+		obs_maggies_unc *= factor/wave_eff
+
+	# here we want to return
+	# effective wavelength of photometric bands, observed maggies, observed uncertainty, model maggies, observed_maggies-model_maggies / uncertainties
+	# model maggies, observed_maggies-model_maggies/uncertainties
+	return wave_eff, obs_maggies, obs_maggies_unc, mu, (obs_maggies-mu)/obs_maggies_unc, spec, sps.wavelengths
 
 def sed_figure(sample_results, sps, model,
-                alpha=0.3, samples = [-1], powell=None,
-                maxprob=0, outname=None, plot_init = 0, fast=True,
-                truths = None,
+                alpha=0.3, samples = [-1],
+                maxprob=0, outname=None, fast=False,
+                truths = None, agb_off = True,
                 **kwargs):
 	"""
 	Plot the photometry for the model and data (with error bars), and
 	plot residuals
 	"""
-	c = 3e8
+
 	ms = 5
 	alpha = 0.8
 	
@@ -664,35 +652,40 @@ def sed_figure(sample_results, sps, model,
 	# flatchain
 	flatchain = sample_results['flatchain']
 
-	# plot max probability model
-	mwave, mospec, mounc, specvecs = comp_samples([sample_results['quantiles']['maxprob_params']], sample_results, sps, photflag=1)
-		
-	phot.plot(np.log10(mwave), np.log10(specvecs[0][0]*(c/(mwave/1e10))), 
-		      color='#e60000', marker='o', ms=ms, linestyle=' ', label='max lnprob', 
-		      alpha=alpha, markeredgewidth=0.7,**kwargs)
+	# for maximum probability model, plot the spectrum,
+	# photometry, and chi values
+	wave_eff, obsmags, obsmags_unc, modmags, chi, modspec, modlam = return_sedplot_vars(sample_results['quantiles']['maxprob_params'], sample_results, sps)
+
+	phot.plot(np.log10(wave_eff), np.log10(modmags), color='#e60000', marker='o', ms=ms, linestyle=' ', label='max lnprob', alpha=alpha, markeredgewidth=0.7,**kwargs)
 	
-	res.plot(np.log10(mwave), specvecs[0][-1], 
+	res.plot(np.log10(wave_eff), chi, 
 		     color='#e60000', marker='o', linestyle=' ', label='max lnprob', 
 		     ms=ms,alpha=alpha,markeredgewidth=0.7,**kwargs)
 	
-	# define observations
-	xplot = np.log10(mwave)
-	yplot = np.log10(mospec*(c/(mwave/1e10)))
-	linerr_down = np.clip(mospec-mounc, 1e-80, 1e80)*(c/(mwave/1e10))
-	linerr_up = np.clip(mospec+mounc, 1e-80, 1e80)*(c/(mwave/1e10))
+	nz = modspec > 0
+	phot.plot(np.log10(modlam[nz]), np.log10(modspec[nz]), linestyle='-',
+              color='red', alpha=0.6,**kwargs)
+
+	# plot AGB-off for Charlie
+	if agb_off:
+		sample_results['model'].params['add_agb_dust_model'] = np.array(False)
+		_, _, _, _, _, modspec_off, modlam_off = return_sedplot_vars(sample_results['quantiles']['maxprob_params'], sample_results, sps)
+
+		nz = modspec > 0
+		phot.plot(np.log10(modlam_off[nz]), np.log10(modspec_off[nz]), linestyle='-',
+              color='blue', alpha=0.6,label='AGB dust off',**kwargs)
+
+	# define observations for later use
+	xplot = np.log10(wave_eff)
+	yplot = np.log10(obsmags)
+	linerr_down = np.clip(obsmags-obsmags_unc, 1e-80, np.inf)
+	linerr_up = np.clip(obsmags+obsmags_unc, 1e-80, np.inf)
 	yerr = [yplot - np.log10(linerr_down), np.log10(linerr_up)-yplot]
 
 	# set up plot limits
 	phot.set_xlim(min(xplot)*0.9,max(xplot)*1.04)
 	phot.set_ylim(min(yplot[np.isfinite(yplot)])*0.7,max(yplot[np.isfinite(yplot)])*1.04)
 	res.set_xlim(min(xplot)*0.9,max(xplot)*1.04)
-
-	# add most likely spectrum
-	spec,_,w = model.mean_model(sample_results['quantiles']['maxprob_params'], sample_results['obs'], sps=sps)
-	nz = spec > 0
-
-	phot.plot(np.log10(w[nz]), np.log10(spec[nz]*(c/(w[nz]/1e10))), linestyle='-',
-              color='red', alpha=0.6,**kwargs)
 
     # PLOT OBSERVATIONS + ERRORS 
 	phot.errorbar(xplot, yplot, yerr=yerr,
@@ -722,25 +715,13 @@ def sed_figure(sample_results, sps, model,
 		# then this will be passing parameters to the wrong model. pass.
 		# in future, attach a model to the truths file!
 		try:
-			mwave_truth, mospec_truth, mounc_truth, specvecs_truth = comp_samples([truths['truths']], sample_results, sps, photflag=1)
+			wave_eff, _, _, _, chi_truth, _, _ = return_sedplot_vars(sample_results['quantiles']['maxprob_params'], sample_results, sps)
 
-			res.plot(np.log10(mwave_truth), specvecs_truth[0][-1], 
+			res.plot(np.log10(wave_eff_truth), chi_truth, 
 				     color='blue', marker='o', linestyle=' ', label='truths', 
 				     ms=ms,alpha=0.3,markeredgewidth=0.7,**kwargs)
 		except AssertionError:
 			pass
-
-	# plot Powell minimization answer
-	if powell is not None:
-		mwave_powell, mospec_powell, mounc_powell, specvecs_powell = comp_samples([powell], sample_results, sps, photflag=1)
-		
-		phot.plot(np.log10(mwave_powell), np.log10(specvecs_powell[0][0]*(c/(mwave_powell/1e10))), 
-			      color='purple', marker='o', ms=ms, linestyle=' ', label='powell', 
-			      alpha=alpha, markeredgewidth=0.7,**kwargs)
-
-		#res.plot(np.log10(mwave_powell), specvecs_powell[0][-1], 
-		#	     color='purple', marker='o', linestyle=' ', label='powell', 
-		#	     ms=ms,alpha=0.3,markeredgewidth=0.7,**kwargs)
 
 	# add SFH plot
 	ax_loc = [0.2,0.35,0.12,0.14]
@@ -765,14 +746,14 @@ def sed_figure(sample_results, sps, model,
 	deltay = (phot.get_ylim()[1]-phot.get_ylim()[0])*0.038
 
 	# calculate reduced chi-squared
-	chisq=np.sum(specvecs[0][-1]**2)
+	chisq=np.sum(chi**2)
 	ndof = np.sum(sample_results['obs']['phot_mask']) - len(sample_results['model'].free_params)-1
 	reduced_chisq = chisq/(ndof-1)
 
 	# also calculate for truths if truths exist
 	if truths is not None:
 		try:
-			chisq_truth=np.sum(specvecs_truth[0][-1]**2)
+			chisq_truth=np.sum(chi_truth**2)
 			reduced_chisq_truth = chisq_truth/(ndof-1)
 			phot.text(textx, texty, r'best-fit $\chi^2_n$='+"{:.2f}".format(reduced_chisq)+' (true='
 				      +"{:.2f}".format(reduced_chisq_truth)+')',
@@ -888,9 +869,9 @@ def sed_figure(sample_results, sps, model,
 def make_all_plots(filebase=None,
 				   outfolder=os.getenv('APPS')+'/threedhst_bsfh/plots/',
 				   sample_results=None,
-				   sps=None,plt_chain_figure=True,
-				   plt_triangle_plot=True,
-				   plt_sed_figure=True):
+				   sps=None,plt_chain=True,
+				   plt_triangle=True,
+				   plt_sed=True):
 
 	'''
 	Driver. Loads output, makes all plots for a given galaxy.
@@ -960,14 +941,14 @@ def make_all_plots(filebase=None,
 	sample_results = create_plotquant(sample_results, truths=truths)
 	sample_results['extents'] = return_extent(sample_results)
     # chain plot
-	if plt_chain_figure: 
+	if plt_chain: 
 		print 'MAKING CHAIN PLOT'
 		show_chain(sample_results,
 	               outname=outfolder+filename+'_'+max(times)+".chain.png",
 			       alpha=0.3,truths=truths)
 
 	# triangle plot
-	if plt_triangle_plot: 
+	if plt_triangle: 
 		print 'MAKING TRIANGLE PLOT'
 		chopped_sample_results = copy.deepcopy(sample_results)
 
@@ -977,7 +958,7 @@ def make_all_plots(filebase=None,
 							 show_titles=True, truths=truths, powell_results=powell_results)
 
 	# sed plot
-	if plt_sed_figure:
+	if plt_sed:
 		print 'MAKING SED PLOT'
 		
 		# FAST fit?
@@ -986,15 +967,10 @@ def make_all_plots(filebase=None,
 			fast=1
 		except:
 			fast=0
-		
-		# powell guess?
-		#bestpowell=np.argmin([p.fun for p in powell_results])
-		#pguess = powell_results[bestpowell].x
-		pguess = None
 
  		# plot
  		pfig = sed_figure(sample_results, sps, copy.deepcopy(sample_results['model']),
- 						  maxprob=1,fast=fast,truths=truths,powell=pguess,
+ 						  maxprob=1,fast=fast,truths=truths,
  						  outname=outfolder+filename+'_'+max(times)+'.sed.png')
  		
 def plot_all_driver(runname=None,**extras):
