@@ -225,7 +225,7 @@ def transform_logtau_to_tau(tau=None, logtau=None, **extras):
 
 def add_dust1(dust2=None, **extras):
 
-    return 1.86*dust2
+    return 0.86*dust2
 
 class BurstyModel(sedmodel.CSPModel):
 
