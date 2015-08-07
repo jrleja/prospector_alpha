@@ -368,7 +368,11 @@ def plot_sfh(sample_results,nsamp=1000,ncomp=1):
 		sfh_params = threed_dutils.find_sfh_params(sample_results['model'],flatchain[mm,:])
 
 		if mm == 0:
-			t,step=np.linspace(0,14.0,num=nt,retstep=True)
+			# set up time vector
+			idx = np.array(sample_results['model'].theta_labels()) == 'tage'
+			maxtime = np.max(flatchain[:nsamp,idx])
+
+			t,step=np.linspace(0,maxtime,num=nt,retstep=True)
 
 		# calculate new time vector such that
 		# the spacing from tage back to zero
@@ -922,9 +926,10 @@ def make_all_plots(filebase=None,
 	if not sps:
 		# load stellar population, set up custom filters
 		if np.sum([1 for x in sample_results['model'].config_list if x['name'] == 'pmetals']) > 0:
-			sps = threed_dutils.setup_sps()
+			sps = threed_dutils.setup_sps(custom_filter_key=sample_results['model']['run_params'].get('custom_filter_key',None))
 		else:
-			sps = threed_dutils.setup_sps(zcontinuous=1)
+			sps = threed_dutils.setup_sps(zcontinuous=1,
+										  custom_filter_key=sample_results['model']['run_params'].get('custom_filter_key',None))
 
 	# BEGIN PLOT ROUTINE
 	print 'MAKING PLOTS FOR ' + filename + ' in ' + outfolder

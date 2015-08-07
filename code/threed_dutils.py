@@ -85,7 +85,7 @@ def test_likelihood(param_file=None, sps=None, model=None, obs=None, thetas=None
 
 	return lnp_phot + lnp_prior
 
-def setup_sps(zcontinuous=2,compute_vega_magnitudes=False,filter_key=True):
+def setup_sps(zcontinuous=2,compute_vega_magnitudes=False,custom_filter_key=None):
 
 	'''
 	easy way to define an SPS
@@ -94,9 +94,9 @@ def setup_sps(zcontinuous=2,compute_vega_magnitudes=False,filter_key=True):
 
 	# load stellar population, set up custom filters
 	sps = fsps.StellarPopulation(zcontinuous=zcontinuous, compute_vega_mags=compute_vega_magnitudes)
-	if filter_key is None:
-		custom_filter_keys = os.getenv('APPS')+'/threedhst_bsfh/filters/filter_keys_threedhst.txt'
-		fsps.filters.FILTERS = model_setup.custom_filter_dict(custom_filter_keys)
+	if custom_filter_key is not None:
+		# os.getenv('APPS')+'/threedhst_bsfh/filters/filter_keys_threedhst.txt'
+		fsps.filters.FILTERS = model_setup.custom_filter_dict(custom_filter_key)
 
 	return sps
 

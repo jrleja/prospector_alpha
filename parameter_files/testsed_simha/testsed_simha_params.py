@@ -26,6 +26,7 @@ run_params = {'verbose':True,
               'phot':True,
               'photname':os.getenv('APPS')+'/threedhst_bsfh/data/testsed_simha_truth.cat',
               'truename':os.getenv('APPS')+'/threedhst_bsfh/data/testsed_simha_truth.dat',
+              'custom_filter_key': os.getenv('APPS')+'/threedhst_bsfh/filters/filter_keys_threedhst.txt',
               'objname':'1',
               }
 

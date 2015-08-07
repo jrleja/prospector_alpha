@@ -164,6 +164,9 @@ def load_obs_brown(photname, extinctname, herschname, objname):
     hflux = np.array([herschel[1].data[f][match][0] for f in hflux_fields])
     hunc = np.array([herschel[1].data[f][match][0] for f in hunc_fields])
 
+    # 5% error floor
+    hunc = np.clip(hunc, hflux*0.05, np.inf)
+
     #### combine with brown catalog
     # convert from Jy to maggies
     flux = np.append(flux, hflux/3631.)    

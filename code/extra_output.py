@@ -52,10 +52,12 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 	# initialize sps
 	# check to see if we want zcontinuous=2 (i.e., the MDF)
 	if np.sum([1 for x in sample_results['model'].config_list if x['name'] == 'pmetals']) > 0:
-		sps = threed_dutils.setup_sps(zcontinuous=2)
+		sps = threed_dutils.setup_sps(zcontinuous=2,
+			                          custom_filter_key=sample_results['model']['run_params'].get('custom_filter_key',None))
 		print 'zcontinuous=2'
 	else:
-		sps = threed_dutils.setup_sps(zcontinuous=1)
+		sps = threed_dutils.setup_sps(zcontinuous=1,
+			                          custom_filter_key=sample_results['model']['run_params'].get('custom_filter_key',None))
 		print 'zcontinuous=1'
 
 	# maxprob
