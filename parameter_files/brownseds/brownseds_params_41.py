@@ -128,19 +128,22 @@ def load_obs_brown(photname, extinctname, herschname, objname):
     hdulist = fits.open(photname)
 
     # find object
-    idx = hdulist[1].data['Name'] == objname
+    if objname is not None:
+        idx = hdulist[1].data['Name'] == objname
+    else:
+        idx = np.arange(0,len(hdulist[1].data['Name']))
     
     # extract fluxes+uncertainties for all objects
     mag_fields = [f for f in hdulist[1].columns.names if (f[0:2] != 'e_') and (f != 'Name')]
     magunc_fields = [f for f in hdulist[1].columns.names if f[0:2] == 'e_']
 
     # extract fluxes for particular object
-    mag = np.array([hdulist[1].data[f][idx][0] for f in mag_fields])
-    magunc  = np.array([hdulist[1].data[f][idx][0] for f in magunc_fields])
+    mag = np.array([np.squeeze(hdulist[1].data[f][idx]) for f in mag_fields])
+    magunc  = np.array([np.squeeze(hdulist[1].data[f][idx]) for f in magunc_fields])
 
     # extinctions
     extinct = fits.open(extinctname)
-    extinctions = np.array([extinct[1].data[f][idx][0] for f in extinct[1].columns.names if f != 'Name'])
+    extinctions = np.array([np.squeeze(extinct[1].data[f][idx]) for f in extinct[1].columns.names if f != 'Name'])
 
     # adjust fluxes for extinction
     # then convert to maggies
@@ -154,27 +157,30 @@ def load_obs_brown(photname, extinctname, herschname, objname):
 
     #### Herschel photometry
     herschel = fits.open(herschname)
-    match = herschel[1].data['Name'] == objname.lower().replace(' ','')
-    if np.sum(match) != 1:
-        print 1/0
+    if objname is not None:
+        match = herschel[1].data['Name'] == objname.lower().replace(' ','')
+    else:
+        match = np.arange(0,len(herschel[1].data['Name']))
 
     hflux_fields = [f for f in herschel[1].columns.names if (('pacs' in f) or ('spire' in f)) and f[-3:] != 'unc']
     hunc_fields = [f for f in herschel[1].columns.names if (('pacs' in f) or ('spire' in f)) and f[-3:] == 'unc']
 
-    hflux = np.array([herschel[1].data[f][match][0] for f in hflux_fields])
-    hunc = np.array([herschel[1].data[f][match][0] for f in hunc_fields])
+    hflux = np.array([np.squeeze(herschel[1].data[f][match]) for f in hflux_fields])
+    hunc = np.array([np.squeeze(herschel[1].data[f][match]) for f in hunc_fields])
 
     # 5% error floor
     hunc = np.clip(hunc, hflux*0.05, np.inf)
 
     #### combine with brown catalog
     # convert from Jy to maggies
-    flux = np.append(flux, hflux/3631.)    
-    unc = np.append(unc, hunc/3631.) 
+    flux = np.concatenate((flux,hflux/3631.))   
+    unc = np.concatenate((unc, hunc/3631.))
     mag_fields = np.append(mag_fields,hflux_fields)   
 
     # phot mask
-    phot_mask = flux != 0
+    phot_mask_brown = mag != 0
+    phot_mask_hersch = hflux != 0
+    phot_mask = np.concatenate((phot_mask_brown,phot_mask_hersch))
 
     # map brown filters to FSPS filters
     # and remove fields where we don't have filter definitions
@@ -341,6 +347,7 @@ else:
 hdulist = fits.open(run_params['datname'])
 idx = hdulist[1].data['Name'] == run_params['objname']
 zred =  hdulist[1].data['cz'][idx][0] / 3e5
+hdulist.close()
 
 #### TUNIV #####
 tuniv = WMAP9.age(zred).value
