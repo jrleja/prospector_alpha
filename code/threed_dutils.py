@@ -558,8 +558,8 @@ def return_fast_sed(fastname,objname, sps=None, obs=None, dustem = False):
 		model.params['add_agb_dust_model'] = np.array(True)
 
 
-	spec, mags, w = model.mean_model(model.initial_theta, obs, sps=sps, norm_spec=True)
-
+	spec, mags,sm = model.mean_model(model.initial_theta, obs, sps=sps, norm_spec=True)
+	w = sps.wavelengths
 	return spec,mags,w,fast,fields
 
 
@@ -799,8 +799,9 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None, measure_ir 
 		# nebon
 		model.params['add_neb_emission'] = np.array(True)
 		model.params['add_neb_continuum'] = np.array(True)
-		spec,mags,w = model.mean_model(thetas, obs, sps=sps, norm_spec=False)
-		
+		spec,mags,sm = model.mean_model(thetas, obs, sps=sps, norm_spec=False)
+		w = sps.wavelengths
+
 		# switch to flam
 		factor = 3e18 / w**2
 		spec *= factor
@@ -844,7 +845,8 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None, measure_ir 
 		              [np.concatenate((edgetrans,np.ones(100),edgetrans))]]
 
 		# calculate z=0 magnitudes
-		spec_neboff,mags_neboff,w = model.mean_model(thetas, obs, sps=sps,norm_spec=False)
+		spec_neboff,mags_neboff,sm = model.mean_model(thetas, obs, sps=sps,norm_spec=False)
+		w = sps.wavelengths
 
 		_,lir     = integrate_mag(w,spec_neboff,lir_filter, z=None, alt_file=None) # comes out in ergs/s
 		lir       = lir / 3.846e33 #  convert to Lsun

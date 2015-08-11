@@ -261,7 +261,10 @@ class BurstyModel(sedmodel.CSPModel):
             if par == 'logtau' or \
                par == 'metallicity' or \
                par == 'sf_tanslope' or \
-               par == 'delt_trunc':
+               par == 'delt_trunc' or \
+               par == 'duste_umin' or \
+               par == 'duste_qpah' or \
+               par == 'duste_gamma':
                 disp[inds[0]:inds[1]] = self._config_dict[par].get('init_disp', initial_disp)
 
             # fractional dispersion with artificial floor
@@ -296,6 +299,15 @@ class BurstyModel(sedmodel.CSPModel):
             if par == 'dust2' or \
                par == 'dust_index':
                 disp[inds[0]:inds[1]] = 0.15
+
+            if par == 'duste_umin':
+                disp[inds[0]:inds[1]] = 1.5
+
+            if par == 'duste_qpah':
+                disp[inds[0]:inds[1]] = 1.0
+
+            if par == 'duste_gamma':
+                disp[inds[0]:inds[1]] = 0.1
 
             # 15% floor
             if par == 'tage':
@@ -576,6 +588,7 @@ model_params.append({'name': 'duste_gamma', 'N': 1,
 model_params.append({'name': 'duste_umin', 'N': 1,
                         'isfree': dust_variable,
                         'init': 1.0,
+                        'init_disp': 3.0,
                         'units': None,
                         'prior_function': tophat,
                         'prior_args': {'mini':0.1, 'maxi':25.0}})
@@ -583,6 +596,7 @@ model_params.append({'name': 'duste_umin', 'N': 1,
 model_params.append({'name': 'duste_qpah', 'N': 1,
                         'isfree': dust_variable,
                         'init': 3.0,
+                        'init_disp': 2.0,
                         'units': 'percent',
                         'prior_function': tophat,
                         'prior_args': {'mini':0.0, 'maxi':10.0}})

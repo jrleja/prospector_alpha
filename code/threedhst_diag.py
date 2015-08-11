@@ -926,10 +926,10 @@ def make_all_plots(filebase=None,
 	if not sps:
 		# load stellar population, set up custom filters
 		if np.sum([1 for x in sample_results['model'].config_list if x['name'] == 'pmetals']) > 0:
-			sps = threed_dutils.setup_sps(custom_filter_key=sample_results['model']['run_params'].get('custom_filter_key',None))
+			sps = threed_dutils.setup_sps(custom_filter_key=sample_results['run_params'].get('custom_filter_key',None))
 		else:
 			sps = threed_dutils.setup_sps(zcontinuous=1,
-										  custom_filter_key=sample_results['model']['run_params'].get('custom_filter_key',None))
+										  custom_filter_key=sample_results['run_params'].get('custom_filter_key',None))
 
 	# BEGIN PLOT ROUTINE
 	print 'MAKING PLOTS FOR ' + filename + ' in ' + outfolder
