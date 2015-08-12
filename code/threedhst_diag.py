@@ -208,13 +208,13 @@ def add_to_corner(fig, sample_results, sps, model,truths=None,maxprob=True,powel
 
     return fig
 
-def add_sfh_plot(sample_results,fig,ax_loc,truths=None,fast=None):
+def add_sfh_plot(sample_results,fig,ax_loc,sps,truths=None,fast=None):
 	
 	'''
 	add a small SFH plot at ax_loc
 	'''
 
-	t, perc = plot_sfh(sample_results, ncomp=sample_results['ncomp'])
+	t, perc = plot_sfh(sample_results, ncomp=sample_results['ncomp'],sps)
 	perc = np.log10(perc)
 	axfontsize=4
 	
@@ -365,7 +365,7 @@ def plot_sfh(sample_results,nsamp=1000,ncomp=1):
 	for mm in xrange(nsamp):
 
 		# SFH parameter vector
-		sfh_params = threed_dutils.find_sfh_params(sample_results['model'],flatchain[mm,:])
+		sfh_params = threed_dutils.find_sfh_params(sample_results['model'],flatchain[mm,:],sample_results['obs'],sps)
 
 		if mm == 0:
 			# set up time vector
@@ -635,7 +635,7 @@ def return_sedplot_vars(thetas, sample_results, sps, nufnu=True):
 def sed_figure(sample_results, sps, model,
                 alpha=0.3, samples = [-1],
                 maxprob=0, outname=None, fast=False,
-                truths = None, agb_off = True,
+                truths = None, agb_off = False,
                 **kwargs):
 	"""
 	Plot the photometry for the model and data (with error bars), and
@@ -729,7 +729,7 @@ def sed_figure(sample_results, sps, model,
 
 	# add SFH plot
 	ax_loc = [0.2,0.35,0.12,0.14]
-	add_sfh_plot(sample_results,fig,ax_loc,truths=truths,fast=fast)
+	add_sfh_plot(sample_results,fig,ax_loc,sps,truths=truths,fast=fast)
 
 	# add RGB
 	try:

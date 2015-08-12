@@ -7,7 +7,7 @@ from scipy.integrate import simps
 from calc_ml import load_filter_response
 from bsfh.likelihood import LikelihoodFunction
 
-def find_sfh_params(model,theta):
+def find_sfh_params(model,theta,obs,sps):
 
 	str_sfh_parms = ['sfh','mass','tau','sf_start','tage','sf_trunc','sf_slope']
 	parnames = model.theta_labels()
@@ -29,6 +29,11 @@ def find_sfh_params(model,theta):
 
 	iterable = [(str_sfh_parms[ii],sfh_out[ii]) for ii in xrange(len(sfh_out))]
 	out = {key: value for (key, value) in iterable}
+
+	# Need this because mass is 
+	# current mass, not total mass formed!
+	_,_,_=model.sed(theta, obs, sps=sps)
+	out['mformed'] = out['mass'] / sps.stellar_mass
 
 	return out
 
@@ -220,7 +225,7 @@ def load_truths(truthname,objname,sample_results, sps=None, calc_prob = True):
 
 	# SFH parameters
 	if sample_results is not None:
-		sfh_params = find_sfh_params(sample_results['model'],truths)
+		sfh_params = find_sfh_params(sample_results['model'],truths,sample_results['obs'],sps)
 		deltat=0.1
 		sfr_100  = np.log10(calculate_sfr(sfh_params,deltat))
 		ssfr_100 = np.log10(calculate_sfr(sfh_params,deltat) / 10**totmass)
@@ -675,10 +680,10 @@ def calculate_sfr(sfh_params, timescale, tcalc = None, minsfr = None, maxsfr = N
 
 	sfr=integrate_sfh(tcalc-timescale,
 		              tcalc,
-		              sfh_params)*np.sum(sfh_params['mass'])/(timescale*1e9)
+		              sfh_params)*np.sum(sfh_params['mformed'])/(timescale*1e9)
 
 	if minsfr is None:
-		minsfr = np.sum(sfh_params['mass']) / (sfh_params['tage']*1e9*10000)
+		minsfr = np.sum(sfh_params['mformed']) / (sfh_params['tage']*1e9*10000)
 
 	if maxsfr is None:
 		maxsfr = np.inf
