@@ -131,7 +131,7 @@ def load_obs_brown(photname, extinctname, herschname, objname):
     if objname is not None:
         idx = hdulist[1].data['Name'] == objname
     else:
-        idx = np.arange(0,len(hdulist[1].data['Name']))
+        idx = np.ones(len(hdulist[1].data['Name']),dtype=bool)
     
     # extract fluxes+uncertainties for all objects
     mag_fields = [f for f in hdulist[1].columns.names if (f[0:2] != 'e_') and (f != 'Name')]
@@ -157,16 +157,28 @@ def load_obs_brown(photname, extinctname, herschname, objname):
 
     #### Herschel photometry
     herschel = fits.open(herschname)
-    if objname is not None:
-        match = herschel[1].data['Name'] == objname.lower().replace(' ','')
-    else:
-        match = np.arange(0,len(herschel[1].data['Name']))
-
+    
+    # find interesting fields
     hflux_fields = [f for f in herschel[1].columns.names if (('pacs' in f) or ('spire' in f)) and f[-3:] != 'unc']
     hunc_fields = [f for f in herschel[1].columns.names if (('pacs' in f) or ('spire' in f)) and f[-3:] == 'unc']
 
-    hflux = np.array([np.squeeze(herschel[1].data[f][match]) for f in hflux_fields])
-    hunc = np.array([np.squeeze(herschel[1].data[f][match]) for f in hunc_fields])
+    # different versions if objname is passed or no
+    if objname is not None:
+        match = herschel[1].data['Name'] == objname.lower().replace(' ','')
+        
+        hflux = np.array([np.squeeze(herschel[1].data[match][hflux_fields[i]]) for i in xrange(len(hflux_fields))])
+        hunc = np.array([np.squeeze(herschel[1].data[match][f]) for f in hunc_fields])
+    else:
+        optnames = hdulist[1].data['Name']
+        hnames   = herschel[1].data['Name']
+
+        # non-pythonic, i know, but why change it if it works?
+        hflux,hunc = np.zeros(shape=(len(hflux_fields),len(hnames))), np.zeros(shape=(len(hflux_fields),len(hnames)))
+        for ii in xrange(len(optnames)):
+            match = hnames == optnames[ii].lower().replace(' ','')
+            for kk in xrange(len(hflux_fields)):
+                hflux[kk,ii] = herschel[1].data[match][hflux_fields[kk]]
+                hunc[kk,ii]  = herschel[1].data[match][hunc_fields[kk]]
 
     # 5% error floor
     hunc = np.clip(hunc, hflux*0.05, np.inf)
@@ -205,6 +217,10 @@ def load_obs_brown(photname, extinctname, herschname, objname):
     obs['maggies_unc'] =  unc
     obs['wavelength'] = None
     obs['spectrum'] = None
+
+    if objname is None:
+        obs['hnames'] = herschel[1].data['Name']
+        obs['names'] = hdulist[1].data['Name']
 
     # tidy up
     hdulist.close()
