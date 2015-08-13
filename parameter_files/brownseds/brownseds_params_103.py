@@ -147,13 +147,11 @@ def load_obs_brown(photname, extinctname, herschname, objname):
 
     # adjust fluxes for extinction
     # then convert to maggies
-    mag_adj = mag + extinctions
+    mag_adj = mag - extinctions
     flux = 10**((-2./5)*mag_adj)
 
     # convert uncertainty to maggies
-    # this includes dust factor?
     unc = magunc*flux/1.086
-    #unc = unc * 10**(extinctions/(-2.5))
 
     #### Herschel photometry
     herschel = fits.open(herschname)
@@ -317,13 +315,13 @@ class BurstyModel(sedmodel.CSPModel):
                 disp[inds[0]:inds[1]] = 0.15
 
             if par == 'duste_umin':
-                disp[inds[0]:inds[1]] = 1.5
+                disp[inds[0]:inds[1]] = 4.5
 
             if par == 'duste_qpah':
-                disp[inds[0]:inds[1]] = 1.0
+                disp[inds[0]:inds[1]] = 3.0
 
             if par == 'duste_gamma':
-                disp[inds[0]:inds[1]] = 0.1
+                disp[inds[0]:inds[1]] = 0.2
 
             # 15% floor
             if par == 'tage':
@@ -597,6 +595,7 @@ model_params.append({'name': 'add_dust_emission', 'N': 1,
 model_params.append({'name': 'duste_gamma', 'N': 1,
                         'isfree': dust_variable,
                         'init': 0.01,
+                        'init_disp': 0.2,
                         'units': None,
                         'prior_function': tophat,
                         'prior_args': {'mini':0.0, 'maxi':1.0}})
@@ -604,7 +603,7 @@ model_params.append({'name': 'duste_gamma', 'N': 1,
 model_params.append({'name': 'duste_umin', 'N': 1,
                         'isfree': dust_variable,
                         'init': 1.0,
-                        'init_disp': 3.0,
+                        'init_disp': 5.0,
                         'units': None,
                         'prior_function': tophat,
                         'prior_args': {'mini':0.1, 'maxi':25.0}})
@@ -612,7 +611,7 @@ model_params.append({'name': 'duste_umin', 'N': 1,
 model_params.append({'name': 'duste_qpah', 'N': 1,
                         'isfree': dust_variable,
                         'init': 3.0,
-                        'init_disp': 2.0,
+                        'init_disp': 3.0,
                         'units': 'percent',
                         'prior_function': tophat,
                         'prior_args': {'mini':0.0, 'maxi':10.0}})
