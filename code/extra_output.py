@@ -95,7 +95,7 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 		    
 		# extract sfh parameters
 		# the ELSE finds SFH parameters that are NOT part of the chain
-		sfh_params = threed_dutils.find_sfh_params(sample_results['model'],flatchain[jj,:])
+		sfh_params = threed_dutils.find_sfh_params(sample_results['model'],flatchain[jj,:],sample_results['obs'],sps)
 
 		# calculate half-mass assembly time, sfr
 		half_time[jj] = threed_dutils.halfmass_assembly_time(sfh_params,sfh_params['tage'])

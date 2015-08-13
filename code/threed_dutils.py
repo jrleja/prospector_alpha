@@ -273,7 +273,7 @@ def running_median(x,y,nbins=10,avg=False):
 		running_median = np.array([np.median(y[idx-1==k]) for k in range(nbins)])
 	else:
 		running_median = np.array([np.mean(y[idx-1==k]) for k in range(nbins)])
-	bins = bins-delta/2.
+	bins = bins+delta/2.
 
 	# remove empty
 	empty = np.isnan(running_median) == 1

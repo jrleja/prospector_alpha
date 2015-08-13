@@ -65,7 +65,7 @@ def add_to_corner(fig, sample_results, sps, model,truths=None,maxprob=True,powel
 	# will want to put them in axes[6-8] or something
     axes = fig.get_axes()
 	
-    plotquant = np.log10(sample_results['extras'].get('flatchain',None))
+    plotquant = sample_results['extras'].get('flatchain',None)
     plottit   = sample_results['extras'].get('parnames',None)
 
     to_show = ['half_time','ssfr_100','sfr_100']
@@ -148,63 +148,60 @@ def add_to_corner(fig, sample_results, sps, model,truths=None,maxprob=True,powel
 
     plotloc   = 2
     for jj in xrange(len(plottit)):
-		
-        if showing[jj] == 0:
-            continue
-        plotloc += 1
 
-        axes[plotloc].set_visible(True)
-        axes[plotloc].set_frame_on(True)
+		if showing[jj] == 0:
+		    continue
+		plotloc += 1
 
-        if plottit[jj] == 'half_time':
-            plotquant[:,jj] = 10**plotquant[:,jj]
+		axes[plotloc].set_visible(True)
+		axes[plotloc].set_frame_on(True)
 
-        # Plot the histograms.
-        try:
-            n, b, p = axes[plotloc].hist(plotquant[:,jj], bins=50,
-                              histtype="step",color='k',
-                              range=[np.min(plotquant[:,jj]),np.max(plotquant[:,jj])])
-        except:
-            plt.close()
-            print np.min(plotquant[:,jj])
-            print np.max(plotquant[:,jj])
-            print 1/0
+		# Plot the histograms.
+		try:
+		    n, b, p = axes[plotloc].hist(plotquant[:,jj], bins=50,
+		                      histtype="step",color='k',
+		                      range=[np.min(plotquant[:,jj]),np.max(plotquant[:,jj])])
+		except:
+		    plt.close()
+		    print np.min(plotquant[:,jj])
+		    print np.max(plotquant[:,jj])
+		    print 1/0
 
 
-        # plot quantiles
-        qvalues = np.log10([sample_results['extras']['q16'][jj],
-        		            sample_results['extras']['q50'][jj],
-        		            sample_results['extras']['q84'][jj]])
-        if plottit[jj] == 'half_time':
-            qvalues = 10**qvalues
+		# plot quantiles
+		qvalues = np.log10([sample_results['extras']['q16'][jj],
+				            sample_results['extras']['q50'][jj],
+				            sample_results['extras']['q84'][jj]])
 
-        for q in qvalues:
-        	axes[plotloc].axvline(q, ls="dashed", color='k')
+		qvalues = 10**qvalues
 
-        # display quantiles
-        q_m = qvalues[1]-qvalues[0]
-        q_p = qvalues[2]-qvalues[1]
+		for q in qvalues:
+			axes[plotloc].axvline(q, ls="dashed", color='k')
 
-        # format quantile display
-        fmt = "{{0:{0}}}".format(".2f").format
-        title = r"${{{0}}}_{{-{1}}}^{{+{2}}}$"
-        title = title.format(fmt(qvalues[1]), fmt(q_m), fmt(q_p))
-        if plottit[jj] != 'half_time':
-            title = "{0} = {1}".format('log'+plottit[jj],title)
-        else:
-            title = "{0} = {1}".format(plottit[jj],title)
-        axes[plotloc].set_title(title)
+		# display quantiles
+		q_m = qvalues[1]-qvalues[0]
+		q_p = qvalues[2]-qvalues[1]
 
-        # axes
-        axes[plotloc].set_ylim(0, 1.1 * np.max(n))
-        axes[plotloc].set_yticklabels([])
-        axes[plotloc].xaxis.set_major_locator(MaxNLocator(5))
+		# format quantile display
+		fmt = "{{0:{0}}}".format(".2e").format
+		title = r"${{{0}}}_{{-{1}}}^{{+{2}}}$"
+		title = title.format(fmt(qvalues[1]), fmt(q_m), fmt(q_p))
+		title = "{0}={1}".format(plottit[jj],title)
+		axes[plotloc].set_title(title)
+
+		# axes
+		# set min/max
+		axes[plotloc].set_xlim(np.percentile(plotquant[:,jj],0.5),
+							  np.percentile(plotquant[:,jj],99.5))
+		axes[plotloc].set_ylim(0, 1.1 * np.max(n))
+		axes[plotloc].set_yticklabels([])
+		axes[plotloc].xaxis.set_major_locator(MaxNLocator(5))
 	
-        # truths
-        if truths is not None:
-            if plottit[jj] in parnames:
-                plottruth = tvals[parnames == plottit[jj]]
-                axes[plotloc].axvline(x=plottruth,color='r')
+		# truths
+		if truths is not None:
+		    if plottit[jj] in parnames:
+		        plottruth = tvals[parnames == plottit[jj]]
+		        axes[plotloc].axvline(x=plottruth,color='r')
 
     return fig
 
@@ -214,7 +211,7 @@ def add_sfh_plot(sample_results,fig,ax_loc,sps,truths=None,fast=None):
 	add a small SFH plot at ax_loc
 	'''
 
-	t, perc = plot_sfh(sample_results, ncomp=sample_results['ncomp'],sps)
+	t, perc = plot_sfh(sample_results, sps, ncomp=sample_results['ncomp'])
 	perc = np.log10(perc)
 	axfontsize=4
 	
@@ -337,7 +334,7 @@ def plot_sfh_single(truths,parnames,ncomp=1):
 
 	return t[::-1], intsfr
 
-def plot_sfh(sample_results,nsamp=1000,ncomp=1):
+def plot_sfh(sample_results,sps,nsamp=1000,ncomp=1):
 
 	'''
 	create sfh for plotting purposes
@@ -509,14 +506,12 @@ def return_extent(sample_results):
 			mini = priors['mini']
 			maxi = priors['maxi']
 
-		if extent[0] == extent[1]:
-			extent = (extent[0]*0.8,extent[0]*1.2)
-		else:
-			extend = (extent[1]-extent[0])*0.12
-			if np.abs(0.5*(mini-extent[0])/(mini+extent[0])) < 1e-4:
-				extent[0]=extent[0]-extend
-			if np.abs(0.5*(maxi-extent[1])/(maxi+extent[1])) < 1e-4:
-				extent[1]=extent[1]+extend
+		# extend with priors if necessary
+		extend = (extent[1]-extent[0])*0.10
+		if np.isclose(extent[0],mini):
+			extent[0]=extent[0]-extend
+		if np.isclose(extent[1],maxi):
+			extent[1]=extent[1]+extend
     	
 		extents.append((extent[0],extent[1]))
 	
