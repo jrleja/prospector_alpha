@@ -7,7 +7,7 @@ from scipy.integrate import simps
 from calc_ml import load_filter_response
 from bsfh.likelihood import LikelihoodFunction
 
-def find_sfh_params(model,theta,obs,sps):
+def find_sfh_params(model,theta,obs,sps,sm=None):
 
 	str_sfh_parms = ['sfh','mass','tau','sf_start','tage','sf_trunc','sf_slope']
 	parnames = model.theta_labels()
@@ -32,8 +32,13 @@ def find_sfh_params(model,theta,obs,sps):
 
 	# Need this because mass is 
 	# current mass, not total mass formed!
-	_,_,_=model.sed(theta, obs, sps=sps)
-	out['mformed'] = out['mass'] / sps.stellar_mass
+	
+	# if we pass sm from a prior model call,
+	# we don't have to calculate it here
+	if sm is None:
+		_,_,_=model.sed(theta, obs, sps=sps)
+		sm = sps.stellar_mass
+	out['mformed'] = out['mass'] / sm
 
 	return out
 
@@ -146,7 +151,7 @@ def synthetic_emlines(mass,sfr,dust1,dust2,dust_index):
 	# [Ha / [OII]] vs [NII] / Ha from Hayashi et al. 2013, fig 6
 	# evidence in discussion suggests should add reddening
 	# corresponding to extinction of A(Ha) = 0.35
-	# also should change with metallicity, oh well
+	# also should change with metallicity
 	nii_ha_x = np.array([0.13,0.2,0.3,0.4,0.5])
 	ha_oii_y = np.array([1.1,1.3,2.0,2.9,3.6])
 	ratio = np.interp(flux[4,:]/flux[0,:],nii_ha_x,ha_oii_y)
@@ -660,7 +665,24 @@ def integrate_mag(spec_lam,spectra,filter, z=None, alt_file=None):
 	#print 'maggies: {0}'.format(10**(-0.4*mag)*1e10)
 	return mag, luminosity
 
-def calculate_sfr(sfh_params, timescale, tcalc = None, minsfr = None, maxsfr = None):
+def return_full_sfh(t, sfh_params):
+
+	deltat=0.0001
+
+	# calculate new time vector such that
+	# the spacing from tage back to zero
+	# is identical for each SFH model
+	tcalc = t-sfh_params['tage']
+	tcalc = tcalc[tcalc < 0]*-1
+
+	intsfr = np.zeros(len(t))
+	for mm in xrange(len(tcalc)): 
+		intsfr[mm] = calculate_sfr(sfh_params, deltat, tcalc = tcalc[mm])
+
+	return intsfr
+
+def calculate_sfr(sfh_params, timescale, tcalc = None, 
+	              minsfr = None, maxsfr = None):
 
 	'''
 	standardized SFR calculator. returns SFR averaged over timescale.
@@ -780,12 +802,15 @@ def integrate_sfh(t1,t2,sfh_params):
 	tot_sfr = np.sum(intsfr*sfh['mass'])/np.sum(sfh['mass'])
 	return tot_sfr
 
-def measure_emline_lum(sps, model = None, obs = None, thetas = None, measure_ir = False, saveplot = False):
+def measure_emline_lum(sps, model = None, obs = None, thetas = None, 
+	                   measure_ir = False, saveplot = False, spec=None):
 	
 	'''
 	takes spec(on)-spec(off) to measure emission line luminosity
 	sideband is defined for each emission line after visually 
 	inspecting the spectral sampling density around each line
+
+	if we pass spec, then avoid the first model call
 	'''
 
     # define emission lines
@@ -802,21 +827,26 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None, measure_ir 
 		model.params['zred'] = np.array(0.0)
 
 		# nebon
+		if spec is not None:
+			spec,mags,sm = model.mean_model(thetas, obs, sps=sps, norm_spec=False)
+
+		# neboff
+		model.params['add_neb_emission'] = np.array(False)
+		model.params['add_neb_continuum'] = np.array(False)
+		spec_neboff,mags,sm = model.mean_model(thetas, obs, sps=sps, norm_spec=False)
+		w = sps.wavelengths
 		model.params['add_neb_emission'] = np.array(True)
 		model.params['add_neb_continuum'] = np.array(True)
-		spec,mags,sm = model.mean_model(thetas, obs, sps=sps, norm_spec=False)
-		w = sps.wavelengths
 
-		# switch to flam
+		# subtract, switch to flam
 		factor = 3e18 / w**2
-		spec *= factor
+		spec = (spec-spec_neboff) *factor
 
 		model.params['zred'] = z
 
 	else:
-		sps.params['add_neb_emission'] = True
-		sps.params['add_neb_continuum'] = True
-		w, spec = sps.get_spectrum(tage=sps.params['tage'], peraa=True)
+		print 'why are you here?'
+		print 1/0
 
 	emline_flux = np.zeros(len(wavelength))
 
@@ -850,10 +880,10 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None, measure_ir 
 		              [np.concatenate((edgetrans,np.ones(100),edgetrans))]]
 
 		# calculate z=0 magnitudes
-		spec_neboff,mags_neboff,sm = model.mean_model(thetas, obs, sps=sps,norm_spec=False)
+		spec,mags,sm = model.mean_model(thetas, obs, sps=sps)
 		w = sps.wavelengths
 
-		_,lir     = integrate_mag(w,spec_neboff,lir_filter, z=None, alt_file=None) # comes out in ergs/s
+		_,lir     = integrate_mag(w,spec,lir_filter, z=None, alt_file=None) # comes out in ergs/s
 		lir       = lir / 3.846e33 #  convert to Lsun
 
 		# revert to proper redshift, calculate redshifted mips magnitudes

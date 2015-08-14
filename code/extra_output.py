@@ -2,18 +2,19 @@ from bsfh import model_setup,read_results
 import os, threed_dutils, triangle, threedhst_diag, pickle, sys
 import numpy as np
 import matplotlib.pyplot as plt
-from astropy.cosmology import WMAP9
 from copy import copy
 from astropy import constants
 
 def calc_emp_ha(mass,sfr,dust2,dustindex,ncomp=1):
+
+	# dust1 is hardcoded here, be careful!!!!
 
 	ha_flux=0.0
 	oiii_flux=0.0
 	for kk in xrange(ncomp):
 		x=threed_dutils.synthetic_emlines(mass[kk],
 				                          np.atleast_1d(sfr)[kk],
-				                          0.0,
+				                          dust2[kk]*0.86,
 				                          dust2[kk],
 				                          dustindex)
 		oiii_flux = oiii_flux + x['flux'][x['name'] == '[OIII]']
@@ -38,7 +39,8 @@ def maxprob_model(sample_results,sps):
 
 	return thetas, maxprob
 
-def calc_extra_quantities(sample_results, nsamp_mc=1000):
+
+def calc_extra_quantities(sample_results, ncalc=2000):
 
 	'''' 
 	CALCULATED QUANTITIES
@@ -46,10 +48,12 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 	model star formation history parameters (ssfr,sfr,half-mass time)
 	'''
 
-    # save nebon/neboff status
+	parnames = sample_results['model'].theta_labels()
+
+    ##### save nebon/neboff status
 	nebstatus = sample_results['model'].params['add_neb_emission']
 
-	# initialize sps
+	##### initialize sps
 	# check to see if we want zcontinuous=2 (i.e., the MDF)
 	if np.sum([1 for x in sample_results['model'].config_list if x['name'] == 'pmetals']) > 0:
 		sps = threed_dutils.setup_sps(zcontinuous=2,
@@ -60,113 +64,98 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 			                          custom_filter_key=sample_results['run_params'].get('custom_filter_key',None))
 		print 'zcontinuous=1'
 
-	# maxprob
-	thetas, maxprob = maxprob_model(sample_results,sps)
+	##### maxprob
+	# also confirm probability calculations are consistent with fit
+	maxthetas, maxprob = maxprob_model(sample_results,sps)
 
-	# calculate number of components
+	##### set call parameters
 	sample_results['ncomp'] = np.sum(['mass' in x for x in sample_results['model'].theta_labels()])
+	deltat=[0.01,0.1,1.0] # for averaging SFR over, in Gyr
+	nline = 6 # set by number of lines measured in threed_dutils
 
-    # initialize output arrays for SFH parameters
-	#nchain = sample_results['flatchain'].shape[0]
-	parnames = sample_results['model'].theta_labels()
-	nchain = 2000
-	half_time,sfr_10,sfr_100,sfr_1000,ssfr_100,totmass,emp_ha,emp_oiii = [np.zeros(shape=(nchain)) for i in range(8)]
+    ##### initialize output arrays for SFH + emission line posterior draws #####
+	half_time,sfr_10,sfr_100,sfr_1000,ssfr_100,totmass,emp_ha,emp_oiii,mips_flux,lir = [np.zeros(shape=(ncalc)) for i in range(10)]
+	lineflux = np.empty(shape=(ncalc,nline))
 
-    # get constants for SFH calculation [MODEL DEPENDENT]
-	z = sample_results['model'].params['zred'][0]
-	tuniv = WMAP9.age(z).value
-	deltat=[0.01,0.1,1.0] # in Gyr
-	if sample_results['run_params'].get('truename') is not None:
-		tuniv = 14.0
-    
-	##### DO EMPIRICAL EMISSION LINES IN CHAIN ######
+	##### information for empirical emission line calculation ######
 	dust2_index = np.array([True if (x[:-sample_results['ncomp']] == 'dust2') or 
 		                            (x == 'dust2') else 
 		                            False for x in parnames])
 	dust_index_index = np.array([True if x == 'dust_index' else False for x in parnames])
 
-	# use randomized, flattened, thinned chain for posterior draws
+	##### use randomized, flattened, thinned chain for posterior draws
 	# don't allow things outside the priors
-	flatchain = copy(sample_results['flatchain'][np.isfinite(threed_dutils.chop_chain(sample_results['lnprobability'])) == True])
+	in_priors = np.isfinite(threed_dutils.chop_chain(sample_results['lnprobability'])) == True
+	flatchain = copy(sample_results['flatchain'][in_priors])
 	np.random.shuffle(flatchain)
 
-	######## SFH parameters #########
-	for jj in xrange(nchain):
-		    
-		# extract sfh parameters
-		# the ELSE finds SFH parameters that are NOT part of the chain
-		sfh_params = threed_dutils.find_sfh_params(sample_results['model'],flatchain[jj,:],sample_results['obs'],sps)
+	##### set up time vector for full SFHs
+	nt = 100
+	idx = np.array(sample_results['model'].theta_labels()) == 'tage'
+	maxtime = np.max(flatchain[:ncalc,idx])
+	t = np.linspace(0,maxtime,num=nt)
+	intsfr = np.zeros(shape=(nt,ncalc))
 
-		# calculate half-mass assembly time, sfr
+	##### set up model flux vectors
+	mags = np.zeros(shape=(len(sample_results['obs']['filters']),ncalc))
+	spec = np.zeros(shape=(len(sps.wavelengths),ncalc))
+
+	######## posterior sampling #########
+	for jj in xrange(ncalc):
+		
+		##### model call, to set parameters
+		thetas = flatchain[jj,:]
+		spec[:,jj],mags[:,jj],sm = sample_results['model'].mean_model(thetas, sample_results['obs'], sps=sps)
+
+		##### extract sfh parameters
+		# pass stellar mass to avoid extra model call
+		sfh_params = threed_dutils.find_sfh_params(sample_results['model'],flatchain[jj,:],
+			                                       sample_results['obs'],sps,sm=sm)
+
+		##### calculate SFH
+		intsfr[:,jj] = threed_dutils.return_full_sfh(t, sfh_params)
+
+		##### solve for half-mass assembly time
+		# this is half-time in the sense of integral of SFR, i.e.
+		# mass loss is NOT taken into account.
 		half_time[jj] = threed_dutils.halfmass_assembly_time(sfh_params,sfh_params['tage'])
 
-		# calculate sfr
-		sfr_10[jj]   = threed_dutils.calculate_sfr(sfh_params, 0.01, minsfr=None, maxsfr=None)
-		sfr_100[jj]  = threed_dutils.calculate_sfr(sfh_params, 0.1,  minsfr=None, maxsfr=None)
-		sfr_1000[jj] = threed_dutils.calculate_sfr(sfh_params, 1.0,  minsfr=None, maxsfr=None)
+		##### calculate time-averaged SFR
+		sfr_10[jj]   = threed_dutils.calculate_sfr(sfh_params, 0.01, minsfr=-np.inf, maxsfr=np.inf)
+		sfr_100[jj]  = threed_dutils.calculate_sfr(sfh_params, 0.1,  minsfr=-np.inf, maxsfr=np.inf)
+		sfr_1000[jj] = threed_dutils.calculate_sfr(sfh_params, 1.0,  minsfr=-np.inf, maxsfr=np.inf)
 
-		# calculate mass, sSFR
-		ssfr_100[jj] = sfr_100[jj] / np.sum(sfh_params['mass'])
+		##### calculate mass, sSFR
 		totmass[jj] = np.sum(sfh_params['mass'])
+		ssfr_100[jj] = sfr_100[jj] / totmass[jj]
 
-		# empirical halpha
+		##### empirical halpha
 		emp_ha[jj],emp_oiii[jj] = calc_emp_ha(sfh_params['mass'],sfr_100[jj],
 			                                  flatchain[jj,dust2_index],flatchain[jj,dust_index_index],
 			                                  ncomp=sample_results['ncomp'])
-
-
-
-	# CALCULATE Q16,Q50,Q84 FOR VARIABLE PARAMETERS
-	ntheta = len(sample_results['initial_theta'])
-	q_16, q_50, q_84 = (np.zeros(ntheta)+np.nan for i in range(3))
-	for kk in xrange(ntheta): q_16[kk], q_50[kk], q_84[kk] = triangle.quantile(sample_results['flatchain'][:,kk], [0.16, 0.5, 0.84])
-	
-	# CALCULATE Q16,Q50,Q84 FOR EXTRA PARAMETERS
-	extra_flatchain = np.dstack((half_time, sfr_10, sfr_100, sfr_1000, ssfr_100, totmass, emp_ha, emp_oiii))[0]
-	nextra = extra_flatchain.shape[1]
-	q_16e, q_50e, q_84e = (np.zeros(nextra)+np.nan for i in range(3))
-	for kk in xrange(nextra): q_16e[kk], q_50e[kk], q_84e[kk] = triangle.quantile(extra_flatchain[:,kk], [0.16, 0.5, 0.84])
-
-    ######## MODEL CALL PARAMETERS ########
-	# set up outputs
-	nline = 6 # set by number of lines measured in threed_dutils
-	mips_flux = np.zeros(nsamp_mc)
-	lineflux = np.empty(shape=(nsamp_mc,nline))
-	lir      = np.zeros(nsamp_mc)
-
-	# save initial states
-	neb_em = sample_results['model'].params.get('add_neb_emission', np.array(False))
-	con_em = sample_results['model'].params.get('add_neb_continuum', np.array(False))
-	met_save = sample_results['model'].params.get('logzsol', np.array(0.0))
-
-    # use previously-randomized flatchain
-	for jj in xrange(nsamp_mc):
-		thetas = flatchain[jj,:]
-		
-		# randomly save emline fig
-		if jj == 5:
-			saveplot=sample_results['run_params']['objname']
-		else:
-			saveplot=False
-
+		##### model Halpha, L_IR, and mips flux
 		modelout = threed_dutils.measure_emline_lum(sps, thetas = thetas,
 			 										model=sample_results['model'], obs = sample_results['obs'],
-											        saveplot=saveplot, measure_ir=True)
+											        saveplot=False, measure_ir=True,
+											        spec=spec[:,jj])
 		
 		lineflux[jj,:] = modelout['emline_flux']
 		mips_flux[jj]  = modelout['mips']
 		lir[jj]        = modelout['lir']
 
-	# restore initial states
-	sample_results['model'].params['add_neb_emission'] = neb_em
-	sample_results['model'].params['add_neb_continuum'] = con_em
-	#sample_results['model'].params['logzsol'] = met_save
 
-	##### MAXIMUM PROBABILITY
-	# grab best-fitting model
-	thetas, maxprob = maxprob_model(sample_results,sps)
+	##### CALCULATE Q16,Q50,Q84 FOR VARIABLE PARAMETERS
+	ntheta = len(sample_results['initial_theta'])
+	q_16, q_50, q_84 = (np.zeros(ntheta)+np.nan for i in range(3))
+	for kk in xrange(ntheta): q_16[kk], q_50[kk], q_84[kk] = triangle.quantile(sample_results['flatchain'][:,kk], [0.16, 0.5, 0.84])
+	
+	##### CALCULATE Q16,Q50,Q84 FOR EXTRA PARAMETERS
+	extra_flatchain = np.dstack((half_time, sfr_10, sfr_100, sfr_1000, ssfr_100, totmass, emp_ha, emp_oiii))[0]
+	nextra = extra_flatchain.shape[1]
+	q_16e, q_50e, q_84e = (np.zeros(nextra)+np.nan for i in range(3))
+	for kk in xrange(nextra): q_16e[kk], q_50e[kk], q_84e[kk] = triangle.quantile(extra_flatchain[:,kk], [0.16, 0.5, 0.84])
 
-	##### FORMAT EMLINE OUTPUT #####
+	##### FORMAT EMLINE OUTPUT 
 	q_16em, q_50em, q_84em, thetamaxem = (np.zeros(nline)+np.nan for i in range(4))
 	for kk in xrange(nline): q_16em[kk], q_50em[kk], q_84em[kk] = triangle.quantile(lineflux[:,kk], [0.16, 0.5, 0.84])
 	emline_info = {'name':modelout['emline_name'],
@@ -176,23 +165,28 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 	               'q84':q_84em}
 	sample_results['model_emline'] = emline_info
 
-	###### FORMAT MIPS OUTPUT
-	mips = {'mips_flux':mips_flux,'L_IR':lir}
-	sample_results['mips'] = mips
-
-	# EXTRA PARAMETER OUTPUTS #
+	#### EXTRA PARAMETER OUTPUTS 
 	extras = {'flatchain': extra_flatchain,
 			  'parnames': np.array(['half_time','sfr_10','sfr_100','sfr_1000','ssfr_100','totmass','emp_ha','emp_oiii']),
 			  'q16': q_16e,
 			  'q50': q_50e,
-			  'q84': q_84e}
+			  'q84': q_84e,
+			  'sfh': intsfr,
+			  't_sfh': t}
 	sample_results['extras'] = extras
 
-	# QUANTILE OUTPUTS #
+	#### OBSERVABLES
+	observables = {'spec': spec,
+	               'mags': mags,
+	               'lam_obs': sps.wavelengths,
+	               'L_IR':lir}
+	sample_results['observables'] = observables
+
+	#### QUANTILE OUTPUTS #
 	quantiles = {'q16':q_16,
 				 'q50':q_50,
 				 'q84':q_84,
-				 'maxprob_params':thetas,
+				 'maxprob_params':maxthetas,
 				 'maxprob':maxprob}
 	sample_results['quantiles'] = quantiles
 
@@ -200,7 +194,7 @@ def calc_extra_quantities(sample_results, nsamp_mc=1000):
 	sample_results['model'].params['add_neb_emission'] = np.array(nebstatus)
 	return sample_results
 
-def post_processing(param_name, add_extra=True, nsamp_mc=1000):
+def post_processing(param_name, add_extra=True, **extras):
 
 	'''
 	Driver. Loads output, makes all plots for a given galaxy.
@@ -255,7 +249,7 @@ def post_processing(param_name, add_extra=True, nsamp_mc=1000):
 	if add_extra:
 		print 'ADDING EXTRA OUTPUT FOR ' + filename + ' in ' + outfolder
 		sample_results['flatchain'] = threed_dutils.chop_chain(sample_results['chain'])
-		sample_results = calc_extra_quantities(sample_results,nsamp_mc=nsamp_mc)
+		sample_results = calc_extra_quantities(sample_results,**extras)
 	
 		### SAVE OUTPUT HERE
 		pickle.dump(sample_results,open(mcmc_filename, "wb"))

@@ -9,6 +9,11 @@ from matplotlib.ticker import MaxNLocator
 
 plt.ioff() # don't pop up a window for each plot
 
+median_err_color = '0.75'
+median_main_color = 'black'
+most_likely_color = '#e60000'
+obs_color = '#545454'
+
 tiny_number = 1e-3
 big_number = 1e90
 
@@ -183,7 +188,10 @@ def add_to_corner(fig, sample_results, sps, model,truths=None,maxprob=True,powel
 		q_p = qvalues[2]-qvalues[1]
 
 		# format quantile display
-		fmt = "{{0:{0}}}".format(".2e").format
+		if plottit[jj] == 'ssfr_100':
+			fmt = "{{0:{0}}}".format(".1e").format
+		else:
+			fmt = "{{0:{0}}}".format(".2f").format
 		title = r"${{{0}}}_{{-{1}}}^{{+{2}}}$"
 		title = title.format(fmt(qvalues[1]), fmt(q_m), fmt(q_p))
 		title = "{0}={1}".format(plottit[jj],title)
@@ -211,23 +219,39 @@ def add_sfh_plot(sample_results,fig,ax_loc,sps,truths=None,fast=None):
 	add a small SFH plot at ax_loc
 	'''
 
-	t, perc = plot_sfh(sample_results, sps, ncomp=sample_results['ncomp'])
-	perc = np.log10(perc)
+	#### load median SFH
+	t = sample_results['extras']['t_sfh']
+	perc = np.zeros(shape=(len(t),3))
+	for jj in xrange(len(t)): perc[jj,:] = np.percentile(sample_results['extras']['sfh'][jj,:],[16.0,50.0,84.0])
 	axfontsize=4
 	
+	#### load most likely SFH
+	mlike_sfh = threed_dutils.find_sfh_params(sample_results['model'],
+		                                      sample_results['quantiles']['maxprob_params'],
+		                                      sample_results['obs'],sps)
+	most_likely = threed_dutils.return_full_sfh(t, mlike_sfh)
+
 	# set up plotting
 	if fig is not None:
 		ax_inset=fig.add_axes(ax_loc,zorder=32)
 	else:
 		ax_inset = ax_loc
 	
+	# convert to log
+	parnames = np.array(sample_results['model'].theta_labels())
+	minsfr = sample_results['quantiles']['q50'][parnames=='mass'] / \
+	         (sample_results['quantiles']['q50'][parnames=='tage']*1e9*10000)
+	perc = np.log10(np.clip(perc,minsfr,np.inf))
+	most_likely= np.log10(np.clip(most_likely,minsfr,np.inf))
+
 	# plot whole SFH
-	ax_inset.plot(t, perc[:,0,1],'-',color='black')
-	
+	ax_inset.plot(t, perc[:,1],'-',color=median_main_color)
+	ax_inset.plot(t, most_likely,'-',color=most_likely_color)
+
 	##### FAST + normal fit SFH #####
 	if truths is None:
 	
-		ax_inset.fill_between(t, perc[:,0,0], perc[:,0,2], color='0.75')
+		ax_inset.fill_between(t, perc[:,0], perc[:,2], color=median_err_color)
 
 		#colors=['blue','red']
 		#for aa in xrange(1,perc.shape[1]):
@@ -235,8 +259,8 @@ def add_sfh_plot(sample_results,fig,ax_loc,sps,truths=None,fast=None):
 		#	ax_inset.text(0.08,0.83-0.07*(aa-1), 'tau'+str(aa),transform = ax_inset.transAxes,color=colors[aa-1],fontsize=axfontsize*1.4)
 
 		# set up plotting range
-		plotmax_y = np.max(perc[:,0,1])
-		plotmin_y = np.min(perc[:,0,1])
+		plotmax_y = np.max(perc[:,1])
+		plotmin_y = np.min(perc[:,1])
 
 		# FAST SFH
 		if fast:
@@ -259,7 +283,7 @@ def add_sfh_plot(sample_results,fig,ax_loc,sps,truths=None,fast=None):
 	##### TRUTHS + 50th percentile SFH #####
 	else:
 		
-		ax_inset.fill_between(t, perc[:,0,0], perc[:,0,2], color='0.75')
+		ax_inset.fill_between(t, perc[:,0], perc[:,2], color='0.75')
 
 		parnames = sample_results['model'].theta_labels()
 		tt,pt = plot_sfh_single(truths,truths['parnames'],ncomp=sample_results['ncomp'])
@@ -271,13 +295,13 @@ def add_sfh_plot(sample_results,fig,ax_loc,sps,truths=None,fast=None):
 		ax_inset.text(0.08,0.83, 'truth',transform = ax_inset.transAxes,color='blue',fontsize=axfontsize*1.4)
 
 		# set up plotting range
-		plotmax_y = np.maximum(np.max(perc[:,0,1]),np.max(pt[:,0]))
-		plotmin_y = np.maximum(np.min(perc[:,0,1]),np.min(pt[:,0]))
+		plotmax_y = np.maximum(np.max(perc[:,1]),np.max(pt[:,0]))
+		plotmin_y = np.maximum(np.min(perc[:,1]),np.min(pt[:,0]))
 
 	# the minimum time for which the upper percentile is equal to the minimum SFR
 	# exclude any times before the 50th percentile of tage, since those are 
 	# probably after quenching
-	plotmax_x = t[perc[:,0,2] == np.min(perc[:,0,2])]
+	plotmax_x = t[perc[:,2] == np.min(perc[:,2])]
 	plotmax_x = np.min(plotmax_x[plotmax_x > sample_results['quantiles']['q50'][np.array(sample_results['model'].theta_labels()) == 'tage']])
 	if truths is not None:
 		plotmax_x = np.max(np.append(plotmax_x,truths['sfh_params']['tage']))
@@ -293,8 +317,9 @@ def add_sfh_plot(sample_results,fig,ax_loc,sps,truths=None,fast=None):
 	ax_inset.set_xlabel('t [Gyr]',fontsize=axfontsize,weight='bold')
 	ax_inset.tick_params(labelsize=axfontsize)
 
-	# label
-	ax_inset.text(0.08,0.9, 'tot',transform = ax_inset.transAxes,fontsize=axfontsize*1.4)
+	# labels
+	ax_inset.text(0.08,0.9, 'most likely',color=most_likely_color, transform = ax_inset.transAxes,fontsize=axfontsize*1.4)
+	ax_inset.text(0.08,0.8, 'median',color=median_main_color, transform = ax_inset.transAxes,fontsize=axfontsize*1.4)
 
 def plot_sfh_fast(tau,tage,mass,tuniv=None):
 
@@ -333,71 +358,6 @@ def plot_sfh_single(truths,parnames,ncomp=1):
 		for jj in xrange(nt): intsfr[jj,kk+1] = threed_dutils.calculate_sfr(newdict, deltat, tcalc = t[jj])
 
 	return t[::-1], intsfr
-
-def plot_sfh(sample_results,sps,nsamp=1000,ncomp=1):
-
-	'''
-	create sfh for plotting purposes
-	input: str_sfh_parms = ['tage','tau','sf_start']
-	returns: time-vector, plus SFR(t), where SFR is in units of Gyr^-1 (normalize by mass to get true SFR)
-	SFR(t) = [len(TIME),len(COMPONENTS)+1,3]
-	the 0th vector is total sfh, 1st is 1st component, etc
-	third dimension is [q16,q50,q84]
-	'''
-
-	# sample randomly from SFH
-	import copy
-	flatchain = copy.copy(sample_results['flatchain'])
-	np.random.shuffle(flatchain)
-
-	# calculate minimum SFR for plotting purposes
-	minsfr = sample_results['quantiles']['q50'][np.array(sample_results['model'].theta_labels()) == 'mass'] /  \
-	        (sample_results['quantiles']['q50'][np.array(sample_results['model'].theta_labels()) == 'tage']*1e9*10000)
-
-	# initialize output variables
-	nt = 100
-	intsfr = np.zeros(shape=(nsamp,nt,ncomp+1))
-	deltat=0.0001
-
-	for mm in xrange(nsamp):
-
-		# SFH parameter vector
-		sfh_params = threed_dutils.find_sfh_params(sample_results['model'],flatchain[mm,:],sample_results['obs'],sps)
-
-		if mm == 0:
-			# set up time vector
-			idx = np.array(sample_results['model'].theta_labels()) == 'tage'
-			maxtime = np.max(flatchain[:nsamp,idx])
-
-			t,step=np.linspace(0,maxtime,num=nt,retstep=True)
-
-		# calculate new time vector such that
-		# the spacing from tage back to zero
-		# is identical for each SFH model
-		tcalc = t-sfh_params['tage']
-		tcalc = tcalc[tcalc < 0]*-1
-		#tcalc = tcalc[::-1]
-
-		totmass = np.sum(sfh_params['mass'])
-		for jj in xrange(len(tcalc)): 
-
-			intsfr[mm,jj,0] = threed_dutils.calculate_sfr(sfh_params, deltat, tcalc = tcalc[jj],minsfr=minsfr)
-
-		# now for each component
-		for kk in xrange(ncomp):
-			iterable = [(key,value[kk]) for key, value in sfh_params.iteritems()]
-			newdict = {key: value for (key, value) in iterable}
-			for jj in xrange(nt): intsfr[mm,jj,kk+1] = threed_dutils.calculate_sfr(newdict, deltat, tcalc = t[jj],minsfr=minsfr)
-
-		# clip to minimum sfr, at 0.01% of average SFR over lifetime
-		# this is only for values that were unfilled by the loop over tcalc
-		intsfr = np.clip(intsfr,minsfr,np.inf)
-
-	q = np.zeros(shape=(nt,ncomp+1,3))
-	for kk in xrange(ncomp+1):
-		for jj in xrange(nt): q[jj,kk,:] = np.percentile(intsfr[:,jj,kk],[16.0,50.0,84.0])
-
-	return t, q
 
 def create_plotquant(sample_results, logplot = ['mass'], truths=None):
     
@@ -655,15 +615,17 @@ def sed_figure(sample_results, sps, model,
 	# photometry, and chi values
 	wave_eff, obsmags, obsmags_unc, modmags, chi, modspec, modlam = return_sedplot_vars(sample_results['quantiles']['maxprob_params'], sample_results, sps)
 
-	phot.plot(np.log10(wave_eff), np.log10(modmags), color='#e60000', marker='o', ms=ms, linestyle=' ', label='max lnprob', alpha=alpha, markeredgewidth=0.7,**kwargs)
+	phot.plot(np.log10(wave_eff), np.log10(modmags), color=most_likely_color, 
+		      marker='o', ms=ms, linestyle=' ', label='most likely', alpha=alpha, 
+		      markeredgewidth=0.7,**kwargs)
 	
 	res.plot(np.log10(wave_eff), chi, 
-		     color='#e60000', marker='o', linestyle=' ', label='max lnprob', 
+		     color=most_likely_color, marker='o', linestyle=' ', label='most likely', 
 		     ms=ms,alpha=alpha,markeredgewidth=0.7,**kwargs)
 	
 	nz = modspec > 0
 	phot.plot(np.log10(modlam[nz]), np.log10(modspec[nz]), linestyle='-',
-              color='red', alpha=0.6,**kwargs)
+              color=most_likely_color, alpha=0.9,**kwargs)
 
 	# plot AGB-off for Charlie
 	if agb_off:
@@ -683,13 +645,42 @@ def sed_figure(sample_results, sps, model,
 
 	# set up plot limits
 	phot.set_xlim(min(xplot)*0.9,max(xplot)*1.04)
-	phot.set_ylim(min(yplot[np.isfinite(yplot)])*0.7,max(yplot[np.isfinite(yplot)])*1.04)
+	phot.set_ylim(min(yplot[np.isfinite(yplot)])*0.95,max(yplot[np.isfinite(yplot)])*1.04)
 	res.set_xlim(min(xplot)*0.9,max(xplot)*1.04)
 
     # PLOT OBSERVATIONS + ERRORS 
 	phot.errorbar(xplot, yplot, yerr=yerr,
-                  color='#545454', marker='o', label='observed', alpha=alpha, linestyle=' ',ms=ms)
+                  color=obs_color, marker='o', label='observed', alpha=alpha, linestyle=' ',ms=ms)
 	
+	###### spectra for q50 + 5th, 95th percentile
+	# must convert to nu fnu
+	w = sample_results['observables']['lam_obs']
+	spec_pdf = np.zeros(shape=(len(w),3))
+	mag_pdf = np.zeros(len(sample_results['obs']['filters']))
+	mask = sample_results['obs']['phot_mask']
+
+	for jj in xrange(len(w)): spec_pdf[jj,:] = np.percentile(sample_results['observables']['spec'][jj,:],[5.0,50.0,95.0])
+	for jj in xrange(len(mag_pdf)): mag_pdf[jj] = np.percentile(sample_results['observables']['mags'][jj,:],[50.0])
+	
+	median_chi = (mag_pdf[mask] - sample_results['obs']['maggies'][mask])/sample_results['obs']['maggies_unc'][mask]
+
+	sfactor = 3e18/w
+	pfactor = 3e18/wave_eff
+
+	nz = spec_pdf[:,1] > 0
+	#phot.plot(np.log10(w[nz]), np.log10(spec_pdf[nz,1]*sfactor[nz]), linestyle='-',
+    #          color=median_main_color, alpha=0.6)
+	phot.fill_between(np.log10(w), np.log10(spec_pdf[:,0]*sfactor), 
+		                           np.log10(spec_pdf[:,2]*sfactor),
+		                           color=median_err_color)
+
+	#phot.plot(np.log10(wave_eff), np.log10(mag_pdf[mask]*pfactor), color=median_main_color, 
+	#	      marker='o', ms=ms, linestyle=' ', label='median', alpha=alpha, 
+	#	      markeredgewidth=0.7,**kwargs)
+	
+	#res.plot(np.log10(wave_eff), median_chi, 
+	#	     color=median_main_color, marker='o', linestyle=' ', label='median', 
+	#	     ms=ms,alpha=alpha,markeredgewidth=0.7,**kwargs)
 
 	# plot best-fit FAST model
 	if fast:
@@ -728,26 +719,28 @@ def sed_figure(sample_results, sps, model,
 
 	# add RGB
 	try:
-		field=sample_results['run_params']['photname'].split('/')[-1].split('_')[0]
-		objnum="%05d" % int(sample_results['run_params']['objname'])
-		img=mpimg.imread(os.getenv('APPS')+
-		                 '/threedhst_bsfh/data/RGB_v4.0_field/'+
-		                 field.lower()+'_'+objnum+'_vJH_6.png')
-		ax_inset2=fig.add_axes([0.31,0.34,0.15,0.15],zorder=32)
+		#field=sample_results['run_params']['photname'].split('/')[-1].split('_')[0]
+		#objnum="%05d" % int(sample_results['run_params']['objname'])
+		#imgname=os.getenv('APPS')+'/threedhst_bsfh/data/RGB_v4.0_field/'+field.lower()+'_'+objnum+'_vJH_6.png'
+		imgname=os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/rgb/'+sample_results['run_params']['objname'].replace(' ','_')+'.png'
+		img=mpimg.imread(imgname)
+		ax_inset2=fig.add_axes([0.34,0.34,0.15,0.15],zorder=32)
 		ax_inset2.imshow(img)
 		ax_inset2.set_axis_off()
-	except:
+	except IOError:
 		print 'no RGB image'
 
 	# diagnostic text
 	textx = (phot.get_xlim()[1]-phot.get_xlim()[0])*0.975+phot.get_xlim()[0]
 	texty = (phot.get_ylim()[1]-phot.get_ylim()[0])*0.2+phot.get_ylim()[0]
-	deltay = (phot.get_ylim()[1]-phot.get_ylim()[0])*0.038
+	deltay = (phot.get_ylim()[1]-phot.get_ylim()[0])*0.05
 
 	# calculate reduced chi-squared
 	chisq=np.sum(chi**2)
+	chisq_median=np.sum(median_chi**2)
 	ndof = np.sum(sample_results['obs']['phot_mask']) - len(sample_results['model'].free_params)-1
 	reduced_chisq = chisq/(ndof-1)
+	reduced_chisq_median = chisq_median/(ndof-1)
 
 	# also calculate for truths if truths exist
 	if truths is not None:
@@ -762,8 +755,10 @@ def sed_figure(sample_results, sps, model,
 	else:
 		phot.text(textx, texty, r'best-fit $\chi^2_n$='+"{:.2f}".format(reduced_chisq),
 			  fontsize=10, ha='right')
+		phot.text(textx, texty-deltay, r'median of PDF $\chi^2_n$='+"{:.2f}".format(reduced_chisq_median),
+			  fontsize=10, ha='right')
 	
-	phot.text(textx, texty-deltay, r'avg acceptance='+"{:.2f}".format(np.mean(sample_results['acceptance'])),
+	phot.text(textx, texty-2*deltay, r'avg acceptance='+"{:.2f}".format(np.mean(sample_results['acceptance'])),
 				 fontsize=10, ha='right')
 		
 	# load ancil data
@@ -819,12 +814,12 @@ def sed_figure(sample_results, sps, model,
 			pass
 		
 	# galaxy text
-	phot.text(textx, texty-2*deltay, 'z='+"{:.2f}".format(z_txt),
+	phot.text(textx, texty-3*deltay, 'z='+"{:.2f}".format(z_txt),
 			  fontsize=10, ha='right')
-	phot.text(textx, texty-3*deltay, 'uvj_flag='+str(uvj_txt),
-			  fontsize=10, ha='right')
-	phot.text(textx, texty-4*deltay, 'S/N(F160W)='+"{:.2f}".format(sn_txt),
-			  fontsize=10, ha='right')
+	#phot.text(textx, texty-3*deltay, 'uvj_flag='+str(uvj_txt),
+	#		  fontsize=10, ha='right')
+	#phot.text(textx, texty-4*deltay, 'S/N(F160W)='+"{:.2f}".format(sn_txt),
+	#			  fontsize=10, ha='right')
 		
 		
 	# extra line
