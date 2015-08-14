@@ -323,9 +323,9 @@ class BurstyModel(sedmodel.CSPModel):
             if par == 'duste_gamma':
                 disp[inds[0]:inds[1]] = 0.2
 
-            # 15% floor
+            # 20% floor
             if par == 'tage':
-                disp[inds[0]:inds[1]] = 0.15 * thetas[inds[0]:inds[1]]
+                disp[inds[0]:inds[1]] = 0.2 * thetas[inds[0]:inds[1]]
 
             if par == 'delt_trunc':
                 disp[inds[0]:inds[1]] = 0.1

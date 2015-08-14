@@ -283,8 +283,9 @@ def collate_output(runname,outname):
 
 		# MIPS information
 		try:
-			q_16_mips, q_50_mips, q_84_mips = triangle.quantile(sample_results['mips']['mips_flux'], [0.16, 0.5, 0.84])
-			q_16_lir, q_50_lir, q_84_lir = triangle.quantile(sample_results['mips']['L_IR'], [0.16, 0.5, 0.84])
+			idx = sample_results['obs']['filters'] == 'MIPS_24'
+			q_16_mips, q_50_mips, q_84_mips = triangle.quantile(sample_results['observables']['mags'][idx], [0.16, 0.5, 0.84])
+			q_16_lir, q_50_lir, q_84_lir = triangle.quantile(sample_results['observables']['L_IR'], [0.16, 0.5, 0.84])
 			mips_flux[:,jj] = np.array([q_16_mips, q_50_mips, q_84_mips])
 			L_IR[:,jj] = np.array([q_16_lir, q_50_lir, q_84_lir])
 		except:

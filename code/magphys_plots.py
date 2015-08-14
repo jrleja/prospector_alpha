@@ -21,310 +21,20 @@ magphys_color = '#1974D2'
 #### where do the pickle files go?
 outpickle = '/Users/joel/code/magphys/data/pickles'
 
-def load_spectra(objname, nufnu=True):
-	
-	# flux is read in as ergs / s / cm^2 / Angstrom
-	# the source key is:
-	# 0 = model
-	# 1 = optical spectrum
-	# 2 = Akari
-	# 3 = Spitzer IRS
-
-	foldername = '/Users/joel/code/python/threedhst_bsfh/data/brownseds_data/spectra/'
-	rest_lam, flux, obs_lam, source = np.loadtxt(foldername+objname.replace(' ','_')+'_spec.dat',comments='#',unpack=True)
-
-	if nufnu:
-
-		# convert to flam * lam
-		flux = flux * obs_lam
-
-		# convert to janskys, then maggies * Hz
-		flux = flux * 1e23 / 3631
-
-	out = {}
-	out['rest_lam'] = rest_lam
-	out['flux'] = flux
-	out['obs_lam'] = obs_lam
-	out['source'] = source
-
-	return out
-
-
-def return_sedplot_vars(thetas, sample_results, sps, nufnu=True):
+def plot_all_residuals(alldata):
 
 	'''
-	if nufnu == True: return in units of nu * fnu (maggies * Hz). Else, return maggies.
+	show all residuals for spectra + photometry, magphys + prospectr
 	'''
-
-	# observational information
-	mask = sample_results['obs']['phot_mask']
-	wave_eff = sample_results['obs']['wave_effective'][mask]
-	obs_maggies = sample_results['obs']['maggies'][mask]
-	obs_maggies_unc = sample_results['obs']['maggies_unc'][mask]
-
-	# model information
-	spec, mu ,_ = sample_results['model'].mean_model(thetas, sample_results['obs'], sps=sps)
-	mu = mu[mask]
-
-	# output units
-	if nufnu == True:
-		mu *= c/wave_eff
-		spec *= c/sps.wavelengths
-		obs_maggies *= c/wave_eff
-		obs_maggies_unc *= c/wave_eff
-
-	# here we want to return
-	# effective wavelength of photometric bands, observed maggies, observed uncertainty, model maggies, observed_maggies-model_maggies / uncertainties
-	# model maggies, observed_maggies-model_maggies/uncertainties
-	return wave_eff, obs_maggies, obs_maggies_unc, mu, (obs_maggies-mu)/obs_maggies_unc, spec, sps.wavelengths
-
-def plot_obs_spec(obs_spec, phot, spec_res, alpha, 
-	              modlam, modspec, maglam, magspec,z, objname, source,
-	              color='black',label=''):
-
-	'''
-	standard wrapper for plotting observed + residuals for spectra
-	'''
-
-	mask = obs_spec['source'] == source
-	if np.sum(mask) > 0:
-
-		phot.plot(np.log10(obs_spec['obs_lam'][mask]), 
-			      np.log10(obs_spec['flux'][mask]),
-			      alpha=0.9,
-			      color=color
-			      )
-
-		# interpolate observations onto fsps grid
-		obs_flux_interp = interp1d(obs_spec['obs_lam'][mask],
-			                       obs_spec['flux'][mask], 
-			                       bounds_error = False, fill_value = 0)
-
-		nz = (modlam > np.min(obs_spec['obs_lam'][mask])) & \
-		     (modlam < np.max(obs_spec['obs_lam'][mask]))
-		prospectr_lam = modlam[nz]
-		prospectr_resid = np.log10(obs_flux_interp(modlam[nz])) - np.log10(modspec[nz])
-		spec_res.plot(np.log10(prospectr_lam), 
-			          prospectr_resid,
-			          color=prosp_color,
-			          alpha=alpha,
-			          linestyle='-')
-
-		# interpolate magphys onto fsps grid
-		mag_flux_interp = interp1d(maglam, magspec,
-		                           bounds_error=False, fill_value=0)
-		magphys_lam = prospectr_lam
-		magphys_resid = np.log10(obs_flux_interp(modlam[nz])) - np.log10(mag_flux_interp(modlam[nz]))
-		spec_res.plot(np.log10(magphys_lam), 
-			          magphys_resid,
-			          color=magphys_color,
-			          alpha=alpha,
-			          linestyle='-')
-
-		# write text
-		spec_res.text(0.98,0.05, label,
-			          transform = spec_res.transAxes,horizontalalignment='right')
-
-		# output rest-frame wavelengths + residuals
-		out = {
-			   'magphys_restlam': magphys_lam/(1+z),
-			   'magphys_resid': magphys_resid,
-			   'prospectr_restlam': prospectr_lam/(1+z),
-			   'prospectr_resid': prospectr_resid
-			   }
-
-		output = outpickle+'/'+objname+'_'+label+'.pickle'
-		pickle.dump(out,open(output, "wb"))
-
-	else:
-
-		# remove axis
-		spec_res.axis('off')
-
-def sed_comp_figure(sample_results, sps, model, magphys,
-                alpha=0.3, samples = [-1],
-                maxprob=0, outname=None, fast=False,
-                truths = None, agb_off = False,
-                **kwargs):
-	"""
-	Plot the photometry for the model and data (with error bars), and
-	plot residuals
-	"""
-
-
-	#### set up plot
-	fig = plt.figure(figsize=(12,12))
-	gs = gridspec.GridSpec(2, 1, height_ratios=[3,1])
-	gs.update(bottom=0.525, top=0.99, hspace=0.00)
-	phot, res = plt.Subplot(fig, gs[0]), plt.Subplot(fig, gs[1])
-
-	gs2 = gridspec.GridSpec(3, 1)
-	gs2.update(top=0.475, bottom=0.05, hspace=0.15)
-	spec_res_opt,spec_res_akari,spec_res_spit = plt.subplot(gs2[0]),plt.subplot(gs2[1]),plt.subplot(gs2[2])
-
-
-	#colors = ['#76FF7A', '#1CD3A2', '#1974D2', '#7442C8', '#FC2847', '#FDFC74', '#8E4585', '#FF1DCE']
-
-	ms = 8
-	alpha = 0.8
-
-	##### Prospectr maximum probability model ######
-	# plot the spectrum, photometry, and chi values
-	wave_eff, obsmags, obsmags_unc, modmags, chi, modspec, modlam = \
-	return_sedplot_vars(sample_results['quantiles']['maxprob_params'], 
-		                sample_results, sps)
-
-	phot.plot(np.log10(wave_eff), np.log10(modmags), 
-		      color=prosp_color, marker='o', ms=ms, 
-		      linestyle=' ', label='Prospectr', alpha=alpha, 
-		      markeredgewidth=0.7,**kwargs)
-	
-	res.plot(np.log10(wave_eff), chi, 
-		     color=prosp_color, marker='o', linestyle=' ', label='Prospectr', 
-		     ms=ms,alpha=alpha,markeredgewidth=0.7,**kwargs)
-	
-	nz = modspec > 0
-	phot.plot(np.log10(modlam[nz]), np.log10(modspec[nz]), linestyle='-',
-              color=prosp_color, alpha=0.6,**kwargs)
-
-	##### photometric observations, errors ######
-	xplot = np.log10(wave_eff)
-	yplot = np.log10(obsmags)
-	linerr_down = np.clip(obsmags-obsmags_unc, 1e-80, np.inf)
-	linerr_up = np.clip(obsmags+obsmags_unc, 1e-80, np.inf)
-	yerr = [yplot - np.log10(linerr_down), np.log10(linerr_up)-yplot]
-
-	phot.errorbar(xplot, yplot, yerr=yerr,
-                  color=obs_color, marker='o', label='observed', alpha=alpha, linestyle=' ',ms=ms)
-	
-	# plot limits
-	phot.set_xlim(3.1,max(xplot)*1.04)
-	phot.set_ylim(min(yplot[np.isfinite(yplot)])*0.95,max(yplot[np.isfinite(yplot)])*1.04)
-	res.set_xlim(3.1,max(xplot)*1.04)
-
-	##### magphys: spectrum + photometry #####
-	# note: we steal the filter effective wavelengths from Prospectr here
-	# if filters are mismatched in Prospectr vs MAGPHYS, this will do weird things
-	# not fixing it, since it may serve as an "alarm bell"
-	m = magphys['obs']['phot_mask']
-
-	# comes out in maggies, change to maggies*Hz
-	nu_eff = c / wave_eff
-	spec_fac = c / magphys['model']['lam']
-
-	phot.plot(np.log10(wave_eff), 
-		      np.log10(magphys['model']['flux'][m]*nu_eff), 
-		      color=magphys_color, marker='o', ms=ms, 
-		      linestyle=' ', label='MAGPHYS', alpha=alpha, 
-		      markeredgewidth=0.7,**kwargs)
-	
-	chi_magphys = (magphys['model']['flux'][m]-magphys['obs']['flux'][m])/magphys['obs']['flux_unc'][m]
-	res.plot(np.log10(wave_eff), 
-		     chi_magphys, 
-		     color=magphys_color, marker='o', linestyle=' ', label='MAGPHYS', 
-		     ms=ms,alpha=alpha,markeredgewidth=0.7,**kwargs)
-	
-	nz = magphys['model']['spec'] > 0
-	phot.plot(np.log10(magphys['model']['lam'][nz]), 
-		      np.log10(magphys['model']['spec'][nz]*spec_fac), 
-		      linestyle='-', color=magphys_color, alpha=0.6,
-		      **kwargs)
-
-	##### observed spectra + residuals #####
-	obs_spec = load_spectra(sample_results['run_params']['objname'])
-	label = ['Optical','Akari', 'Spitzer IRS']
-	resplots = [spec_res_opt, spec_res_akari, spec_res_spit]
-
-	for ii in xrange(3):
-		plot_obs_spec(obs_spec, phot, resplots[ii], alpha, modlam, modspec,
-					  magphys['model']['lam'], magphys['model']['spec']*spec_fac,
-					  magphys['metadata']['redshift'], sample_results['run_params']['objname'],
-		              ii+1, color=obs_color, label=label[ii])
-
-	# diagnostic text
-	textx = (phot.get_xlim()[1]-phot.get_xlim()[0])*0.975+phot.get_xlim()[0]
-	texty = (phot.get_ylim()[1]-phot.get_ylim()[0])*0.2+phot.get_ylim()[0]
-	deltay = (phot.get_ylim()[1]-phot.get_ylim()[0])*0.038
-
-	# calculate reduced chi-squared
-	chisq=np.sum(chi**2)/np.sum(sample_results['obs']['phot_mask'])
-	chisq_magphys=np.sum(chi_magphys**2)/np.sum(sample_results['obs']['phot_mask'])
-	print magphys['metadata']['chisq'], chisq_magphys
-	#ndof = np.sum(sample_results['obs']['phot_mask']) - len(sample_results['model'].free_params)-1
-	#reduced_chisq = chisq/(ndof-1)
-	phot.text(textx, texty, r'best-fit $\chi^2/$N$_{\mathrm{phot}}$='+"{:.2f}".format(chisq),
-			  fontsize=10, ha='right', color=prosp_color)
-	phot.text(textx, texty-deltay, r'best-fit $\chi^2/$N$_{\mathrm{phot}}$='+"{:.2f}".format(chisq_magphys),
-			  fontsize=10, ha='right', color=magphys_color)
-		
-	z_txt = sample_results['model'].params['zred'][0]
-		
-	# galaxy text
-	phot.text(textx, texty-2*deltay, 'z='+"{:.2f}".format(z_txt),
-			  fontsize=10, ha='right')
-		
-	# extra line
-	allres = resplots+[res]
-	for plot in allres: 
-		plot.axhline(0, linestyle=':', color='grey')
-	
-	# legend
-	# make sure not to repeat labels
-	from collections import OrderedDict
-	handles, labels = phot.get_legend_handles_labels()
-	by_label = OrderedDict(zip(labels, handles))
-	phot.legend(by_label.values(), by_label.keys(), 
-				loc=1, prop={'size':8},
-			    frameon=False)
-			    
-    # set labels
-	res.set_ylabel( r'$\chi$')
-	for plot in resplots: plot.set_ylabel( r'log(f$_{\mathrm{obs}}/$f$_{\mathrm{mod}}$)')
-	phot.set_ylabel(r'log($\nu f_{\nu}$)')
-	spec_res_spit.set_xlabel(r'log($\lambda_{obs}$) [$\AA$]')
-	
-	# chill on the number of tick marks
-	#res.yaxis.set_major_locator(MaxNLocator(4))
-	for plot in allres: plot.yaxis.set_major_locator(MaxNLocator(4))
-
-	# clean up and output
-	fig.add_subplot(phot)
-	for res in allres: fig.add_subplot(res)
-	
-	# set second x-axis
-	y1, y2=phot.get_ylim()
-	x1, x2=phot.get_xlim()
-	ax2=phot.twiny()
-	ax2.set_xticks(np.arange(0,10,0.2))
-	ax2.set_xlim(np.log10((10**(x1))/(1+z_txt)), np.log10((10**(x2))/(1+z_txt)))
-	ax2.set_xlabel(r'log($\lambda_{rest}$) [$\AA$]')
-	ax2.set_ylim(y1, y2)
-
-	# remove ticks
-	phot.set_xticklabels([])
-    
-	if outname is not None:
-		fig.savefig(outname, bbox_inches='tight', dpi=500)
-		#os.system('open '+outname)
-		plt.close()
-
-	# save chi
-	out = {'chi_magphys': chi_magphys,
-	       'chi_prosp': chi,
-	       'chisq_prosp': chisq,
-	       'chisq_magphys': chisq_magphys,
-	       'lam_obs': wave_eff,
-	       'z': magphys['metadata']['redshift']
-	       }
-	output = outpickle+'/'+sample_results['run_params']['objname']+'_phot.pickle'
-	pickle.dump(out,open(output, "wb"))
-
-def plot_all_residuals(runname='brownseds'):
 
 	##### set up plots
 	fig = plt.figure(figsize=(8,8))
-	gs = gridspec.GridSpec(4, 1, height_ratios=[1.5,1,1,1,1])
-	phot, chisq, opt, akar, spit = plt.Subplot(fig, gs[0]), plt.Subplot(fig, gs[1]), plt.Subplot(fig, gs[2]), plt.Subplot(fig, gs[3]), plt.Subplot(fig, gs[4])
+	gs = gridspec.GridSpec(4, 1, height_ratios=[1.5,1,1,1])
+	phot = plt.Subplot(fig, gs[0])
+	opt = plt.Subplot(fig, gs[1])
+	akar = plt.Subplot(fig, gs[2])
+	spit = plt.Subplot(fig,gs[3])
+	print 1/0
 
 	#### parameters
 	alpha_minor = 0.2
@@ -465,8 +175,316 @@ def plot_all_residuals(runname='brownseds'):
 	
 	plt.savefig(outfolder+'median_residuals.png',dpi=300)
 
+
+def load_spectra(objname, nufnu=True):
 	
-def make_resid_plots(filebase=None,
+	# flux is read in as ergs / s / cm^2 / Angstrom
+	# the source key is:
+	# 0 = model
+	# 1 = optical spectrum
+	# 2 = Akari
+	# 3 = Spitzer IRS
+
+	foldername = '/Users/joel/code/python/threedhst_bsfh/data/brownseds_data/spectra/'
+	rest_lam, flux, obs_lam, source = np.loadtxt(foldername+objname.replace(' ','_')+'_spec.dat',comments='#',unpack=True)
+
+	if nufnu:
+
+		# convert to flam * lam
+		flux = flux * obs_lam
+
+		# convert to janskys, then maggies * Hz
+		flux = flux * 1e23 / 3631
+
+	out = {}
+	out['rest_lam'] = rest_lam
+	out['flux'] = flux
+	out['obs_lam'] = obs_lam
+	out['source'] = source
+
+	return out
+
+
+def return_sedplot_vars(thetas, sample_results, sps, nufnu=True):
+
+	'''
+	if nufnu == True: return in units of nu * fnu (maggies * Hz). Else, return maggies.
+	'''
+
+	# observational information
+	mask = sample_results['obs']['phot_mask']
+	wave_eff = sample_results['obs']['wave_effective'][mask]
+	obs_maggies = sample_results['obs']['maggies'][mask]
+	obs_maggies_unc = sample_results['obs']['maggies_unc'][mask]
+
+	# model information
+	spec, mu ,_ = sample_results['model'].mean_model(thetas, sample_results['obs'], sps=sps)
+	mu = mu[mask]
+
+	# output units
+	if nufnu == True:
+		mu *= c/wave_eff
+		spec *= c/sps.wavelengths
+		obs_maggies *= c/wave_eff
+		obs_maggies_unc *= c/wave_eff
+
+	# here we want to return
+	# effective wavelength of photometric bands, observed maggies, observed uncertainty, model maggies, observed_maggies-model_maggies / uncertainties
+	# model maggies, observed_maggies-model_maggies/uncertainties
+	return wave_eff, obs_maggies, obs_maggies_unc, mu, (obs_maggies-mu)/obs_maggies_unc, spec, sps.wavelengths
+
+def plot_obs_spec(obs_spec, phot, spec_res, alpha, 
+	              modlam, modspec, maglam, magspec,z, objname, source,
+	              color='black',label=''):
+
+	'''
+	standard wrapper for plotting observed + residuals for spectra
+	'''
+
+	mask = obs_spec['source'] == source
+	if np.sum(mask) > 0:
+
+		phot.plot(np.log10(obs_spec['obs_lam'][mask]), 
+			      np.log10(obs_spec['flux'][mask]),
+			      alpha=0.9,
+			      color=color
+			      )
+
+		# interpolate observations onto fsps grid
+		obs_flux_interp = interp1d(obs_spec['obs_lam'][mask],
+			                       obs_spec['flux'][mask], 
+			                       bounds_error = False, fill_value = 0)
+
+		nz = (modlam > np.min(obs_spec['obs_lam'][mask])) & \
+		     (modlam < np.max(obs_spec['obs_lam'][mask]))
+		prospectr_lam = modlam[nz]
+		prospectr_resid = np.log10(obs_flux_interp(modlam[nz])) - np.log10(modspec[nz])
+		spec_res.plot(np.log10(prospectr_lam), 
+			          prospectr_resid,
+			          color=prosp_color,
+			          alpha=alpha,
+			          linestyle='-')
+
+		# interpolate magphys onto fsps grid
+		mag_flux_interp = interp1d(maglam, magspec,
+		                           bounds_error=False, fill_value=0)
+		magphys_lam = prospectr_lam
+		magphys_resid = np.log10(obs_flux_interp(modlam[nz])) - np.log10(mag_flux_interp(modlam[nz]))
+		spec_res.plot(np.log10(magphys_lam), 
+			          magphys_resid,
+			          color=magphys_color,
+			          alpha=alpha,
+			          linestyle='-')
+
+		#### write text, add lines
+		spec_res.text(0.98,0.05, label,
+			          transform = spec_res.transAxes,horizontalalignment='right')
+		spec_res.axhline(0, linestyle=':', color='grey')
+		spec_res.set_xlim(min(np.log10(magphys_lam))*0.95,max(np.log10(magphys_lam))*1.03)
+		if label == 'Optical':
+			spec_res.set_ylim(-np.std(magphys_resid)*4,np.std(magphys_resid)*4)
+
+		# output rest-frame wavelengths + residuals
+		out = {
+			   'magphys_restlam': magphys_lam/(1+z),
+			   'magphys_resid': magphys_resid,
+			   'prospectr_restlam': prospectr_lam/(1+z),
+			   'prospectr_resid': prospectr_resid
+			   }
+
+		return out
+
+	else:
+
+		# remove axis
+		spec_res.axis('off')
+
+def sed_comp_figure(sample_results, sps, model, magphys,
+                alpha=0.3, samples = [-1],
+                maxprob=0, outname=None, fast=False,
+                truths = None, agb_off = False,
+                **kwargs):
+	"""
+	Plot the photometry for the model and data (with error bars) for
+	a single object, and plot residuals.
+
+	Returns a dictionary called 'residuals', which contains the 
+	photometric + spectroscopic residuals for this object, for both
+	magphys and prospectr.
+	"""
+
+
+	#### set up plot
+	fig = plt.figure(figsize=(12,12))
+	gs = gridspec.GridSpec(2, 1, height_ratios=[3,1])
+	gs.update(bottom=0.525, top=0.99, hspace=0.00)
+	phot, res = plt.Subplot(fig, gs[0]), plt.Subplot(fig, gs[1])
+
+	gs2 = gridspec.GridSpec(3, 1)
+	gs2.update(top=0.475, bottom=0.05, hspace=0.15)
+	spec_res_opt,spec_res_akari,spec_res_spit = plt.subplot(gs2[0]),plt.subplot(gs2[1]),plt.subplot(gs2[2])
+
+	ms = 8
+	alpha = 0.8
+
+	#### setup output
+	residuals={}
+
+	##### Prospectr maximum probability model ######
+	# plot the spectrum, photometry, and chi values
+	try:
+		wave_eff, obsmags, obsmags_unc, modmags, chi, modspec, modlam = \
+		return_sedplot_vars(sample_results['quantiles']['maxprob_params'], 
+			                sample_results, sps)
+	except KeyError:
+		raise AttributeError("You must run post-processing on the Prospectr "
+						     "data for" + sample_results['run_params']['objname'])
+
+	phot.plot(np.log10(wave_eff), np.log10(modmags), 
+		      color=prosp_color, marker='o', ms=ms, 
+		      linestyle=' ', label='Prospectr', alpha=alpha, 
+		      markeredgewidth=0.7,**kwargs)
+	
+	res.plot(np.log10(wave_eff), chi, 
+		     color=prosp_color, marker='o', linestyle=' ', label='Prospectr', 
+		     ms=ms,alpha=alpha,markeredgewidth=0.7,**kwargs)
+	
+	nz = modspec > 0
+	phot.plot(np.log10(modlam[nz]), np.log10(modspec[nz]), linestyle='-',
+              color=prosp_color, alpha=0.6,**kwargs)
+
+	##### photometric observations, errors ######
+	xplot = np.log10(wave_eff)
+	yplot = np.log10(obsmags)
+	linerr_down = np.clip(obsmags-obsmags_unc, 1e-80, np.inf)
+	linerr_up = np.clip(obsmags+obsmags_unc, 1e-80, np.inf)
+	yerr = [yplot - np.log10(linerr_down), np.log10(linerr_up)-yplot]
+
+	res.errorbar(xplot, yplot, yerr=yerr,
+                  color=obs_color, marker='o', label='observed', alpha=alpha, linestyle=' ',ms=ms)
+	
+	# plot limits
+	phot.set_xlim(3.1,max(xplot)*1.04)
+	phot.set_ylim(min(yplot[np.isfinite(yplot)])*0.95,max(yplot[np.isfinite(yplot)])*1.04)
+	res.set_xlim(3.1,max(xplot)*1.04)
+
+	##### magphys: spectrum + photometry #####
+	# note: we steal the filter effective wavelengths from Prospectr here
+	# if filters are mismatched in Prospectr vs MAGPHYS, this will do weird things
+	# not fixing it, since it may serve as an "alarm bell"
+	m = magphys['obs']['phot_mask']
+
+	# comes out in maggies, change to maggies*Hz
+	nu_eff = c / wave_eff
+	spec_fac = c / magphys['model']['lam']
+
+	phot.plot(np.log10(wave_eff), 
+		      np.log10(magphys['model']['flux'][m]*nu_eff), 
+		      color=magphys_color, marker='o', ms=ms, 
+		      linestyle=' ', label='MAGPHYS', alpha=alpha, 
+		      markeredgewidth=0.7,**kwargs)
+	
+	chi_magphys = (magphys['model']['flux'][m]-magphys['obs']['flux'][m])/magphys['obs']['flux_unc'][m]
+	res.plot(np.log10(wave_eff), 
+		     chi_magphys, 
+		     color=magphys_color, marker='o', linestyle=' ', label='MAGPHYS', 
+		     ms=ms,alpha=alpha,markeredgewidth=0.7,**kwargs)
+	
+	nz = magphys['model']['spec'] > 0
+	phot.plot(np.log10(magphys['model']['lam'][nz]), 
+		      np.log10(magphys['model']['spec'][nz]*spec_fac), 
+		      linestyle='-', color=magphys_color, alpha=0.6,
+		      **kwargs)
+
+	##### observed spectra + residuals #####
+	obs_spec = load_spectra(sample_results['run_params']['objname'])
+	label = ['Optical','Akari', 'Spitzer IRS']
+	resplots = [spec_res_opt, spec_res_akari, spec_res_spit]
+
+	for ii in xrange(3):
+		residuals[label[ii]] = plot_obs_spec(obs_spec, phot, resplots[ii], alpha, modlam, modspec,
+					                         magphys['model']['lam'], magphys['model']['spec']*spec_fac,
+					                         magphys['metadata']['redshift'], sample_results['run_params']['objname'],
+		                                     ii+1, color=obs_color, label=label[ii])
+
+	# diagnostic text
+	textx = (phot.get_xlim()[1]-phot.get_xlim()[0])*0.975+phot.get_xlim()[0]
+	texty = (phot.get_ylim()[1]-phot.get_ylim()[0])*0.2+phot.get_ylim()[0]
+	deltay = (phot.get_ylim()[1]-phot.get_ylim()[0])*0.038
+
+	# calculate reduced chi-squared
+	chisq=np.sum(chi**2)/np.sum(sample_results['obs']['phot_mask'])
+	chisq_magphys=np.sum(chi_magphys**2)/np.sum(sample_results['obs']['phot_mask'])
+	print magphys['metadata']['chisq'], chisq_magphys
+	#ndof = np.sum(sample_results['obs']['phot_mask']) - len(sample_results['model'].free_params)-1
+	#reduced_chisq = chisq/(ndof-1)
+	phot.text(textx, texty, r'best-fit $\chi^2/$N$_{\mathrm{phot}}$='+"{:.2f}".format(chisq),
+			  fontsize=10, ha='right', color=prosp_color)
+	phot.text(textx, texty-deltay, r'best-fit $\chi^2/$N$_{\mathrm{phot}}$='+"{:.2f}".format(chisq_magphys),
+			  fontsize=10, ha='right', color=magphys_color)
+		
+	z_txt = sample_results['model'].params['zred'][0]
+		
+	# galaxy text
+	phot.text(textx, texty-2*deltay, 'z='+"{:.2f}".format(z_txt),
+			  fontsize=10, ha='right')
+		
+	# extra line
+	phot.axhline(0, linestyle=':', color='grey')
+	
+	# legend
+	# make sure not to repeat labels
+	from collections import OrderedDict
+	handles, labels = phot.get_legend_handles_labels()
+	by_label = OrderedDict(zip(labels, handles))
+	phot.legend(by_label.values(), by_label.keys(), 
+				loc=1, prop={'size':8},
+			    frameon=False)
+			    
+    # set labels
+	res.set_ylabel( r'$\chi$')
+	for plot in resplots: plot.set_ylabel( r'log(f$_{\mathrm{obs}}/$f$_{\mathrm{mod}}$)')
+	phot.set_ylabel(r'log($\nu f_{\nu}$)')
+	spec_res_spit.set_xlabel(r'log($\lambda_{obs}$) [$\AA$]')
+	
+	# chill on the number of tick marks
+	#res.yaxis.set_major_locator(MaxNLocator(4))
+	allres = resplots+[res]
+	for plot in allres: plot.yaxis.set_major_locator(MaxNLocator(4))
+
+	# clean up and output
+	fig.add_subplot(phot)
+	for res in allres: fig.add_subplot(res)
+	
+	# set second x-axis
+	y1, y2=phot.get_ylim()
+	x1, x2=phot.get_xlim()
+	ax2=phot.twiny()
+	ax2.set_xticks(np.arange(0,10,0.2))
+	ax2.set_xlim(np.log10((10**(x1))/(1+z_txt)), np.log10((10**(x2))/(1+z_txt)))
+	ax2.set_xlabel(r'log($\lambda_{rest}$) [$\AA$]')
+	ax2.set_ylim(y1, y2)
+
+	# remove ticks
+	phot.set_xticklabels([])
+    
+	if outname is not None:
+		fig.savefig(outname, bbox_inches='tight', dpi=500)
+		#os.system('open '+outname)
+		plt.close()
+
+	# save chi for photometry
+	out = {'chi_magphys': chi_magphys,
+	       'chi_prosp': chi,
+	       'chisq_prosp': chisq,
+	       'chisq_magphys': chisq_magphys,
+	       'lam_obs': wave_eff,
+	       'z': magphys['metadata']['redshift']
+	       }
+	residuals['phot'] = out
+	return residuals
+	
+def collate_data(filebase=None,
 				   outfolder=os.getenv('APPS')+'/threedhst_bsfh/plots/',
 				   sample_results=None,
 				   sps=None,
@@ -527,40 +545,44 @@ def make_resid_plots(filebase=None,
 
 	# BEGIN PLOT ROUTINE
 	print 'MAKING PLOTS FOR ' + filename + ' in ' + outfolder
+	alldata = {}
 
 	# sed plot
 	if plt_sed:
 		print 'MAKING SED COMPARISON PLOT'
  		# plot
- 		pfig = sed_comp_figure(sample_results, sps, copy.deepcopy(sample_results['model']),
+ 		residuals = sed_comp_figure(sample_results, sps, copy.deepcopy(sample_results['model']),
  						  magphys, maxprob=1,
  						  outname=outfolder+filename.replace(' ','_')+'_'+max(times)+'.sed.png')
  		
 	# SAVE OUTPUTS
 	print 'SAVING OUTPUTS for ' + sample_results['run_params']['objname']
-	alldata = {}
-	alldata['magphys'] = pdfs
+	alldata['residuals'] = residuals
+	alldata['magphys'] = magphys['pdfs']
 	alldata['pquantiles'] = sample_results['quantiles']
 	alldata['pextras'] = sample_results['extras']
 
 	return alldata
 
-def plt_all(runname=None,skip_startup=False,**extras):
+def plt_all(runname=None,startup=True,**extras):
 
 	'''
 	for a list of galaxies, make all plots
+
+	startup: if True, then make all the residual plots and save pickle file
+			 if False, load previous pickle file
 	'''
 	if runname == None:
 		runname = 'brownseds'
 
 	output = outpickle+'/alldata.pickle'
 
-	if skip_startup == False:
+	if startup == True:
 		filebase, parm_basename, ancilname=threed_dutils.generate_basenames(runname)
 		alldata = []
 		for jj in xrange(len(filebase)):
 			print 'iteration '+str(jj) 
-			dictionary = make_resid_plots(filebase=filebase[jj],\
+			dictionary = collate_data(filebase=filebase[jj],\
 			                           outfolder=os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/magphys/',
 			                           **extras)
 			alldata.append(dictionary)
@@ -570,7 +592,8 @@ def plt_all(runname=None,skip_startup=False,**extras):
 		with open(output, "rb") as f:
 			alldata=pickle.load(f)
 
-	plot_comparison()
-	plot_mass_metallicity()
-	plot_sfr_mass()
+	plot_all_residuals(alldata)
+	plot_comparison(alldata)
+	plot_mass_metallicity(alldata)
+	plot_sfr_mass(alldata)
 	

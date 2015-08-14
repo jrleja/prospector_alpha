@@ -306,7 +306,7 @@ def add_sfh_plot(sample_results,fig,ax_loc,sps,truths=None,fast=None):
 	if truths is not None:
 		plotmax_x = np.max(np.append(plotmax_x,truths['sfh_params']['tage']))
 
-	dynrange = (plotmax_y-plotmin_y)*0.1
+	dynrange = (plotmax_y-plotmin_y)*0.3
 	axlim_sfh=[plotmax_x,
 	           np.min(t),
 	           plotmin_y,
@@ -645,7 +645,7 @@ def sed_figure(sample_results, sps, model,
 
 	# set up plot limits
 	phot.set_xlim(min(xplot)*0.9,max(xplot)*1.04)
-	phot.set_ylim(min(yplot[np.isfinite(yplot)])*0.95,max(yplot[np.isfinite(yplot)])*1.04)
+	phot.set_ylim(min(yplot[np.isfinite(yplot)])*0.9,max(yplot[np.isfinite(yplot)])*1.04)
 	res.set_xlim(min(xplot)*0.9,max(xplot)*1.04)
 
     # PLOT OBSERVATIONS + ERRORS 
