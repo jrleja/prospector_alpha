@@ -590,38 +590,6 @@ def plot_driver(runname):
  		plt.savefig(outname, dpi=300)
 		plt.close()
 
-def offset_and_scatter(x,y,biweight=True):
-
-	n = len(x)
-	mean_offset = np.sum(x-y)/n
-
-	if biweight:
-		diff = y-x
-		Y0  = np.median(diff)
-
-		# calculate MAD
-		MAD = np.median(np.abs(diff-Y0))/0.6745
-
-		# biweighted value
-		U   = (diff-Y0)/(6.*MAD)
-		UU  = U*U
-		Q   = UU <= 1.0
-		if np.sum(Q) < 3:
-			print 'distribution is TOO WEIRD, returning -1'
-			scat=-1
-
-		N = len(diff)
-		numerator = np.sum( (diff[Q]-Y0)**2 * (1-UU[Q])**4)
-		den1      = np.sum( (1.-UU[Q])*(1.-5.*UU[Q]))
-		siggma    = N*numerator/(den1*(den1-1.))
-
-		scat      = np.sqrt(siggma)
-
-	else:
-		scat=np.sqrt(np.sum((x-y-mean_offset)**2.)/(n-2))
-
-	return mean_offset,scat
-
 def ml_vs_color(runname):
 
 	filebase,params,ancilname=threed_dutils.generate_basenames(runname)

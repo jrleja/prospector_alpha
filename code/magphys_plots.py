@@ -11,6 +11,7 @@ import pickle
 
 
 c = 3e18   # angstroms per second
+minsfr = 1e-4
 plt.ioff() # don't pop up a window for each plot
 
 #### set up colors and plot style
@@ -21,6 +22,163 @@ magphys_color = '#1974D2'
 #### where do the pickle files go?
 outpickle = '/Users/joel/code/magphys/data/pickles'
 
+def equalize_axes(ax, x,y, dynrange=0.1, line_of_equality=True):
+	
+	''' 
+	sets up an equal x and y range that encompasses all of the data
+	if line_of_equality, add a diagonal line of equality 
+	dynrange represents the % of the data range above and below which
+	the plot limits are set
+	'''
+
+	dynx, dyny = (np.nanmax(x)-np.nanmin(x))*dynrange,\
+                 (np.nanmax(y)-np.nanmin(y))*dynrange
+	if np.nanmin(x)-dynx > np.nanmin(y)-dyny:
+		min = np.nanmin(y)-dyny
+	else:
+		min = np.nanmin(x)-dynx
+	if np.nanmax(x)+dynx > np.nanmax(y)+dyny:
+		max = np.nanmax(x)+dynx
+	else:
+		max = np.nanmax(y)+dyny
+
+	ax.axis((min,max,min,max))
+
+	if line_of_equality:
+		ax.errorbar([-1e3,1e3],[-1e3,1e3],linestyle='--',color='0.1',alpha=0.8)
+
+	return ax
+	
+
+def plot_comparison(alldata,outfolder):
+
+	'''
+	mass vs mass
+	sfr vs sfr
+	etc
+	'''
+
+	##### set up plots
+	fig = plt.figure(figsize=(10,10))
+	gs1 = gridspec.GridSpec(2, 2)
+	mass = plt.Subplot(fig, gs1[0])
+	sfr = plt.Subplot(fig, gs1[1])
+	met = plt.Subplot(fig, gs1[2])
+	age = plt.Subplot(fig,gs1[3])
+
+	fig.add_subplot(mass)
+	fig.add_subplot(sfr)
+	fig.add_subplot(met)
+	#fig.add_subplot(age)
+
+	fmt = 'ko'
+	alpha = 0.6
+
+	##### find prospectr indexes
+	parnames = alldata[0]['pquantiles']['parnames']
+	idx_mass = parnames == 'mass'
+	idx_met = parnames == 'logzsol'
+
+	eparnames = alldata[0]['pextras']['parnames']
+	idx_sfr = eparnames == 'sfr_100'
+
+	##### find magphys indexes
+	idx_mmet = alldata[0]['model']['full_parnames'] == 'Z/Zo'
+
+	##### mass
+	magmass, promass = np.empty(shape=(0,3)), np.empty(shape=(0,3))
+	for data in alldata:
+		if data:
+			tmp = np.array([data['pquantiles']['q16'][idx_mass][0],
+				            data['pquantiles']['q50'][idx_mass][0],
+				            data['pquantiles']['q84'][idx_mass][0]])
+			promass = np.concatenate((promass,np.atleast_2d(np.log10(tmp))),axis=0)
+			magmass = np.concatenate((magmass,np.atleast_2d(data['magphys']['percentiles']['M*'][1:4])))
+
+	proerrs = [promass[:,1]-promass[:,0],
+	           promass[:,2]-promass[:,1]]
+	magerrs = [magmass[:,1]-magmass[:,0],
+	           magmass[:,2]-magmass[:,1]]
+	mass.errorbar(promass[:,1],magmass[:,1],
+		          fmt=fmt, alpha=alpha,
+			      xerr=proerrs, yerr=magerrs)
+
+	# labels
+	mass.set_xlabel(r'log(M$_*$) [Prospectr]',labelpad=13)
+	mass.set_ylabel(r'log(M$_*$) [MAGPHYS]')
+	mass = equalize_axes(mass,promass[:,1],magmass[:,1])
+
+	# text
+	off,scat = threed_dutils.offset_and_scatter(promass[:,1],magmass[:,1],biweight=True)
+	mass.text(0.99,0.05, 'biweight scatter='+"{:.2f}".format(scat) + ' dex',
+			  transform = mass.transAxes,horizontalalignment='right')
+	mass.text(0.99,0.1, 'mean offset='+"{:.2f}".format(off) + ' dex',
+		      transform = mass.transAxes,horizontalalignment='right')
+
+	##### SFR
+	magsfr, prosfr = np.empty(shape=(0,3)), np.empty(shape=(0,3))
+	for data in alldata:
+		if data:
+			tmp = np.array([data['pextras']['q16'][idx_sfr][0],
+				            data['pextras']['q50'][idx_sfr][0],
+				            data['pextras']['q84'][idx_sfr][0]])
+			tmp = np.log10(np.clip(tmp,minsfr,np.inf))
+			prosfr = np.concatenate((prosfr,np.atleast_2d(tmp)))
+			magsfr = np.concatenate((magsfr,np.atleast_2d(data['magphys']['percentiles']['SFR'][1:4])))
+
+	proerrs = [prosfr[:,1]-prosfr[:,0],
+	           prosfr[:,2]-prosfr[:,1]]
+	magerrs = [magsfr[:,1]-magsfr[:,0],
+	           magsfr[:,2]-magsfr[:,1]]
+	sfr.errorbar(prosfr[:,1],magsfr[:,1],
+		          fmt=fmt, alpha=alpha,
+			      xerr=proerrs, yerr=magerrs)
+
+	# labels
+	sfr.set_xlabel(r'log(SFR) [Prospectr]')
+	sfr.set_ylabel(r'log(SFR) [MAGPHYS]')
+	sfr = equalize_axes(sfr,prosfr[:,1],magsfr[:,1])
+
+	# text
+	off,scat = threed_dutils.offset_and_scatter(prosfr[:,1],magsfr[:,1],biweight=True)
+	sfr.text(0.99,0.05, 'biweight scatter='+"{:.2f}".format(scat) + ' dex',
+			  transform = sfr.transAxes,horizontalalignment='right')
+	sfr.text(0.99,0.1, 'mean offset='+"{:.2f}".format(off) + ' dex',
+		      transform = sfr.transAxes,horizontalalignment='right')
+
+	##### metallicity
+	# check that we're using the same solar abundance
+	magmet, promet = np.empty(shape=(0,1)), np.empty(shape=(0,3))
+	for data in alldata:
+		if data:
+			tmp = np.array([data['pquantiles']['q16'][idx_met][0],
+				            data['pquantiles']['q50'][idx_met][0],
+				            data['pquantiles']['q84'][idx_met][0]])
+			promet = np.concatenate((promet,np.atleast_2d(tmp)))
+			magmet = np.concatenate((magmet,np.log10(np.atleast_2d(data['model']['full_parameters'][idx_mmet][0]))))
+
+	proerrs = [promet[:,1]-promet[:,0],
+	           promet[:,2]-promet[:,1]]
+	met.errorbar(promet[:,1],magmet,
+		          fmt=fmt, alpha=alpha,
+			      xerr=proerrs)
+
+	# labels
+	met.set_xlabel(r'log(Z/Z$_{\odot}$) [Prospectr]',labelpad=13)
+	met.set_ylabel(r'log(Z/Z$_{\odot}$) [best-fit MAGPHYS]')
+	met = equalize_axes(met,promet[:,1],magmet)
+
+	# text
+	off,scat = threed_dutils.offset_and_scatter(promet[:,1],magmet,biweight=True)
+	met.text(0.99,0.05, 'biweight scatter='+"{:.2f}".format(scat) + ' dex',
+			  transform = met.transAxes,horizontalalignment='right')
+	met.text(0.99,0.1, 'mean offset='+"{:.2f}".format(off) + ' dex',
+		      transform = met.transAxes,horizontalalignment='right')
+	
+
+	plt.savefig(outfolder+'basic_comparison.png',dpi=300)
+	plt.close()
+
 def plot_all_residuals(alldata):
 
 	'''
@@ -28,13 +186,30 @@ def plot_all_residuals(alldata):
 	'''
 
 	##### set up plots
-	fig = plt.figure(figsize=(8,8))
-	gs = gridspec.GridSpec(4, 1, height_ratios=[1.5,1,1,1])
-	phot = plt.Subplot(fig, gs[0])
-	opt = plt.Subplot(fig, gs[1])
-	akar = plt.Subplot(fig, gs[2])
-	spit = plt.Subplot(fig,gs[3])
-	print 1/0
+	fig = plt.figure(figsize=(15,12.5))
+	gs1 = gridspec.GridSpec(4, 1)
+	gs1.update(top=0.95, bottom=0.05, left=0.05, right=0.75,hspace=0.22)
+	phot = plt.Subplot(fig, gs1[0])
+	opt = plt.Subplot(fig, gs1[1])
+	akar = plt.Subplot(fig, gs1[2])
+	spit = plt.Subplot(fig,gs1[3])
+	
+
+	gs2 = gridspec.GridSpec(4, 1)
+	gs2.update(top=0.95, bottom=0.05, left=0.8, right=0.97,hspace=0.22)
+	phot_hist = plt.Subplot(fig, gs2[0])
+	opt_hist = plt.Subplot(fig, gs2[1])
+	akar_hist = plt.Subplot(fig, gs2[2])
+	spit_hist = plt.Subplot(fig,gs2[3])
+	
+	
+	##### add plots
+	plots = [opt,akar,spit]
+	plots_hist = [opt_hist, akar_hist, spit_hist]
+	for plot in plots: fig.add_subplot(plot)
+	for plot in plots_hist: fig.add_subplot(plot)
+	fig.add_subplot(phot)
+	fig.add_subplot(phot_hist)
 
 	#### parameters
 	alpha_minor = 0.2
@@ -42,37 +217,30 @@ def plot_all_residuals(alldata):
 	alpha_major = 0.8
 	lw_major = 2.5
 
-	#### load list of names
-	namelist = os.getenv('APPS')+"/threedhst_bsfh/data/brownseds_data/photometry/namelist.txt"
-	objnames = np.loadtxt(namelist,delimiter='#',dtype = str)
-	objnames = objnames[0:9]
-
 	##### load and plot photometric residuals
 	chi_magphys, chi_prosp, chisq_magphys,chisq_prosp, lam_rest = np.array([]),np.array([]),np.array([]), np.array([]), np.array([])
-	for name in objnames:
-		output = outpickle+'/'+name+'_phot.pickle'
-		with open(output, "rb") as f:
-			objinfo=pickle.load(f)
+	for data in alldata:
 
-		chi_magphys = np.append(chi_magphys,objinfo['chi_magphys'])
-		chi_prosp = np.append(chi_prosp,objinfo['chi_prosp'])
-		chisq_magphys = np.append(chisq_magphys,objinfo['chisq_magphys'])
-		chisq_prosp = np.append(chisq_prosp,objinfo['chisq_prosp'])
-		lam_rest = np.append(lam_rest,np.log10(objinfo['lam_obs']/(1+objinfo['z'])))
+		if data:
+			chi_magphys = np.append(chi_magphys,data['residuals']['phot']['chi_magphys'])
+			chi_prosp = np.append(chi_prosp,data['residuals']['phot']['chi_prosp'])
+			chisq_magphys = np.append(chisq_magphys,data['residuals']['phot']['chisq_magphys'])
+			chisq_prosp = np.append(chisq_prosp,data['residuals']['phot']['chisq_prosp'])
+			lam_rest = np.append(lam_rest,np.log10(data['residuals']['phot']['lam_obs']/(1+data['residuals']['phot']['z'])))
 
-		phot.plot(np.log10(objinfo['lam_obs']/(1+objinfo['z'])), 
-			      objinfo['chi_magphys'],
-			      alpha=alpha_minor,
-			      color=magphys_color,
-			      lw=lw_minor
-			      )
+			phot.plot(np.log10(data['residuals']['phot']['lam_obs']/(1+data['residuals']['phot']['z'])), 
+				      data['residuals']['phot']['chi_magphys'],
+				      alpha=alpha_minor,
+				      color=magphys_color,
+				      lw=lw_minor
+				      )
 
-		phot.plot(np.log10(objinfo['lam_obs']/(1+objinfo['z'])), 
-			      objinfo['chi_prosp'],
-			      alpha=alpha_minor,
-			      color=prosp_color,
-			      lw=lw_minor
-			      )
+			phot.plot(np.log10(data['residuals']['phot']['lam_obs']/(1+data['residuals']['phot']['z'])), 
+				      data['residuals']['phot']['chi_prosp'],
+				      alpha=alpha_minor,
+				      color=prosp_color,
+				      lw=lw_minor
+				      )
 
 	##### calculate and plot running median
 	nfilters = 33 # calculate this more intelligently?
@@ -92,58 +260,68 @@ def plot_all_residuals(alldata):
 		      color=prosp_color,
 		      lw=lw_major
 		      )
-
-	phot.text(0.98,0.05, 'photometry',
+	phot.text(0.99,0.92, 'MAGPHYS',
+			  transform = phot.transAxes,horizontalalignment='right',
+			  color=magphys_color)
+	phot.text(0.99,0.85, 'Prospectr',
+			  transform = phot.transAxes,horizontalalignment='right',
+			  color=prosp_color)
+	phot.text(0.99,0.05, 'photometry',
 			  transform = phot.transAxes,horizontalalignment='right')
 	phot.set_xlabel(r'log($\lambda_{\mathrm{rest}}$) [$\AA$]')
 	phot.set_ylabel(r'$\chi$')
 	phot.axhline(0, linestyle=':', color='grey')
-	fig.add_subplot(phot)
 
 	##### histogram of chisq values
-	n, b, p = chisq.hist(chisq_magphys, bins=20,
-		                 histtype="step",color=magphys_color,
-		                 range=[0,10])
+	nbins = 10
+	alpha_hist = 0.3
+	# first call is transparent, to get bins
+	# suitable for both data sets
+	n, b, p = phot_hist.hist([chisq_magphys,chisq_prosp],
+		                 nbins, histtype='bar',
+		                 color=[magphys_color,prosp_color],
+		                 alpha=0.0,lw=2)
+	n, b, p = phot_hist.hist(chisq_magphys,
+		                 bins=b, histtype='bar',
+		                 color=magphys_color,
+		                 alpha=alpha_hist,lw=2)
+	n, b, p = phot_hist.hist(chisq_prosp,
+		                 bins=b, histtype='bar',
+		                 color=prosp_color,
+		                 alpha=alpha_hist,lw=2)
 
-	n, b, p = chisq.hist(chisq_prosp, bins=20,
-		                 histtype="step",color=prosp_color,
-		                 range=[0,10])
-	chisq.set_ylabel('N')
-	chisq.set_xlabel(r'$\chi^2$')
+	phot_hist.set_ylabel('N')
+	phot_hist.set_xlabel(r'$\chi^2_{\mathrm{phot}}/$N$_{\mathrm{phot}}$')
 
 	##### load and plot spectroscopic residuals
 	label = ['Optical','Akari', 'Spitzer IRS']
 	nbins = [500,50,50]
-	plots = [opt,akar,spit]
 	for i, plot in enumerate(plots):
-		res_magphys, res_prosp, lam_magphys, lam_prosp = np.array([]),np.array([]),np.array([]),np.array([])
-		for name in objnames:
-			
-			output = outpickle+'/'+name+'_'+label[i]+'.pickle'
-			try:
-				with open(output, "rb") as f:
-					objinfo=pickle.load(f)
-			except IOError:
-				continue
+		res_magphys, res_prosp, lam_magphys, lam_prosp, mean_off_mag, mean_off_pro = np.array([]),np.array([]),np.array([]),np.array([]),np.array([]),np.array([])
+		for data in alldata:
+			if data:
+				if data['residuals'][label[i]]:
+					res_magphys = np.append(res_magphys,data['residuals'][label[i]]['magphys_resid'])
+					res_prosp = np.append(res_prosp,data['residuals'][label[i]]['prospectr_resid'])
+					lam_magphys = np.append(lam_magphys,np.log10(data['residuals'][label[i]]['magphys_restlam']))
+					lam_prosp = np.append(lam_prosp,np.log10(data['residuals'][label[i]]['prospectr_restlam']))		
 
-			res_magphys = np.append(res_magphys,objinfo['magphys_resid'])
-			res_prosp = np.append(res_prosp,objinfo['prospectr_resid'])
-			lam_magphys = np.append(lam_magphys,np.log10(objinfo['magphys_restlam']))
-			lam_prosp = np.append(lam_prosp,np.log10(objinfo['prospectr_restlam']))		
+					plot.plot(np.log10(data['residuals'][label[i]]['magphys_restlam']), 
+						      data['residuals'][label[i]]['magphys_resid'],
+						      alpha=alpha_minor,
+						      color=magphys_color,
+						      lw=lw_minor
+						      )
 
-			plot.plot(np.log10(objinfo['magphys_restlam']), 
-				      objinfo['magphys_resid'],
-				      alpha=alpha_minor,
-				      color=magphys_color,
-				      lw=lw_minor
-				      )
+					plot.plot(np.log10(data['residuals'][label[i]]['prospectr_restlam']), 
+						      data['residuals'][label[i]]['prospectr_resid'],
+						      alpha=alpha_minor,
+						      color=prosp_color,
+						      lw=lw_minor
+						      )
 
-			plot.plot(np.log10(objinfo['prospectr_restlam']), 
-				      objinfo['prospectr_resid'],
-				      alpha=alpha_minor,
-				      color=prosp_color,
-				      lw=lw_minor
-				      )
+					mean_off_mag = np.append(mean_off_mag,data['residuals'][label[i]]['magphys_resid'].mean())
+					mean_off_pro = np.append(mean_off_pro,data['residuals'][label[i]]['prospectr_resid'].mean())
 
 		##### calculate and plot running median
 		magbins, magmedian = threed_dutils.running_median(lam_magphys,res_magphys,nbins=nbins[i])
@@ -165,16 +343,35 @@ def plot_all_residuals(alldata):
 
 		plot.set_xlabel(r'log($\lambda_{\mathrm{rest}}$) [$\AA$]')
 		plot.set_ylabel(r'log(f$_{\mathrm{obs}}/$f$_{\mathrm{mod}}$)')
-		plot.text(0.98,0.05, label[i],
+		plot.text(0.99,0.05, label[i],
 			      transform = plot.transAxes,horizontalalignment='right')
 		plot.axhline(0, linestyle=':', color='grey')
-
-		fig.add_subplot(plot)
 	
-	outfolder = os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/magphys/'
+		##### histogram of mean offsets
+		nbins_hist = 10
+		alpha_hist = 0.3
+		# first histogram is transparent, to get bins
+		# suitable for both data sets
+		n, b, p = plots_hist[i].hist([mean_off_mag,mean_off_pro],
+			                 nbins_hist, histtype='bar',
+			                 color=[magphys_color,prosp_color],
+			                 alpha=0.0,lw=2)
+		n, b, p = plots_hist[i].hist(mean_off_mag,
+			                 bins=b, histtype='bar',
+			                 color=magphys_color,
+			                 alpha=alpha_hist,lw=2)
+		n, b, p = plots_hist[i].hist(mean_off_pro,
+			                 bins=b, histtype='bar',
+			                 color=prosp_color,
+			                 alpha=alpha_hist,lw=2)
+
+		plots_hist[i].set_ylabel('N')
+		plots_hist[i].set_xlabel(r'mean offset [dex]')
+
+	outfolder = os.getenv('APPS')+'/threedhst_bsfh/plots/brownseds/magphys/'
 	
 	plt.savefig(outfolder+'median_residuals.png',dpi=300)
-
+	plt.close()
 
 def load_spectra(objname, nufnu=True):
 	
@@ -337,8 +534,9 @@ def sed_comp_figure(sample_results, sps, model, magphys,
 		return_sedplot_vars(sample_results['quantiles']['maxprob_params'], 
 			                sample_results, sps)
 	except KeyError:
-		raise AttributeError("You must run post-processing on the Prospectr "
-						     "data for" + sample_results['run_params']['objname'])
+		print "You must run post-processing on the Prospectr " + \
+			  "data for " + sample_results['run_params']['objname']
+		return None
 
 	phot.plot(np.log10(wave_eff), np.log10(modmags), 
 		      color=prosp_color, marker='o', ms=ms, 
@@ -359,14 +557,12 @@ def sed_comp_figure(sample_results, sps, model, magphys,
 	linerr_down = np.clip(obsmags-obsmags_unc, 1e-80, np.inf)
 	linerr_up = np.clip(obsmags+obsmags_unc, 1e-80, np.inf)
 	yerr = [yplot - np.log10(linerr_down), np.log10(linerr_up)-yplot]
-
-	res.errorbar(xplot, yplot, yerr=yerr,
-                  color=obs_color, marker='o', label='observed', alpha=alpha, linestyle=' ',ms=ms)
 	
 	# plot limits
 	phot.set_xlim(3.1,max(xplot)*1.04)
 	phot.set_ylim(min(yplot[np.isfinite(yplot)])*0.95,max(yplot[np.isfinite(yplot)])*1.04)
 	res.set_xlim(3.1,max(xplot)*1.04)
+	res.axhline(0, linestyle=':', color='grey')
 
 	##### magphys: spectrum + photometry #####
 	# note: we steal the filter effective wavelengths from Prospectr here
@@ -378,11 +574,19 @@ def sed_comp_figure(sample_results, sps, model, magphys,
 	nu_eff = c / wave_eff
 	spec_fac = c / magphys['model']['lam']
 
-	phot.plot(np.log10(wave_eff), 
-		      np.log10(magphys['model']['flux'][m]*nu_eff), 
-		      color=magphys_color, marker='o', ms=ms, 
-		      linestyle=' ', label='MAGPHYS', alpha=alpha, 
-		      markeredgewidth=0.7,**kwargs)
+	try:
+		phot.plot(np.log10(wave_eff), 
+			      np.log10(magphys['model']['flux'][m]*nu_eff), 
+			      color=magphys_color, marker='o', ms=ms, 
+			      linestyle=' ', label='MAGPHYS', alpha=alpha, 
+			      markeredgewidth=0.7,**kwargs)
+	except:
+		print sample_results['obs']['phot_mask']
+		print magphys['obs']['phot_mask']
+		print sample_results['run_params']['objname']
+		print 'Mismatch between Prospectr and MAGPHYS photometry!'
+		plt.close()
+		return None
 	
 	chi_magphys = (magphys['model']['flux'][m]-magphys['obs']['flux'][m])/magphys['obs']['flux_unc'][m]
 	res.plot(np.log10(wave_eff), 
@@ -398,6 +602,7 @@ def sed_comp_figure(sample_results, sps, model, magphys,
 
 	##### observed spectra + residuals #####
 	obs_spec = load_spectra(sample_results['run_params']['objname'])
+
 	label = ['Optical','Akari', 'Spitzer IRS']
 	resplots = [spec_res_opt, spec_res_akari, spec_res_spit]
 
@@ -553,14 +758,19 @@ def collate_data(filebase=None,
  		# plot
  		residuals = sed_comp_figure(sample_results, sps, copy.deepcopy(sample_results['model']),
  						  magphys, maxprob=1,
- 						  outname=outfolder+filename.replace(' ','_')+'_'+max(times)+'.sed.png')
+ 						  outname=outfolder+filename.replace(' ','_')+'.sed.png')
  		
 	# SAVE OUTPUTS
-	print 'SAVING OUTPUTS for ' + sample_results['run_params']['objname']
-	alldata['residuals'] = residuals
-	alldata['magphys'] = magphys['pdfs']
-	alldata['pquantiles'] = sample_results['quantiles']
-	alldata['pextras'] = sample_results['extras']
+	if residuals is not None:
+		print 'SAVING OUTPUTS for ' + sample_results['run_params']['objname']
+		alldata['residuals'] = residuals
+		alldata['magphys'] = magphys['pdfs']
+		alldata['model'] = magphys['model']
+		alldata['pquantiles'] = sample_results['quantiles']
+		alldata['pextras'] = sample_results['extras']
+		alldata['pquantiles']['parnames'] = np.array(sample_results['model'].theta_labels())
+	else:
+		alldata = None
 
 	return alldata
 
@@ -576,6 +786,7 @@ def plt_all(runname=None,startup=True,**extras):
 		runname = 'brownseds'
 
 	output = outpickle+'/alldata.pickle'
+	outfolder = os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/magphys/sed_residuals/'
 
 	if startup == True:
 		filebase, parm_basename, ancilname=threed_dutils.generate_basenames(runname)
@@ -583,7 +794,7 @@ def plt_all(runname=None,startup=True,**extras):
 		for jj in xrange(len(filebase)):
 			print 'iteration '+str(jj) 
 			dictionary = collate_data(filebase=filebase[jj],\
-			                           outfolder=os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/magphys/',
+			                           outfolder=outfolder,
 			                           **extras)
 			alldata.append(dictionary)
 
@@ -593,7 +804,7 @@ def plt_all(runname=None,startup=True,**extras):
 			alldata=pickle.load(f)
 
 	plot_all_residuals(alldata)
-	plot_comparison(alldata)
+	plot_comparison(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/magphys/')
 	plot_mass_metallicity(alldata)
 	plot_sfr_mass(alldata)
 	
