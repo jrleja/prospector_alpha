@@ -246,9 +246,9 @@ def transform_logtau_to_tau(tau=None, logtau=None, **extras):
 
     return 10**logtau
 
-def add_dust1(dust2=None, **extras):
+#def add_dust1(dust2=None, **extras):
 
-    return 0.86*dust2
+#    return 0.86*dust2
 
 class BurstyModel(sedmodel.CSPModel):
 
@@ -283,6 +283,7 @@ class BurstyModel(sedmodel.CSPModel):
 
             # fractional dispersion with artificial floor
             if par == 'dust2' or \
+               par == 'dust1' or \
                par == 'dust_index':
                 disp[inds[0]:inds[1]] = (self._config_dict[par].get('init_disp', initial_disp) * thetas[inds[0]:inds[1]]**2 + \
                                          0.1**2)**0.5
@@ -313,6 +314,9 @@ class BurstyModel(sedmodel.CSPModel):
             if par == 'dust2' or \
                par == 'dust_index':
                 disp[inds[0]:inds[1]] = 0.15
+
+            if par == 'dust1':
+                disp[inds[0]:inds[1]] = 0.5
 
             if par == 'duste_umin':
                 disp[inds[0]:inds[1]] = 4.5
@@ -549,12 +553,12 @@ model_params.append({'name': 'dust_type', 'N': 1,
                         'prior_args': None})
                         
 model_params.append({'name': 'dust1', 'N': 1,
-                        'isfree': False,
-                        'init': 0.0,
-                        'depends_on': add_dust1,
+                        'isfree': True,
+                        'init': 1.0,
+                        'init_disp': 0.5,
                         'units': '',
                         'prior_function': tophat,
-                        'prior_args': {'mini':0.0, 'maxi':8.0}})
+                        'prior_args': {'mini':0.0, 'maxi':4.0}})
 
 model_params.append({'name': 'dust2', 'N': 1,
                         'isfree': True,
