@@ -148,14 +148,14 @@ def plot_comparison(alldata,outfolder):
 
 	##### metallicity
 	# check that we're using the same solar abundance
-	magmet, promet = np.empty(shape=(0,1)), np.empty(shape=(0,3))
+	magmet, promet = np.empty(0),np.empty(shape=(0,3))
 	for data in alldata:
 		if data:
 			tmp = np.array([data['pquantiles']['q16'][idx_met][0],
 				            data['pquantiles']['q50'][idx_met][0],
 				            data['pquantiles']['q84'][idx_met][0]])
 			promet = np.concatenate((promet,np.atleast_2d(tmp)))
-			magmet = np.concatenate((magmet,np.log10(np.atleast_2d(data['model']['full_parameters'][idx_mmet][0]))))
+			magmet = np.concatenate((magmet,np.log10(np.atleast_1d(data['model']['full_parameters'][idx_mmet][0]))))
 
 	proerrs = [promet[:,1]-promet[:,0],
 	           promet[:,2]-promet[:,1]]
@@ -249,11 +249,21 @@ def plot_all_residuals(alldata):
 
 	phot.plot(magbins, 
 		      magmedian,
-		      alpha=alpha_major,
+		      color='black',
+		      lw=lw_major*1.1
+		      )
+
+	phot.plot(magbins, 
+		      magmedian,
 		      color=magphys_color,
 		      lw=lw_major
 		      )
 
+	phot.plot(probins, 
+		      promedian,
+		      color='black',
+		      lw=lw_major*1.1
+		      )
 	phot.plot(probins, 
 		      promedian,
 		      alpha=alpha_major,
@@ -277,15 +287,18 @@ def plot_all_residuals(alldata):
 	alpha_hist = 0.3
 	# first call is transparent, to get bins
 	# suitable for both data sets
-	n, b, p = phot_hist.hist([chisq_magphys,chisq_prosp],
+	histmax = 2
+	okmag = chisq_magphys < histmax
+	okpro = chisq_prosp < histmax
+	n, b, p = phot_hist.hist([chisq_magphys[okmag],chisq_prosp[okpro]],
 		                 nbins, histtype='bar',
 		                 color=[magphys_color,prosp_color],
 		                 alpha=0.0,lw=2)
-	n, b, p = phot_hist.hist(chisq_magphys,
+	n, b, p = phot_hist.hist(chisq_magphys[okmag],
 		                 bins=b, histtype='bar',
 		                 color=magphys_color,
 		                 alpha=alpha_hist,lw=2)
-	n, b, p = phot_hist.hist(chisq_prosp,
+	n, b, p = phot_hist.hist(chisq_prosp[okpro],
 		                 bins=b, histtype='bar',
 		                 color=prosp_color,
 		                 alpha=alpha_hist,lw=2)
@@ -320,8 +333,8 @@ def plot_all_residuals(alldata):
 						      lw=lw_minor
 						      )
 
-					mean_off_mag = np.append(mean_off_mag,data['residuals'][label[i]]['magphys_resid'].mean())
-					mean_off_pro = np.append(mean_off_pro,data['residuals'][label[i]]['prospectr_resid'].mean())
+					mean_off_mag = np.append(mean_off_mag,np.nanmean(data['residuals'][label[i]]['magphys_resid']))
+					mean_off_pro = np.append(mean_off_pro,np.nanmean(data['residuals'][label[i]]['prospectr_resid']))
 
 		##### calculate and plot running median
 		magbins, magmedian = threed_dutils.running_median(lam_magphys,res_magphys,nbins=nbins[i])
@@ -329,14 +342,24 @@ def plot_all_residuals(alldata):
 
 		plot.plot(magbins, 
 			      magmedian,
-			      alpha=alpha_major,
+			      color='black',
+			      lw=lw_major*1.1
+			      )
+
+		plot.plot(magbins, 
+			      magmedian,
 			      color=magphys_color,
 			      lw=lw_major
 			      )
 
 		plot.plot(probins, 
 			      promedian,
-			      alpha=alpha_major,
+			      color='black',
+			      lw=lw_major
+			      )
+
+		plot.plot(probins, 
+			      promedian,
 			      color=prosp_color,
 			      lw=lw_major
 			      )
@@ -352,21 +375,29 @@ def plot_all_residuals(alldata):
 		alpha_hist = 0.3
 		# first histogram is transparent, to get bins
 		# suitable for both data sets
-		n, b, p = plots_hist[i].hist([mean_off_mag,mean_off_pro],
+		histmax = 2
+		okmag = mean_off_mag < histmax
+		okpro = mean_off_pro < histmax
+		n, b, p = plots_hist[i].hist([mean_off_mag[okmag],mean_off_pro[okpro]],
 			                 nbins_hist, histtype='bar',
 			                 color=[magphys_color,prosp_color],
 			                 alpha=0.0,lw=2)
-		n, b, p = plots_hist[i].hist(mean_off_mag,
+		n, b, p = plots_hist[i].hist(mean_off_mag[okmag],
 			                 bins=b, histtype='bar',
 			                 color=magphys_color,
 			                 alpha=alpha_hist,lw=2)
-		n, b, p = plots_hist[i].hist(mean_off_pro,
+		n, b, p = plots_hist[i].hist(mean_off_pro[okpro],
 			                 bins=b, histtype='bar',
 			                 color=prosp_color,
 			                 alpha=alpha_hist,lw=2)
 
 		plots_hist[i].set_ylabel('N')
 		plots_hist[i].set_xlabel(r'mean offset [dex]')
+
+		if label[i] == 'Optical':
+			plot.set_ylim(-1.5,1.5)
+		if label[i] == 'Spitzer IRS':
+			plot.set_ylim(-1.5,1.5)
 
 	outfolder = os.getenv('APPS')+'/threedhst_bsfh/plots/brownseds/magphys/'
 	
@@ -557,7 +588,9 @@ def sed_comp_figure(sample_results, sps, model, magphys,
 	linerr_down = np.clip(obsmags-obsmags_unc, 1e-80, np.inf)
 	linerr_up = np.clip(obsmags+obsmags_unc, 1e-80, np.inf)
 	yerr = [yplot - np.log10(linerr_down), np.log10(linerr_up)-yplot]
-	
+	phot.errorbar(xplot, yplot, yerr=yerr,
+                  color=obs_color, marker='o', label='observed', alpha=alpha, linestyle=' ',ms=ms)
+	print 1/0
 	# plot limits
 	phot.set_xlim(3.1,max(xplot)*1.04)
 	phot.set_ylim(min(yplot[np.isfinite(yplot)])*0.95,max(yplot[np.isfinite(yplot)])*1.04)
@@ -588,7 +621,7 @@ def sed_comp_figure(sample_results, sps, model, magphys,
 		plt.close()
 		return None
 	
-	chi_magphys = (magphys['model']['flux'][m]-magphys['obs']['flux'][m])/magphys['obs']['flux_unc'][m]
+	chi_magphys = (magphys['obs']['flux'][m]-magphys['model']['flux'][m])/magphys['obs']['flux_unc'][m]
 	res.plot(np.log10(wave_eff), 
 		     chi_magphys, 
 		     color=magphys_color, marker='o', linestyle=' ', label='MAGPHYS', 

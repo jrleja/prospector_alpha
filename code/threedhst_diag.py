@@ -645,7 +645,7 @@ def sed_figure(sample_results, sps, model,
 
 	# set up plot limits
 	phot.set_xlim(min(xplot)*0.9,max(xplot)*1.04)
-	phot.set_ylim(min(yplot[np.isfinite(yplot)])*0.9,max(yplot[np.isfinite(yplot)])*1.04)
+	phot.set_ylim(min(yplot[np.isfinite(yplot)])*0.8,max(yplot[np.isfinite(yplot)])*1.04)
 	res.set_xlim(min(xplot)*0.9,max(xplot)*1.04)
 
     # PLOT OBSERVATIONS + ERRORS 
