@@ -178,14 +178,14 @@ def load_obs_brown(photname, extinctname, herschname, objname):
                 hflux[kk,ii] = herschel[1].data[match][hflux_fields[kk]]
                 hunc[kk,ii]  = herschel[1].data[match][hunc_fields[kk]]
 
-    # 5% error floor
-    hunc = np.clip(hunc, hflux*0.05, np.inf)
-
     #### combine with brown catalog
     # convert from Jy to maggies
     flux = np.concatenate((flux,hflux/3631.))   
     unc = np.concatenate((unc, hunc/3631.))
     mag_fields = np.append(mag_fields,hflux_fields)   
+
+    # 5% error floor
+    unc = np.clip(unc, flux*0.05, np.inf)
 
     # phot mask
     phot_mask_brown = mag != 0
@@ -526,7 +526,7 @@ model_params.append({'name': 'sf_tanslope', 'N': 1,
                         'init_disp': 0.25,
                         'units': '',
                         'prior_function': tophat,
-                        'prior_args': {'mini':-np.pi/2., 'maxi': np.pi/3.}})
+                        'prior_args': {'mini':-np.pi/2., 'maxi': np.pi/2.5}})
 
 model_params.append({'name': 'sf_slope', 'N': 1,
                         'isfree': False,
