@@ -6,6 +6,39 @@ from scipy.interpolate import interp1d
 from scipy.integrate import simps
 from calc_ml import load_filter_response
 from bsfh.likelihood import LikelihoodFunction
+import copy
+
+
+def smooth_spectrum(lam,spec,sigma,
+	                minlam=0.0,maxlam=1e50):     
+
+	'''
+	ripped from smoothspec.f90
+	the 'fast way'
+	integration is truncated at +/-4*sigma
+	'''
+	c_kms = 2.99e5
+	int_trunc=4
+	spec_out = copy.copy(spec)
+
+	for ii in xrange(len(lam)):
+		if lam[ii] < minlam or lam[ii] > maxlam:
+			spec_out[ii] = spec[ii]
+			continue
+
+		dellam = lam[ii]*(int_trunc*sigma/c_kms+1)-lam[ii]
+		integrate_lam = (lam > lam[ii]-dellam) & (lam < lam[ii]+dellam)
+
+		if np.sum(integrate_lam) <= 1:
+			spec_out[ii] = spec[ii]
+		else:
+			vel = (lam[ii]/lam[integrate_lam]-1)*c_kms
+			func = 1/np.sqrt(2*np.pi)/sigma * np.exp(-vel**2/2./sigma**2)
+			dx=np.abs(np.diff(vel)) # we want absolute value
+			func = func / np.trapz(func,dx=dx)
+			spec_out[ii] = np.trapz(func*spec[integrate_lam],dx=dx)
+
+	return spec_out
 
 def offset_and_scatter(x,y,biweight=True):
 

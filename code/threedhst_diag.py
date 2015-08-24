@@ -213,17 +213,23 @@ def add_to_corner(fig, sample_results, sps, model,truths=None,maxprob=True,powel
 
     return fig
 
-def add_sfh_plot(sample_results,fig,ax_loc,sps,truths=None,fast=None):
+def add_sfh_plot(sample_results,fig,ax_loc,sps,
+	             truths=None,fast=None,text_size=1,
+	             no_legend=False):
 	
 	'''
 	add a small SFH plot at ax_loc
+	truths: also plot truths
+	fast: also plot FAST fits
+	text_size: multiply font size by this, to accomodate larger/smaller figures
+	no_legend: don't create a legend. useful to create elsewhere.
 	'''
 
 	#### load median SFH
 	t = sample_results['extras']['t_sfh']
 	perc = np.zeros(shape=(len(t),3))
 	for jj in xrange(len(t)): perc[jj,:] = np.percentile(sample_results['extras']['sfh'][jj,:],[16.0,50.0,84.0])
-	axfontsize=4
+	axfontsize=4*text_size
 	
 	#### load most likely SFH
 	mlike_sfh = threed_dutils.find_sfh_params(sample_results['model'],
@@ -306,7 +312,7 @@ def add_sfh_plot(sample_results,fig,ax_loc,sps,truths=None,fast=None):
 	if truths is not None:
 		plotmax_x = np.max(np.append(plotmax_x,truths['sfh_params']['tage']))
 
-	dynrange = (plotmax_y-plotmin_y)*0.3
+	dynrange = (plotmax_y-plotmin_y)*0.4
 	axlim_sfh=[plotmax_x,
 	           np.min(t),
 	           plotmin_y,
@@ -318,8 +324,10 @@ def add_sfh_plot(sample_results,fig,ax_loc,sps,truths=None,fast=None):
 	ax_inset.tick_params(labelsize=axfontsize)
 
 	# labels
-	ax_inset.text(0.08,0.9, 'most likely',color=most_likely_color, transform = ax_inset.transAxes,fontsize=axfontsize*1.4)
-	ax_inset.text(0.08,0.8, 'median',color=median_main_color, transform = ax_inset.transAxes,fontsize=axfontsize*1.4)
+	ax_inset.text(0.92,0.24, 'most likely',color=most_likely_color, transform = ax_inset.transAxes,fontsize=axfontsize*1.4,ha='right')
+	ax_inset.text(0.92,0.16, 'median',color=median_main_color, transform = ax_inset.transAxes,fontsize=axfontsize*1.4,ha='right')
+
+	return ax_inset
 
 def plot_sfh_fast(tau,tage,mass,tuniv=None):
 
@@ -615,16 +623,16 @@ def sed_figure(sample_results, sps, model,
 	# photometry, and chi values
 	wave_eff, obsmags, obsmags_unc, modmags, chi, modspec, modlam = return_sedplot_vars(sample_results['quantiles']['maxprob_params'], sample_results, sps)
 
-	phot.plot(np.log10(wave_eff), np.log10(modmags), color=most_likely_color, 
+	phot.plot(wave_eff, modmags, color=most_likely_color, 
 		      marker='o', ms=ms, linestyle=' ', label='most likely', alpha=alpha, 
 		      markeredgewidth=0.7,**kwargs)
 	
-	res.plot(np.log10(wave_eff), chi, 
+	res.plot(wave_eff, chi, 
 		     color=most_likely_color, marker='o', linestyle=' ', label='most likely', 
 		     ms=ms,alpha=alpha,markeredgewidth=0.7,**kwargs)
 	
 	nz = modspec > 0
-	phot.plot(np.log10(modlam[nz]), np.log10(modspec[nz]), linestyle='-',
+	phot.plot(modlam[nz], modspec[nz], linestyle='-',
               color=most_likely_color, alpha=0.9,**kwargs)
 
 	# plot AGB-off for Charlie
@@ -633,20 +641,18 @@ def sed_figure(sample_results, sps, model,
 		_, _, _, _, _, modspec_off, modlam_off = return_sedplot_vars(sample_results['quantiles']['maxprob_params'], sample_results, sps)
 
 		nz = modspec > 0
-		phot.plot(np.log10(modlam_off[nz]), np.log10(modspec_off[nz]), linestyle='-',
+		phot.plot(modlam_off[nz], modspec_off[nz], linestyle='-',
               color='blue', alpha=0.6,label='AGB dust off',**kwargs)
 
 	# define observations for later use
-	xplot = np.log10(wave_eff)
-	yplot = np.log10(obsmags)
-	linerr_down = np.clip(obsmags-obsmags_unc, 1e-80, np.inf)
-	linerr_up = np.clip(obsmags+obsmags_unc, 1e-80, np.inf)
-	yerr = [yplot - np.log10(linerr_down), np.log10(linerr_up)-yplot]
+	xplot = wave_eff
+	yplot = obsmags
+	yerr=obsmags_unc
 
 	# set up plot limits
-	phot.set_xlim(min(xplot)*0.9,max(xplot)*1.04)
-	phot.set_ylim(min(yplot[np.isfinite(yplot)])*0.8,max(yplot[np.isfinite(yplot)])*1.04)
-	res.set_xlim(min(xplot)*0.9,max(xplot)*1.04)
+	phot.set_xlim(min(xplot)*0.4,max(xplot)*1.5)
+	res.set_xlim(min(xplot)*0.4,max(xplot)*1.5)
+	phot.set_ylim(min(yplot[np.isfinite(yplot)])*0.5,max(yplot[np.isfinite(yplot)])*2.5)
 
     # PLOT OBSERVATIONS + ERRORS 
 	phot.errorbar(xplot, yplot, yerr=yerr,
@@ -670,9 +676,9 @@ def sed_figure(sample_results, sps, model,
 	nz = spec_pdf[:,1] > 0
 	#phot.plot(np.log10(w[nz]), np.log10(spec_pdf[nz,1]*sfactor[nz]), linestyle='-',
     #          color=median_main_color, alpha=0.6)
-	phot.fill_between(np.log10(w), np.log10(spec_pdf[:,0]*sfactor), 
-		                           np.log10(spec_pdf[:,2]*sfactor),
-		                           color=median_err_color)
+	phot.fill_between(w, spec_pdf[:,0]*sfactor, 
+		                 spec_pdf[:,2]*sfactor,
+		                 color=median_err_color)
 
 	#phot.plot(np.log10(wave_eff), np.log10(mag_pdf[mask]*pfactor), color=median_main_color, 
 	#	      marker='o', ms=ms, linestyle=' ', label='median', alpha=alpha, 
@@ -715,7 +721,7 @@ def sed_figure(sample_results, sps, model,
 
 	# add SFH plot
 	ax_loc = [0.2,0.35,0.12,0.14]
-	add_sfh_plot(sample_results,fig,ax_loc,sps,truths=truths,fast=fast)
+	ax_inset = add_sfh_plot(sample_results,fig,ax_loc,sps,truths=truths,fast=fast)
 
 	# add RGB
 	try:
@@ -731,9 +737,9 @@ def sed_figure(sample_results, sps, model,
 		print 'no RGB image'
 
 	# diagnostic text
-	textx = (phot.get_xlim()[1]-phot.get_xlim()[0])*0.975+phot.get_xlim()[0]
-	texty = (phot.get_ylim()[1]-phot.get_ylim()[0])*0.2+phot.get_ylim()[0]
-	deltay = (phot.get_ylim()[1]-phot.get_ylim()[0])*0.05
+	textx = 0.98
+	texty = 0.2
+	deltay = 0.035
 
 	# calculate reduced chi-squared
 	chisq=np.sum(chi**2)
@@ -754,12 +760,12 @@ def sed_figure(sample_results, sps, model,
 			pass
 	else:
 		phot.text(textx, texty, r'best-fit $\chi^2_n$='+"{:.2f}".format(reduced_chisq),
-			  fontsize=10, ha='right')
+			  fontsize=10, ha='right',transform = phot.transAxes)
 		phot.text(textx, texty-deltay, r'median of PDF $\chi^2_n$='+"{:.2f}".format(reduced_chisq_median),
-			  fontsize=10, ha='right')
+			  fontsize=10, ha='right',transform = phot.transAxes)
 	
 	phot.text(textx, texty-2*deltay, r'avg acceptance='+"{:.2f}".format(np.mean(sample_results['acceptance'])),
-				 fontsize=10, ha='right')
+				 fontsize=10, ha='right',transform = phot.transAxes)
 		
 	# load ancil data
 	if 'ancilname' in sample_results['run_params'].keys():
@@ -815,7 +821,7 @@ def sed_figure(sample_results, sps, model,
 		
 	# galaxy text
 	phot.text(textx, texty-3*deltay, 'z='+"{:.2f}".format(z_txt),
-			  fontsize=10, ha='right')
+			  fontsize=10, ha='right',transform = phot.transAxes)
 	#phot.text(textx, texty-3*deltay, 'uvj_flag='+str(uvj_txt),
 	#		  fontsize=10, ha='right')
 	#phot.text(textx, texty-4*deltay, 'S/N(F160W)='+"{:.2f}".format(sn_txt),
@@ -836,9 +842,12 @@ def sed_figure(sample_results, sps, model,
 			    
     # set labels
 	res.set_ylabel( r'$\chi$')
-	phot.set_ylabel(r'log($\nu f_{\nu}$)')
-	res.set_xlabel(r'log($\lambda_{obs}$) [$\AA$]')
-	
+	phot.set_ylabel(r'$\nu f_{\nu}$')
+	res.set_xlabel(r'$\lambda_{obs}$ [$\AA$]')
+	phot.set_yscale('log',nonposx='clip')
+	phot.set_xscale('log',nonposx='clip')
+	res.set_xscale('log',nonposx='clip')
+
 	# clean up and output
 	fig.add_subplot(phot)
 	fig.add_subplot(res)
@@ -848,9 +857,10 @@ def sed_figure(sample_results, sps, model,
 	x1, x2=phot.get_xlim()
 	ax2=phot.twiny()
 	ax2.set_xticks(np.arange(0,10,0.2))
-	ax2.set_xlim(np.log10((10**(x1))/(1+z_txt)), np.log10((10**(x2))/(1+z_txt)))
+	ax2.set_xlim(x1/(1+z_txt), x2/(1+z_txt))
 	ax2.set_xlabel(r'log($\lambda_{rest}$) [$\AA$]')
 	ax2.set_ylim(y1, y2)
+	ax2.set_xscale('log',nonposx='clip')
 
 	# remove ticks
 	phot.set_xticklabels([])

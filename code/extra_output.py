@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from copy import copy
 from astropy import constants
 
-def calc_emp_ha(mass,sfr,dust2,dustindex,ncomp=1):
+def calc_emp_ha(mass,sfr,dust1,dust2,dustindex,ncomp=1):
 
 	# dust1 is hardcoded here, be careful!!!!
 
@@ -14,7 +14,7 @@ def calc_emp_ha(mass,sfr,dust2,dustindex,ncomp=1):
 	for kk in xrange(ncomp):
 		x=threed_dutils.synthetic_emlines(mass[kk],
 				                          np.atleast_1d(sfr)[kk],
-				                          dust2[kk]*0.86,
+				                          dust1[kk],
 				                          dust2[kk],
 				                          dustindex)
 		oiii_flux = oiii_flux + x['flux'][x['name'] == '[OIII]']
@@ -78,6 +78,9 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 	lineflux = np.empty(shape=(ncalc,nline))
 
 	##### information for empirical emission line calculation ######
+	dust1_index = np.array([True if (x[:-sample_results['ncomp']] == 'dust1') or 
+		                            (x == 'dust1') else 
+		                            False for x in parnames])
 	dust2_index = np.array([True if (x[:-sample_results['ncomp']] == 'dust2') or 
 		                            (x == 'dust2') else 
 		                            False for x in parnames])
@@ -131,7 +134,9 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 
 		##### empirical halpha
 		emp_ha[jj],emp_oiii[jj] = calc_emp_ha(sfh_params['mass'],sfr_100[jj],
-			                                  flatchain[jj,dust2_index],flatchain[jj,dust_index_index],
+			                                  flatchain[jj,dust1_index],
+			                                  flatchain[jj,dust2_index],
+			                                  flatchain[jj,dust_index_index],
 			                                  ncomp=sample_results['ncomp'])
 		##### model Halpha, L_IR, and mips flux
 		modelout = threed_dutils.measure_emline_lum(sps, thetas = thetas,
