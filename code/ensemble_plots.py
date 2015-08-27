@@ -252,12 +252,12 @@ def collate_output(runname,outname):
 			continue
 
 		# check for existence of extra information
-		#try:
-		#	sample_results['quantiles']
-		#except:
-		print 'Generating extra information for '+mcmc_filename+', '+model_filename
-		extra_output.post_processing(params[jj])
-		sample_results, powell_results, model = read_results.read_pickles(mcmc_filename, model_file=model_filename,inmod=None)
+		try:
+			sample_results['quantiles']
+		except:
+			print 'Generating extra information for '+mcmc_filename+', '+model_filename
+			extra_output.post_processing(params[jj])
+			sample_results, powell_results, model = read_results.read_pickles(mcmc_filename, model_file=model_filename,inmod=None)
 
 		# initialize output arrays if necessary
 		ntheta = len(sample_results['initial_theta'])+len(sample_results['extras']['parnames'])

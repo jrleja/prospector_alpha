@@ -32,7 +32,7 @@ run_params = {'verbose':True,
 # OBS
 #############
 
-def translate_filters(bfilters):
+def translate_filters(bfilters, full_list = False):
     '''
     translate filter names to FSPS standard
     this is ALREADY a mess, clean up soon!
@@ -116,7 +116,11 @@ def translate_filters(bfilters):
     'spire500': 'SPIRE_500'
     }
 
-    return np.array([translate[f] for f in bfilters]), np.array([translate_pfsps[f] for f in bfilters])
+    if full_list:
+        return translate.values()
+    else:
+        return np.array([translate[f] for f in bfilters]), np.array([translate_pfsps[f] for f in bfilters])
+
 
 def load_obs_brown(photname, extinctname, herschname, objname):
     """
@@ -170,7 +174,7 @@ def load_obs_brown(photname, extinctname, herschname, objname):
         optnames = hdulist[1].data['Name']
         hnames   = herschel[1].data['Name']
 
-        # non-pythonic, i know, but why change it if it works?
+        # non-pythonic, i know, but why change if it works?
         hflux,hunc = np.zeros(shape=(len(hflux_fields),len(hnames))), np.zeros(shape=(len(hflux_fields),len(hnames)))
         for ii in xrange(len(optnames)):
             match = hnames == optnames[ii].lower().replace(' ','')
@@ -183,9 +187,6 @@ def load_obs_brown(photname, extinctname, herschname, objname):
     flux = np.concatenate((flux,hflux/3631.))   
     unc = np.concatenate((unc, hunc/3631.))
     mag_fields = np.append(mag_fields,hflux_fields)   
-
-    # 5% error floor
-    unc = np.clip(unc, flux*0.05, np.inf)
 
     # phot mask
     phot_mask_brown = mag != 0
@@ -206,6 +207,16 @@ def load_obs_brown(photname, extinctname, herschname, objname):
     # load wave_effective
     from translate_filter import calc_lameff_for_fsps
     wave_effective = calc_lameff_for_fsps(filters)
+
+    # error floors
+    # split at 4.2 micron observed frame
+    #high = wave_effective > 4.2e4
+    #low = wave_effective <= 4.2e4
+    #if high[0] != -1:
+    #    unc[high] = np.clip(unc[high], flux[high]*0.08, np.inf)
+    #if low[0] != -1:
+    #     unc[low] = np.clip(unc[low], flux[low]*0.02, np.inf)
+    unc = np.clip(unc, flux*0.05, np.inf)
 
     # build output dictionary
     obs['wave_effective'] = wave_effective
@@ -316,7 +327,7 @@ class BurstyModel(sedmodel.CSPModel):
                 disp[inds[0]:inds[1]] = 0.15
 
             if par == 'dust1':
-                disp[inds[0]:inds[1]] = 0.5
+                disp[inds[0]:inds[1]] = 1.0
 
             if par == 'duste_umin':
                 disp[inds[0]:inds[1]] = 4.5
@@ -385,7 +396,7 @@ run_params['tuniv']       = tuniv
 
 #### TAGE #####
 tage_maxi = tuniv
-tage_init = tuniv/2.
+tage_init = 1.0
 tage_mini  = 0.11      # FSPS standard
 
 model_type = BurstyModel
@@ -423,7 +434,7 @@ model_params.append({'name': 'mass', 'N': 1,
                         'init_disp': 0.25,
                         'units': r'M_\odot',
                         'prior_function': tophat,
-                        'prior_args': {'mini':1e7,'maxi':1e14}})
+                        'prior_args': {'mini':1e5,'maxi':1e14}})
 
 model_params.append({'name': 'pmetals', 'N': 1,
                         'isfree': False,
@@ -526,7 +537,7 @@ model_params.append({'name': 'sf_tanslope', 'N': 1,
                         'init_disp': 0.25,
                         'units': '',
                         'prior_function': tophat,
-                        'prior_args': {'mini':-np.pi/2., 'maxi': np.pi/2.5}})
+                        'prior_args': {'mini':-np.pi/2., 'maxi': np.pi/2}})
 
 model_params.append({'name': 'sf_slope', 'N': 1,
                         'isfree': False,
@@ -555,7 +566,7 @@ model_params.append({'name': 'dust_type', 'N': 1,
 model_params.append({'name': 'dust1', 'N': 1,
                         'isfree': True,
                         'init': 1.0,
-                        'init_disp': 0.5,
+                        'init_disp': 0.6,
                         'units': '',
                         'prior_function': tophat,
                         'prior_args': {'mini':0.0, 'maxi':4.0}})
