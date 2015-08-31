@@ -550,7 +550,7 @@ model_params.append({'name': 'imf_type', 'N': 1,
 ######## Dust Absorption ##############
 model_params.append({'name': 'dust_type', 'N': 1,
                         'isfree': False,
-                        'init': 0,
+                        'init': 4,
                         'units': 'index',
                         'prior_function_name': None,
                         'prior_args': None})
@@ -600,7 +600,7 @@ model_params.append({'name': 'add_dust_emission', 'N': 1,
                         'prior_args': None})
 
 model_params.append({'name': 'duste_gamma', 'N': 1,
-                        'isfree': dust_variable,
+                        'isfree': True,
                         'init': 0.01,
                         'init_disp': 0.2,
                         'units': None,
@@ -608,7 +608,7 @@ model_params.append({'name': 'duste_gamma', 'N': 1,
                         'prior_args': {'mini':0.0, 'maxi':1.0}})
 
 model_params.append({'name': 'duste_umin', 'N': 1,
-                        'isfree': dust_variable,
+                        'isfree': True,
                         'init': 1.0,
                         'init_disp': 5.0,
                         'units': None,
@@ -616,7 +616,7 @@ model_params.append({'name': 'duste_umin', 'N': 1,
                         'prior_args': {'mini':0.1, 'maxi':25.0}})
 
 model_params.append({'name': 'duste_qpah', 'N': 1,
-                        'isfree': dust_variable,
+                        'isfree': True,
                         'init': 3.0,
                         'init_disp': 3.0,
                         'units': 'percent',
