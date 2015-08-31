@@ -375,14 +375,6 @@ class BurstyModel(sedmodel.CSPModel):
                                 (theta[start:end], **self._config_dict[k]['prior_args']))
         return lnp_prior
 
-##### if we have KINGFISH imaging,
-##### leave dust parameters free
-if 'SPIRE_500' in obs['filters']:
-    dust_variable = True
-else:
-    dust_variable = False
-
-
 #### SET SFH PRIORS #####
 ###### REDSHIFT ######
 hdulist = fits.open(run_params['datname'])
@@ -396,7 +388,7 @@ run_params['tuniv']       = tuniv
 
 #### TAGE #####
 tage_maxi = tuniv
-tage_init = 1.0
+tage_init = 1.1
 tage_mini  = 0.11      # FSPS standard
 
 model_type = BurstyModel
@@ -445,7 +437,7 @@ model_params.append({'name': 'pmetals', 'N': 1,
 
 model_params.append({'name': 'logzsol', 'N': 1,
                         'isfree': True,
-                        'init': -0.1,
+                        'init': -0.5,
                         'init_disp': 0.15,
                         'units': r'$\log (Z/Z_\odot)$',
                         'prior_function': tophat,
@@ -558,7 +550,7 @@ model_params.append({'name': 'imf_type', 'N': 1,
 ######## Dust Absorption ##############
 model_params.append({'name': 'dust_type', 'N': 1,
                         'isfree': False,
-                        'init': 4,
+                        'init': 0,
                         'units': 'index',
                         'prior_function_name': None,
                         'prior_args': None})

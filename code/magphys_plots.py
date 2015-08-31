@@ -112,6 +112,165 @@ def equalize_axes(ax, x,y, dynrange=0.1, line_of_equality=True):
 
 	return ax
 	
+def plot_relationships(alldata,outfolder):
+
+	'''
+	mass-metallicity
+	mass-SFR
+	etc
+	'''
+
+	##### set up plots
+	fig = plt.figure(figsize=(10,5))
+	gs1 = mpl.gridspec.GridSpec(1, 2)
+	msfr = plt.Subplot(fig, gs1[0])
+	mz = plt.Subplot(fig, gs1[1])
+
+	fig.add_subplot(msfr)
+	fig.add_subplot(mz)
+
+	alpha = 0.6
+
+	##### find prospectr indexes
+	parnames = alldata[0]['pquantiles']['parnames']
+	idx_mass = parnames == 'mass'
+	idx_met = parnames == 'logzsol'
+
+	eparnames = alldata[0]['pextras']['parnames']
+	idx_sfr = eparnames == 'sfr_100'
+
+	##### find magphys indexes
+	idx_mmet = alldata[0]['model']['full_parnames'] == 'Z/Zo'
+
+	##### extract mass, SFR, metallicity
+	magmass, promass, magsfr, prosfr, promet = [np.empty(shape=(0,3)) for x in xrange(5)]
+	magmet = np.empty(0)
+	for data in alldata:
+		if data:
+			
+			# mass
+			tmp = np.array([data['pquantiles']['q16'][idx_mass][0],
+				            data['pquantiles']['q50'][idx_mass][0],
+				            data['pquantiles']['q84'][idx_mass][0]])
+			promass = np.concatenate((promass,np.atleast_2d(np.log10(tmp))),axis=0)
+			magmass = np.concatenate((magmass,np.atleast_2d(data['magphys']['percentiles']['M*'][1:4])))
+
+			# SFR
+			tmp = np.array([data['pextras']['q16'][idx_sfr][0],
+				            data['pextras']['q50'][idx_sfr][0],
+				            data['pextras']['q84'][idx_sfr][0]])
+			tmp = np.log10(np.clip(tmp,minsfr,np.inf))
+			prosfr = np.concatenate((prosfr,np.atleast_2d(tmp)))
+			magsfr = np.concatenate((magsfr,np.atleast_2d(data['magphys']['percentiles']['SFR'][1:4])))
+
+			# metallicity
+			tmp = np.array([data['pquantiles']['q16'][idx_met][0],
+				            data['pquantiles']['q50'][idx_met][0],
+				            data['pquantiles']['q84'][idx_met][0]])
+			promet = np.concatenate((promet,np.atleast_2d(tmp)))
+			magmet = np.concatenate((magmet,np.log10(np.atleast_1d(data['model']['full_parameters'][idx_mmet][0]))))
+
+	##### Errors on Prospectr+Magphys quantities
+	# mass errors
+	proerrs_mass = [promass[:,1]-promass[:,0],
+	                promass[:,2]-promass[:,1]]
+	magerrs_mass = [magmass[:,1]-magmass[:,0],
+	                magmass[:,2]-magmass[:,1]]
+
+	# SFR errors
+	proerrs_sfr = [prosfr[:,1]-prosfr[:,0],
+	               prosfr[:,2]-prosfr[:,1]]
+	magerrs_sfr = [magsfr[:,1]-magsfr[:,0],
+	               magsfr[:,2]-magsfr[:,1]]
+
+	# metallicity errors
+	proerrs_met = [promet[:,1]-promet[:,0],
+	               promet[:,2]-promet[:,1]]
+
+
+	##### STAR-FORMING SEQUENCE #####
+	msfr.errorbar(promass[:,1],prosfr[:,1],
+		          fmt='o', alpha=alpha,
+		          color=prosp_color,
+		          label='Prospectr',
+			      xerr=proerrs_mass, yerr=proerrs_sfr)
+	msfr.errorbar(magmass[:,1],magsfr[:,1],
+		          fmt='o', alpha=alpha,
+		          color=magphys_color,
+		          label='MAGPHYS',
+			      xerr=magerrs_mass, yerr=magerrs_sfr)
+
+	# Chang et al. 2015
+	# + 0.39 dex, -0.64 dex
+	chang_color = 'orange'
+	chang_mass = np.linspace(7,12,40)
+	chang_sfr = 0.8 * np.log10(10**chang_mass/1e10) - 0.23
+	chang_scatlow = 0.64
+	chang_scathigh = 0.39
+
+	msfr.plot(chang_mass, chang_sfr,
+		          color=chang_color,
+		          lw=2.5,
+		          label='Chang+15',
+		          zorder=-1)
+
+	msfr.fill_between(chang_mass, chang_sfr-chang_scatlow, chang_sfr+chang_scathigh, 
+		                  color=chang_color,
+		                  alpha=0.3)
+
+
+	#### Salim+07
+	ssfr_salim = -0.35*(chang_mass-10)-9.83
+	salim_sfr = np.log10(10**ssfr_salim*10**chang_mass)
+
+	msfr.plot(chang_mass, salim_sfr,
+		          color='green',
+		          lw=2.5,
+		          label='Salim+07',
+		          zorder=-1)
+
+	# legend
+	msfr.legend(loc=2, prop={'size':12},
+			    frameon=False)
+
+	msfr.set_xlabel(r'log(M/M$_{\odot}$)')
+	msfr.set_ylabel(r'log(SFR/M$_{\odot}$/yr)')
+
+	##### MASS-METALLICITY #####
+	mz.errorbar(promass[:,1],promet[:,1],
+		          fmt='o', alpha=alpha,
+		          color=prosp_color,
+			      xerr=proerrs_mass, yerr=proerrs_met)
+	mz.errorbar(magmass[:,1],magmet,
+		          fmt='o', alpha=alpha,
+		          color=magphys_color,
+			      xerr=magerrs_mass)	
+
+	# Gallazzi+05
+	# shape: mass q50 q16 q84
+	# IMF is probably Kroupa, though not stated in paper
+	# must add correction...
+	massmet = np.loadtxt(os.getenv('APPS')+'/threedhst_bsfh/data/gallazzi_05_massmet.txt')
+
+	mz.plot(massmet[:,0], massmet[:,1],
+		          color='green',
+		          lw=2.5,
+		          label='Gallazzi+05',
+		          zorder=-1)
+
+	mz.fill_between(massmet[:,0], massmet[:,2], massmet[:,3], 
+		                  color='green',
+		                  alpha=0.3)
+
+
+	# legend
+	mz.legend(loc=2, prop={'size':12},
+			    frameon=False)
+
+	mz.set_xlabel(r'log(M/M$_{\odot}$)')
+	mz.set_ylabel(r'log(Z/Z$_{\odot}$/yr)')
+
+	print 1/0
 
 def plot_comparison(alldata,outfolder):
 
@@ -134,7 +293,6 @@ def plot_comparison(alldata,outfolder):
 	fig.add_subplot(met)
 	#fig.add_subplot(age)
 
-	fmt = 'ko'
 	alpha = 0.6
 
 	##### find prospectr indexes
@@ -978,8 +1136,7 @@ def plt_all(runname=None,startup=True,**extras):
 		with open(output, "rb") as f:
 			alldata=pickle.load(f)
 
+	plot_relationships(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/magphys/')
 	plot_all_residuals(alldata)
 	plot_comparison(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/magphys/')
-	plot_mass_metallicity(alldata)
-	plot_sfr_mass(alldata)
 	

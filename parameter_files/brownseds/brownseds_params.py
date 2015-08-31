@@ -375,14 +375,6 @@ class BurstyModel(sedmodel.CSPModel):
                                 (theta[start:end], **self._config_dict[k]['prior_args']))
         return lnp_prior
 
-##### if we have KINGFISH imaging,
-##### leave dust parameters free
-if 'SPIRE_500' in obs['filters']:
-    dust_variable = True
-else:
-    dust_variable = False
-
-
 #### SET SFH PRIORS #####
 ###### REDSHIFT ######
 hdulist = fits.open(run_params['datname'])
@@ -396,7 +388,7 @@ run_params['tuniv']       = tuniv
 
 #### TAGE #####
 tage_maxi = tuniv
-tage_init = 1.0
+tage_init = 1.1
 tage_mini  = 0.11      # FSPS standard
 
 model_type = BurstyModel
@@ -445,7 +437,7 @@ model_params.append({'name': 'pmetals', 'N': 1,
 
 model_params.append({'name': 'logzsol', 'N': 1,
                         'isfree': True,
-                        'init': -0.1,
+                        'init': -0.5,
                         'init_disp': 0.15,
                         'units': r'$\log (Z/Z_\odot)$',
                         'prior_function': tophat,
@@ -558,7 +550,7 @@ model_params.append({'name': 'imf_type', 'N': 1,
 ######## Dust Absorption ##############
 model_params.append({'name': 'dust_type', 'N': 1,
                         'isfree': False,
-                        'init': 4,
+                        'init': 0,
                         'units': 'index',
                         'prior_function_name': None,
                         'prior_args': None})
@@ -608,7 +600,7 @@ model_params.append({'name': 'add_dust_emission', 'N': 1,
                         'prior_args': None})
 
 model_params.append({'name': 'duste_gamma', 'N': 1,
-                        'isfree': dust_variable,
+                        'isfree': True,
                         'init': 0.01,
                         'init_disp': 0.2,
                         'units': None,
@@ -616,7 +608,7 @@ model_params.append({'name': 'duste_gamma', 'N': 1,
                         'prior_args': {'mini':0.0, 'maxi':1.0}})
 
 model_params.append({'name': 'duste_umin', 'N': 1,
-                        'isfree': dust_variable,
+                        'isfree': True,
                         'init': 1.0,
                         'init_disp': 5.0,
                         'units': None,
@@ -624,7 +616,7 @@ model_params.append({'name': 'duste_umin', 'N': 1,
                         'prior_args': {'mini':0.1, 'maxi':25.0}})
 
 model_params.append({'name': 'duste_qpah', 'N': 1,
-                        'isfree': dust_variable,
+                        'isfree': True,
                         'init': 3.0,
                         'init_disp': 3.0,
                         'units': 'percent',

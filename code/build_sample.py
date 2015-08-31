@@ -209,17 +209,19 @@ def build_sample_constrained(basename,outname=None,add_zp_err=False):
 	#### load test model, build sps  ####
 	model = model_setup.load_model(parmfile)
 	obs   = model_setup.load_obs(parmfile)
-	sps = threed_dutils.setup_sps(custom_filter_key=model['run_params'].get('custom_filter_key',None))
+	sps = threed_dutils.setup_sps()
 
 	#### basic parameters ####
 	ngals_per_model     = 500
 	noise               = 0.00            # perturb fluxes
 	reported_noise      = 0.05            # reported noise
-	test_sfhs           = [1,2,3,4,5]     # which test sfhs to use?
 	test_sfhs           = [0]
 	ntest               = len(test_sfhs)
 	ngals               = ntest*ngals_per_model
 	
+	#### parameters to vary ####
+	to_vary = ['logzsol']
+
 	#### band-specific noise ####
 	if 'gp_filter_amps' in model.free_params:
 		band_specific_noise = [0.0,0.15,0.25] # add band-specific noise?
@@ -241,14 +243,11 @@ def build_sample_constrained(basename,outname=None,add_zp_err=False):
 
 			# random in logspace for mass
 			# also enforce priors
-			if parname_strip(parnames[ii]) != 'delt_trunc' and \
-			   parname_strip(parnames[ii]) != 'sf_slope' and \
-			   parnames[ii] != 'dust2' and \
-			   parname_strip(parnames[ii]) != 'tage':
+			if parnames[ii] not in to_vary:
 				
 				for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): testparms[kk,ii] = model.params[parnames[ii]] 
 				print model.params[parnames[ii]] 
-			
+
 			#### generate specific SFHs if necessary ####
 			elif parname_strip(parnames[ii]) == 'tage':
 				min,max = return_bounds(parnames[ii],model,ii,test_sfhs=test_sfhs[jj])
@@ -278,6 +277,12 @@ def build_sample_constrained(basename,outname=None,add_zp_err=False):
 				for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): testparms[kk,ii] = np.clip(random.gauss(0.5, 0.5),min,max)
 				print min,max
 
+			#### boilerplate randomized parameter
+			elif parnames[ii] == 'logzsol':
+
+				min,max = return_bounds(parnames[ii],model,ii,test_sfhs=test_sfhs[jj])
+				for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): testparms[kk,ii] = random.random()*(max-min)+min
+			
 			
 
 	#### make sure priors are satisfied
@@ -306,10 +311,8 @@ def build_sample_constrained(basename,outname=None,add_zp_err=False):
 
 	#### generate photometry, add noise ####
 	for ii in xrange(ngals):
-		model.initial_theta = testparms[ii,:]
-		_,maggiestemp,_ = model.mean_model(model.initial_theta, obs, sps=sps,norm_spec=False)
-		maggies[ii,:] = maggiestemp
-
+		_,maggies[ii,:],_ = model.mean_model(testparms[ii,:], obs, sps=sps,norm_spec=False)
+		print maggies[ii,:]
 		#### record noise ####
 		maggies_unc[ii,:] = maggies[ii,:]*reported_noise
 
@@ -534,16 +537,6 @@ def build_sample_test(basename,outname=None,add_zp_err=False):
 			add_noise = random.gauss(0, tnoise)
 			print obs['filters'][kk].lower()+': ' + "{:.2f}".format(add_noise)
 			maggies[ii,kk] += add_noise*maggies[ii,kk]
-
-	#### add zeropoint offsets ####
-	if add_zp_err:
-		zp_offsets = threed_dutils.load_zp_offsets('COSMOS')
-		for kk in xrange(len(zp_offsets)):
-			filter = zp_offsets[kk]['Band'].lower()+'_cosmos'
-			index  = obs['filters'] == filter
-			maggies[:,index] = maggies[:,index]*zp_offsets[kk]['Flux-Correction']
-			if np.sum(index) == 0:
-				print 1/0
 
 	#### output ####
 	#### ids first ####
