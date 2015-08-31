@@ -261,120 +261,6 @@ def add_dust1(dust2=None, **extras):
 
     return 0.86*dust2
 
-class BurstyModel(sedmodel.CSPModel):
-
-    def theta_disps(self, thetas, initial_disp=0.1):
-        """Get a vector of dispersions for each parameter to use in
-        generating sampler balls for emcee's Ensemble sampler.
-
-        :param initial_disp: (default: 0.1)
-            The default dispersion to use in case the `init_disp` key
-            is not provided in the parameter configuration.  This is
-            in units of the parameter, so e.g. 0.1 will result in a
-            smpler ball with a dispersion that is 10% of the central
-            parameter value.
-        """
-        disp = np.zeros(self.ndim) + initial_disp
-        for par, inds in self.theta_index.iteritems():
-            
-            # fractional dispersion
-            if par == 'mass' or \
-               par == 'tage':
-                disp[inds[0]:inds[1]] = self._config_dict[par].get('init_disp', initial_disp) * thetas[inds[0]:inds[1]]
-
-            # constant (log) dispersion
-            if par == 'logtau' or \
-               par == 'metallicity' or \
-               par == 'sf_tanslope' or \
-               par == 'delt_trunc' or \
-               par == 'duste_umin' or \
-               par == 'duste_qpah' or \
-               par == 'duste_gamma':
-                disp[inds[0]:inds[1]] = self._config_dict[par].get('init_disp', initial_disp)
-
-            # fractional dispersion with artificial floor
-            if par == 'dust2' or \
-               par == 'dust1' or \
-               par == 'dust_index':
-                disp[inds[0]:inds[1]] = (self._config_dict[par].get('init_disp', initial_disp) * thetas[inds[0]:inds[1]]**2 + \
-                                         0.1**2)**0.5
-            
-        return disp
-
-    def theta_disp_floor(self, thetas):
-        """Get a vector of dispersions for each parameter to use as
-        a floor for the walker-calculated dispersions.
-        """
-        disp = np.zeros(self.ndim)
-        for par, inds in self.theta_index.iteritems():
-            
-            # constant 5% floor
-            if par == 'mass':
-                disp[inds[0]:inds[1]] = 0.05 * thetas[inds[0]:inds[1]]
-
-            # constant 0.05 floor (log space, sf_slope, dust_index)
-            if par == 'logzsol':
-                disp[inds[0]:inds[1]] = 0.25
-
-            if par == 'logtau':
-                disp[inds[0]:inds[1]] = 0.25
-
-            if par == 'sf_tanslope':
-                disp[inds[0]:inds[1]] = 0.3
-
-            if par == 'dust2' or \
-               par == 'dust_index':
-                disp[inds[0]:inds[1]] = 0.15
-
-            if par == 'dust1':
-                disp[inds[0]:inds[1]] = 1.0
-
-            if par == 'duste_umin':
-                disp[inds[0]:inds[1]] = 4.5
-
-            if par == 'duste_qpah':
-                disp[inds[0]:inds[1]] = 3.0
-
-            if par == 'duste_gamma':
-                disp[inds[0]:inds[1]] = 0.2
-
-            # 20% floor
-            if par == 'tage':
-                disp[inds[0]:inds[1]] = 0.2 * thetas[inds[0]:inds[1]]
-
-            if par == 'delt_trunc':
-                disp[inds[0]:inds[1]] = 0.1
-            
-        return disp
-
-    def prior_product(self, theta):
-        """
-        Return a scalar which is the ln of the product of the prior
-        probabilities for each element of theta.  Requires that the
-        prior functions are defined in the theta descriptor.
-
-        :param theta:
-            Iterable containing the free model parameter values.
-
-        :returns lnp_prior:
-            The log of the product of the prior probabilities for
-            these parameter values.
-        """  
-        lnp_prior = 0
-
-        # implement uniqueness of outliers
-        if 'gp_outlier_locs' in self.theta_index:
-            start,end = self.theta_index['gp_outlier_locs']
-            outlier_locs = theta[start:end]
-            if len(np.unique(np.round(outlier_locs))) != len(outlier_locs):
-                return -np.inf
-
-        for k, v in self.theta_index.iteritems():
-            start, end = v
-            lnp_prior += np.sum(self._config_dict[k]['prior_function']
-                                (theta[start:end], **self._config_dict[k]['prior_args']))
-        return lnp_prior
-
 #### SET SFH PRIORS #####
 ###### REDSHIFT ######
 hdulist = fits.open(run_params['datname'])
@@ -509,7 +395,7 @@ model_params.append({'name': 'sf_start', 'N': 1,
 
 model_params.append({'name': 'delt_trunc', 'N': 1,
                         'isfree': True,
-                        'init': 0.5,
+                        'init': 1.0,
                         'init_disp': 0.1,
                         'units': '',
                         'prior_function': tophat,
@@ -662,5 +548,133 @@ model_params.append({'name': 'phot_jitter', 'N': 1,
                         'prior_function':tophat,
                         'prior_args': {'mini':0.0, 'maxi':0.5}})
 
+#### resort list of parameters 
+#### so that major ones are fit first
+parnames = [m['name'] for m in model_params]
+fit_order = ['mass', 'tage', 'logtau', 'dust2', 'delt_trunc', 'sf_tanslope', 'duste_gamma', 'logzsol', 'dust1', 'dust_index','duste_umin', 'duste_qpah']
+tparams = [model_params[parnames.index(i)] for i in fit_order]
+for param in model_params: 
+    if param['name'] not in fit_order:
+        tparams.append(param)
+model_params = tparams
+
 # name outfile
 run_params['outfile'] = run_params['outfile']+'_'+run_params['objname']
+
+
+###### REDEFINE MODEL FOR MY OWN NEFARIOUS PURPOSES ######
+class BurstyModel(sedmodel.CSPModel):
+
+    def theta_disps(self, thetas, initial_disp=0.1):
+        """Get a vector of dispersions for each parameter to use in
+        generating sampler balls for emcee's Ensemble sampler.
+
+        :param initial_disp: (default: 0.1)
+            The default dispersion to use in case the `init_disp` key
+            is not provided in the parameter configuration.  This is
+            in units of the parameter, so e.g. 0.1 will result in a
+            smpler ball with a dispersion that is 10% of the central
+            parameter value.
+        """
+        disp = np.zeros(self.ndim) + initial_disp
+        for par, inds in self.theta_index.iteritems():
+            
+            # fractional dispersion
+            if par == 'mass' or \
+               par == 'tage':
+                disp[inds[0]:inds[1]] = self._config_dict[par].get('init_disp', initial_disp) * thetas[inds[0]:inds[1]]
+
+            # constant (log) dispersion
+            if par == 'logtau' or \
+               par == 'metallicity' or \
+               par == 'sf_tanslope' or \
+               par == 'delt_trunc' or \
+               par == 'duste_umin' or \
+               par == 'duste_qpah' or \
+               par == 'duste_gamma':
+                disp[inds[0]:inds[1]] = self._config_dict[par].get('init_disp', initial_disp)
+
+            # fractional dispersion with artificial floor
+            if par == 'dust2' or \
+               par == 'dust1' or \
+               par == 'dust_index':
+                disp[inds[0]:inds[1]] = (self._config_dict[par].get('init_disp', initial_disp) * thetas[inds[0]:inds[1]]**2 + \
+                                         0.1**2)**0.5
+            
+        return disp
+
+    def theta_disp_floor(self, thetas):
+        """Get a vector of dispersions for each parameter to use as
+        a floor for the walker-calculated dispersions.
+        """
+        disp = np.zeros(self.ndim)
+        for par, inds in self.theta_index.iteritems():
+            
+            # constant 5% floor
+            if par == 'mass':
+                disp[inds[0]:inds[1]] = 0.05 * thetas[inds[0]:inds[1]]
+
+            # constant 0.05 floor (log space, sf_slope, dust_index)
+            if par == 'logzsol':
+                disp[inds[0]:inds[1]] = 0.25
+
+            if par == 'logtau':
+                disp[inds[0]:inds[1]] = 0.25
+
+            if par == 'sf_tanslope':
+                disp[inds[0]:inds[1]] = 0.3
+
+            if par == 'dust2' or \
+               par == 'dust_index':
+                disp[inds[0]:inds[1]] = 0.15
+
+            if par == 'dust1':
+                disp[inds[0]:inds[1]] = 1.0
+
+            if par == 'duste_umin':
+                disp[inds[0]:inds[1]] = 4.5
+
+            if par == 'duste_qpah':
+                disp[inds[0]:inds[1]] = 3.0
+
+            if par == 'duste_gamma':
+                disp[inds[0]:inds[1]] = 0.2
+
+            # 20% floor
+            if par == 'tage':
+                disp[inds[0]:inds[1]] = 0.2 * thetas[inds[0]:inds[1]]
+
+            if par == 'delt_trunc':
+                disp[inds[0]:inds[1]] = 0.1
+            
+        return disp
+
+    def prior_product(self, theta):
+        """
+        Return a scalar which is the ln of the product of the prior
+        probabilities for each element of theta.  Requires that the
+        prior functions are defined in the theta descriptor.
+
+        :param theta:
+            Iterable containing the free model parameter values.
+
+        :returns lnp_prior:
+            The log of the product of the prior probabilities for
+            these parameter values.
+        """  
+        lnp_prior = 0
+
+        # implement uniqueness of outliers
+        if 'gp_outlier_locs' in self.theta_index:
+            start,end = self.theta_index['gp_outlier_locs']
+            outlier_locs = theta[start:end]
+            if len(np.unique(np.round(outlier_locs))) != len(outlier_locs):
+                return -np.inf
+
+        for k, v in self.theta_index.iteritems():
+            start, end = v
+            lnp_prior += np.sum(self._config_dict[k]['prior_function']
+                                (theta[start:end], **self._config_dict[k]['prior_args']))
+        return lnp_prior
+
+
