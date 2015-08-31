@@ -213,7 +213,7 @@ def build_sample_constrained(basename,outname=None,add_zp_err=False):
 
 	#### basic parameters ####
 	ngals_per_model     = 500
-	noise               = 0.00            # perturb fluxes
+	noise               = 0.05            # perturb fluxes
 	reported_noise      = 0.05            # reported noise
 	test_sfhs           = [0]
 	ntest               = len(test_sfhs)
@@ -311,7 +311,7 @@ def build_sample_constrained(basename,outname=None,add_zp_err=False):
 
 	#### generate photometry, add noise ####
 	for ii in xrange(ngals):
-		_,maggies[ii,:],_ = model.mean_model(testparms[ii,:], obs, sps=sps,norm_spec=False)
+		_,maggies[ii,:],_ = model.mean_model(testparms[ii,:], obs, sps=sps)
 		print maggies[ii,:]
 		#### record noise ####
 		maggies_unc[ii,:] = maggies[ii,:]*reported_noise
@@ -334,16 +334,6 @@ def build_sample_constrained(basename,outname=None,add_zp_err=False):
 			add_noise = random.gauss(0, tnoise)
 			print obs['filters'][kk].lower()+': ' + "{:.2f}".format(add_noise)
 			maggies[ii,kk] += add_noise*maggies[ii,kk]
-
-	#### add zeropoint offsets ####
-	if add_zp_err:
-		zp_offsets = threed_dutils.load_zp_offsets('COSMOS')
-		for kk in xrange(len(zp_offsets)):
-			filter = zp_offsets[kk]['Band'].lower()+'_cosmos'
-			index  = obs['filters'] == filter
-			maggies[:,index] = maggies[:,index]*zp_offsets[kk]['Flux-Correction']
-			if np.sum(index) == 0:
-				print 1/0
 
 	#### output ####
 	#### ids first ####

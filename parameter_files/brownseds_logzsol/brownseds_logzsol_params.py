@@ -22,7 +22,7 @@ run_params = {'verbose':True,
               'phot':True,
               'photname':os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_logzsol.cat',
               'truename':os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_logzsol.dat',
-              'objname':'Arp 256 N',
+              'objname':'1',
               }
 
 ############
