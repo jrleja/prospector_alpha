@@ -457,6 +457,44 @@ def return_mwave_custom(filters):
 
 	return lameff_return
 
+def load_moustakas_data(objnames = None):
+
+	'''
+	specifically written to load optical emission line fluxes, of the "radial strip" variety
+	this corresponds to the aperture used in the Brown sample
+
+	if we pass a list of object names, return a sorted, matched list
+	otherwise return everything
+	'''
+
+	#### load data
+	# arcane vizier formatting means I'm using astropy tables here
+	from astropy.io import ascii
+	foldername = os.getenv('APPS')+'/threedhst_bsfh/data/Moustakas+10/'
+	filename = 'table3.dat'
+	readme = 'ReadMe'
+	table = ascii.read(foldername+filename, readme=foldername+readme)
+
+	#### filter to only radial strips
+	accept = table['Spectrum'] == 'Radial Strip'
+	table = table[accept.data]
+
+	#####
+	if objnames is not None:
+		outtable = []
+		for name in objnames:
+			match = table['Name'] == name
+			if np.sum(match.data) == 0:
+				print 'no match for ' + name
+				continue
+			else:
+				outtable.append(table[match.data])
+	else:
+		outtable = table
+
+	return outtable
+
+
 def load_zp_offsets(field):
 
 	filename = os.getenv('APPS')+'/threedhst_bsfh/data/zp_offsets_tbl11_skel14.txt'

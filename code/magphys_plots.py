@@ -519,7 +519,7 @@ def plot_all_residuals(alldata):
 	##### histogram of chisq values
 	nbins = 10
 	alpha_hist = 0.3
-	# first call is transparent, to get bins
+	# first call is color-less, to get bins
 	# suitable for both data sets
 	histmax = 5
 	okmag = chisq_magphys < histmax

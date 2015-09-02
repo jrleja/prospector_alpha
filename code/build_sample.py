@@ -212,7 +212,7 @@ def build_sample_constrained(basename,outname=None,add_zp_err=False):
 	sps = threed_dutils.setup_sps()
 
 	#### basic parameters ####
-	ngals_per_model     = 500
+	ngals_per_model     = 70
 	noise               = 0.05            # perturb fluxes
 	reported_noise      = 0.05            # reported noise
 	test_sfhs           = [0]
@@ -277,12 +277,12 @@ def build_sample_constrained(basename,outname=None,add_zp_err=False):
 				for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): testparms[kk,ii] = np.clip(random.gauss(0.5, 0.5),min,max)
 				print min,max
 
-			#### boilerplate randomized parameter
+			#### not randomized
 			elif parnames[ii] == 'logzsol':
 
 				min,max = return_bounds(parnames[ii],model,ii,test_sfhs=test_sfhs[jj])
 				min = -0.6
-				for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): testparms[kk,ii] = random.random()*(max-min)+min
+				for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): testparms[kk,ii] = 0.19-0.01*kk
 			
 			
 
