@@ -277,7 +277,6 @@ tage_maxi = tuniv
 tage_init = 1.1
 tage_mini  = 0.11      # FSPS standard
 
-model_type = BurstyModel
 model_params = []
 
 param_template = {'name':'', 'N':1, 'isfree': False,
@@ -677,4 +676,5 @@ class BurstyModel(sedmodel.CSPModel):
                                 (theta[start:end], **self._config_dict[k]['prior_args']))
         return lnp_prior
 
+model_type = BurstyModel
 

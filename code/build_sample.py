@@ -281,6 +281,7 @@ def build_sample_constrained(basename,outname=None,add_zp_err=False):
 			elif parnames[ii] == 'logzsol':
 
 				min,max = return_bounds(parnames[ii],model,ii,test_sfhs=test_sfhs[jj])
+				min = -0.6
 				for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): testparms[kk,ii] = random.random()*(max-min)+min
 			
 			

@@ -121,7 +121,7 @@ model_params.append({'name': 'logzsol', 'N': 1,
                         'log_param': True,
                         'units': r'$\log (Z/Z_\odot)$',
                         'prior_function': tophat,
-                        'prior_args': {'mini':-1, 'maxi':0.19}})
+                        'prior_args': {'mini':-2.0, 'maxi':0.19}})
                         
 ###### SFH   ########
 model_params.append({'name': 'sfh', 'N': 1,
@@ -182,7 +182,7 @@ model_params.append({'name': 'sf_start', 'N': 1,
 ########    IMF  ##############
 model_params.append({'name': 'imf_type', 'N': 1,
                         	 'isfree': False,
-                           'init': 1, #1 = chabrier
+                             'init': 1, #1 = chabrier
                        		 'units': None,
                        		 'prior_function_name': None,
                         	 'prior_args': None})
