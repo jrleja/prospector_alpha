@@ -12,6 +12,208 @@ from scipy.interpolate import interp1d
 pc2cm = 3.08567758e18
 minmodel_flux = 2e-1
 
+
+def collate_output(runname,outname):
+
+	'''
+	prototype for generating useful output balls
+	currently saves q16, q50, q84, maxprob, and parmlist for each galaxy
+
+	in the future, want it to include:
+	maximum likelihood fit (both parameters and likelihood)
+	mean acceptance fraction
+	also output information about the powell minimization process
+	pri[0].x = min([p.fun for p in pr])   <--- if this is true, then the minimization process chose the processor with initial conditions
+	np.array([p.x for p in pr])
+	'''
+
+	filebase,params,ancilname=threed_dutils.generate_basenames(runname)
+	ngals = len(filebase)
+
+	sps = threed_dutils.setup_sps(zcontinuous=2)
+
+	nfail = 0
+	for jj in xrange(ngals):
+
+		# find most recent output file
+		# with the objname
+		folder = "/".join(filebase[jj].split('/')[:-1])
+		filename = filebase[jj].split("/")[-1]
+		files = [f for f in os.listdir(folder) if "_".join(f.split('_')[:-2]) == filename]	
+		times = [f.split('_')[-2] for f in files]
+
+		# if we found no files, skip this object
+		if len(times) == 0:
+			print 'Failed to find any files in '+folder+' of type ' +filename+' to extract times'
+			nfail+=1
+			continue
+
+		# load results
+		mcmc_filename=filebase[jj]+'_'+max(times)+"_mcmc"
+		model_filename=filebase[jj]+'_'+max(times)+"_model"
+
+		try:
+			sample_results, powell_results, model = read_results.read_pickles(mcmc_filename, model_file=model_filename,inmod=None)
+		except (ValueError,EOFError,KeyError):
+			print mcmc_filename + ' failed during output writing'
+			nfail+=1
+			continue
+		except IOError:
+			print mcmc_filename + ' does not exist!'
+			nfail+=1
+			continue
+
+		# check for existence of extra information
+		try:
+			sample_results['quantiles']
+		except:
+			print 'Generating extra information for '+mcmc_filename+', '+model_filename
+			extra_output.post_processing(params[jj])
+			sample_results, powell_results, model = read_results.read_pickles(mcmc_filename, model_file=model_filename,inmod=None)
+
+		# initialize output arrays if necessary
+		ntheta = len(sample_results['initial_theta'])+len(sample_results['extras']['parnames'])
+		try:
+			q_16
+		except:
+			q_16, q_50, q_84 = (np.zeros(shape=(ntheta,ngals))+np.nan for i in range(3))
+			thetamax = np.zeros(shape=(ntheta-len(sample_results['extras']['parnames']),ngals))
+			z, mips_sn = (np.zeros(ngals) for i in range(2))
+			mips_flux, L_IR = (np.zeros(shape=(3,ngals)) for i in range(2))
+			output_name = np.empty(0,dtype='object')
+			obs,model_emline,truths = [],[],[]
+
+		# insert percentiles
+		q_16[:,jj], q_50[:,jj], q_84[:,jj] = np.concatenate((sample_results['quantiles']['q16'],sample_results['extras']['q16'])),\
+		              						 np.concatenate((sample_results['quantiles']['q50'],sample_results['extras']['q50'])),\
+		              						 np.concatenate((sample_results['quantiles']['q84'],sample_results['extras']['q84']))
+		
+		# miscellaneous output
+		z[jj] = np.atleast_1d(sample_results['model'].params['zred'])
+		output_name=np.append(output_name,filename)
+
+		# grab best-fitting model
+		thetamax[:,jj] = sample_results['quantiles']['maxprob_params']
+
+		# save dictionary lists
+		obs.append(sample_results['obs'])
+		model_emline.append(sample_results['model_emline'])
+		try:
+			filename = '/threedhst_bsfh'+sample_results['run_params']['truename'].split('/threedhst_bsfh')[1]
+			filename = os.getenv('APPS')+filename
+			truths.append(threed_dutils.load_truths(filename,
+				                                    sample_results['run_params']['objname'],
+				                                    sample_results, sps=sps, calc_prob = True)
+			             )
+		except KeyError:
+			pass
+
+		print jj
+
+	print 'total galaxies: {0}, successful loads: {1}'.format(ngals,ngals-nfail)
+	print 'saving in {0}'.format(outname)
+
+	output = {'outname': output_name,\
+			  'parname': np.concatenate([sample_results['model'].theta_labels(),sample_results['extras']['parnames']]),\
+		      'q16': q_16,\
+		      'q50': q_50,\
+		      'q84': q_84,\
+		      'maxprob': thetamax,\
+		      'L_IR': L_IR,
+		      'z':z,
+		      'obs':obs,
+		      'model_emline':model_emline,
+		      'truths':truths}
+
+	pickle.dump(output,open(outname, "wb"))
+		
+
+
+def true_params(runname):
+
+	outname = os.getenv('APPS')+'/threedhst_bsfh/results/'+runname+'/'+runname+'_ensemble.pickle'
+
+	# if the save file doesn't exist, make it
+	if not os.path.isfile(outname):
+		collate_output(runname,outname)
+
+	with open(outname, "rb") as f:
+		ensemble=pickle.load(f)
+
+	###### TRUTHS
+	idx_met = list(ensemble['parname']).index('logzsol')
+	true_met = [x['truths'][idx_met] for x in ensemble['truths']]
+
+	###### BEST-FIT
+	logzsol=np.squeeze(ensemble['q50'][ensemble['parname'] == 'logzsol'])
+	logzsol_q84=np.squeeze(ensemble['q84'][ensemble['parname'] == 'logzsol'])
+	logzsol_q16=np.squeeze(ensemble['q16'][ensemble['parname'] == 'logzsol'])
+	remove = np.isfinite(logzsol)
+
+	logzsol_errs = [logzsol[remove]-logzsol_q16[remove],logzsol_q84[remove]-logzsol[remove]]
+
+	###### PLOT
+	fig, ax = plt.subplots(1, 1, figsize = (8,8))
+	ax.errorbar(true_met, logzsol[remove],
+		        yerr=logzsol_errs,fmt='o',color='grey',
+		        alpha=0.5,capsize=0)
+
+	ax.plot([-10,10],[-10,10],linestyle='--',color='black')
+
+	###### STATS
+	off,scat = threed_dutils.offset_and_scatter(true_met,logzsol[remove])
+	ax.text(0.04,0.95, 'scatter='+"{:.2f}".format(scat)+' dex',transform = ax.transAxes)
+	ax.text(0.04,0.9, 'mean offset='+"{:.2f}".format(off)+' dex',transform = ax.transAxes)
+
+	###### BEAUTIFY
+	ax.set_ylabel(r'log(Z/Z$_{\odot}$) (fit)')
+	ax.set_xlabel(r'log(Z/Z$_{\odot}$) (truth)')
+
+	axlims = [-2,0.2]
+	ax.axis((-2,0.2,-2,0.2))
+	plt.show()
+	plt.savefig('/Users/joel/code/python/threedhst_bsfh/plots/'+runname+'/ensemble/metallicity_recovery.png')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 def age_vs_mass():
 	'''
 	one-off plot, delta(mass) versus delta(t_half)
@@ -202,130 +404,6 @@ def convergence(runname):
 		print 1/0
 
 
-
-def collate_output(runname,outname):
-
-	'''
-	prototype for generating useful output balls
-	currently saves q16, q50, q84, maxprob, and parmlist for each galaxy
-
-	in the future, want it to include:
-	maximum likelihood fit (both parameters and likelihood)
-	mean acceptance fraction
-	also output information about the powell minimization process
-	pri[0].x = min([p.fun for p in pr])   <--- if this is true, then the minimization process chose the processor with initial conditions
-	np.array([p.x for p in pr])
-	'''
-
-	filebase,params,ancilname=threed_dutils.generate_basenames(runname)
-	ngals = len(filebase)
-
-	nfail = 0
-	for jj in xrange(ngals):
-
-		# find most recent output file
-		# with the objname
-		folder = "/".join(filebase[jj].split('/')[:-1])
-		filename = filebase[jj].split("/")[-1]
-		files = [f for f in os.listdir(folder) if "_".join(f.split('_')[:-2]) == filename]	
-		times = [f.split('_')[-2] for f in files]
-
-		# if we found no files, skip this object
-		if len(times) == 0:
-			print 'Failed to find any files in '+folder+' of type ' +filename+' to extract times'
-			nfail+=1
-			continue
-
-		# load results
-		mcmc_filename=filebase[jj]+'_'+max(times)+"_mcmc"
-		model_filename=filebase[jj]+'_'+max(times)+"_model"
-
-		try:
-			sample_results, powell_results, model = read_results.read_pickles(mcmc_filename, model_file=model_filename,inmod=None)
-		except (ValueError,EOFError,KeyError):
-			print mcmc_filename + ' failed during output writing'
-			nfail+=1
-			continue
-		except IOError:
-			print mcmc_filename + ' does not exist!'
-			nfail+=1
-			continue
-
-		# check for existence of extra information
-		try:
-			sample_results['quantiles']
-		except:
-			print 'Generating extra information for '+mcmc_filename+', '+model_filename
-			extra_output.post_processing(params[jj])
-			sample_results, powell_results, model = read_results.read_pickles(mcmc_filename, model_file=model_filename,inmod=None)
-
-		# initialize output arrays if necessary
-		ntheta = len(sample_results['initial_theta'])+len(sample_results['extras']['parnames'])
-		try:
-			q_16
-		except:
-			q_16, q_50, q_84 = (np.zeros(shape=(ntheta,ngals))+np.nan for i in range(3))
-			thetamax = np.zeros(shape=(ntheta-len(sample_results['extras']['parnames']),ngals))
-			z, mips_sn = (np.zeros(ngals) for i in range(2))
-			mips_flux, L_IR = (np.zeros(shape=(3,ngals)) for i in range(2))
-			output_name = np.empty(0,dtype='object')
-			obs,model_emline,ancildat = [],[],[]
-
-		# insert percentiles
-		q_16[:,jj], q_50[:,jj], q_84[:,jj] = np.concatenate((sample_results['quantiles']['q16'],sample_results['extras']['q16'])),\
-		              						 np.concatenate((sample_results['quantiles']['q50'],sample_results['extras']['q50'])),\
-		              						 np.concatenate((sample_results['quantiles']['q84'],sample_results['extras']['q84']))
-		
-		# miscellaneous output
-		z[jj] = np.atleast_1d(sample_results['model_params'][0]['init'])[0]
-		mips_sn[jj] = sample_results['obs']['maggies'][-1]/sample_results['obs']['maggies_unc'][-1]
-		output_name=np.append(output_name,filename)
-
-		# MIPS information
-		try:
-			idx = sample_results['obs']['filters'] == 'MIPS_24'
-			q_16_mips, q_50_mips, q_84_mips = triangle.quantile(sample_results['observables']['mags'][idx], [0.16, 0.5, 0.84])
-			q_16_lir, q_50_lir, q_84_lir = triangle.quantile(sample_results['observables']['L_IR'], [0.16, 0.5, 0.84])
-			mips_flux[:,jj] = np.array([q_16_mips, q_50_mips, q_84_mips])
-			L_IR[:,jj] = np.array([q_16_lir, q_50_lir, q_84_lir])
-		except:
-			print 1/0
-
-		# grab best-fitting model
-		thetamax[:,jj] = sample_results['quantiles']['maxprob_params']
-
-		# save dictionary lists
-		obs.append(sample_results['obs'])
-		model_emline.append(sample_results['model_emline'])
-		try:
-			ancildat.append(threed_dutils.load_ancil_data(os.getenv('APPS')+'/threedhst_bsfh/data/'+ancilname,
-			            							  sample_results['run_params']['objname']))
-		except TypeError:
-			pass
-
-		print jj
-
-	print 'total galaxies: {0}, successful loads: {1}'.format(ngals,ngals-nfail)
-	print 'saving in {0}'.format(outname)
-	fastname = sample_results['run_params']['fastname']
-
-	output = {'outname': output_name,\
-			  'fastname': fastname,\
-			  'parname': np.concatenate([sample_results['model'].theta_labels(),sample_results['extras']['parnames']]),\
-		      'q16': q_16,\
-		      'q50': q_50,\
-		      'q84': q_84,\
-		      'maxprob': thetamax,\
-		      'mips_sn': mips_sn,\
-		      'mips_flux': mips_flux,\
-		      'L_IR': L_IR,
-		      'z':z,
-		      'obs':obs,
-		      'model_emline':model_emline,
-		      'ancildat':ancildat}
-
-	pickle.dump(output,open(outname, "wb"))
-		
 def plot_driver(runname):
 	
 	#runname = "neboff"
