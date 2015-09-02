@@ -33,7 +33,7 @@ outpickle = '/Users/joel/code/magphys/data/pickles'
 
 class jLogFormatter(mpl.ticker.LogFormatter):
 	'''
-	this just changes the format from exponential to floating point.
+	this changes the format from exponential to floating point.
 	'''
 
 	def __call__(self, x, pos=None):
@@ -121,7 +121,7 @@ def plot_relationships(alldata,outfolder):
 	'''
 
 	##### set up plots
-	fig = plt.figure(figsize=(10,5))
+	fig = plt.figure(figsize=(13,6.0))
 	gs1 = mpl.gridspec.GridSpec(1, 2)
 	msfr = plt.Subplot(fig, gs1[0])
 	mz = plt.Subplot(fig, gs1[1])
@@ -130,6 +130,7 @@ def plot_relationships(alldata,outfolder):
 	fig.add_subplot(mz)
 
 	alpha = 0.6
+	ms = 6.0
 
 	##### find prospectr indexes
 	parnames = alldata[0]['pquantiles']['parnames']
@@ -193,12 +194,14 @@ def plot_relationships(alldata,outfolder):
 		          fmt='o', alpha=alpha,
 		          color=prosp_color,
 		          label='Prospectr',
-			      xerr=proerrs_mass, yerr=proerrs_sfr)
+			      xerr=proerrs_mass, yerr=proerrs_sfr,
+			      ms=ms)
 	msfr.errorbar(magmass[:,1],magsfr[:,1],
 		          fmt='o', alpha=alpha,
 		          color=magphys_color,
 		          label='MAGPHYS',
-			      xerr=magerrs_mass, yerr=magerrs_sfr)
+			      xerr=magerrs_mass, yerr=magerrs_sfr,
+			      ms=ms)
 
 	# Chang et al. 2015
 	# + 0.39 dex, -0.64 dex
@@ -240,11 +243,13 @@ def plot_relationships(alldata,outfolder):
 	mz.errorbar(promass[:,1],promet[:,1],
 		          fmt='o', alpha=alpha,
 		          color=prosp_color,
-			      xerr=proerrs_mass, yerr=proerrs_met)
+			      xerr=proerrs_mass, yerr=proerrs_met,
+			      ms=ms)
 	mz.errorbar(magmass[:,1],magmet,
 		          fmt='o', alpha=alpha,
 		          color=magphys_color,
-			      xerr=magerrs_mass)	
+			      xerr=magerrs_mass,
+			      ms=ms)	
 
 	# Gallazzi+05
 	# shape: mass q50 q16 q84
@@ -264,13 +269,16 @@ def plot_relationships(alldata,outfolder):
 
 
 	# legend
-	mz.legend(loc=2, prop={'size':12},
+	mz.legend(loc=4, prop={'size':12},
 			    frameon=False)
 
+	mz.set_ylim(-2.0,0.3)
+	mz.set_xlim(9,11.8)
 	mz.set_xlabel(r'log(M/M$_{\odot}$)')
 	mz.set_ylabel(r'log(Z/Z$_{\odot}$/yr)')
 
-	print 1/0
+	plt.savefig(outfolder+'mass_metallicity.png',dpi=300)
+	plt.close
 
 def plot_comparison(alldata,outfolder):
 
@@ -294,6 +302,7 @@ def plot_comparison(alldata,outfolder):
 	#fig.add_subplot(age)
 
 	alpha = 0.6
+	fmt = 'o'
 
 	##### find prospectr indexes
 	parnames = alldata[0]['pquantiles']['parnames']
@@ -821,7 +830,8 @@ def sed_comp_figure(sample_results, sps, model, magphys,
 		wave_eff, obsmags, obsmags_unc, modmags, chi, modspec, modlam = \
 		return_sedplot_vars(sample_results['quantiles']['maxprob_params'], 
 			                sample_results, sps)
-	except KeyError:
+	except KeyError as e:
+		print e
 		print "You must run post-processing on the Prospectr " + \
 			  "data for " + sample_results['run_params']['objname']
 		return None

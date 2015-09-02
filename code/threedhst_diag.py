@@ -298,7 +298,7 @@ def add_sfh_plot(sample_results,fig,ax_loc,sps,
 		#for aa in xrange(sample_results.get('ncomp',2)):
 		#	ax_inset.plot(tt, pt[:,aa+1],'-',color=tcolors[aa],alpha=0.5,linewidth=0.75)
 		ax_inset.plot(tt, pt[:,0],'-',color='blue')
-		ax_inset.text(0.08,0.83, 'truth',transform = ax_inset.transAxes,color='blue',fontsize=axfontsize*1.4)
+		ax_inset.text(0.92,0.32, 'truth',transform = ax_inset.transAxes,color='blue',fontsize=axfontsize*1.4,ha='right')
 
 		# set up plotting range
 		plotmax_y = np.maximum(np.max(perc[:,1]),np.max(pt[:,0]))
@@ -572,6 +572,12 @@ def return_sedplot_vars(thetas, sample_results, sps, nufnu=True):
 	'''
 
 	# observational information
+	# hack to reload obs for brownseds_logzsol run
+	if 'truename' in sample_results['run_params']:
+		from brownseds_logzsol_params import load_obs_mock
+		sample_results['obs'] = load_obs_mock(os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_logzsol.cat', 
+			                                  sample_results['run_params']['objname'])
+
 	mask = sample_results['obs']['phot_mask']
 	wave_eff = sample_results['obs']['wave_effective'][mask]
 	obs_maggies = sample_results['obs']['maggies'][mask]
@@ -711,7 +717,7 @@ def sed_figure(sample_results, sps, model,
 		# then this will be passing parameters to the wrong model. pass.
 		# in future, attach a model to the truths file!
 		try:
-			wave_eff, _, _, _, chi_truth, _, _ = return_sedplot_vars(sample_results['quantiles']['maxprob_params'], sample_results, sps)
+			wave_eff_truth, _, _, _, chi_truth, _, _ = return_sedplot_vars(truths['truths'], sample_results, sps)
 
 			res.plot(np.log10(wave_eff_truth), chi_truth, 
 				     color='blue', marker='o', linestyle=' ', label='truths', 
@@ -755,15 +761,15 @@ def sed_figure(sample_results, sps, model,
 			reduced_chisq_truth = chisq_truth/(ndof-1)
 			phot.text(textx, texty, r'best-fit $\chi^2_n$='+"{:.2f}".format(reduced_chisq)+' (true='
 				      +"{:.2f}".format(reduced_chisq_truth)+')',
-				      fontsize=10, ha='right')
+				      fontsize=10, ha='right',transform = phot.transAxes)
 		except NameError:
 			pass
 	else:
 		phot.text(textx, texty, r'best-fit $\chi^2_n$='+"{:.2f}".format(reduced_chisq),
 			  fontsize=10, ha='right',transform = phot.transAxes)
-		phot.text(textx, texty-deltay, r'median of PDF $\chi^2_n$='+"{:.2f}".format(reduced_chisq_median),
-			  fontsize=10, ha='right',transform = phot.transAxes)
 	
+	phot.text(textx, texty-deltay, r'median of PDF $\chi^2_n$='+"{:.2f}".format(reduced_chisq_median),
+		  fontsize=10, ha='right',transform = phot.transAxes)
 	phot.text(textx, texty-2*deltay, r'avg acceptance='+"{:.2f}".format(np.mean(sample_results['acceptance'])),
 				 fontsize=10, ha='right',transform = phot.transAxes)
 		
