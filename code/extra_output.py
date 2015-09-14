@@ -50,8 +50,10 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 
 	parnames = sample_results['model'].theta_labels()
 
-    ##### save nebon/neboff status
-	nebstatus = sample_results['model'].params['add_neb_emission']
+	##### modify nebon status
+	# we want to be able to turn it on and off at will
+	if sample_results['model'].params['add_neb_emission'] == 2:
+		sample_results['model'].params['add_neb_emission'] = True
 
 	##### initialize sps
 	# check to see if we want zcontinuous=2 (i.e., the MDF)
@@ -132,7 +134,7 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 		totmass[jj] = np.sum(sfh_params['mass'])
 		ssfr_100[jj] = sfr_100[jj] / totmass[jj]
 
-		##### empirical halpha
+		##### empirical halphad
 		emp_ha[jj],emp_oiii[jj] = calc_emp_ha(sfh_params['mass'],sfr_100[jj],
 			                                  flatchain[jj,dust1_index],
 			                                  flatchain[jj,dust2_index],

@@ -5,7 +5,7 @@ import os, copy, threed_dutils
 from bsfh import read_results
 from scipy.interpolate import interp1d
 from matplotlib.ticker import MaxNLocator
-import pickle, math
+import pickle, math, measure_emline_lum
 import matplotlib as mpl
 
 # plotting preferences
@@ -108,10 +108,180 @@ def equalize_axes(ax, x,y, dynrange=0.1, line_of_equality=True):
 	ax.axis((min,max,min,max))
 
 	if line_of_equality:
-		ax.errorbar([-1e3,1e3],[-1e3,1e3],linestyle='--',color='0.1',alpha=0.8)
+		ax.plot([min,max],[min,max],linestyle='--',color='0.1',alpha=0.8)
 
 	return ax
+
+def translate_line_names(linenames):
+	'''
+	translate from my names to Moustakas names
+	'''
+	translate = {r'H$\alpha$': 'Ha',
+				 '[OIII] 4959': 'OIII',
+	             r'H$\beta$': 'Hb',
+	             '[NII] 6583': 'NII'}
+
+	return np.array([translate[line] for line in linenames])
+
+def remove_doublets(x, names):
+
+	if any('[OIII]' in s for s in list(names)):
+		keep = np.array(names) != '[OIII] 5007'
+		x = x[keep]
+		names = names[keep]
+		if not isinstance(x[0],basestring):
+			x[np.array(names) == '[OIII] 4959'] *= 3.98
+
+	if any('[NII]' in s for s in list(names)):
+		keep = np.array(names) != '[NII] 6549'
+		x = x[keep]
+		names = names[keep]
+		#if not isinstance(x[0],basestring):
+		#	x[np.array(names) == '[NII] 6583'] *= 3.93
+
+	return x
+
+def plot_emline_comp(alldata,outfolder):
+	'''
+	emission line luminosity comparisons:
+		(1) Observed luminosity, Prospectr vs MAGPHYS continuum subtraction
+		(2) Moustakas+10 comparisons
+		(3) model Balmer decrement (from dust) versus observed Balmer decrement
+		(4) model Halpha (from KS + dust) versus observed Halpha
+	'''
+
+	alpha = 0.6
+	fmt = 'o'
+
+	##### Pull relevant information out of alldata
+	emline_names = alldata[0]['residuals']['emlines']['em_name']
+	nlines = len(emline_names) - 2   # two doublets
+	objnames = np.array([f['objname'] for f in alldata])
+
+	fillvalue = np.zeros(nlines)
+	all_flux = np.array([f['residuals']['emlines']['flux'] if f['residuals']['emlines'] is not None else fillvalue for f in alldata])
+	all_flux_errup = np.array([f['residuals']['emlines']['flux_errup'] if f['residuals']['emlines'] is not None else fillvalue for f in alldata])
+	all_flux_errdown = np.array([f['residuals']['emlines']['flux_errdown'] if f['residuals']['emlines'] is not None else fillvalue for f in alldata])
+	all_lum = np.array([f['residuals']['emlines']['lum'] if f['residuals']['emlines'] is not None else fillvalue for f in alldata])
+	all_lum_errup = np.array([f['residuals']['emlines']['lum_errup'] if f['residuals']['emlines'] is not None else fillvalue for f in alldata])
+	all_lum_errdown = np.array([f['residuals']['emlines']['lum_errdown'] if f['residuals']['emlines'] is not None else fillvalue for f in alldata])
+
+	absnames = alldata[0]['residuals']['emlines']['abs_name']
+	nabs = len(absnames)
+	fillvalue = np.zeros(nabs*2)
+	abs_flux = np.array([f['residuals']['emlines']['abs_flux'] if f['residuals']['emlines'] is not None else fillvalue for f in alldata])
+
+	#################
+	#### plot Prospectr absorption versus MAGPHYS absorption (Halpha, Hbeta)
+	#################
+	fig, axes = plt.subplots(2, nabs, figsize = (10,5*nabs))
+	axes = np.ravel(axes)
+	for ii in xrange(nabs):
+		idx = abs_flux[:,ii] != 0
+		xplot = np.log10(np.abs(abs_flux[idx,ii*2]))
+		yplot = np.log10(np.abs(abs_flux[idx,ii*2+1])) 
+		axes[ii].plot(xplot,  yplot, 
+			    fmt,
+			    alpha=alpha)
+		
+		xlabel = r"log({0} absorption) [Prospectr]"
+		ylabel = r"log({0} absorption) [MAGPHYS]"
+		axes[ii].set_xlabel(xlabel.format(absnames[ii]))
+		axes[ii].set_ylabel(ylabel.format(absnames[ii]))
+
+		# equalize axes, show offset and scatter
+		axes[ii] = equalize_axes(axes[ii], xplot,yplot)
+		off,scat = threed_dutils.offset_and_scatter(xplot,
+			                                        yplot,
+			                                        biweight=True)
+		axes[ii].text(0.99,0.05, 'biweight scatter='+"{:.2f}".format(scat) + ' dex',
+				  transform = axes[ii].transAxes,horizontalalignment='right')
+		axes[ii].text(0.99,0.1, 'mean offset='+"{:.2f}".format(off) + ' dex',
+			      transform = axes[ii].transAxes,horizontalalignment='right')
 	
+	# save
+	plt.tight_layout()
+	plt.savefig(outfolder+'absorption_comparison.png',dpi=300)
+	plt.close()	
+
+	#################
+	#### plot observed fluxes versus Moustakas+10 fluxes
+	#################
+	#### STILL NEED ERRORS FROM MY END
+
+	#### Pull out Moustakas+10 object info
+	# plot against Prospectr-subtracted observation
+	dat = threed_dutils.load_moustakas_data(objnames = list(objnames))
+	
+	#### extract info for objects with measurements in both catalogs
+	####
+	# add in functionality: replace all_fluxes with Moustakas fluxes, so that we're always
+	# using the most accurate fit when evaluating the model properties
+	# check for each line: if there is a supplied ratio 
+	xplot, yplot, yerr = np.zeros(shape=(nlines,0)), np.zeros(shape=(nlines,0)), np.zeros(shape=(nlines,0))
+	emline_names_doubrem = remove_doublets(emline_names,emline_names)
+	moust_names = translate_line_names(emline_names_doubrem)
+
+	for ii in xrange(len(dat)):
+		if dat[ii] is not None:
+			
+			xflux = remove_doublets(all_flux[ii],emline_names)
+			flux_lum_ratio = all_flux[ii][0] / all_lum[ii][0]
+			
+			for kk in xrange(nabs): xflux[emline_names_doubrem == absnames[kk]] -= abs_flux[ii,kk*2]*flux_lum_ratio
+			#if xflux[emline_names_doubrem == absnames[0]] > 4e-12:
+				#print 1/0
+
+			xplot = np.concatenate((xplot,xflux[:,None]),axis=1)
+
+			yflux = np.array([dat[ii]['F'+name][0] for name in moust_names])*1e-15
+			yfluxerr = np.array([dat[ii]['e_F'+name][0] for name in moust_names])*1e-15
+			yplot = np.concatenate((yplot,yflux[:,None]),axis=1)
+			yerr = np.concatenate((yerr,yfluxerr[:,None]),axis=1)
+
+	#### plot information
+	# remove NaNs from Moustakas here, which are presumably emission lines
+	# where the flux was measured to be negative
+	nplot = len(moust_names)
+	ncols = int(np.round((1*nplot)/2.))
+	fig, axes = plt.subplots(ncols, 2, figsize = (12,6*ncols))
+	axes = np.ravel(axes)
+	for ii in xrange(nplot):
+		ok_idx = np.isfinite(yplot[ii,:])
+		yp = np.log10(yplot[ii,ok_idx])
+		xp = np.log10(np.clip(xplot[ii,ok_idx], np.min(yplot[ii,ok_idx]),np.inf))
+
+		axes[ii].errorbar(xp,yp,#yerr=yerr[ii,ok_idx],
+			              fmt=fmt, alpha=alpha,
+			              linestyle=' ')
+
+		axes[ii].set_xlabel('measured '+emline_names_doubrem[ii])
+		axes[ii].set_ylabel('Moustakas+10 '+emline_names_doubrem[ii])
+		axes[ii] = equalize_axes(axes[ii], xp,yp)
+		off,scat = threed_dutils.offset_and_scatter(xp,yp,biweight=True)
+		axes[ii].text(0.99,0.05, 'biweight scatter='+"{:.3f}".format(scat) +' dex',
+				  transform = axes[ii].transAxes,horizontalalignment='right')
+		axes[ii].text(0.99,0.1, 'mean offset='+"{:.3f}".format(off) +' dex',
+			      transform = axes[ii].transAxes,horizontalalignment='right')
+
+	plt.tight_layout()
+	plt.savefig(outfolder+'moustakas_comparison.png',dpi=300)
+	plt.close()
+
+	#################
+	#### plot observed Balmer decrement versus expected
+	#################
+
+	#### First, select those with detected Halpha > 0, S/N (Hbeta), S/N (Halpha)  > 2 or something
+	# later, maybe (Hbeta emission) > (Hbeta absorption) ? Probably not.
+	idx_ha = emline_names == r'H$\alpha$'
+	idx_hb = emline_names == r'H$\beta$'
+	ha_flux = [f[idx_ha] for f in all_flux]
+	ha_flux_errup = [f[idx_ha] for f in all_flux_errup]
+	ha_flux_errdown = [f[idx_ha] for f in all_flux_errdown]
+	ha_lum =  np.squeeze(all_lum[:,idx_ha])
+	ha_det = np.array([True if (ha[0] > 0) and (ha[1] > 0) else False for ha in ha_flux ])
+
 def plot_relationships(alldata,outfolder):
 
 	'''
@@ -654,17 +824,19 @@ def load_spectra(objname, nufnu=True):
 	foldername = '/Users/joel/code/python/threedhst_bsfh/data/brownseds_data/spectra/'
 	rest_lam, flux, obs_lam, source = np.loadtxt(foldername+objname.replace(' ','_')+'_spec.dat',comments='#',unpack=True)
 
-	if nufnu:
+	lsun = 3.846e33  # ergs/s
+	flux_lsun = flux / lsun
 
-		# convert to flam * lam
-		flux = flux * obs_lam
+	# convert to flam * lam
+	flux = flux * obs_lam
 
-		# convert to janskys, then maggies * Hz
-		flux = flux * 1e23 / 3631
+	# convert to janskys, then maggies * Hz
+	flux = flux * 1e23 / 3631
 
 	out = {}
 	out['rest_lam'] = rest_lam
 	out['flux'] = flux
+	out['flux_lsun'] = flux_lsun
 	out['obs_lam'] = obs_lam
 	out['source'] = source
 
@@ -905,15 +1077,21 @@ def sed_comp_figure(sample_results, sps, model, magphys,
 	resplots = [spec_res_opt, spec_res_akari, spec_res_spit]
 
 	for ii in xrange(3):
+		
+		if label[ii] == 'Optical':
+			residuals['emlines'] = measure_emline_lum.measure(sample_results, obs_spec, magphys,sps,sigsmooth=sigsmooth[ii])
 		residuals[label[ii]] = plot_obs_spec(obs_spec, phot, resplots[ii], alpha, modlam/1e4, modspec,
 					                         magphys['model']['lam']/1e4, magphys['model']['spec']*spec_fac,
 					                         magphys['metadata']['redshift'], sample_results['run_params']['objname'],
 		                                     ii+1, color=obs_color, label=label[ii],sigsmooth=sigsmooth[ii])
 
+
+
 	# diagnostic text
 	textx = 0.98
 	texty = 0.15
 	deltay = 0.045
+
 
 	#### SFR and mass
 	# calibrated to be to the right of ax_loc = [0.38,0.68,0.13,0.13]
@@ -1064,6 +1242,7 @@ def collate_data(filebase=None,
 
 	# load if necessary
 	if not sample_results:
+		sample_results, powell_results, model = read_results.read_pickles(mcmc_filename, model_file=model_filename,inmod=None)
 		try:
 			sample_results, powell_results, model = read_results.read_pickles(mcmc_filename, model_file=model_filename,inmod=None)
 		except (EOFError,ValueError) as e:
@@ -1095,6 +1274,8 @@ def collate_data(filebase=None,
 	alldata = {}
 
 	# sed plot
+	# don't cache emission lines, since we will want to turn them on / off
+	sample_results['model'].params['add_neb_emission'] = np.array(True)
 	if plt_sed:
 		print 'MAKING SED COMPARISON PLOT'
  		# plot
@@ -1146,6 +1327,7 @@ def plt_all(runname=None,startup=True,**extras):
 		with open(output, "rb") as f:
 			alldata=pickle.load(f)
 
+	plot_emline_comp(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/magphys/emlines_comp/')
 	plot_relationships(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/magphys/')
 	plot_all_residuals(alldata)
 	plot_comparison(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/magphys/')

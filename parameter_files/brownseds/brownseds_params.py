@@ -443,7 +443,7 @@ model_params.append({'name': 'dust_type', 'N': 1,
 model_params.append({'name': 'dust1', 'N': 1,
                         'isfree': True,
                         'init': 1.0,
-                        'init_disp': 0.6,
+                        'init_disp': 0.8,
                         'units': '',
                         'prior_function': tophat,
                         'prior_args': {'mini':0.0, 'maxi':4.0}})

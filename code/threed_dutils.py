@@ -465,6 +465,8 @@ def load_moustakas_data(objnames = None):
 
 	if we pass a list of object names, return a sorted, matched list
 	otherwise return everything
+
+	returns in units of 10^-15^erg/s/cm^2^
 	'''
 
 	#### load data
@@ -486,6 +488,7 @@ def load_moustakas_data(objnames = None):
 			match = table['Name'] == name
 			if np.sum(match.data) == 0:
 				print 'no match for ' + name
+				outtable.append(None)
 				continue
 			else:
 				outtable.append(table[match.data])
@@ -926,7 +929,7 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None,
 	if model:
 
 		# save redshift
-		z      = model.params.get('zred', np.array(0.0))+0.0
+		z      = model.params.get('zred', np.array(0.0))
 		model.params['zred'] = np.array(0.0)
 
 		# nebon
