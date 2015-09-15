@@ -670,6 +670,15 @@ class BurstyModel(sedmodel.CSPModel):
             if len(np.unique(np.round(outlier_locs))) != len(outlier_locs):
                 return -np.inf
 
+        if 'dust1' in self.theta_index:
+            if 'dust2' in self.theta_index:
+                start,end = self.theta_index['dust1']
+                dust1 = theta[start:end]
+                start,end = self.theta_index['dust2']
+                dust2 = theta[start:end]
+                if dust1/4. > dust2:
+                    return -np.inf
+
         for k, v in self.theta_index.iteritems():
             start, end = v
             lnp_prior += np.sum(self._config_dict[k]['prior_function']

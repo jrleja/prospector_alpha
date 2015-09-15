@@ -429,8 +429,8 @@ def plot_emline_comp(alldata,outfolder):
 	yplot = np.log10(all_flux[keep_idx,idx_ha])
 	yerr = asym_errors(all_flux[keep_idx,idx_ha],all_flux_errup[keep_idx,idx_ha],all_flux_errdown[keep_idx,idx_ha],log=True)
 	ax.errorbar(xplot, yplot, yerr=yerr,fmt=fmt,alpha=alpha,linestyle=' ',color='grey')
-	ax.set_xlabel(r'log(observed H$_{\alpha}$)')
-	ax.set_ylabel(r'log(best-fit Prospectr H$_{\alpha}$)')
+	ax.set_ylabel(r'log(observed H$_{\alpha}$)')
+	ax.set_xlabel(r'log(best-fit Prospectr H$_{\alpha}$)')
 	ax = equalize_axes(ax,xplot,yplot)
 	off,scat = threed_dutils.offset_and_scatter(xplot,yplot,biweight=True)
 	ax.text(0.99,0.05, 'biweight scatter='+"{:.2f}".format(scat)+ ' dex',
@@ -444,16 +444,51 @@ def plot_emline_comp(alldata,outfolder):
 	#### plot deviation in Halpha versus L_IR, extinction at 5500 Angstroms, and (dust1 extinct) / (dust2_extinct)
 	#################
 	lir = np.array([f['temp_emline']['lir'] for f in alldata])
+	sfr = np.array([f['pextras']['q50'][2] for f in alldata])
 	fig, ax = plt.subplots(1,1, figsize = (10,10))
 	xplot = yplot - xplot
-	yplot = np.log10(lir[keep_idx])
-	yerr = asym_errors(all_flux[keep_idx,idx_ha],all_flux_errup[keep_idx,idx_ha],all_flux_errdown[keep_idx,idx_ha],log=True)
+	yplot = np.log10(lir[keep_idx]/sfr[keep_idx])
 	ax.errorbar(xplot, yplot, fmt=fmt,alpha=alpha,linestyle=' ',color='grey')
-	ax.set_xlabel(r'L_IR')
-	ax.set_ylabel(r'log(best-fit Prospectr H$_{\alpha}$/observed H$_{\alpha}$)')
+	ax.set_ylabel(r'L_IR / SFR')
+	ax.set_xlabel(r'log(best-fit Prospectr H$_{\alpha}$/observed H$_{\alpha}$)')
 	plt.savefig(outfolder+'halpha_deviations_vs_lir.png',dpi=300)
 	plt.close()
+	
+	parnames = alldata[0]['pquantiles']['parnames']
+	dinx_idx = parnames == 'dust_index'
+	dust1_idx = parnames == 'dust1'
+	dust2_idx = parnames == 'dust2'
+
+	ext_ha,ext_d1,ext_d2 = [], [], []
+	ha_lam = 6563.0
+	for ii, dat in enumerate(alldata):
+		d1 = dat['pquantiles']['maxprob_params'][dust1_idx]
+		d2 = dat['pquantiles']['maxprob_params'][dust2_idx]	
+		d1_ind = -1.0
+		d2_ind = dat['pquantiles']['maxprob_params'][dinx_idx]
+		
+		ext_d1.append(d1*(ha_lam/5500)**d1_ind)
+		ext_d2.append(d2*(ha_lam/5500)**d2_ind)
+		ext_ha.append(d1*(ha_lam/5500)**d1_ind + d2*(ha_lam/5500)**d2_ind)
+
+	fig, ax = plt.subplots(1,1, figsize = (10,10))
+	yplot = np.array(ext_ha)[keep_idx]
+	ax.errorbar(xplot, yplot, fmt=fmt,alpha=alpha,linestyle=' ',color='grey')
+	ax.set_ylabel(r'$\tau_{H\alpha}$')
+	ax.set_xlabel(r'log(best-fit Prospectr H$_{\alpha}$/observed H$_{\alpha}$)')
+	plt.savefig(outfolder+'halpha_deviations_vs_extinction.png',dpi=300)
+	plt.close()
+	
+	fig, ax = plt.subplots(1,1, figsize = (10,10))
+	yplot = np.array(ext_d1)[keep_idx] / np.array(ext_d2)[keep_idx]
+	ax.errorbar(xplot, yplot, fmt=fmt,alpha=alpha,linestyle=' ',color='grey')
+	ax.set_ylabel(r'$\tau_1 / \tau_2$ (6563 Angstroms)')
+	ax.set_xlabel(r'log(best-fit Prospectr H$_{\alpha}$/observed H$_{\alpha}$)')
+	ax.set_ylim(0,50)
+	plt.savefig(outfolder+'halpha_deviations_vs_d1d2.png',dpi=300)
+	plt.close()	
 	print 1/0
+
 
 
 	#################
