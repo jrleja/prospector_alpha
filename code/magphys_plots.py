@@ -441,6 +441,22 @@ def plot_emline_comp(alldata,outfolder):
 	plt.close()
 
 	#################
+	#### plot deviation in Halpha versus L_IR, extinction at 5500 Angstroms, and (dust1 extinct) / (dust2_extinct)
+	#################
+	lir = np.array([f['temp_emline']['lir'] for f in alldata])
+	fig, ax = plt.subplots(1,1, figsize = (10,10))
+	xplot = yplot - xplot
+	yplot = np.log10(lir[keep_idx])
+	yerr = asym_errors(all_flux[keep_idx,idx_ha],all_flux_errup[keep_idx,idx_ha],all_flux_errdown[keep_idx,idx_ha],log=True)
+	ax.errorbar(xplot, yplot, fmt=fmt,alpha=alpha,linestyle=' ',color='grey')
+	ax.set_xlabel(r'L_IR')
+	ax.set_ylabel(r'log(best-fit Prospectr H$_{\alpha}$/observed H$_{\alpha}$)')
+	plt.savefig(outfolder+'halpha_deviations_vs_lir.png',dpi=300)
+	plt.close()
+	print 1/0
+
+
+	#################
 	#### plot observed Balmer decrement versus expected
 	#################
 
@@ -1498,6 +1514,7 @@ def collate_data(filebase=None,
 		alldata['model'] = magphys['model']
 		alldata['pquantiles'] = sample_results['quantiles']
 		alldata['model_emline'] = sample_results['model_emline']
+		alldata['lir'] = sample_results['observables']['L_IR']
 		alldata['pextras'] = sample_results['extras']
 		alldata['pquantiles']['parnames'] = np.array(sample_results['model'].theta_labels())
 	else:
@@ -1581,10 +1598,11 @@ def add_model_emline(runname='brownseds'):
 		# now create emission line measurements
 		modelout = threed_dutils.measure_emline_lum(sps, thetas = sample_results['quantiles']['maxprob_params'],
 										            model=sample_results['model'], obs = sample_results['obs'],
-							                        savestr=sample_results['run_params']['objname'], measure_ir=False)
+							                        savestr=sample_results['run_params']['objname'], measure_ir=True)
 		temline={}
 		temline['flux'] = modelout['emline_flux']
 		temline['name'] = modelout['emline_name']
+		temline['lir']  = modelout['lir']
 		alldata[jj]['temp_emline'] = temline
 		if jj == 0:
 			print temline
