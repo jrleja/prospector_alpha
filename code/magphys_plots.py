@@ -7,6 +7,8 @@ from scipy.interpolate import interp1d
 from matplotlib.ticker import MaxNLocator
 import pickle, math, measure_emline_lum
 import matplotlib as mpl
+from astropy.cosmology import WMAP9
+from astropy import constants
 
 # plotting preferences
 mpl.rcParams.update({'font.size': 16})
@@ -85,7 +87,18 @@ def median_by_band(x,y,avg=False):
 
 	return avglam, outval
 
-def equalize_axes(ax, x,y, dynrange=0.1, line_of_equality=True):
+def asym_errors(center, up, down, log=False):
+
+	if log:
+		errup = np.log10(up)-np.log10(center)
+		errdown = np.log10(center)-np.log10(down)
+		errarray = [errdown,errup]
+	else:
+		errarray = [center-down,up-center]
+
+	return errarray
+
+def equalize_axes(ax, x,y, dynrange=0.1, line_of_equality=True, log=False):
 	
 	''' 
 	sets up an equal x and y range that encompasses all of the data
@@ -94,8 +107,11 @@ def equalize_axes(ax, x,y, dynrange=0.1, line_of_equality=True):
 	the plot limits are set
 	'''
 
-	dynx, dyny = (np.nanmax(x)-np.nanmin(x))*dynrange,\
-                 (np.nanmax(y)-np.nanmin(y))*dynrange
+	if log:
+		dynx, dyny = (np.nanmin(x)*0.5, np.nanmin(y)*0.5) 
+	else:
+		dynx, dyny = (np.nanmax(x)-np.nanmin(x))*dynrange,\
+	                 (np.nanmax(y)-np.nanmin(y))*dynrange
 	if np.nanmin(x)-dynx > np.nanmin(y)-dyny:
 		min = np.nanmin(y)-dyny
 	else:
@@ -105,11 +121,11 @@ def equalize_axes(ax, x,y, dynrange=0.1, line_of_equality=True):
 	else:
 		max = np.nanmax(y)+dyny
 
-	ax.axis((min,max,min,max))
+	ax.set_xlim(min,max)
+	ax.set_ylim(min,max)
 
 	if line_of_equality:
 		ax.plot([min,max],[min,max],linestyle='--',color='0.1',alpha=0.8)
-
 	return ax
 
 def translate_line_names(linenames):
@@ -141,6 +157,18 @@ def remove_doublets(x, names):
 
 	return x
 
+def calc_balmer_dec(tau1, tau2, ind1, ind2):
+
+	ha_lam = 6562.801
+	hb_lam = 4861.363
+
+	exp_ha = tau1*(ha_lam/5500)**ind1 + tau2*(ha_lam/5500)**ind2
+	exp_hb = tau1*(hb_lam/5500)**ind1 + tau2*(hb_lam/5500)**ind2
+
+	balm_dec = 2.86 * np.exp(exp_hb-exp_ha)
+
+	return balm_dec
+
 def plot_emline_comp(alldata,outfolder):
 	'''
 	emission line luminosity comparisons:
@@ -155,7 +183,7 @@ def plot_emline_comp(alldata,outfolder):
 
 	##### Pull relevant information out of alldata
 	emline_names = alldata[0]['residuals']['emlines']['em_name']
-	nlines = len(emline_names) - 2   # two doublets
+	nlines = len(emline_names)
 	objnames = np.array([f['objname'] for f in alldata])
 
 	fillvalue = np.zeros(nlines)
@@ -170,16 +198,20 @@ def plot_emline_comp(alldata,outfolder):
 	nabs = len(absnames)
 	fillvalue = np.zeros(nabs*2)
 	abs_flux = np.array([f['residuals']['emlines']['abs_flux'] if f['residuals']['emlines'] is not None else fillvalue for f in alldata])
+	try:
+		abs_lum = np.array([f['residuals']['emlines']['abs_lum'] if f['residuals']['emlines'] is not None else fillvalue for f in alldata])
+	except:
+		abs_lum = abs_flux
 
 	#################
 	#### plot Prospectr absorption versus MAGPHYS absorption (Halpha, Hbeta)
 	#################
-	fig, axes = plt.subplots(2, nabs, figsize = (10,5*nabs))
+	fig, axes = plt.subplots(2, int(np.ceil(nabs/2.)), figsize = (10,5*nabs))
 	axes = np.ravel(axes)
 	for ii in xrange(nabs):
-		idx = abs_flux[:,ii] != 0
-		xplot = np.log10(np.abs(abs_flux[idx,ii*2]))
-		yplot = np.log10(np.abs(abs_flux[idx,ii*2+1])) 
+		idx = abs_lum[:,ii] != 0
+		xplot = np.log10(np.abs(abs_lum[idx,ii*2]))
+		yplot = np.log10(np.abs(abs_lum[idx,ii*2+1])) 
 		axes[ii].plot(xplot,  yplot, 
 			    fmt,
 			    alpha=alpha)
@@ -207,7 +239,7 @@ def plot_emline_comp(alldata,outfolder):
 	#################
 	#### plot observed fluxes versus Moustakas+10 fluxes
 	#################
-	#### STILL NEED ERRORS FROM MY END
+	# erg / s / cm^2
 
 	#### Pull out Moustakas+10 object info
 	# plot against Prospectr-subtracted observation
@@ -217,8 +249,8 @@ def plot_emline_comp(alldata,outfolder):
 	####
 	# add in functionality: replace all_fluxes with Moustakas fluxes, so that we're always
 	# using the most accurate fit when evaluating the model properties
-	# check for each line: if there is a supplied ratio 
-	xplot, yplot, yerr = np.zeros(shape=(nlines,0)), np.zeros(shape=(nlines,0)), np.zeros(shape=(nlines,0))
+	xplot, xplot_errup, xplot_errdown, yplot, yerr = [np.zeros(shape=(nlines-2,0)) for x in range(5)]
+	moust_objnames = []
 	emline_names_doubrem = remove_doublets(emline_names,emline_names)
 	moust_names = translate_line_names(emline_names_doubrem)
 
@@ -226,18 +258,29 @@ def plot_emline_comp(alldata,outfolder):
 		if dat[ii] is not None:
 			
 			xflux = remove_doublets(all_flux[ii],emline_names)
+			xflux_errup = remove_doublets(all_flux_errup[ii],emline_names)
+			xflux_errdown = remove_doublets(all_flux_errdown[ii],emline_names)
+			
+			'''
 			flux_lum_ratio = all_flux[ii][0] / all_lum[ii][0]
 			
-			for kk in xrange(nabs): xflux[emline_names_doubrem == absnames[kk]] -= abs_flux[ii,kk*2]*flux_lum_ratio
-			#if xflux[emline_names_doubrem == absnames[0]] > 4e-12:
-				#print 1/0
+			for kk in xrange(nabs): 
+				idx = emline_names_doubrem == absnames[kk]
+				xflux[idx] -= abs_flux[ii,kk*2]*flux_lum_ratio
+				xflux_errup[idx] -= abs_flux[ii,kk*2]*flux_lum_ratio
+				xflux_errdown[idx] -= abs_flux[ii,kk*2]*flux_lum_ratio
+			'''
 
 			xplot = np.concatenate((xplot,xflux[:,None]),axis=1)
+			xplot_errup = np.concatenate((xplot_errup,xflux_errup[:,None]),axis=1)
+			xplot_errdown = np.concatenate((xplot_errdown,xflux_errdown[:,None]),axis=1)
 
 			yflux = np.array([dat[ii]['F'+name][0] for name in moust_names])*1e-15
 			yfluxerr = np.array([dat[ii]['e_F'+name][0] for name in moust_names])*1e-15
 			yplot = np.concatenate((yplot,yflux[:,None]),axis=1)
 			yerr = np.concatenate((yerr,yfluxerr[:,None]),axis=1)
+
+			moust_objnames.append(objnames[ii])
 
 	#### plot information
 	# remove NaNs from Moustakas here, which are presumably emission lines
@@ -248,39 +291,202 @@ def plot_emline_comp(alldata,outfolder):
 	axes = np.ravel(axes)
 	for ii in xrange(nplot):
 		ok_idx = np.isfinite(yplot[ii,:])
-		yp = np.log10(yplot[ii,ok_idx])
-		xp = np.log10(np.clip(xplot[ii,ok_idx], np.min(yplot[ii,ok_idx]),np.inf))
+		yp = yplot[ii,ok_idx]
+		yp_err = asym_errors(yp,
+			                 yplot[ii,ok_idx]+yerr[ii,ok_idx],
+			                 yplot[ii,ok_idx]-yerr[ii,ok_idx])
 
-		axes[ii].errorbar(xp,yp,#yerr=yerr[ii,ok_idx],
+		# if I measure < 0 where Moustakas measures > 0,
+		# clip to Moustakas minimum measurement, and
+		# set errors to zero
+		bad = xplot[ii,ok_idx] < 0
+		xp = xplot[ii,ok_idx]
+		xp_errup = xplot_errup[ii,ok_idx]
+		xp_errdown = xplot_errdown[ii,ok_idx]
+		if np.sum(bad) > 0:
+			xp[bad] = np.min(np.concatenate((yplot[ii,ok_idx],xplot[ii,ok_idx][~bad])))*0.6
+			xp_errup[bad] = 0.0
+			xp_errdown[bad] = 1e-99
+		xp_err = asym_errors(xp, xp_errdown, xp_errup)
+
+
+		axes[ii].errorbar(xp,yp,yerr=yp_err,
+						  xerr=xp_err,
 			              fmt=fmt, alpha=alpha,
 			              linestyle=' ')
 
 		axes[ii].set_xlabel('measured '+emline_names_doubrem[ii])
 		axes[ii].set_ylabel('Moustakas+10 '+emline_names_doubrem[ii])
-		axes[ii] = equalize_axes(axes[ii], xp,yp)
-		off,scat = threed_dutils.offset_and_scatter(xp,yp,biweight=True)
+		axes[ii].set_xscale('log',nonposx='clip',subsx=(2,4,7))
+		axes[ii].set_yscale('log',nonposx='clip',subsx=(2,4,7))
+		axes[ii] = equalize_axes(axes[ii], xp,yp,log=True)
+		off,scat = threed_dutils.offset_and_scatter(np.log10(xp),np.log10(yp),biweight=True)
 		axes[ii].text(0.99,0.05, 'biweight scatter='+"{:.3f}".format(scat) +' dex',
 				  transform = axes[ii].transAxes,horizontalalignment='right')
-		axes[ii].text(0.99,0.1, 'mean offset='+"{:.3f}".format(off) +' dex',
+		axes[ii].text(0.99,0.1, 'mean offset='+"{:.3f}".format(off) + ' dex',
 			      transform = axes[ii].transAxes,horizontalalignment='right')
+
+		# print outliers
+		diff = np.log10(xp) - np.log10(yp)
+		outliers = np.abs(diff) > 3*scat
+		print emline_names_doubrem[ii] + ' outliers:'
+		for jj in xrange(len(outliers)):
+			if outliers[jj] == True:
+				print np.array(moust_objnames)[ok_idx][jj]+' ' + "{:.3f}".format(diff[jj]/scat)
 
 	plt.tight_layout()
 	plt.savefig(outfolder+'moustakas_comparison.png',dpi=300)
+	plt.close()
+
+
+	##### PLOT OBS VS OBS BALMER DECREMENT
+	hb_idx_me = emline_names_doubrem == 'H$\\beta$'
+	ha_idx_me = emline_names_doubrem == 'H$\\alpha$'
+	hb_idx_mo = moust_names == 'Hb'
+	ha_idx_mo = moust_names == 'Ha'
+
+	# must have a positive flux in all measurements of all emission lines
+	idx = np.isfinite(yplot[hb_idx_mo,:]) & \
+          np.isfinite(yplot[ha_idx_mo,:]) & \
+          (xplot[hb_idx_me,:] > 0) & \
+          (xplot[ha_idx_me,:] > 0)
+	idx = np.squeeze(idx)
+	mydec = xplot[ha_idx_me,idx] / xplot[hb_idx_me,idx]
+	modec = yplot[ha_idx_mo,idx] / yplot[hb_idx_mo,idx]
+
+  
+	fig, ax = plt.subplots(1,1, figsize = (10,10))
+	ax.errorbar(mydec, modec, fmt=fmt,alpha=alpha,linestyle=' ')
+	ax.set_xlabel('measured Balmer decrement')
+	ax.set_ylabel('Moustakas+10 Balmer decrement')
+	ax = equalize_axes(ax, mydec,modec)
+	off,scat = threed_dutils.offset_and_scatter(mydec,modec,biweight=True)
+	ax.text(0.99,0.05, 'biweight scatter='+"{:.3f}".format(scat),
+			  transform = ax.transAxes,horizontalalignment='right')
+	ax.text(0.99,0.1, 'mean offset='+"{:.3f}".format(off),
+			      transform = ax.transAxes,horizontalalignment='right')
+	ax.plot([2.86,2.86],[0.0,15.0],linestyle='-',color='black')
+	ax.plot([0.0,15.0],[2.86,2.86],linestyle='-',color='black')
+	ax.set_xlim(1,10)
+	ax.set_ylim(1,10)
+	plt.savefig(outfolder+'balmer_dec_comparison.png',dpi=300)
+	plt.close()
+
+	#################
+	#### plot observed Halpha versus expected (PROSPECTR ONLY)
+	#################
+	# first pull out observed Halphas
+	# add an S/N cut... ? remove later maybe
+	sn_cut = 10
+	idx_ha = emline_names == 'H$\\alpha$'
+	idx_hb = emline_names == 'H$\\beta$'
+
+	sn_ha = all_flux[:,idx_ha] / (all_flux_errup[:,idx_ha]-all_flux_errdown[:,idx_ha])
+	sn_hb = all_flux[:,idx_hb] / (all_flux_errup[:,idx_hb]-all_flux_errdown[:,idx_hb])
+
+	keep_idx = np.squeeze(sn_ha > sn_cut)
+
+	'''
+	# MUST RUN EXTRA_OUPTUT AGAIN FOR THIS TO WORK!!!
+	ha_p_idx = alldata[0]['model_emline']['name'] == 'Halpha'
+	model_ha = np.zeros(shape=(len(alldata),3))
+
+	for ii, dat in enumerate(alldata):
+
+		# comes out in Lsun
+		# convert to CGS flux
+		pc2cm = 3.08567758e18
+		distance = WMAP9.luminosity_distance(dat['residuals']['phot']['z']).value*1e6*pc2cm
+		dfactor = (4*np.pi*distance**2)/constants.L_sun.cgs.value
+
+		model_ha[ii,0] = dat['model_emline']['q50'][ha_p_idx] / dfactor
+		model_ha[ii,1] = dat['model_emline']['q84'][ha_p_idx] / dfactor
+		model_ha[ii,2] = dat['model_emline']['q16'][ha_p_idx] / dfactor
+	'''
+
+	######################
+	#### BEGIN SHITTY HACK 
+	######################
+	ha_p_idx = alldata[0]['temp_emline']['name'] == 'Halpha'
+	model_ha = np.zeros(len(alldata))
+	
+	for ii, dat in enumerate(alldata):
+
+		# comes out in Lsun
+		# convert to CGS flux
+		pc2cm = 3.08567758e18
+		distance = WMAP9.luminosity_distance(dat['residuals']['phot']['z']).value*1e6*pc2cm
+		dfactor = (4*np.pi*distance**2)/constants.L_sun.cgs.value
+
+		model_ha[ii] = dat['temp_emline']['flux'][ha_p_idx] / dfactor
+
+	######################
+	#### END SHITTY HACK 
+	######################
+
+	fig, ax = plt.subplots(1,1, figsize = (10,10))
+	xplot = np.log10(model_ha[keep_idx])
+	yplot = np.log10(all_flux[keep_idx,idx_ha])
+	yerr = asym_errors(all_flux[keep_idx,idx_ha],all_flux_errup[keep_idx,idx_ha],all_flux_errdown[keep_idx,idx_ha],log=True)
+	ax.errorbar(xplot, yplot, yerr=yerr,fmt=fmt,alpha=alpha,linestyle=' ',color='grey')
+	ax.set_xlabel(r'log(observed H$_{\alpha}$)')
+	ax.set_ylabel(r'log(best-fit Prospectr H$_{\alpha}$)')
+	ax = equalize_axes(ax,xplot,yplot)
+	off,scat = threed_dutils.offset_and_scatter(xplot,yplot,biweight=True)
+	ax.text(0.99,0.05, 'biweight scatter='+"{:.2f}".format(scat)+ ' dex',
+			  transform = ax.transAxes,horizontalalignment='right')
+	ax.text(0.99,0.1, 'mean offset='+"{:.2f}".format(off) + ' dex',
+			      transform = ax.transAxes,horizontalalignment='right')
+	plt.savefig(outfolder+'halpha_comparison.png',dpi=300)
 	plt.close()
 
 	#################
 	#### plot observed Balmer decrement versus expected
 	#################
 
-	#### First, select those with detected Halpha > 0, S/N (Hbeta), S/N (Halpha)  > 2 or something
-	# later, maybe (Hbeta emission) > (Hbeta absorption) ? Probably not.
-	idx_ha = emline_names == r'H$\alpha$'
-	idx_hb = emline_names == r'H$\beta$'
-	ha_flux = [f[idx_ha] for f in all_flux]
-	ha_flux_errup = [f[idx_ha] for f in all_flux_errup]
-	ha_flux_errdown = [f[idx_ha] for f in all_flux_errdown]
-	ha_lum =  np.squeeze(all_lum[:,idx_ha])
-	ha_det = np.array([True if (ha[0] > 0) and (ha[1] > 0) else False for ha in ha_flux ])
+	#### for now, aggressive S/N cuts
+	# S/N(Ha) > 10, S/N (Hbeta) > 10
+	keep_idx = np.squeeze((sn_ha > sn_cut) & (sn_hb > sn_cut))
+
+	bdec_measured = all_flux[keep_idx,idx_ha] / all_flux[keep_idx,idx_hb]
+
+	#### calculate expected Balmer decrement for Prospectr, MAGPHYS
+	# variable names for Prospectr
+	parnames = alldata[0]['pquantiles']['parnames']
+	dinx_idx = parnames == 'dust_index'
+	dust1_idx = parnames == 'dust1'
+	dust2_idx = parnames == 'dust2'
+
+	# variable names for MAGPHYS ()
+	# tau1 = (1-mu)*tauv
+	# tau2 = mu*tauv
+
+	bdec_magphys, bdec_prospectr = [],[]
+	for ii,dat in enumerate(alldata):
+		if keep_idx[ii]:
+			bdec = calc_balmer_dec(dat['pquantiles']['maxprob_params'][dust1_idx],
+				                   dat['pquantiles']['maxprob_params'][dust2_idx],
+				                   -1.0,
+				                   dat['pquantiles']['maxprob_params'][dinx_idx])
+			bdec_prospectr.append(bdec[0])
+			'''
+			bdec = calc_balmer_dec(dat['pquantiles']['maxprob_params'][dust1_idx],
+				                   dat['pquantiles']['maxprob_params'][dust2_idx],
+				                   -1.3,
+				                   -0.7)
+			'''
+	
+	fig, ax = plt.subplots(1,1, figsize = (10,10))
+	ax.errorbar(bdec_measured, bdec_prospectr, fmt=fmt,alpha=alpha,linestyle=' ')
+	ax.set_xlabel(r'observed H$_{\alpha}$/H$_{\beta}$')
+	ax.set_ylabel(r'Prospectr H$_{\alpha}$/H$_{\beta}$')
+	ax = equalize_axes(ax, bdec_measured,bdec_prospectr)
+	off,scat = threed_dutils.offset_and_scatter(bdec_measured,bdec_prospectr,biweight=True)
+	ax.text(0.99,0.05, 'biweight scatter='+"{:.3f}".format(scat),
+			  transform = ax.transAxes,horizontalalignment='right')
+	ax.text(0.99,0.1, 'mean offset='+"{:.3f}".format(off),
+			      transform = ax.transAxes,horizontalalignment='right')
+	print 1/0
 
 def plot_relationships(alldata,outfolder):
 
@@ -1291,6 +1497,7 @@ def collate_data(filebase=None,
 		alldata['magphys'] = magphys['pdfs']
 		alldata['model'] = magphys['model']
 		alldata['pquantiles'] = sample_results['quantiles']
+		alldata['model_emline'] = sample_results['model_emline']
 		alldata['pextras'] = sample_results['extras']
 		alldata['pquantiles']['parnames'] = np.array(sample_results['model'].theta_labels())
 	else:
@@ -1317,11 +1524,14 @@ def plt_all(runname=None,startup=True,**extras):
 		alldata = []
 		for jj in xrange(len(filebase)):
 			print 'iteration '+str(jj) 
+			if filebase[jj].split('_')[-1] != 'NGC 2403':
+				continue
+
 			dictionary = collate_data(filebase=filebase[jj],\
 			                           outfolder=outfolder,
 			                           **extras)
 			alldata.append(dictionary)
-
+		print 1/0
 		pickle.dump(alldata,open(output, "wb"))
 	else:
 		with open(output, "rb") as f:
@@ -1331,4 +1541,52 @@ def plt_all(runname=None,startup=True,**extras):
 	plot_relationships(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/magphys/')
 	plot_all_residuals(alldata)
 	plot_comparison(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/magphys/')
+
+
+'''
+DELETE THIS SOON, IT IS UGLY
+'''
+def add_model_emline(runname='brownseds'):
+
+	'''
+	add a forgotten key to alldata dictionary, from prospectr data
+	'''
+	if runname == None:
+		runname = 'brownseds'
+
+	output = outpickle+'/alldata.pickle'
+
+	filebase, parm_basename, ancilname=threed_dutils.generate_basenames(runname)
+	with open(output, "rb") as f:
+		alldata=pickle.load(f)
 	
+	sps = threed_dutils.setup_sps(custom_filter_key=None)
+
+	for jj in xrange(len(filebase)):
+		print 'iteration '+str(jj) 
+
+		# find most recent output file
+		# with the objname
+		folder = "/".join(filebase[jj].split('/')[:-1])
+		filename = filebase[jj].split("/")[-1]
+		files = [f for f in os.listdir(folder) if "_".join(f.split('_')[:-2]) == filename]	
+		times = [f.split('_')[-2] for f in files]
+
+		# load results
+		mcmc_filename=filebase[jj]+'_'+max(times)+"_mcmc"
+		model_filename=filebase[jj]+'_'+max(times)+"_model"
+		sample_results, powell_results, model = read_results.read_pickles(mcmc_filename, model_file=model_filename,inmod=None)
+		sample_results['model'].params['add_neb_emission'] = np.array(True)
+
+		# now create emission line measurements
+		modelout = threed_dutils.measure_emline_lum(sps, thetas = sample_results['quantiles']['maxprob_params'],
+										            model=sample_results['model'], obs = sample_results['obs'],
+							                        savestr=sample_results['run_params']['objname'], measure_ir=False)
+		temline={}
+		temline['flux'] = modelout['emline_flux']
+		temline['name'] = modelout['emline_name']
+		alldata[jj]['temp_emline'] = temline
+		if jj == 0:
+			print temline
+	
+	pickle.dump(alldata,open(output, "wb"))

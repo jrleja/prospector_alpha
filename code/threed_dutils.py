@@ -466,7 +466,7 @@ def load_moustakas_data(objnames = None):
 	if we pass a list of object names, return a sorted, matched list
 	otherwise return everything
 
-	returns in units of 10^-15^erg/s/cm^2^
+	returns in units of 10^-15^erg/s/cm^2
 	'''
 
 	#### load data
@@ -487,7 +487,6 @@ def load_moustakas_data(objnames = None):
 		for name in objnames:
 			match = table['Name'] == name
 			if np.sum(match.data) == 0:
-				print 'no match for ' + name
 				outtable.append(None)
 				continue
 			else:
@@ -909,7 +908,7 @@ def integrate_sfh(t1,t2,sfh_params):
 	return tot_sfr
 
 def measure_emline_lum(sps, model = None, obs = None, thetas = None, 
-	                   measure_ir = False, saveplot = False, spec=None):
+	                   measure_ir = False, savestr = False, saveplot=False):
 	
 	'''
 	takes spec(on)-spec(off) to measure emission line luminosity
@@ -917,6 +916,8 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None,
 	inspecting the spectral sampling density around each line
 
 	if we pass spec, then avoid the first model call
+
+	flux comes out in Lsun
 	'''
 
     # define emission lines
@@ -933,13 +934,12 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None,
 		model.params['zred'] = np.array(0.0)
 
 		# nebon
-		if spec is not None:
-			spec,mags,sm = model.mean_model(thetas, obs, sps=sps, norm_spec=False)
+		spec,mags,sm = model.mean_model(thetas, obs, sps=sps)
 
 		# neboff
 		model.params['add_neb_emission'] = np.array(False)
 		model.params['add_neb_continuum'] = np.array(False)
-		spec_neboff,mags,sm = model.mean_model(thetas, obs, sps=sps, norm_spec=False)
+		spec_neboff,mags,sm = model.mean_model(thetas, obs, sps=sps)
 		w = sps.wavelengths
 		model.params['add_neb_emission'] = np.array(True)
 		model.params['add_neb_continuum'] = np.array(True)
@@ -955,7 +955,6 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None,
 		print 1/0
 
 	emline_flux = np.zeros(len(wavelength))
-
 	for jj in xrange(len(wavelength)):
 		integrate_lam = (w > sideband[jj][0]) & (w < sideband[jj][1])
 		baseline      = spec[np.abs(w-sideband[jj][0]) == np.min(np.abs(w-sideband[jj][0]))][0]
@@ -972,7 +971,7 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None,
 			for kk in xrange(len(plotlam)):
 				plt.vlines(plotlam[kk],plt.ylim()[0],plt.ylim()[1],color='0.5',linestyle='--')
 				plt.text(plotlam[kk],(plt.ylim()[0]+plt.ylim()[1])/2.*(1.0-kk/6.0),plotlines[kk])
-			plt.savefig(os.getenv('APPS')+'/threedhst_bsfh/plots/testem/emline_'+str(saveplot)+'.png',dpi=300)
+			plt.savefig(os.getenv('APPS')+'/threedhst_bsfh/plots/testem/emline_'+savestr+'.png',dpi=300)
 			plt.close()
 
 	if measure_ir:

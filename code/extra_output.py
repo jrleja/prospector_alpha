@@ -53,7 +53,7 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 	##### modify nebon status
 	# we want to be able to turn it on and off at will
 	if sample_results['model'].params['add_neb_emission'] == 2:
-		sample_results['model'].params['add_neb_emission'] = True
+		sample_results['model'].params['add_neb_emission'] = np.array(True)
 
 	##### initialize sps
 	# check to see if we want zcontinuous=2 (i.e., the MDF)
@@ -143,8 +143,8 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 		##### model Halpha, L_IR, and mips flux
 		modelout = threed_dutils.measure_emline_lum(sps, thetas = thetas,
 			 										model=sample_results['model'], obs = sample_results['obs'],
-											        saveplot=False, measure_ir=True,
-											        spec=spec[:,jj])
+											        savestr=sample_results['run_params']['objname'], 
+											        saveplot=False,measure_ir=True)
 		
 		lineflux[jj,:] = modelout['emline_flux']
 		mips_flux[jj]  = modelout['mips']
