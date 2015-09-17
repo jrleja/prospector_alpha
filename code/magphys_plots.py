@@ -180,7 +180,7 @@ def plot_emline_comp(alldata,outfolder):
 
 	alpha = 0.6
 	fmt = 'o'
-	alldata = alldata[:120]
+
 	##### Pull relevant information out of alldata
 	emline_names = alldata[0]['residuals']['emlines']['em_name']
 	nlines = len(emline_names)
@@ -1581,7 +1581,6 @@ def plt_all(runname=None,startup=True,**extras):
 			                           outfolder=outfolder,
 			                           **extras)
 			alldata.append(dictionary)
-		print 1/0
 		pickle.dump(alldata,open(output, "wb"))
 	else:
 		with open(output, "rb") as f:
