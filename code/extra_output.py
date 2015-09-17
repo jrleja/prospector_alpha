@@ -197,8 +197,6 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 				 'maxprob':maxprob}
 	sample_results['quantiles'] = quantiles
 
-	# reset nebon/neboff status in model
-	sample_results['model'].params['add_neb_emission'] = np.array(nebstatus)
 	return sample_results
 
 def post_processing(param_name, add_extra=True, **extras):

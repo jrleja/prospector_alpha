@@ -180,7 +180,7 @@ def plot_emline_comp(alldata,outfolder):
 
 	alpha = 0.6
 	fmt = 'o'
-
+	alldata = alldata[:120]
 	##### Pull relevant information out of alldata
 	emline_names = alldata[0]['residuals']['emlines']['em_name']
 	nlines = len(emline_names)
@@ -206,7 +206,7 @@ def plot_emline_comp(alldata,outfolder):
 	#################
 	#### plot Prospectr absorption versus MAGPHYS absorption (Halpha, Hbeta)
 	#################
-	fig, axes = plt.subplots(2, int(np.ceil(nabs/2.)), figsize = (10,5*nabs))
+	fig, axes = plt.subplots(int(np.ceil(nabs/2.),2), figsize = (10,5*nabs))
 	axes = np.ravel(axes)
 	for ii in xrange(nabs):
 		idx = abs_lum[:,ii] != 0
@@ -439,7 +439,7 @@ def plot_emline_comp(alldata,outfolder):
 			      transform = ax.transAxes,horizontalalignment='right')
 	plt.savefig(outfolder+'halpha_comparison.png',dpi=300)
 	plt.close()
-
+	print 1/0
 	#################
 	#### plot deviation in Halpha versus L_IR, extinction at 5500 Angstroms, and (dust1 extinct) / (dust2_extinct)
 	#################
@@ -1576,8 +1576,6 @@ def plt_all(runname=None,startup=True,**extras):
 		alldata = []
 		for jj in xrange(len(filebase)):
 			print 'iteration '+str(jj) 
-			if filebase[jj].split('_')[-1] != 'NGC 2403':
-				continue
 
 			dictionary = collate_data(filebase=filebase[jj],\
 			                           outfolder=outfolder,
@@ -1613,6 +1611,7 @@ def add_model_emline(runname='brownseds'):
 		alldata=pickle.load(f)
 	
 	sps = threed_dutils.setup_sps(custom_filter_key=None)
+	from extra_output import maxprob_model
 
 	for jj in xrange(len(filebase)):
 		print 'iteration '+str(jj) 
@@ -1630,8 +1629,10 @@ def add_model_emline(runname='brownseds'):
 		sample_results, powell_results, model = read_results.read_pickles(mcmc_filename, model_file=model_filename,inmod=None)
 		sample_results['model'].params['add_neb_emission'] = np.array(True)
 
+		maxthetas, maxprob = maxprob_model(sample_results,sps)
+
 		# now create emission line measurements
-		modelout = threed_dutils.measure_emline_lum(sps, thetas = sample_results['quantiles']['maxprob_params'],
+		modelout = threed_dutils.measure_emline_lum(sps, thetas = maxthetas,
 										            model=sample_results['model'], obs = sample_results['obs'],
 							                        savestr=sample_results['run_params']['objname'], measure_ir=True)
 		temline={}
