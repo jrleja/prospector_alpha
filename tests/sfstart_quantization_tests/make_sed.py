@@ -4,6 +4,10 @@ from bsfh import model_setup
 import matplotlib.pyplot as plt
 import matplotlib.cm as cmx
 import matplotlib.colors as colors
+import pickle
+
+outname = 'tres=10.pickle'
+outplot = 'galex_v_tage_tres=10.png'
 
 def get_cmap(N):
     '''Returns a function that maps each index in 0, 1, ... N-1 to a distinct 
@@ -13,9 +17,6 @@ def get_cmap(N):
     def map_index_to_rgb_color(index):
         return scalar_map.to_rgba(index)
     return map_index_to_rgb_color
-
-# change to a folder name, to save figures
-outname = ''
 
 # setup model, sps
 sps = threed_dutils.setup_sps()
@@ -30,10 +31,9 @@ model.set_parameters(model.initial_theta)
 
 # set up sf_start array
 sfh_params = threed_dutils.find_sfh_params(model,model.initial_theta,obs,sps)
-nsamp = 200
+nsamp = 45
 cmap = get_cmap(nsamp)
-tcalc = np.linspace(1.4,1.8, nsamp)
-tcalc = np.append(1.57,tcalc)
+tcalc = np.linspace(1.4,1.7, nsamp)
 print tcalc
 c = 3e8
 
@@ -43,7 +43,7 @@ colors = ['#76FF7A', '#1CD3A2', '#1974D2', '#7442C8', '#FC2847', '#FDFC74', '#8E
 
 ###### calculate FSPS quantities ######
 # pass parameters to sps object
-sfr = np.array([])
+galex = []
 for ii,tt in enumerate(tcalc):
     for k, v in model.params.iteritems():
         if k in sps.params.all_params:
@@ -57,25 +57,30 @@ for ii,tt in enumerate(tcalc):
     sps.params['tage'] = np.atleast_1d(tt)
     sps.params['sf_trunc'] = np.atleast_1d(0.98*tt)
 
-    w, spec = sps.get_spectrum(tage=sps.params['tage'], peraa=False)
-    yplot   = spec*(c/(w/1e10))
-    sfr = np.append(sfr,sps.sfr)
+    mags = sps.get_mags(tage=sps.params['tage'],bands=obs['filters'])
+    yplot   = mags
+
+    galex.append(mags[0])
     if ii == 0:
         origspec = yplot
     else:
-        ax.plot(np.log10(w),yplot/origspec,linestyle='-',alpha=0.5,color=cmap(ii),label=tt)
+        ax.plot(np.log10(obs['wave_effective']),yplot/origspec,'o',alpha=0.5,color=cmap(ii),label=tt)
 
 fmt = "{:.2f}".format(tcalc[0])
 ax.set_xlabel(r'log($\lambda [\AA]$)')
 ax.set_ylabel(r'f$_{\mathrm{model}}$ / f$_{\mathrm{tage='+fmt+'}}$')
 ax.legend(loc=1,prop={'size':10},title='tage')
-ax.axis((3,6.0,0.3,4.0))
+ax.set_xlim(3,4.0)
+ax.set_ylim(0.6,1.4)
 
 plt.savefig('tage_test.png',dpi=300)
 plt.close()
 
 fig, ax = plt.subplots()
 ax.set_xlabel(r'tage')
-ax.set_ylabel(r'sfr')
-ax.plot(tcalc[1:],sfr[1:],alpha=0.5,color='blue')
-plt.savefig('sfr.png',dpi=300)
+ax.set_ylabel(r'GALEX mag')
+ax.plot(tcalc,galex,alpha=0.5,color='blue')
+plt.savefig(outplot,dpi=300)
+
+output = {'tcalc':tcalc,'galex':galex}
+pickle.dump(output,open(outname, "wb"))
