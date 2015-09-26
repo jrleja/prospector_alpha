@@ -11,45 +11,96 @@ from scipy.integrate import simps
 
 
 c_kms = 2.99e5
-maxfev = 300
+maxfev = 1000
 
-class jGaussian1D(core.Fittable1DModel):
-	"""
-	redefined to add a constant
-	"""
+class tLinear1D(core.Fittable1DModel):
 
-	amplitude = Parameter(default=1)
-	mean = Parameter(default=0)
-	stddev = Parameter(default=1)
-	constant = Parameter(default=0)
-	slope = Parameter(default=0)
-	_bounding_box = 'auto'
-
-	def bounding_box_default(self, factor=5.5):
-		x0 = self.mean.value
-		dx = factor * self.stddev
-
-		return (x0 - dx, x0 + dx)
+	slope_low = Parameter(default=0)
+	intercept_low = Parameter(default=0)
+	slope_mid = Parameter(default=0)
+	intercept_mid = Parameter(default=0)
+	slope_high = Parameter(default=0)
+	intercept_high = Parameter(default=0)
+	linear = True
 
 	@staticmethod
-	def evaluate(x, amplitude, mean, stddev, constant,slope):
-		"""
-		Gaussian1D model function.
-		"""
-		return amplitude * np.exp(- 0.5 * (x - mean) ** 2 / stddev ** 2) + constant + slope*x
+	def evaluate(x, slope_low, intercept_low, slope_mid, intercept_mid, slope_high, intercept_high):
+		"""One dimensional Line model function"""
+
+		out = np.zeros_like(x)
+		low = np.array(x) < 4300
+		mid = (np.array(x) > 4300) & (np.array(x) < 5600)
+		high = np.array(x) > 5600
+		out[low] = slope_low*x[low]+intercept_low
+		out[mid] = slope_mid*x[mid]+intercept_mid
+		out[high] = slope_high*x[high]+intercept_high
+
+		return out
 
 	@staticmethod
-	def fit_deriv(x, amplitude, mean, stddev, constant,slope):
-		"""
-		Gaussian1D model function derivatives.
-		"""
+	def fit_deriv(x, slope_low, intercept_low, slope_mid, intercept_mid, slope_high, intercept_high):
+		"""One dimensional Line model derivative with respect to parameters"""
 
-		d_amplitude = np.exp(-0.5 / stddev ** 2 * (x - mean) ** 2)
-		d_mean = amplitude * d_amplitude * (x - mean) / stddev ** 2
-		d_stddev = amplitude * d_amplitude * (x - mean) ** 2 / stddev ** 3
-		d_constant = np.zeros_like(x)
-		d_slope = x
-		return [d_amplitude, d_mean, d_stddev, d_constant, d_slope]
+		low = np.array(x) < 4300
+		mid = (np.array(x) > 4300) & (np.array(x) < 5600)
+		high = np.array(x) > 5600
+		
+		d_lslope = np.zeros_like(x)
+		d_lint = np.zeros_like(x)
+		d_mslope = np.zeros_like(x)
+		d_mint = np.zeros_like(x)
+		d_hslope = np.zeros_like(x)
+		d_hint = np.zeros_like(x)
+		
+		d_lslope[low] = x[low]
+		d_mslope[mid] = x[mid]
+		d_hslope[high] = x[high]
+		d_lint[low] = np.ones_like(x[low])
+		d_mint[mid] = np.ones_like(x[mid])
+		d_hint[high] = np.ones_like(x[high])
+
+		return [d_lslope, d_lint, d_mslope, d_mint, d_hslope, d_hint]
+
+
+class bLinear1D(core.Fittable1DModel):
+
+	slope_low = Parameter(default=0)
+	intercept_low = Parameter(default=0)
+	slope_high = Parameter(default=0)
+	intercept_high = Parameter(default=0)
+	linear = True
+
+	@staticmethod
+	def evaluate(x, slope_low, intercept_low, slope_high, intercept_high):
+		"""One dimensional Line model function"""
+
+		out = np.zeros_like(x)
+		low = np.array(x) < 5600
+		high = np.array(x) > 5600
+		out[low] = slope_low*x[low]+intercept_low
+		out[high] = slope_high*x[high]+intercept_high
+
+		return out
+
+	@staticmethod
+	def fit_deriv(x, slope_low, intercept_low, slope_high, intercept_high):
+		"""One dimensional Line model derivative with respect to parameters"""
+
+		low = np.array(x) < 5600
+		high = np.array(x) > 5600
+		
+		d_lslope = np.zeros_like(x)
+		d_lint = np.zeros_like(x)
+		d_hslope = np.zeros_like(x)
+		d_hint = np.zeros_like(x)
+		
+		d_lslope[low] = x[low]
+		d_hslope[high] = x[high]
+		d_lint[low] = np.ones_like(x[low])
+		d_hint[high] = np.ones_like(x[high])
+
+		return [d_lslope, d_lint, d_hslope, d_hint]
+
 
 class jLorentz1D(core.Fittable1DModel):
 	"""
@@ -79,13 +130,11 @@ class jLorentz1D(core.Fittable1DModel):
 
 		return [d_amplitude, d_x_0, d_fwhm, d_constant]
 
-class jVoigt1D(core.Fittable1DModel):
+class Voigt1D(core.Fittable1DModel):
 	x_0 = Parameter(default=0)
 	amplitude_L = Parameter(default=1)
 	fwhm_L = Parameter(default=2/np.pi)
 	fwhm_G = Parameter(default=np.log(2))
-	constant = Parameter(default=0)
-	slope = Parameter(default=0)
 
 	_abcd = np.array([
 	    [-1.2150, -1.3509, -1.2150, -1.3509],  # A
@@ -94,7 +143,7 @@ class jVoigt1D(core.Fittable1DModel):
 	    [0.0210, -1.1858, -0.0210, 1.1858]])   # D
 
 	@classmethod
-	def evaluate(cls, x, x_0, amplitude_L, fwhm_L, fwhm_G,constant,slope):
+	def evaluate(cls, x, x_0, amplitude_L, fwhm_L, fwhm_G):
 
 		A, B, C, D = cls._abcd
 		sqrt_ln2 = np.sqrt(np.log(2))
@@ -105,10 +154,10 @@ class jVoigt1D(core.Fittable1DModel):
 
 		V = np.sum((C * (Y - A) + D * (X - B))/(((Y - A) ** 2 + (X - B) ** 2)), axis=-1)
 
-		return (fwhm_L * amplitude_L * np.sqrt(np.pi) * sqrt_ln2 / fwhm_G) * V + constant + slope*x
+		return (fwhm_L * amplitude_L * np.sqrt(np.pi) * sqrt_ln2 / fwhm_G) * V
 
 	@classmethod
-	def fit_deriv(cls, x, x_0, amplitude_L, fwhm_L, fwhm_G,constant,slope):
+	def fit_deriv(cls, x, x_0, amplitude_L, fwhm_L, fwhm_G):
 
 		A, B, C, D = cls._abcd
 		sqrt_ln2 = np.sqrt(np.log(2))
@@ -127,15 +176,13 @@ class jVoigt1D(core.Fittable1DModel):
 		dyda = [- cnt * dVdx * 2 * sqrt_ln2 / fwhm_G,
 				cnt * V / amplitude_L,
 		        cnt * (V / fwhm_L + dVdy * sqrt_ln2 / fwhm_G),
-		        -cnt * (V + (sqrt_ln2 / fwhm_G) * (2 * (x - x_0) * dVdx + fwhm_L * dVdy)) / fwhm_G,
-		        np.ones_like(x),
-		        x]
+		        -cnt * (V + (sqrt_ln2 / fwhm_G) * (2 * (x - x_0) * dVdx + fwhm_L * dVdy)) / fwhm_G]
 		return dyda
 
 def bootstrap(obslam, obsflux, model, fitter, noise, line_lam):
 
 	# number of bootstrap fits
-	nboot = 300
+	nboot = 100
 
 	# count lines
 	nlines = len(line_lam)
@@ -143,71 +190,32 @@ def bootstrap(obslam, obsflux, model, fitter, noise, line_lam):
 	# desired output
 	params = np.zeros(shape=(len(model.parameters),nboot))
 	flux   = np.zeros(shape=(nboot,nlines))
-	rest_eqw = np.zeros(shape=(nboot,nlines))
+	bfit_flux = np.zeros(nlines)
+
+	# best-fit
+	bfit = fitter(model, obslam, obsflux,maxiter=100)
+
+	for j in xrange(nlines):
+		bfit_flux[j] = getattr(bfit, 'amplitude_'+str(j)).value*np.sqrt(2*np.pi*getattr(bfit, 'stddev_'+str(j)).value**2) * constants.L_sun.cgs.value
 
 	# random data sets are generated and fitted
 	for i in xrange(nboot):
 		randomDelta = np.random.normal(0., 1.,len(obsflux))
 		randomFlux = obsflux + randomDelta*noise
-		fit = fitter(model, obslam, randomFlux,maxiter=maxfev)
+		fit = fitter(model, obslam, randomFlux,maxiter=100)
 		params[:,i] = fit.parameters
 
 		# calculate emission line flux + rest EQW
 		for j in xrange(nlines):
 			flux[i,j] = getattr(fit, 'amplitude_'+str(j)).value*np.sqrt(2*np.pi*getattr(fit, 'stddev_'+str(j)).value**2) * constants.L_sun.cgs.value
-			rest_eqw[i,j] = flux[i,j] / constants.L_sun.cgs.value / (fit.constant_0 + fit.slope_0*line_lam[j])
 
 	# now get median + percentiles
 	medianpar = np.percentile(params, 50,axis=1)
 
 	# we want errors for flux and eqw
 	fluxout = np.array([np.percentile(flux, 50,axis=0),np.percentile(flux, 84,axis=0),np.percentile(flux, 16,axis=0)])
-	eqwout = np.array([np.percentile(rest_eqw, 50,axis=0),np.percentile(rest_eqw, 84,axis=0),np.percentile(rest_eqw, 16,axis=0)])
 
-	return medianpar,fluxout,eqwout
-
-class observify():
-
-	def __init__(self,xfit,yfit, eline_lam, fitrange):
-		self.mask = self.create_mask(xfit, eline_lam, fitrange)
-		self.xfit = xfit[self.mask]
-		self.yfit = yfit[self.mask]
-
-	def observify(self, pars, x, y):
-		# pars is the following:
-		# [y-intercept, slope, redshift, sigma]
-
-		# first redshift
-		xred = (1 + pars[2]) * x
-
-		# now normalize
-		yflux = y + (pars[0] + pars[1]*xred)
-
-		# now smooth
-		ynew = threed_dutils.smooth_spectrum(xred,yflux,pars[3])
-
-		return xred, ynew
-
-	def fit_observify(self, pars, x, y):
-
-		# interpolate onto observations, return residuals
-		xint,yint=self.observify(pars,x,y)
-		flux_interp = interp1d(xint,yint, bounds_error = False, fill_value = 0)
-		return self.yfit - flux_interp(self.xfit)
-
-	def create_mask(self, lam, emline_lam, bounds):
-
-			#### apply boundary region
-			mask = np.ones_like(lam,dtype=bool)
-			masked = (lam < bounds[0]) | (lam > bounds[1])
-			mask[masked] = 0
-
-			#### mask emission lines
-			masklam = 20
-			for elam in emline_lam: mask[(lam > elam-masklam) & (lam < elam+masklam)] = 0
-
-			return mask
-
+	return bfit,fluxout,bfit_flux
 
 def absline_model(lam):
 	'''
@@ -218,40 +226,57 @@ def absline_model(lam):
 	### how much do we allow centroid to vary?
 	del_lam = 2.0
 
-	### what is the maximum line width in Angstroms?
-	fwhm_max = 8.0
+	for ii in xrange(len(lam)):
+		if ii == 0:
+			voi = Voigt1D(amplitude_L=-5e6, x_0=lam[ii], fwhm_L=5.0, fwhm_G=5.0)
+		else:
+			voi += Voigt1D(amplitude_L=-5e6, x_0=lam[ii], fwhm_L=5.0, fwhm_G=5.0)
 
-	### build model
-	voi = jVoigt1D(amplitude_L=-5e6, x_0=lam, fwhm_L=5.0, fwhm_G=5.0, constant=5e6)
-	voi.x_0.max = lam+del_lam
-	voi.x_0.min = lam-del_lam
-	#voi.fwhm_L.max = fwhm_max
-	#voi.fwhm_G.max = fwhm_max
+	voi += tLinear1D(intercept_low=5e6, intercept_mid=5e6, intercept_high=5e6)
+
+	### set constraints
+	for ii in xrange(len(lam)):
+		getattr(voi, 'x_0_'+str(ii)).max = lam[ii]+del_lam
+		getattr(voi, 'x_0_'+str(ii)).min = lam[ii]-del_lam
 
 	return voi
-
-def halpha_tied_to_nii_1(g1):
-	return g1.mean_0+14
-
-def nii_2_tied_to_nii_1(g1):
-	return g1.mean_0+34
-
-def oiii_2_tied_to_oiii_1(g1):
-	return g1.mean_0+48
-
-def hbeta_tied_to_oiii_1(g1):
-	return g1.mean_0-97.67
 
 def tiedfunc_oiii(g1):
 	amp = 2.98 * g1.amplitude_0
 	return amp
 
 def tiedfunc_nii(g1):
-	amp = 2.93 * g1.amplitude_0
+	amp = 2.93 * g1.amplitude_3
 	return amp
 
 def tiedfunc_sig(g1):
 	return g1.stddev_0
+
+def loiii_2(g1):
+	zadj = g1.mean_0 / 4958.92 - 1
+	return (1+zadj) *  5006.84
+
+def lhbeta(g1):
+	zadj = g1.mean_0 / 4958.92 - 1
+	return (1+zadj) *  4861.33
+
+def lnii_1(g1):
+	zadj = g1.mean_0 / 4958.92 - 1
+	return (1+zadj) *  6548.03
+
+def lnii_2(g1):
+	zadj = g1.mean_0 / 4958.92 - 1
+	return (1+zadj) *  6583.41
+
+def lhalpha(g1):
+	zadj = g1.mean_0 / 4958.92 - 1
+	return (1+zadj) *  6562.80
+
+def soiii(g1):
+	return g1.stddev_0
+
+def snii(g1):
+	return g1.stddev_3
 
 def sig_ret(model):
 	n=0
@@ -265,97 +290,77 @@ def sig_ret(model):
 
 	return sig
 
-def emline_model(lams, emtied,emtied_lam):
+def umbrella_model(lams, amp_tied, lam_tied, sig_tied):
 	'''
-	return model for region + set of lambdas
-	might need to complicate by setting custom del_lam, stddev_max, etc for different regions
+	return model for [OIII], Hbeta, [NII], Halpha, + constant
+	centers are all tied to redshift parameter
 	'''
 
-	### how much do we allow centroid to vary?
-	#del_lam = 20.0
+	#### ADD ALL MODELS FIRST
+	for ii in xrange(len(lams)):
+		if ii == 0:
+			model = functional_models.Gaussian1D(amplitude=1e7, mean=lams[ii], stddev=5.0)
+		else: 
+			model += functional_models.Gaussian1D(amplitude=1e7, mean=lams[ii], stddev=5.0)
 
-	### what is the maximum line width in Angstroms?
-	stddev_max = 40
+	# add slope + constant
+	model += bLinear1D(intercept_low=1e7,intercept_high=1e7)
 
-	### build model
-	gauss_init = None
-	for lam in lams:
-		gtemp = jGaussian1D(amplitude=1e7, mean=lam, stddev=5.0, constant=0.2e7)
-		#gtemp.mean.max = lam+del_lam
-		#gtemp.mean.min = lam-del_lam
-		gtemp.stddev.max = stddev_max
+	#### NOW TIE THEM TOGETHER
+	for ii in xrange(len(lams)):
+		# position and widths
+		if ii != 0:
+			#getattr(model, 'stddev_'+str(ii)).tied = tiedfunc_sig
+			getattr(model, 'mean_'+str(ii)).tied = lam_tied[ii]
 
-		#### sum models
-		# remove constants if we have one
-		if gauss_init is None:
-			gauss_init = gtemp
-		else:
-			gtemp.constant = 0.0
-			gtemp.slope = 0.0
-			gtemp.constant.fixed = True
-			gtemp.slope.fixed = True
-			gauss_init += gtemp
+		# amplitudes, if necessary
+		if amp_tied[ii] is not None:
+			getattr(model, 'amplitude_'+str(ii)).tied = amp_tied[ii]
 
-	# if it exists, tie the second amplitude to the first one
-	if emtied is not None:
-		gauss_init.amplitude_1.tied = emtied
-		gauss_init.stddev_1.tied = tiedfunc_sig
+		# sigmas, if necessary
+		if sig_tied[ii] is not None:
+			getattr(model, 'stddev_'+str(ii)).tied = sig_tied[ii]
 
-	if emtied_lam is not None:
-		gauss_init.mean_1.tied = emtied_lam[0]
-		gauss_init.mean_2.tied = emtied_lam[1]
+		getattr(model, 'stddev_'+str(ii)).max = 25
 
-	return gauss_init
+	return model
+
 
 def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 	
 	'''
-	measure rest-frame emission line luminosities
-	and absorption strengths for two different models:
-		(1) MAGPHYS
-		(2) PROSPECTR
+	measure rest-frame emission line luminosities using two different continuum models, MAGPHYS and Prospectr
 
 	ALGORITHM:
 	convert to rest-frame spectrum in proper units
 	
-	setup plot
-	for each set of absorption lines:
-		for each model:
-			fetch Voigt model
-			smooth by [220 km/s, 50 km/s]
-			fit Voigt
-			plot
-	save plot
+	for each model:
+		fetch Voigt model for Halpha, Hbeta
+		smooth by [220 km/s, 50 km/s]
+		fit Voigt + slope + constant
 
-	setup plot
-	for each set of emission lines:
+	fit Gaussians + slope + constant + redshift to two regions around [OIII],Hbeta and [NII], Halpha
+	for each model:
 
-		fetch emission model (function)
-		fit observed emission region (inital fit for normalization + width of lines)
-	
-		loop to measure noise in spectra
-		for each model spectra:
-			normalize model spectra to observations
-				additive: calculate linear continuum for both, calculate difference, add to model
-			smooth model, using avg(SIGMA) from all measured emission lines
-			subtract model from observations
-			
-			mask emission lines, measure residuals
-			fit gaussian to distribution of residuals to get noise
-			cap noise at 1% < (noise/flux) < 20%
-		
-		bootstrap errors + best fit to emission line region using provided noise (only use Prospectr noise, not that it matters)
+		normalize and redshift (if needed) absorption to match emission model
+		smooth absorption spectrum with measured width of emission lines [may need to add multiplicative constant]
+		subtract continuum from spectrum
+		mask emission lines
+		fit gaussian to remaining residuals
+		the width is saved as the measured error
 
-		plot fits
+	take the MINIMUM error from both continuum models as the error in the spectrum
+
+	for each model:
+
+		bootstrap errors, median
+		plot continuum, continuum + emission, observations
 
 	return: LUMINOSITY, FLUX, ERRORS, LINE NAME, LINE LAMBDA
 		luminosity comes out in ergs / s
 		flux comes out in ergs / s / cm^2
 
-	ways to improve:
-		-- do some emission lines need separate component?
-		--simultaneous fitting of nearby emission lines, such as [NII] doublet + Halpha
-
+	to add: wavelength-dependent smoothing
 	'''
 
 	##### FIRST, CHECK RESOLUTION IN REGION OF HALPHA
@@ -366,36 +371,28 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 		print 'too low resolution, not measuring fluxes for '+sample_results['run_params']['objname']
 		return None
 
-	#### min / max noise measured in spectrum
-	maxnoise = np.inf
-	minnoise = 0.01
-
 	#### smoothing (prospectr, magphys) in km/s
 	smooth       = [200,50]
 
 	#### output names
 	base = '/Users/joel/code/python/threedhst_bsfh/plots/brownseds/magphys/line_fits/'
-	out_em = base+sample_results['run_params']['objname']+'_em.png'
-	out_abs = base+sample_results['run_params']['objname']+'_abs.png'
+	out_em = [base+sample_results['run_params']['objname']+'_em_prosp.png',base+sample_results['run_params']['objname']+'_em_mag.png']
 
     #### define emission lines to measure
     # we do this in sets of lines, which are unpacked at the end
-	emline = np.array([['[OIII] 4959','[OIII] 5007',r'H$\beta$'],
-		               ['[NII] 6549', '[NII] 6583', r'H$\alpha$']])
-	em_wave = np.array([[4959,5007,4861.33],
-		                [6549,6583,6563,]])
-	em_bbox  = [(4700,5400),(6350,6680)]
-	emtied = [tiedfunc_oiii, tiedfunc_nii]
-	emtied_lam = [[oiii_2_tied_to_oiii_1,hbeta_tied_to_oiii_1],[nii_2_tied_to_nii_1,halpha_tied_to_nii_1]]
-	nset_em = emline.shape[0]
+	emline = np.array(['[OIII] 4959','[OIII] 5007',r'H$\beta$','[NII] 6549', '[NII] 6583', r'H$\alpha$'])
+	em_wave = np.array([4958.92,5006.84,4861.33,6548.03,6583.41,6562.80,])
+	em_bbox = [(4700,5400),(6350,6680)]
+	amp_tied = [None, tiedfunc_oiii, None, None, tiedfunc_nii, None]
+	lam_tied = [None, loiii_2, lhbeta, lnii_1, lnii_2, lhalpha]
+	sig_tied = [None, soiii, None, None, snii, None]
+	nline = len(emline)
 
 	#### now define sets of absorption lines to measure
-	absline = np.array([[r'H$\beta$'],
-		                [r'H$\alpha$']])
-	abs_wave = np.array([[4861.33],\
-		                 [6563]])
-	abs_bbox  = [(4550,5100),(6300,6840)]
-	nset_abs = absline.shape[0]               
+	absline = np.array([r'H$\delta$',r'H$\beta$',r'H$\alpha$'])
+	abs_wave = np.array([4101.76,4861.33,6562.80])
+	abs_bbox  = [(4000,4200),(4550,5100),(6300,6840)]
+	nabs = len(abs_wave)             
 
 	#### put all spectra in proper units (Lsun/AA, rest wavelength in Angstroms)
 	# first, get rest-frame Prospectr spectrum w/o emission lines
@@ -426,103 +423,45 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 	obsflux = obs_spec['flux_lsun']*dfactor
 	obslam = obs_spec['rest_lam']
 
-	##### Prepare for loop over absorption lines
-	# set up model iterables + outputs
+	#### set up model iterables
 	model_fluxes = [prospflux,magflux]
 	model_lams   = [wav,maglam]
 	model_names  = ['Prospectr', 'MAGPHYS']
 	nmodel       = len(model_names)
 
-	absline_flux = np.zeros(shape=(nset_abs,nmodel))
-	absline_eqw = np.zeros(shape=(nset_abs,nmodel))
-	absline_constant = np.zeros(shape=(nset_abs,nmodel))
-	absline_slope = np.zeros(shape=(nset_abs,nmodel))
-
 	##### define fitter
 	fitter = fitting.LevMarLSQFitter()
 
-	######################
-	##### OBSERVIFY ######
-	######################
-	fitrange = [np.min(em_bbox)-300, np.max(em_bbox)]
-	fitrange = [5000,6000]
-	ob = observify(obslam,obsflux,np.ravel(em_wave),fitrange)
-
-	obsfits = []
-	fig, ax = plt.subplots(1, 1, figsize = (10,10))
-
-	for ii, mflux in enumerate(model_fluxes):
-
-		mod_mask = ob.create_mask(model_lams[ii], np.ravel(em_wave), fitrange)
-		x = model_lams[ii][mod_mask]
-		y = mflux[mod_mask]
-
-		# \vec{x}_init
-		# y-intercept, slope, additional redshift, sigma
-		obs_init = [0.0, 0.0, 0.0, 500]
-		try:
-			obspars, cov_x,fit_info,msg,_ = leastsq(ob.fit_observify, np.array(obs_init), args=(x,y), maxfev=maxfev,full_output=True)
-		except TypeError as e:
-			print e
-			print 1/0
-		obsfits.append(obspars)
-
-		fig, ax = plt.subplots(1, 1, figsize = (10,5))
-		ax.plot(ob.xfit, ob.yfit,color='black')
-		ax.plot(x, y,color='red')
-		xp, yp = ob.observify(obspars,x,y)
-		ax.plot(xp,yp,color='blue')
-		ax.set_xlim(5100,5300)
-		plt.show()
-		print 1/0
-
-
-
-	#### set up figure
-	fig, axarr = plt.subplots(nset_abs, nmodel, figsize = (5*nset_abs, 5*nmodel))
-
-	
 	#######################
 	##### ABSORPTION ######
 	#######################
 	# Voigt profile fails to fit the Balmer absorption cores
 	# smoothed with 150 km/s resolution
-	for ii in xrange(nset_abs):
-		absmod = absline_model(abs_wave[ii][0])
-		for jj in xrange(nmodel):
-			p_idx = (model_lams[jj] > abs_bbox[ii][0]) & (model_lams[jj] < abs_bbox[ii][1])
-			fit_lam = model_lams[jj][p_idx]
-			fit_dat = model_fluxes[jj][p_idx]
-			fit_smooth = threed_dutils.smooth_spectrum(fit_lam,fit_dat,smooth[jj])
-			abs_fit = fitter(absmod, fit_lam, fit_smooth, maxiter=maxfev)
-			
-			# Voigt profile is too complex to integrate analytically
-			# so we're going in numerically
-			I1 = simps(abs_fit(fit_lam), fit_lam)
-			I2 = simps(np.ones_like(fit_lam)+abs_fit.constant.value+abs_fit.slope.value*fit_lam, fit_lam)
-			absline_flux[ii,jj] = -(I2 - I1) * constants.L_sun.cgs.value
-			absline_eqw[ii,jj] = absline_flux[ii,jj]/(abs_fit.constant.value + abs_fit.slope.value*abs_wave[ii][0]) / constants.L_sun.cgs.value
-			absline_constant[ii,jj] = abs_fit.constant.value
-			absline_slope[ii,jj] = abs_fit.slope.value
+	absmod = absline_model(abs_wave)
+	absmods = []
+	for jj in xrange(nmodel):
+		p_idx = np.zeros_like(model_lams[jj],dtype=bool)
+		for bbox in abs_bbox:p_idx[(model_lams[jj] > bbox[0]) & (model_lams[jj] < bbox[1])] = True
+		fit_lam = model_lams[jj][p_idx]
+		fit_dat = model_fluxes[jj][p_idx]
+		fit_smooth = threed_dutils.smooth_spectrum(fit_lam,fit_dat,smooth[jj])
+		abs_fit = fitter(absmod, fit_lam, fit_smooth, maxiter=maxfev)
+		
+		test_plot = False
+		if test_plot:
+			fig, ax = plt.subplots(1,1)
+			plt.plot(fit_lam,fit_smooth, color='black')
+			plt.plot(fit_lam,abs_fit(fit_lam),color='red')
+			plt.show()
+			print 1/0
+		absmods.append(abs_fit)
 
+		# Voigt profile is too complex to integrate analytically
+		# so we're going in numerically
+		#I1 = simps(abs_fit(fit_lam), fit_lam)
+		#I2 = simps(np.ones_like(fit_lam)+abs_fit.constant.value+abs_fit.slope.value*fit_lam, fit_lam)
+		#absline_flux[ii,jj] = -(I2 - I1) * constants.L_sun.cgs.value
 
-			#### plot 			
-			axarr[ii,jj].plot(fit_lam,fit_smooth,color='black')
-			axarr[ii,jj].plot(fit_lam,abs_fit(fit_lam),color='red')
-			axarr[ii,jj].set_ylabel(r'model [L$_{\odot}/\AA$]')
-			axarr[ii,jj].set_xlabel(r'$\lambda$ [$\AA$]')
-			axarr[ii,jj].text(0.04, 0.935, absline[ii][0],fontsize=16, transform = axarr[ii,jj].transAxes)
-			axarr[ii,jj].text(0.04, 0.87, r'flux='+"{:.2e}".format(absline_flux[ii,jj])+' erg/s',fontsize=16, transform = axarr[ii,jj].transAxes)
-			axarr[ii,jj].text(0.04, 0.805, r'EQW='+"{:.2f}".format(absline_eqw[ii,jj])+r' $\AA$',fontsize=16, transform = axarr[ii,jj].transAxes)
-			axarr[ii,jj].text(0.975, 0.938, model_names[jj],fontsize=16, transform = axarr[ii,jj].transAxes,ha='right')
-
-			axarr[ii,jj].xaxis.set_major_locator(MaxNLocator(5))
-			axarr[ii,jj].yaxis.get_major_formatter().set_powerlimits((0, 1))
-			axarr[ii,jj].set_ylim(np.min(fit_smooth)*0.9,np.max(fit_smooth)*1.3)
-	
-	plt.tight_layout()
-	plt.savefig(out_abs, dpi = 300)
-	plt.close()
 
 
 	#######################
@@ -530,153 +469,201 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 	#######################
 	# set up emission line outputs
 	# flux and resteqw are lists because we'll define these locally for each set
-	emline_noise = np.zeros(shape=(nset_em,nmodel))
+	emline_noise = np.zeros(nmodel)
 	emline_flux = []
-	emline_rest_eqw = []
+	residuals   = []
+	bestfit_flux = []
+	bestfit_eqw = []
+	smoothed_absflux = []
 
-	##### set up figure
-	fig, axarr = plt.subplots(nset_em, 1, figsize = (5*nset_em,10))
+	#### define model, fitting region
+	emmod =  umbrella_model(em_wave, amp_tied, lam_tied, sig_tied)
+	p_idx = np.zeros_like(obslam,dtype=bool)
+	for bbox in em_bbox:p_idx[(obslam > bbox[0]) & (obslam < bbox[1])] = True
 
-	for ii in xrange(nset_em):
+	### initial fit to emission
+	gauss_fit = fitter(emmod, obslam[p_idx], obsflux[p_idx],maxiter= maxfev)
+	
+	### find proper smoothing
+	tmpflux = np.zeros(nline)
+	for j in xrange(nline):tmpflux[j] = getattr(gauss_fit, 'amplitude_'+str(j)).value*np.sqrt(2*np.pi*getattr(gauss_fit, 'stddev_'+str(j)).value**2)
+	mlow = em_wave < 5600
+	emnorm =  np.concatenate((gauss_fit.intercept_low_6+gauss_fit.slope_low_6*em_wave[mlow],
+							  gauss_fit.intercept_high_6+gauss_fit.slope_high_6*em_wave[~mlow]))
+	tmpeqw = tmpflux / emnorm
 
-		#### define model, region to fit to
-		emmod = emline_model(em_wave[ii],emtied[ii],emtied_lam[ii])
-		p_idx = (obslam > em_bbox[ii][0]) & (obslam < em_bbox[ii][1])
+	# take two highest EQW lines
+	high_eqw = tmpeqw.argsort()[-2:][::-1]
+	sigma_spec = np.mean(np.array(sig_ret(gauss_fit))[high_eqw]/em_wave[high_eqw])*c_kms
 
-		### initial fit to emission
-		gauss_fit = fitter(emmod, obslam[p_idx], obsflux[p_idx],maxiter= maxfev)
+	test_plot = False
+	if test_plot:
+		fig, ax = plt.subplots(1,1)
+		plt.plot(obslam[p_idx],obsflux[p_idx], color='black')
+		plt.plot(obslam[p_idx],gauss_fit(obslam[p_idx]),color='red')
+		plt.show()
+		print 1/0
 
+	#### now interact with model
+	for jj in xrange(nmodel):
+		
+		#### normalize model spectra to observations, and redshift
+		model_norm = model_fluxes[jj]*gauss_fit[6](model_lams[jj])/absmods[jj][3](model_lams[jj])
+
+		zadj = gauss_fit.mean_0 / 4958.92 - 1
+		model_newlam = (1+zadj)*model_lams[jj]
+
+		# absorption model versus emission model
 		test_plot = False
 		if test_plot:
+			p_idx_mod = ((model_newlam > em_bbox[0][0]) & (model_newlam < em_bbox[0][1])) | ((model_newlam > em_bbox[1][0]) & (model_newlam < em_bbox[1][1]))
 			fig, ax = plt.subplots(1,1)
-			plt.plot(obslam[p_idx],obsflux[p_idx], color='black')
-			plt.plot(obslam[p_idx],gauss_fit(obslam[p_idx]),color='red')
+			plt.plot(model_newlam[p_idx_mod], model_norm[p_idx_mod], color='black')
+			plt.plot(obslam[p_idx], gauss_fit(obslam[p_idx]), color='red')
+			plt.show()
+
+		#### smooth spectrum
+		smoothed = threed_dutils.smooth_spectrum(model_newlam, model_norm, sigma_spec)
+
+		#### interpolate and subtract
+		flux_interp = interp1d(model_newlam, smoothed, bounds_error = False, fill_value = 0)
+		modflux = flux_interp(obslam[p_idx])
+		resid = obsflux[p_idx] - modflux
+
+		smoothed_absflux.append(modflux)
+		residuals.append(resid)
+
+		#### mask emission lines
+		masklam = 30
+		mask = np.ones_like(obslam[p_idx],dtype=bool)
+		for lam in em_wave: mask[(obslam[p_idx] > lam-masklam) & (obslam[p_idx] < lam+masklam)] = 0
+
+		#### fit Gaussian to residuals (clear structure visible sometimes...)
+		hist, bin_edges = np.histogram(resid[mask], density=True)
+		ngauss_init = functional_models.Gaussian1D(mean=0.0,stddev=1e5,amplitude=1e-6)
+		ngauss_init.mean.fixed = True
+		ngauss_init.stddev.max = np.max(np.abs(bin_edges))*0.6
+		noise_gauss = fitter(ngauss_init,(bin_edges[1:]+bin_edges[:-1])/2.,hist, maxiter=maxfev)
+
+		##### TEST PLOT
+		test_plot = False
+		# (obs , model)
+		if test_plot:
+			fig, ax = plt.subplots(1,1)
+			plt.plot(obslam[p_idx], obsflux[p_idx], color='black', drawstyle='steps-mid')
+			plt.plot(obslam[p_idx], flux_interp(obslam[p_idx]), color='red')
+			plt.show()
+		# (obs - model)
+		if test_plot:
+			fig, ax = plt.subplots(1,1)
+			plt.plot(obslam[p_idx], resid, color='black', drawstyle='steps-mid')
+			plt.show()
+
+		# Gaussian fit to residuals in (obs - model)
+		if test_plot:
+			fig, ax = plt.subplots(1,1)
+			plt.plot((bin_edges[1:]+bin_edges[:-1])/2.,hist, color='black')
+			plt.plot((bin_edges[1:]+bin_edges[:-1])/2.,noise_gauss((bin_edges[1:]+bin_edges[:-1])/2.),color='red')
 			plt.show()
 			print 1/0
 
-		#### now interact with model
-		for jj in xrange(nmodel):
-			
-			#### normalize model spectra to observations
-			norm =  (gauss_fit.constant_0+gauss_fit.slope_0*model_lams[jj]) - (absline_constant[ii,jj]+absline_slope[ii,jj]*model_lams[jj])
-			model_norm = model_fluxes[jj] + norm
+		#### measure noise!
+		mlow = em_wave < 5600
+		continuum = gauss_fit[6](em_wave)
+		for ii, em in enumerate(emline): print 'measured '+em+' noise: '"{:.4f}".format(np.abs(noise_gauss.stddev.value)/continuum[ii])
 
-			#### smooth spectrum
-			sigma_spec = np.mean(sig_ret(gauss_fit)/em_wave[ii])*c_kms
-			smoothed = threed_dutils.smooth_spectrum(model_lams[jj], model_norm, sigma_spec)
+		emline_noise[jj] = np.abs(noise_gauss.stddev.value)
 
-			#### interpolate and subtract
-			flux_interp = interp1d(model_lams[jj],smoothed, bounds_error = False, fill_value = 0)
-			resid = obsflux[p_idx] - flux_interp(obslam[p_idx])
+	#### now get errors in parameters by bootstrapping
+	# use lower of two error estimates
+	# flux come out of bootstrap as (nlines,[median,errup,errdown])
+	tnoise = np.min(emline_noise)
 
-			if jj == 0:
-				prosp_sub = resid
+	#### now interact with model
+	for jj in xrange(nmodel):
 
-			#### mask emission lines
-			masklam = 50
-			mask = np.ones_like(obslam[p_idx],dtype=bool)
-			for lam in em_wave[ii]: mask[(obslam[p_idx] > lam-masklam) & (obslam[p_idx] < lam+masklam)] = 0
-
-			#### fit Gaussian to residuals (clear structure visible sometimes...)
-			hist, bin_edges = np.histogram(resid[mask], density=True)
-			ngauss_init = jGaussian1D(mean=0.0,constant=0.0,slope=0.0,stddev=1e5,amplitude=1e-6)
-			ngauss_init.slope.fixed = True
-			ngauss_init.constant.fixed = True
-			ngauss_init.mean.fixed = True
-			ngauss_init.stddev.max = np.max(np.abs(bin_edges))*0.6
-			noise_gauss = fitter(ngauss_init,(bin_edges[1:]+bin_edges[:-1])/2.,hist, maxiter=maxfev)
-
-			##### TEST PLOT
-			test_plot = False
-			# (obs , model)
-			if test_plot:
-				fig, ax = plt.subplots(1,1)
-				plt.plot(obslam[p_idx], obsflux[p_idx], color='black', drawstyle='steps-mid')
-				plt.plot(obslam[p_idx], flux_interp(obslam[p_idx]), color='red')
-				plt.show()
-			# Gaussian fit to (obs - model)
-			if test_plot:
-				fig, ax = plt.subplots(1,1)
-				plt.plot((bin_edges[1:]+bin_edges[:-1])/2.,hist, color='black')
-				plt.plot((bin_edges[1:]+bin_edges[:-1])/2.,noise_gauss((bin_edges[1:]+bin_edges[:-1])/2.),color='red')
-				plt.show()
-				print 1/0
-
-
-
-
-			#### measure noise!
-			lam_noise = em_wave[ii].mean()
-			flux_noise = (gauss_fit.constant_0+gauss_fit.slope_0*lam_noise)
-			print 'measured noise: ' + "{:.4f}".format(np.abs(noise_gauss.stddev.value)/flux_noise)
-			if np.abs(noise_gauss.stddev.value)/flux_noise > 100:
-				print 1/0
-
-			emline_noise[ii,jj] = np.clip(np.abs(noise_gauss.stddev.value),minnoise*flux_noise,maxnoise*flux_noise)
-
-		#### now get errors in parameters by bootstrapping
-		# use lower of two error estimates
-		# eqw and flux come out of bootstrap as (nlines,[median,errup,errdown])
-		tnoise = np.min(emline_noise[ii,:])
-		median_param, emline_flux_local, emline_eqw_local = bootstrap(obslam[p_idx],prosp_sub,emmod,fitter,tnoise,em_wave[ii])
+		bfit_mod, emline_flux_local, bfit_flux = bootstrap(obslam[p_idx],residuals[jj],emmod,fitter,tnoise,em_wave)
 		emline_flux.append(emline_flux_local)
-		emline_rest_eqw.append(emline_eqw_local)
 
 		#### create median model
-		emmod.parameters = median_param
+		emmod.parameters = bfit_mod.parameters
+		bestfit_flux.append(bfit_flux)
 
-		#### plot 
-		axarr[ii].plot(obslam[p_idx],prosp_sub,color='black',drawstyle='steps-mid')
-		axarr[ii].plot(obslam[p_idx],emmod(obslam[p_idx]),color='red')
+		### estimate continuum
+		low_idx = (obslam[p_idx] > 5030) & (obslam[p_idx] < 5100)
+		cont_low = np.mean(emmod[6](obslam[p_idx][low_idx]) + smoothed_absflux[jj][low_idx])*constants.L_sun.cgs.value
 
-		axarr[ii].set_ylabel(r'flux [L$_{\odot}/\AA$]')
-		axarr[ii].set_xlabel(r'$\lambda$ [$\AA$]')
-		for kk in xrange(len(emline[ii])):
-			fmt = "{{0:{0}}}".format(".2e").format
-			emline_str = r"${{{0}}}_{{-{1}}}^{{+{2}}}$"
-			emline_str = emline_str.format(fmt(emline_flux_local[0,kk]), 
-				                           fmt(emline_flux_local[1,kk]-emline_flux_local[0,kk]), 
-				                           fmt(emline_flux_local[0,kk]-emline_flux_local[2,kk])) + ' erg/s, '
-			axarr[ii].text(0.04, 0.935-0.085*kk, 
-				           emline[ii][kk]+': '+emline_str+"{:.2f}".format(emline_eqw_local[0,kk])+r' $\AA$',
-				           fontsize=16, transform = axarr[ii].transAxes)
+		high_idx = (obslam[p_idx] > 6400) & (obslam[p_idx] < 6500)
+		cont_high = np.mean(emmod[6](obslam[p_idx][high_idx]) + smoothed_absflux[jj][high_idx])*constants.L_sun.cgs.value
 
-		axarr[ii].xaxis.set_major_locator(MaxNLocator(5))
-		axarr[ii].yaxis.get_major_formatter().set_powerlimits((0, 1))
+		eqw = np.concatenate((emline_flux_local[:,:3] / cont_low, emline_flux_local[:,3:] / cont_high),axis=1)
 
-	plt.tight_layout()
-	plt.savefig(out_em, dpi = 300)
-	plt.close()
+		bestfit_eqw.append(eqw)
+
+		#############################
+		#### PLOT ALL THE THINGS ####
+		#############################
+		# set up figure
+		# loop over models at some point? including above fit?
+		fig, axarr = plt.subplots(1, 2, figsize = (20,5))
+		for ii, bbox in enumerate(em_bbox):
+
+			p_idx_em = ((obslam[p_idx] > bbox[0]) & (obslam[p_idx] < bbox[1]))
+
+			axarr[ii].plot(obslam[p_idx][p_idx_em],obsflux[p_idx][p_idx_em],color='black',drawstyle='steps-mid')
+			axarr[ii].plot(obslam[p_idx][p_idx_em],emmod(obslam[p_idx][p_idx_em])+smoothed_absflux[jj][p_idx_em],color='red')
+
+			axarr[ii].plot(obslam[p_idx][p_idx_em],smoothed_absflux[jj][p_idx_em]+emmod[6](obslam[p_idx][p_idx_em]),color='#1E90FF')
+
+			axarr[ii].set_ylabel(r'flux [L$_{\odot}/\AA$]')
+			axarr[ii].set_xlabel(r'$\lambda$ [$\AA$]')
+
+			axarr[ii].xaxis.set_major_locator(MaxNLocator(5))
+			axarr[ii].yaxis.get_major_formatter().set_powerlimits((0, 1))
+
+			e_idx = (em_wave > bbox[0]) & (em_wave < bbox[1])
+			nplot=0
+			for kk in xrange(len(emline)):
+				if e_idx[kk]:
+					fmt = "{{0:{0}}}".format(".2e").format
+					emline_str = r"${{{0}}}_{{-{1}}}^{{+{2}}}$"
+					emline_str = emline_str.format(fmt(bfit_flux[kk]), 
+						                           fmt(emline_flux_local[1,kk]-bfit_flux[kk]), 
+						                           fmt(bfit_flux[kk]-emline_flux_local[2,kk])) + ' erg/s, '
+					axarr[ii].text(0.03, 0.93-0.085*nplot, 
+						           emline[kk]+': '+emline_str,
+						           fontsize=16, transform = axarr[ii].transAxes)
+					nplot+=1
+
+			axarr[ii].text(0.03, 0.93-0.085*nplot, model_names[jj], fontsize=16, transform = axarr[ii].transAxes)
+			axarr[ii].text(0.98, 0.93, 'em+abs model', fontsize=16, transform = axarr[ii].transAxes,ha='right',color='red')
+			axarr[ii].text(0.98, 0.845, 'abs model', fontsize=16, transform = axarr[ii].transAxes,ha='right',color='#1E90FF')
+			axarr[ii].text(0.98, 0.76, 'observations', fontsize=16, transform = axarr[ii].transAxes,ha='right')
+
+
+		plt.tight_layout()
+		plt.savefig(out_em[jj], dpi = 300)
+		plt.close()
 
 	out = {}
-	##### save emission line fluxes
-	for kk in xrange(len(em_wave)): 
+	# save fluxes
+	for ii, mod in enumerate(model_names):
+		temp = {}
 
-		out['lum'] = np.concatenate((out.get('lum',[]),emline_flux[kk][0,:]))
-		out['lum_errup'] = np.concatenate((out.get('lum_errup',[]),emline_flux[kk][1,:]))
-		out['lum_errdown'] = np.concatenate((out.get('lum_errdown',[]),emline_flux[kk][2,:]))
+		temp['lum'] = bestfit_flux[ii]
+		temp['lum_errup'] = emline_flux[ii][1,:]
+		temp['lum_errdown'] = emline_flux[ii][2,:]
 
-		out['flux'] = np.concatenate((out.get('flux',[]),emline_flux[kk][0,:]  / dfactor / (1+magphys['metadata']['redshift'])))
-		out['flux_errup'] = np.concatenate((out.get('flux_errup',[]),emline_flux[kk][1,:]  / dfactor / (1+magphys['metadata']['redshift'])))
-		out['flux_errdown'] = np.concatenate((out.get('flux_errdown',[]),emline_flux[kk][2,:]  / dfactor / (1+magphys['metadata']['redshift'])))
+		temp['flux'] = bestfit_flux[ii]  / dfactor / (1+magphys['metadata']['redshift'])
+		temp['flux_errup'] = emline_flux[ii][1,:]  / dfactor / (1+magphys['metadata']['redshift'])
+		temp['flux_errdown'] = emline_flux[ii][2,:]  / dfactor / (1+magphys['metadata']['redshift'])
 
-		out['rest_eqw'] = np.concatenate((out.get('rest_eqw',[]),emline_rest_eqw[kk][0,:]))
-		out['rest_eqw_errup'] = np.concatenate((out.get('rest_eqw_errup',[]),emline_rest_eqw[kk][1,:]))
-		out['rest_eqw_errdown'] = np.concatenate((out.get('rest_eqw_errdown',[]),emline_rest_eqw[kk][2,:]))
+		temp['eqw_rest'] = bestfit_eqw[ii]
+		print bestfit_eqw[ii] 
 
-		out['em_name'] = np.concatenate((out.get('em_name',[]),emline[kk,:]))
-		out['em_lam'] = np.concatenate((out.get('em_lam',[]),em_wave[kk,:]))
+		out[mod] = temp
 
-	##### save absorption line fluxes
-	# 	absline_flux(eqw) = np.zeros(shape=(nset_abs,nmodel))
-	for kk in xrange(nset_abs):
-
-		out['abs_name'] = np.concatenate((out.get('abs_name',[]),absline[kk,:]))
-		out['abs_lam'] = np.concatenate((out.get('abs_lam',[]),abs_wave[kk,:]))
-		# fill in the rest here
-		# note that there is one measurement per model
-		out['abs_lum'] = np.concatenate((out.get('abs_lum',[]),absline_flux[kk,:]))
-		out['abs_flux'] = np.concatenate((out.get('abs_flux',[]),absline_flux[kk,:]/ dfactor / (1+magphys['metadata']['redshift'])))
-		out['abs_eqw'] = np.concatenate((out.get('abs_eqw',[]),absline_eqw[kk,:]))
+	out['em_name'] = emline
+	out['em_lam'] = em_wave
 
 	return out
