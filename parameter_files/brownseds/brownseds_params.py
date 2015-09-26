@@ -615,7 +615,7 @@ class BurstyModel(sedmodel.CSPModel):
 
             # constant 0.05 floor (log space, sf_slope, dust_index)
             if par == 'logzsol':
-                disp[inds[0]:inds[1]] = 0.25
+                disp[inds[0]:inds[1]] = 0.2
 
             if par == 'logtau':
                 disp[inds[0]:inds[1]] = 0.25
@@ -628,7 +628,7 @@ class BurstyModel(sedmodel.CSPModel):
                 disp[inds[0]:inds[1]] = 0.15
 
             if par == 'dust1':
-                disp[inds[0]:inds[1]] = 1.0
+                disp[inds[0]:inds[1]] = 0.4
 
             if par == 'duste_umin':
                 disp[inds[0]:inds[1]] = 4.5
@@ -637,7 +637,7 @@ class BurstyModel(sedmodel.CSPModel):
                 disp[inds[0]:inds[1]] = 3.0
 
             if par == 'duste_gamma':
-                disp[inds[0]:inds[1]] = 0.2
+                disp[inds[0]:inds[1]] = 0.15
 
             # 20% floor
             if par == 'tage':
