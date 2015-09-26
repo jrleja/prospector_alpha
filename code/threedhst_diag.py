@@ -102,11 +102,11 @@ def add_to_corner(fig, sample_results, sps, model,truths=None,maxprob=True,powel
                        horizontalalignment='left',fontsize=fs)
         for kk in xrange(len(maxprob_parnames)):
             if maxprob_parnames[kk] == 'mass':
-               yplot = np.log10(sample_results['quantiles']['maxprob_params'][kk])
+               yplot = np.log10(sample_results['bfit']['maxprob_params'][kk])
             elif maxprob_parnames[kk] == 'lnprob':
-                yplot = sample_results['quantiles']['maxprob']
+                yplot = sample_results['bfit']['maxprob']
             else:
-                yplot = sample_results['quantiles']['maxprob_params'][kk]
+                yplot = sample_results['bfit']['maxprob_params'][kk]
 
             # add parameter names if not covered by truths
             if truths is None:
@@ -233,7 +233,7 @@ def add_sfh_plot(sample_results,fig,ax_loc,sps,
 	
 	#### load most likely SFH
 	mlike_sfh = threed_dutils.find_sfh_params(sample_results['model'],
-		                                      sample_results['quantiles']['maxprob_params'],
+		                                      sample_results['bfit']['maxprob_params'],
 		                                      sample_results['obs'],sps)
 	most_likely = threed_dutils.return_full_sfh(t, mlike_sfh)
 
@@ -627,7 +627,7 @@ def sed_figure(sample_results, sps, model,
 
 	# for maximum probability model, plot the spectrum,
 	# photometry, and chi values
-	wave_eff, obsmags, obsmags_unc, modmags, chi, modspec, modlam = return_sedplot_vars(sample_results['quantiles']['maxprob_params'], sample_results, sps)
+	wave_eff, obsmags, obsmags_unc, modmags, chi, modspec, modlam = return_sedplot_vars(sample_results['bfit']['maxprob_params'], sample_results, sps)
 
 	phot.plot(wave_eff, modmags, color=most_likely_color, 
 		      marker='o', ms=ms, linestyle=' ', label='most likely', alpha=alpha, 
@@ -644,7 +644,7 @@ def sed_figure(sample_results, sps, model,
 	# plot AGB-off for Charlie
 	if agb_off:
 		sample_results['model'].params['add_agb_dust_model'] = np.array(False)
-		_, _, _, _, _, modspec_off, modlam_off = return_sedplot_vars(sample_results['quantiles']['maxprob_params'], sample_results, sps)
+		_, _, _, _, _, modspec_off, modlam_off = return_sedplot_vars(sample_results['bfit']['maxprob_params'], sample_results, sps)
 
 		nz = modspec > 0
 		phot.plot(modlam_off[nz], modspec_off[nz], linestyle='-',
@@ -786,7 +786,7 @@ def sed_figure(sample_results, sps, model,
 	# FAST text
 	if fast:
 		textx_f = (phot.get_xlim()[1]-phot.get_xlim()[0])*0.42+phot.get_xlim()[0]
-		totmass = np.log10(np.sum(sample_results['quantiles']['maxprob_params'][0:2]))
+		totmass = np.log10(np.sum(sample_results['bfit']['maxprob_params'][0:2]))
 		av    = threed_dutils.av_to_dust2(fastparms[fastfields=='Av'])[0]
 		zf    = fastparms[fastfields=='z'][0]
 
@@ -886,48 +886,12 @@ def make_all_plots(filebase=None,
 	'''
 	Driver. Loads output, makes all plots for a given galaxy.
 	'''
-	
-	# thin and chop the chain?
-	#thin=1
-	#chop_chain=1.666
 
 	# make sure the output folder exists
 	if not os.path.isdir(outfolder):
 		os.makedirs(outfolder)
 
-	
-	# find most recent output file
-	# with the objname
-	folder = "/".join(filebase.split('/')[:-1])
-	filename = filebase.split("/")[-1]
-	files = [f for f in os.listdir(folder) if "_".join(f.split('_')[:-2]) == filename]	
-	times = [f.split('_')[-2] for f in files]
-
-	# if we found no files, skip this object
-	if len(times) == 0:
-		print 'Failed to find any files to extract times in ' + folder + ' of form ' + filename
-		return 0
-
-	# load results
-	mcmc_filename=filebase+'_'+max(times)+"_mcmc"
-	model_filename=filebase+'_'+max(times)+"_model"
-
-	# load if necessary
-	if not sample_results:
-		try:
-			sample_results, powell_results, model = read_results.read_pickles(mcmc_filename, model_file=model_filename,inmod=None)
-		except (EOFError,ValueError) as e:
-			print e
-			print 'Failed to open '+ mcmc_filename +','+model_filename
-			return 0
-	else:
-		import pickle
-		try:
-			mf = pickle.load( open(model_filename, 'rb'))
-		except(AttributeError):
-			mf = load( open(model_filename, 'rb'))
-       
-		powell_results = mf['powell']
+	sample_results, powell_results, model = threed_dutils.load_prospectr_data(filebase)
 
 	if not sps:
 		# load stellar population, set up custom filters
