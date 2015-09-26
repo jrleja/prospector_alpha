@@ -76,7 +76,7 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 	nline = 6 # set by number of lines measured in threed_dutils
 
     ##### initialize output arrays for SFH + emission line posterior draws #####
-	half_time,sfr_10,sfr_100,sfr_1000,ssfr_100,totmass,emp_ha,emp_oiii,mips_flux,lir = [np.zeros(shape=(ncalc)) for i in range(10)]
+	half_time,sfr_10,sfr_100,sfr_1000,ssfr_100,totmass,emp_ha,mips_flux,lir = [np.zeros(shape=(ncalc)) for i in range(9)]
 	lineflux = np.empty(shape=(ncalc,nline))
 
 	##### information for empirical emission line calculation ######
@@ -90,9 +90,11 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 
 	##### use randomized, flattened, thinned chain for posterior draws
 	# don't allow things outside the priors
+	# make maxprob the first stop
 	in_priors = np.isfinite(threed_dutils.chop_chain(sample_results['lnprobability'])) == True
 	flatchain = copy(sample_results['flatchain'][in_priors])
 	np.random.shuffle(flatchain)
+	flatchain[0,:] = maxthetas
 
 	##### set up time vector for full SFHs
 	nt = 100
@@ -134,12 +136,13 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 		totmass[jj] = np.sum(sfh_params['mass'])
 		ssfr_100[jj] = sfr_100[jj] / totmass[jj]
 
-		##### empirical halphad
-		emp_ha[jj],emp_oiii[jj] = calc_emp_ha(sfh_params['mass'],sfr_100[jj],
-			                                  flatchain[jj,dust1_index],
-			                                  flatchain[jj,dust2_index],
-			                                  flatchain[jj,dust_index_index],
-			                                  ncomp=sample_results['ncomp'])
+		##### empirical halpha
+		emp_ha[jj] = threed_dutils.synthetic_halpha(sfr_10[jj],flatchain[jj,dust1_index],
+			                          flatchain[jj,dust2_index],-1.0,
+			                          flatchain[jj,dust_index_index],
+			                          kriek = (sample_results['model'].params['dust_type'] == 4)[0])
+
+
 		##### model Halpha, L_IR, and mips flux
 		modelout = threed_dutils.measure_emline_lum(sps, thetas = thetas,
 			 										model=sample_results['model'], obs = sample_results['obs'],
@@ -157,7 +160,7 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 	for kk in xrange(ntheta): q_16[kk], q_50[kk], q_84[kk] = triangle.quantile(sample_results['flatchain'][:,kk], [0.16, 0.5, 0.84])
 	
 	##### CALCULATE Q16,Q50,Q84 FOR EXTRA PARAMETERS
-	extra_flatchain = np.dstack((half_time, sfr_10, sfr_100, sfr_1000, ssfr_100, totmass, emp_ha, emp_oiii))[0]
+	extra_flatchain = np.dstack((half_time, sfr_10, sfr_100, sfr_1000, ssfr_100, totmass, emp_ha))[0]
 	nextra = extra_flatchain.shape[1]
 	q_16e, q_50e, q_84e = (np.zeros(nextra)+np.nan for i in range(3))
 	for kk in xrange(nextra): q_16e[kk], q_50e[kk], q_84e[kk] = triangle.quantile(extra_flatchain[:,kk], [0.16, 0.5, 0.84])
@@ -174,7 +177,7 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 
 	#### EXTRA PARAMETER OUTPUTS 
 	extras = {'flatchain': extra_flatchain,
-			  'parnames': np.array(['half_time','sfr_10','sfr_100','sfr_1000','ssfr_100','totmass','emp_ha','emp_oiii']),
+			  'parnames': np.array(['half_time','sfr_10','sfr_100','sfr_1000','ssfr_100','totmass','emp_ha']),
 			  'q16': q_16e,
 			  'q50': q_50e,
 			  'q84': q_84e,
@@ -192,10 +195,25 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 	#### QUANTILE OUTPUTS #
 	quantiles = {'q16':q_16,
 				 'q50':q_50,
-				 'q84':q_84,
-				 'maxprob_params':maxthetas,
-				 'maxprob':maxprob}
+				 'q84':q_84}
 	sample_results['quantiles'] = quantiles
+
+	#### BEST-FITS
+	bfit      = {'maxprob_params':maxthetas,
+				 'maxprob':maxprob,
+	             'emp_ha': emp_ha[0],
+	             'sfh': intsfr[:,0],
+	             'half_time': half_time[0],
+	             'sfr_10': sfr_10[0],
+	             'sfr_100':sfr_100[0],
+	             'sfr_1000':sfr_1000[0],
+	             'lir':lir[0],
+	             'mips_flux':mips_flux[0],
+	             'halpha_flux':lineflux[0,4],
+	             'hbeta_flux':lineflux[0,1],
+	             'spec':spec[:,0],
+	             'mags':mags[:,0]}
+	sample_results['bfit'] = bfit
 
 	return sample_results
 
