@@ -175,72 +175,74 @@ def setup_sps(zcontinuous=2,compute_vega_magnitudes=False,custom_filter_key=None
 
 	return sps
 
-def synthetic_emlines(mass,sfr,dust1,dust2,dust_index):
+def synthetic_halpha(sfr,dust1,dust2,dust1_index,dust2_index,kriek=False):
 
 	'''
 	SFR in Msun/yr
 	mass in Msun
 	'''
 
-	# wavelength in angstroms
-	emlines = np.array(['Halpha','Hbeta','Hgamma','[OIII]', '[NII]','[OII]'])
-	lam     = np.array([6563,4861,4341,5007,6583,3727])
-	flux    = np.zeros(shape=(len(lam),len(np.atleast_1d(mass))))
-
 	# calculate Halpha luminosity from KS relationship
 	# comes out in units of [ergs/s]
 	# correct from Chabrier to Salpeter with a factor of 1.7
-	flux[0,:] = 1.26e41 * (sfr*1.7)
-
-	# Halpha: Hbeta: Hgamma = 2.8:1.0:0.47 (Miller 1974)
-	flux[1,:] = flux[0,:]/2.8
-	flux[2,:] = flux[1,:]*0.47
-
-	# [OIII] from Fig 8, http://arxiv.org/pdf/1401.5490v2.pdf
-	# assume [OIII] is a singlet for now
-	# this calculates [5007], add 4959 manually
-	y_ratio=np.array([0.3,0.35,0.5,0.8,1.0,1.3,1.6,2.0,2.7,\
-	       3.0,4.10,4.9,4.9,6.2,6.2])
-	x_ssfr=np.array([1e-10,2e-10,3e-10,4e-10,5e-10,6e-10,7e-10,9e-10,1.2e-9,\
-	       2e-9,3e-9,5e-9,8e-9,1e-8,2e-8])
-	ratio=np.interp(1.0/sfr,x_ssfr,y_ratio)
-
-	# 5007/4959 = 2.88
-	flux[3,:] = ratio*flux[1,:]*(1+1/2.88)
-
-	# from Leja et al. 2013
-	# log[NII/Ha] = -5.36+0.44log(M)
-	lnii_ha = -5.36+0.44*np.log10(mass)
-	flux[4,:] = (10**lnii_ha)*flux[0,:]
-
-	# [Ha / [OII]] vs [NII] / Ha from Hayashi et al. 2013, fig 6
-	# evidence in discussion suggests should add reddening
-	# corresponding to extinction of A(Ha) = 0.35
-	# also should change with metallicity
-	nii_ha_x = np.array([0.13,0.2,0.3,0.4,0.5])
-	ha_oii_y = np.array([1.1,1.3,2.0,2.9,3.6])
-	ratio = np.interp(flux[4,:]/flux[0,:],nii_ha_x,ha_oii_y)
-	flux[5,:] = (1.0/ratio)*flux[0,:]
+	flux = 1.26e41 * (sfr*1.7)
+	lam     = 6563.0
 
 	# correct for dust
 	# if dust_index == None, use Calzetti
-	if dust_index is not None:
-		tau2 = ((lam.reshape(len(lam),1)/5500.)**dust_index)*dust2
-		tau1 = ((lam.reshape(len(lam),1)/5500.)**dust_index)*dust1
-		tautot = tau2+tau1
-		flux = flux*np.exp(-tautot)
+	if dust2_index is not None:
+		flux=flux*charlot_and_fall_extinction(lam,dust1,dust2,dust1_index,dust2_index,kriek=kriek)
 	else:
 		Rv   = 4.05
 		klam = 2.659*(-2.156+1.509/(lam/1e4)-0.198/(lam/1e4)**2+0.011/(lam/1e4)**3)+Rv
 		A_lam = klam/Rv*dust2
 
-		flux = flux[:,0]*10**(-0.4*A_lam)
+		flux = flux*10**(-0.4*A_lam)
 
 	# comes out in ergs/s
-	output = {'name': emlines,
-	          'lam': lam,
-	          'flux': flux}
-	return output
+	return flux
+
+def charlot_and_fall_extinction(lam,dust1,dust2,dust1_index,dust2_index, kriek=False, nobc=False):
+
+	tau2 = ((lam/5500.)**dust2_index)*dust2
+	tau1 = ((lam/5500.)**dust1_index)*dust1
+
+	# MUST ADD UV DUST BUMP
+	if kriek == True:
+		dd63=6300.00
+		dlam=350.0
+		lamuvb=2175.0
+
+		if lam > dd63:
+			cal00 = 1.17*( -1.857+1.04*(1e4/lam) ) + 1.78
+		else:
+			cal00  = 1.17*(-2.156+1.509*(1E4/lam)-0.198*(1E4/lam)**2 + 0.011*(1E4/lam)**3) + 1.78
+
+		cal00 = cal00/0.44/4.05 
+
+		eb = 0.85 - 1.9 * dust2_index  #KC13 Eqn 3
+
+		#Drude profile for 2175A bump
+		drude = eb*(lam*dlam)**2 /( (lam**2-lamuvb**2)**2 + (lam*dlam)**2 )
+
+		tau2 = dust2*(cal00+drude)*(lam/5500.)**dust2_index
+
+
+	if nobc:
+		tautot=tau2
+	else:
+		tautot = tau2+tau1
+
+	return np.exp(-tautot)
+
+
+def calc_balmer_dec(tau1, tau2, ind1, ind2,kriek=False):
+
+	ha_lam = 6562.801
+	hb_lam = 4861.363
+	balm_dec = 2.86*charlot_and_fall_extinction(ha_lam,tau1,tau2,ind1,ind2,kriek=kriek) / \
+	                charlot_and_fall_extinction(hb_lam,tau1,tau2,ind1,ind2,kriek=kriek)
+	return balm_dec
 
 def sfh_half_time(x,sfh_params,c):
 
@@ -495,6 +497,90 @@ def load_moustakas_data(objnames = None):
 		outtable = table
 
 	return outtable
+
+def asym_errors(center, up, down, log=False):
+
+	if log:
+		errup = np.log10(up)-np.log10(center)
+		errdown = np.log10(center)-np.log10(down)
+		errarray = [errdown,errup]
+	else:
+		errarray = [center-down,up-center]
+
+	return errarray
+
+def equalize_axes(ax, x,y, dynrange=0.1, line_of_equality=True, log=False):
+	
+	''' 
+	sets up an equal x and y range that encompasses all of the data
+	if line_of_equality, add a diagonal line of equality 
+	dynrange represents the % of the data range above and below which
+	the plot limits are set
+	'''
+
+	if log:
+		dynx, dyny = (np.nanmin(x)*0.5, np.nanmin(y)*0.5) 
+	else:
+		dynx, dyny = (np.nanmax(x)-np.nanmin(x))*dynrange,\
+	                 (np.nanmax(y)-np.nanmin(y))*dynrange
+	if np.nanmin(x)-dynx > np.nanmin(y)-dyny:
+		min = np.nanmin(y)-dyny
+	else:
+		min = np.nanmin(x)-dynx
+	if np.nanmax(x)+dynx > np.nanmax(y)+dyny:
+		max = np.nanmax(x)+dynx
+	else:
+		max = np.nanmax(y)+dyny
+
+	ax.set_xlim(min,max)
+	ax.set_ylim(min,max)
+
+	if line_of_equality:
+		ax.plot([min,max],[min,max],linestyle='--',color='0.1',alpha=0.8)
+	return ax
+
+def integral_average(x,y,x0,x1):
+	'''
+	to do a definite integral over a given x,y array
+	you have to redefine the x,y array to only exist over
+	the relevant range
+	'''	
+
+	xarr_new = np.linspace(x0, x1, 40)
+	bad = xarr_new == 0.0
+	if np.sum(bad) > 0:
+		xarr_new[bad]=1e-10
+	intfnc = interp1d(x,y, bounds_error = False, fill_value = 0)
+	yarr_new = intfnc(xarr_new)
+
+	from scipy import integrate
+	I1 = integrate.simps(yarr_new, xarr_new) / (x1 - x0)
+
+	return I1
+
+def load_prospectr_data(filebase):
+
+	from bsfh import read_results
+
+	# find most recent output file
+	# with the objname
+	folder = "/".join(filebase.split('/')[:-1])
+	filename = filebase.split("/")[-1]
+	files = [f for f in os.listdir(folder) if "_".join(f.split('_')[:-2]) == filename]	
+	times = [f.split('_')[-2] for f in files]
+
+	# if we found no files, skip this object
+	if len(times) == 0:
+		print 'Failed to find any files to extract times in ' + folder + ' of form ' + filename
+		return 0
+
+	# load results
+	mcmc_filename=filebase+'_'+max(times)+"_mcmc"
+	model_filename=filebase+'_'+max(times)+"_model"
+
+	sample_results, powell_results, model = read_results.read_pickles(mcmc_filename, model_file=model_filename,inmod=None)
+
+	return sample_results, powell_results, model
 
 
 def load_zp_offsets(field):
@@ -908,7 +994,7 @@ def integrate_sfh(t1,t2,sfh_params):
 	return tot_sfr
 
 def measure_emline_lum(sps, model = None, obs = None, thetas = None, 
-	                   measure_ir = False, savestr = False, saveplot=False):
+	                   measure_ir = False, savestr = False, saveplot=True):
 	
 	'''
 	takes spec(on)-spec(off) to measure emission line luminosity
@@ -978,6 +1064,8 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None,
 
 		# set up filters
 		mips_index = [i for i, s in enumerate(obs['filters']) if 'mips' in s]
+		if np.sum(mips_index) == 0:
+			mips_index = [i for i, s in enumerate(obs['filters']) if 'MIPS' in s]
 		botlam = np.atleast_1d(8e4-1)
 		toplam = np.atleast_1d(1000e4+1)
 		edgetrans = np.atleast_1d(0)
@@ -996,8 +1084,8 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None,
 		
 		# if no MIPS flux...
 		try:
-			mips = mags_neboff[mips_index][0]*1e10 # comes out in maggies, convert to flux such that AB zeropoint is 25 mags
-		except:
+			mips = mags[mips_index][0]*1e10 # comes out in maggies, convert to flux such that AB zeropoint is 25 mags
+		except IndexError:
 			mips = np.nan
 
 		out = {'emline_flux': emline_flux,
