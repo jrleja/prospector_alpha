@@ -193,7 +193,8 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 	sample_results['observables'] = observables
 
 	#### QUANTILE OUTPUTS #
-	quantiles = {'q16':q_16,
+	quantiles = {'parnames': parnames,
+				 'q16':q_16,
 				 'q50':q_50,
 				 'q84':q_84}
 	sample_results['quantiles'] = quantiles

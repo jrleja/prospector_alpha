@@ -452,6 +452,20 @@ def plot_obs_spec(obs_spec, phot, spec_res, alpha,
 		# remove axis
 		spec_res.axis('off')
 
+def update_model_info(alldata, sample_results, magphys):
+
+	alldata['objname'] = sample_results['run_params']['objname']
+	alldata['magphys'] = magphys['pdfs']
+	alldata['model'] = magphys['model']
+	alldata['pquantiles'] = sample_results['quantiles']
+	alldata['model_emline'] = sample_results['model_emline']
+	alldata['lir'] = sample_results['observables']['L_IR']
+	alldata['pextras'] = sample_results['extras']
+	alldata['pquantiles']['parnames'] = np.array(sample_results['model'].theta_labels())
+	alldata['bfit'] = sample_results['bfit']
+
+	return alldata
+
 def sed_comp_figure(sample_results, sps, model, magphys,
                 alpha=0.3, samples = [-1],
                 maxprob=0, outname=None, fast=False,
@@ -728,7 +742,6 @@ def collate_data(filebase=None,
 
 	# BEGIN PLOT ROUTINE
 	print 'MAKING PLOTS FOR ' + filename + ' in ' + outfolder
-	alldata = {}
 
 	# sed plot
 	# don't cache emission lines, since we will want to turn them on / off
@@ -740,18 +753,11 @@ def collate_data(filebase=None,
 					  outname=outfolder+filename.replace(' ','_')+'.sed.png')
  		
 	# SAVE OUTPUTS
+	alldata = {}
 	if residuals is not None:
 		print 'SAVING OUTPUTS for ' + sample_results['run_params']['objname']
-		alldata['objname'] = sample_results['run_params']['objname']
 		alldata['residuals'] = residuals
-		alldata['magphys'] = magphys['pdfs']
-		alldata['model'] = magphys['model']
-		alldata['pquantiles'] = sample_results['quantiles']
-		alldata['model_emline'] = sample_results['model_emline']
-		alldata['lir'] = sample_results['observables']['L_IR']
-		alldata['pextras'] = sample_results['extras']
-		alldata['pquantiles']['parnames'] = np.array(sample_results['model'].theta_labels())
-		alldata['bfit'] = sample_results['bfit']
+		alldata = update_model_info(alldata, sample_results, magphys)
 	else:
 		alldata = None
 
@@ -789,12 +795,13 @@ def plt_all(runname=None,startup=True,**extras):
 		with open(output, "rb") as f:
 			alldata=pickle.load(f)
 
+	mag_ensemble.prospectr_comparison(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/pcomp/')
 	mag_ensemble.plot_emline_comp(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/magphys/emlines_comp/')
 	mag_ensemble.plot_relationships(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/magphys/')
 	mag_ensemble.plot_all_residuals(alldata)
 	mag_ensemble.plot_comparison(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/magphys/')
 
-def add_sfr_10(runname=None,startup=True,**extras):
+def add_prosp_mag_info(runname=None):
 
 	'''
 	for a list of galaxies, make all plots
@@ -812,10 +819,11 @@ def add_sfr_10(runname=None,startup=True,**extras):
 		alldata=pickle.load(f)
 
 	filebase, parm_basename, ancilname=threed_dutils.generate_basenames(runname)
-	for dat in alldata:
+	for ii,dat in enumerate(alldata):
+		sample_results, powell_results, model = threed_dutils.load_prospectr_data(filebase[ii])
 		magphys = read_magphys_output(objname=dat['objname'])
-		dat['sfr_10'] = magphys['model']['full_parameters'][-1]
-		print magphys['model']['full_parameters'][-1]
+		dat = update_model_info(dat, sample_results, magphys)
+		print str(ii)+' done'
 
 	pickle.dump(alldata,open(output, "wb"))
 

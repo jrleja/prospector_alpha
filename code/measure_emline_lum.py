@@ -436,7 +436,7 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 	##### ABSORPTION ######
 	#######################
 	# Voigt profile fails to fit the Balmer absorption cores
-	# smoothed with 150 km/s resolution
+	# so smooth it with some kernal
 	absmod = absline_model(abs_wave)
 	absmods = []
 	for jj in xrange(nmodel):
@@ -459,7 +459,7 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 		# Voigt profile is too complex to integrate analytically
 		# so we're going in numerically
 		#I1 = simps(abs_fit(fit_lam), fit_lam)
-		#I2 = simps(np.ones_like(fit_lam)+abs_fit.constant.value+abs_fit.slope.value*fit_lam, fit_lam)
+		#I2 = simps(abs_fit.constant.value+abs_fit.slope.value*fit_lam, fit_lam)
 		#absline_flux[ii,jj] = -(I2 - I1) * constants.L_sun.cgs.value
 
 

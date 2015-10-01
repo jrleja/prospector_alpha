@@ -13,7 +13,7 @@ def smooth_spectrum(lam,spec,sigma,
 	                minlam=0.0,maxlam=1e50):     
 
 	'''
-	ripped from smoothspec.f90
+	ripped from Charlie Conroy's smoothspec.f90
 	the 'fast way'
 	integration is truncated at +/-4*sigma
 	'''
@@ -204,36 +204,37 @@ def synthetic_halpha(sfr,dust1,dust2,dust1_index,dust2_index,kriek=False):
 
 def charlot_and_fall_extinction(lam,dust1,dust2,dust1_index,dust2_index, kriek=False, nobc=False):
 
-	tau2 = ((lam/5500.)**dust2_index)*dust2
-	tau1 = ((lam/5500.)**dust1_index)*dust1
+	dust1_ext = np.exp(-dust1*(lam/5500.)**dust1_index)
+	dust2_ext = np.exp(-dust2*(lam/5500.)**dust2_index)
 
-	# MUST ADD UV DUST BUMP
+	# are we using Kriek & Conroy 13?
 	if kriek == True:
 		dd63=6300.00
+		lamv=5500.0
 		dlam=350.0
 		lamuvb=2175.0
 
+		#Calzetti curve, below 6300 Angstroms, else no addition
 		if lam > dd63:
 			cal00 = 1.17*( -1.857+1.04*(1e4/lam) ) + 1.78
 		else:
-			cal00  = 1.17*(-2.156+1.509*(1E4/lam)-0.198*(1E4/lam)**2 + 0.011*(1E4/lam)**3) + 1.78
-
+			cal00  = 1.17*(-2.156+1.509*(1e4/lam)-0.198*(1E4/lam)**2 + 0.011*(1E4/lam)**3) + 1.78
 		cal00 = cal00/0.44/4.05 
 
 		eb = 0.85 - 1.9 * dust2_index  #KC13 Eqn 3
 
 		#Drude profile for 2175A bump
-		drude = eb*(lam*dlam)**2 /( (lam**2-lamuvb**2)**2 + (lam*dlam)**2 )
+		drude = eb*(lam*dlam)**2 / ( (lam**2-lamuvb**2)**2 + (lam*dlam)**2 )
 
-		tau2 = dust2*(cal00+drude)*(lam/5500.)**dust2_index
-
+		attn_curve = dust2*(cal00+drude/4.05)*(lam/lamv)**dust2_index
+		dust2_ext = np.exp(-attn_curve)
 
 	if nobc:
-		tautot=tau2
+		ext_tot = dust2_ext
 	else:
-		tautot = tau2+tau1
+		ext_tot = dust2_ext*dust1_ext
 
-	return np.exp(-tautot)
+	return ext_tot
 
 
 def calc_balmer_dec(tau1, tau2, ind1, ind2,kriek=False):
@@ -1037,27 +1038,48 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None,
 		model.params['zred'] = z
 
 	else:
-		print 'why are you here?'
-		print 1/0
+		# save redshift
+		z      = sps.params['zred']
+		sps.params['zred'] = 0.0
+
+		# nebon
+		w,spec_neboff= sps.get_spectrum(tage=sps.params['tage'],peraa=False)
+
+		# neboff
+		sps.params['add_neb_emission'] = False
+		sps.params['add_neb_continuum'] = False
+		w, spec_neboff = sps.get_spectrum(tage=sps.params['tage'],peraa=False)
+		sps.params['add_neb_emission'] = True
+		sps.params['add_neb_continuum'] = True
+
+		# subtract, switch to flam
+		factor = 3e18 / w**2
+		spec = (spec-spec_neboff) *factor
+
+		model.params['zred'] = z
 
 	emline_flux = np.zeros(len(wavelength))
 	for jj in xrange(len(wavelength)):
 		integrate_lam = (w > sideband[jj][0]) & (w < sideband[jj][1])
 		baseline      = spec[np.abs(w-sideband[jj][0]) == np.min(np.abs(w-sideband[jj][0]))][0]
+		
 		emline_flux[jj] = np.trapz(spec[integrate_lam]-baseline, w[integrate_lam])
-
-		if saveplot and jj==4:
+		if saveplot and (jj==4 or jj==1):
 			plt.plot(w,spec,'ro',linestyle='-')
 			plt.plot(w[integrate_lam], spec[integrate_lam], 'bo',linestyle=' ')
 			plt.xlim(wavelength[jj]-40,wavelength[jj]+40)
 			plt.ylim(-np.max(spec[integrate_lam])*0.2,np.max(spec[integrate_lam])*1.2)
 			
-			plotlines=['[SIII]','[NII]','Halpha','[SII]']
-			plotlam  =np.array([6312,6583,6563,6725])
+			if jj == 4:
+				plotlines=['[SIII]','[NII]','Halpha','[SII]']
+				plotlam  =np.array([6312,6583,6563,6725])
+			elif jj == 1:
+				plotlines = ['Hbeta']
+				plotlam = np.array(4861)
 			for kk in xrange(len(plotlam)):
 				plt.vlines(plotlam[kk],plt.ylim()[0],plt.ylim()[1],color='0.5',linestyle='--')
 				plt.text(plotlam[kk],(plt.ylim()[0]+plt.ylim()[1])/2.*(1.0-kk/6.0),plotlines[kk])
-			plt.savefig(os.getenv('APPS')+'/threedhst_bsfh/plots/testem/emline_'+savestr+'.png',dpi=300)
+			plt.savefig(os.getenv('APPS')+'/threedhst_bsfh/plots/testem/'+emline[jj]+'_'+savestr+'.png',dpi=300)
 			plt.close()
 
 	if measure_ir:

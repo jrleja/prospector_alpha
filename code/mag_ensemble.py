@@ -220,53 +220,55 @@ def compare_model_flux(alldata, emline_names, outname = 'test.png'):
 	plt.savefig(outname,dpi=300)
 	plt.close()	
 
-def obs_vs_ks_ha(alldata,emline_names,outname='test.png'):
+def obs_vs_ks_ha(alldata,emline_names,obs_info,outname='test.png',outname_cloudy='test_cloudy.png'):
 	
 	#################
 	#### plot observed Halpha versus model Halpha from KS relationship
 	#################
-	sn_cut = 10
 
 	f_ha = ret_inf(alldata,'flux',model='Prospectr',name='H$\\alpha$')
 	f_ha_errup = ret_inf(alldata,'flux_errup',model='Prospectr',name='H$\\alpha$')
 	f_ha_errdown = ret_inf(alldata,'flux_errdown',model='Prospectr',name='H$\\alpha$')
-	err_ha = f_ha_errup - f_ha_errdown
-	sn_ha = f_ha / err_ha
 
-	keep_idx = np.squeeze(sn_ha > sn_cut)
+	keep_idx = obs_info['keep_idx']
 
 	##### indexes
 	mparnames = alldata[0]['model']['parnames']
 	mu_idx = mparnames == 'mu'
 	tauv_idx = mparnames == 'tauv'
 
-	##### Pull dust + SFR information
-	ha_mag, ha_pro = [], []
+	parnames = alldata[0]['pquantiles']['parnames']
+	met_idx = parnames == 'logzsol'
+
+	##### Pull out empirical Halphas from MAGPHYS + Prospectr
+	##### observed Halphas from pipeline (convert to luminosity)
+	ha_mag, ha_pro, pmet, cloudy_ha = [], [], [], []
 	for ii,dat in enumerate(alldata):
-		if keep_idx[ii]:
-			'''
-			tau1 = dat['pquantiles']['maxprob_params'][dust1_idx][0]
-			tau2 = dat['pquantiles']['maxprob_params'][dust2_idx][0]
-			dindex = dat['pquantiles']['maxprob_params'][dinx_idx][0]
-			ext = charlot_and_fall_extinction(6563.0,tau1, tau2, -1.0, dindex)
-			'''
-			ha_pro.append(dat['pextras']['q50'][-2])
-			if ii == 0:
-				print 'this should be halpha'
-				print dat['pextras']['parnames'][-2]
 
-			tau1 = (1-dat['model']['parameters'][mu_idx][0])*dat['model']['parameters'][tauv_idx][0]
-			tau2 = dat['model']['parameters'][mu_idx][0]*dat['model']['parameters'][tauv_idx][0]
-			
-			ha_mag.append(threed_dutils.synthetic_halpha(dat['sfr_10'], tau1, tau2, -1.3, -0.7))
+		#tau1 = dat['bfit']['maxprob_params'][parnames == 'dust1'][0]
+		#tau2 = dat['bfit']['maxprob_params'][parnames == 'dust2'][0]
+		#dind = dat['bfit']['maxprob_params'][parnames == 'dust_index'][0]
+		#ha_pro.append(threed_dutils.synthetic_halpha(dat['bfit']['sfr_100'], tau1, tau2, -1.0, dind))
+		ha_pro.append(dat['bfit']['emp_ha'])
 
-			pc2cm = 3.08567758e18
-			distance = WMAP9.luminosity_distance(dat['residuals']['phot']['z']).value*1e6*pc2cm
-			dfactor = (4*np.pi*distance**2)
-			f_ha[ii] = f_ha[ii] * dfactor
+		tau1 = (1-dat['model']['parameters'][mu_idx][0])*dat['model']['parameters'][tauv_idx][0]
+		tau2 = dat['model']['parameters'][mu_idx][0]*dat['model']['parameters'][tauv_idx][0]
+		
+		ha_mag.append(threed_dutils.synthetic_halpha(dat['sfr_10'], tau1, tau2, -1.3, -0.7))
+		#ha_mag.append(threed_dutils.synthetic_halpha(dat['model']['parameters'][dat['model']['parnames'] == 'SFR'][0], tau1, tau2, -1.3, -0.7))
 
-	ha_mag = np.log10(np.array(ha_mag))
-	ha_pro = np.log10(np.array(ha_pro))
+		pc2cm = 3.08567758e18
+		distance = WMAP9.luminosity_distance(dat['residuals']['phot']['z']).value*1e6*pc2cm
+		dfactor = (4*np.pi*distance**2)
+		f_ha[ii] = f_ha[ii] * dfactor
+
+		pmet.append(dat['bfit']['maxprob_params'][met_idx][0])
+		cloudy_ha.append(obs_info['model_ha'][ii]*dfactor)
+
+	ha_mag = np.log10(np.array(ha_mag)[keep_idx])
+	ha_pro = np.log10(np.array(ha_pro)[keep_idx])
+	ha_cloudy = np.log10(np.array(cloudy_ha)[keep_idx])
+	pmet = np.array(pmet)[keep_idx]
 
 	fig, ax = plt.subplots(1,3, figsize = (22,6))
 
@@ -304,7 +306,26 @@ def obs_vs_ks_ha(alldata,emline_names,outname='test.png'):
 	plt.savefig(outname,dpi=300)
 	plt.close()
 
-def obs_vs_prosp_ha(alldata,emline_names,outname='test.png'):
+	fig, ax = plt.subplots(1,2, figsize = (16,8))
+
+	ax[0].errorbar(ha_pro, ha_cloudy[:,0], fmt='o',alpha=0.6,linestyle=' ')
+	ax[0].set_xlabel(r'log(KS H$_{\alpha}$) [Prospectr]')
+	ax[0].set_ylabel(r'log(CLOUDY H$_{\alpha}$) [Prospectr]')
+	ax[0] = threed_dutils.equalize_axes(ax[0], ha_pro, ha_cloudy[:,0])
+	off,scat = threed_dutils.offset_and_scatter(ha_pro, ha_cloudy[:,0],biweight=True)
+	ax[0].text(0.99,0.05, 'biweight scatter='+"{:.3f}".format(scat) +' dex',
+			  transform = ax[0].transAxes,horizontalalignment='right')
+	ax[0].text(0.99,0.1, 'mean offset='+"{:.3f}".format(off)+ ' dex',
+			      transform = ax[0].transAxes,horizontalalignment='right')
+
+	ax[1].errorbar(ha_pro-ha_cloudy[:,0],pmet, fmt='o',alpha=0.6,linestyle=' ')
+	ax[1].set_xlabel(r'log(KS/COUDY H$_{\alpha}$) [Prospectr]')
+	ax[1].set_ylabel(r'metallicity [Prospectr]')
+
+	plt.savefig(outname_cloudy,dpi=300)
+	plt.close()
+
+def obs_vs_prosp_ha(alldata,emline_names,keep_idx,outname='test.png'):
 
 	#################
 	#### plot observed Halpha versus expected (PROSPECTR ONLY)
@@ -316,10 +337,6 @@ def obs_vs_prosp_ha(alldata,emline_names,outname='test.png'):
 	f_ha = ret_inf(alldata,'flux',model='Prospectr',name='H$\\alpha$')
 	f_ha_errup = ret_inf(alldata,'flux_errup',model='Prospectr',name='H$\\alpha$')
 	f_ha_errdown = ret_inf(alldata,'flux_errdown',model='Prospectr',name='H$\\alpha$')
-	err_ha = f_ha_errup - f_ha_errdown
-	sn_ha = f_ha / err_ha
-
-	keep_idx = np.squeeze(sn_ha > sn_cut)
 
 	ha_p_idx = alldata[0]['model_emline']['name'] == 'Halpha'
 	model_ha = np.zeros(shape=(len(alldata),3))
@@ -336,11 +353,19 @@ def obs_vs_prosp_ha(alldata,emline_names,outname='test.png'):
 		model_ha[ii,1] = dat['model_emline']['q84'][ha_p_idx] / dfactor
 		model_ha[ii,2] = dat['model_emline']['q16'][ha_p_idx] / dfactor
 
+	sfing, composite, agn = return_agn_str(keep_idx)
+	keys = [sfing, composite, agn]
+	colors = ['blue', 'purple', 'red']
+	labels = ['SF', 'SF/AGN', 'AGN']
+
 	fig, ax = plt.subplots(1,1, figsize = (10,10))
 	xplot = np.log10(model_ha[keep_idx][:,0])
 	yplot = np.log10(f_ha[keep_idx])
 	yerr = threed_dutils.asym_errors(f_ha[keep_idx],f_ha_errup[keep_idx], f_ha_errdown[keep_idx],log=True)
-	ax.errorbar(xplot, yplot, yerr=yerr,fmt='o',alpha=0.6,linestyle=' ',color='grey')
+
+	for ii in xrange(len(labels)):
+		ax.errorbar(xplot[keys[ii]], yplot[keys[ii]], yerr=[yerr[0][keys[ii]],yerr[1][keys[ii]]],fmt='o',alpha=0.6,linestyle=' ',color=colors[ii],label=labels[ii])
+	
 	ax.set_ylabel(r'log(observed H$_{\alpha}$)')
 	ax.set_xlabel(r'log(best-fit Prospectr H$_{\alpha}$)')
 	ax = threed_dutils.equalize_axes(ax,xplot,yplot)
@@ -349,6 +374,7 @@ def obs_vs_prosp_ha(alldata,emline_names,outname='test.png'):
 			  transform = ax.transAxes,horizontalalignment='right')
 	ax.text(0.99,0.1, 'mean offset='+"{:.2f}".format(off) + ' dex',
 			      transform = ax.transAxes,horizontalalignment='right')
+	ax.legend(loc=2)
 	plt.savefig(outname,dpi=300)
 	plt.close()
 
@@ -357,6 +383,7 @@ def obs_vs_prosp_ha(alldata,emline_names,outname='test.png'):
 	pinfo['f_ha'] = f_ha
 	pinfo['f_ha_errup'] = f_ha_errup
 	pinfo['f_ha_errdown'] = f_ha_errdown
+	pinfo['keep_idx'] = keep_idx
 
 	return pinfo
 
@@ -365,7 +392,7 @@ def obs_vs_model_bdec(alldata,emline_names,outname='test.png'):
 	#################
 	#### plot observed Balmer decrement versus expected
 	#################
-	sn_cut = 10
+	sn_cut = 5
 
 	f_ha = ret_inf(alldata,'flux',model='Prospectr',name='H$\\alpha$')
 	err_ha = ret_inf(alldata,'flux_errup',model='Prospectr',name='H$\\alpha$') - ret_inf(alldata,'flux_errdown',model='Prospectr',name='H$\\alpha$')
@@ -393,13 +420,15 @@ def obs_vs_model_bdec(alldata,emline_names,outname='test.png'):
 	mu_idx = mparnames == 'mu'
 	tauv_idx = mparnames == 'tauv'
 
-	bdec_magphys, bdec_prospectr = [],[]
+	bdec_magphys, bdec_prospectr, bdec_mod = [],[], []
 	ptau1, ptau2, pdindex = [], [], []
 	for dat in alldata:
-		ptau1.append(dat['pquantiles']['maxprob_params'][dust1_idx][0])
-		ptau2.append(dat['pquantiles']['maxprob_params'][dust2_idx][0])
-		pdindex.append(dat['pquantiles']['maxprob_params'][dinx_idx][0])
+		ptau1.append(dat['bfit']['maxprob_params'][dust1_idx][0])
+		ptau2.append(dat['bfit']['maxprob_params'][dust2_idx][0])
+		pdindex.append(dat['bfit']['maxprob_params'][dinx_idx][0])
 		bdec = threed_dutils.calc_balmer_dec(ptau1[-1], ptau2[-1], -1.0, pdindex[-1],kriek=True)
+		bdec_mod.append(dat['bfit']['halpha_flux'] / dat['bfit']['hbeta_flux'])
+
 		bdec_prospectr.append(bdec)
 		
 		tau1 = (1-dat['model']['parameters'][mu_idx][0])*dat['model']['parameters'][tauv_idx][0]
@@ -407,10 +436,11 @@ def obs_vs_model_bdec(alldata,emline_names,outname='test.png'):
 		bdec = threed_dutils.calc_balmer_dec(tau1, tau2, -1.3, -0.7)
 		bdec_magphys.append(np.squeeze(bdec))
 	
+	pl_bdec_mod = np.array(bdec_mod)[keep_idx]
 	pl_bdec_magphys = np.array(bdec_magphys)[keep_idx]
 	pl_bdec_prospectr = np.array(bdec_prospectr)[keep_idx]
 	pl_bdec_measured = bdec_measured[keep_idx]
-
+	pl_bdec_prospectr = pl_bdec_mod
 	
 	fig, ax = plt.subplots(1,3, figsize = (22,6))
 
@@ -459,12 +489,28 @@ def obs_vs_model_bdec(alldata,emline_names,outname='test.png'):
 
 	return pinfo
 
+def return_agn_str(idx):
+
+	from astropy.io import fits
+	hdulist = fits.open(os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/table1.fits')
+	agn_str = hdulist[1].data['Class']
+	hdulist.close()
+
+	agn_str = agn_str[idx]
+	sfing = (agn_str == 'SF') | (agn_str == '---')
+	composite = (agn_str == 'SF/AGN')
+	agn = agn_str == 'AGN'
+
+	return sfing, composite, agn
+
 def residual_plots(alldata,obs_info, bdec_info):
 	# bdec_info: bdec_magphys, bdec_prospectr, bdec_measured, keep_idx, dust1, dust2, dust2_index
 	# obs_info: model_ha, f_ha, f_ha_errup, f_ha_errdown
 
 	fldr = '/Users/joel/code/python/threedhst_bsfh/plots/brownseds/magphys/emlines_comp/residuals/'
 	idx = bdec_info['keep_idx']
+
+	sfr_100 = np.log10(np.clip([x['bfit']['sfr_100'] for x in alldata],1e-4,np.inf))[idx]
 
 	#### bdec resid versus ha resid
 	bdec_resid = bdec_info['bdec_prospectr'][idx] - bdec_info['bdec_measured'][idx]
@@ -478,31 +524,102 @@ def residual_plots(alldata,obs_info, bdec_info):
 	
 	plt.savefig(fldr+'bdec_resid_versus_ha_resid.png', dpi=300)
 
+	sfing, composite, agn = return_agn_str(idx)
+	keys = [sfing, composite, agn]
+	colors = ['blue', 'purple', 'red']
+	labels = ['SF', 'SF/AGN', 'AGN']
+
 	#### dust1 / dust2
 	fig, ax = plt.subplots(1,2, figsize = (18,8))
-
-	ax[0].errorbar(bdec_info['dust1'][idx]/bdec_info['dust2'][idx], bdec_resid, fmt='o',alpha=0.6,linestyle=' ')
+	
+	xplot = bdec_info['dust1'][idx]/bdec_info['dust2'][idx]
+	yplot = bdec_resid
+	for ii in xrange(len(labels)):
+		ax[0].errorbar(xplot[keys[ii]], yplot[keys[ii]], fmt='o',alpha=0.6,linestyle=' ',color=colors[ii],label=labels[ii])
+	ax[0].axhline(0, linestyle=':', color='grey')
+	ax[0].set_ylim(-np.max(np.abs(yplot)),np.max(np.abs(yplot)))
 	ax[0].set_xlabel(r'dust1/dust2')
 	ax[0].set_ylabel(r'Prospectr - obs [Balmer decrement]')
 
-	ax[1].errorbar(bdec_info['dust1'][idx]/bdec_info['dust2'][idx], ha_resid, fmt='o',alpha=0.6,linestyle=' ')
+	yplot = ha_resid
+	for ii in xrange(len(labels)):
+		ax[1].errorbar(xplot[keys[ii]], yplot[keys[ii]], fmt='o',alpha=0.6,linestyle=' ',color=colors[ii],label=labels[ii])
+	ax[1].axhline(0, linestyle=':', color='grey')
+	ax[1].set_ylim(-np.max(np.abs(yplot)),np.max(np.abs(yplot)))	
 	ax[1].set_xlabel(r'dust1/dust2')
 	ax[1].set_ylabel(r'log(Prospectr/obs) [H$_{\alpha}$]')
+	ax[1].legend()
 	
-	plt.savefig(fldr+'dust1_dust2.png', dpi=300)
+	plt.savefig(fldr+'dust1_dust2_residuals.png', dpi=300)
 
 	#### dust2_index
 	fig, ax = plt.subplots(1,2, figsize = (18,8))
 
-	ax[0].errorbar(bdec_info['dust2_index'][idx], bdec_resid, fmt='o',alpha=0.6,linestyle=' ')
+	xplot = bdec_info['dust2_index'][idx]
+	yplot = bdec_resid
+	for ii in xrange(len(labels)):
+		ax[0].errorbar(xplot[keys[ii]], yplot[keys[ii]], fmt='o',alpha=0.6,linestyle=' ',color=colors[ii],label=labels[ii])
 	ax[0].set_xlabel(r'dust2_index')
 	ax[0].set_ylabel(r'Prospectr - obs [Balmer decrement]')
+	ax[0].axhline(0, linestyle=':', color='grey')
+	ax[0].set_ylim(-np.max(np.abs(yplot)),np.max(np.abs(yplot)))
 
-	ax[1].errorbar(bdec_info['dust2_index'][idx], ha_resid, fmt='o',alpha=0.6,linestyle=' ')
+	yplot = ha_resid
+	for ii in xrange(len(labels)):
+		ax[1].errorbar(xplot[keys[ii]], yplot[keys[ii]], fmt='o',alpha=0.6,linestyle=' ',color=colors[ii],label=labels[ii])
 	ax[1].set_xlabel(r'dust2_index')
 	ax[1].set_ylabel(r'log(Prospectr/obs) [H$_{\alpha}$]')
+	ax[1].legend(loc=3)
+	ax[1].axhline(0, linestyle=':', color='grey')
+	ax[1].set_ylim(-np.max(np.abs(yplot)),np.max(np.abs(yplot)))
 	
-	plt.savefig(fldr+'dust2_index.png', dpi=300)
+	plt.savefig(fldr+'dust_index_residuals.png', dpi=300)
+
+	#### total attenuation at 5500 angstroms
+	fig, ax = plt.subplots(1,2, figsize = (18,8))
+
+	xplot = bdec_info['dust1'][idx] + bdec_info['dust2'][idx]
+	yplot = bdec_resid
+	for ii in xrange(len(labels)):
+		ax[0].errorbar(xplot[keys[ii]], yplot[keys[ii]], fmt='o',alpha=0.6,linestyle=' ',color=colors[ii],label=labels[ii])
+	ax[0].set_xlabel(r'total attenuation [5500 $\AA$]')
+	ax[0].set_ylabel(r'Prospectr - obs [Balmer decrement]')
+	ax[0].legend(loc=4)
+	ax[0].axhline(0, linestyle=':', color='grey')
+	ax[0].set_ylim(-np.max(np.abs(yplot)),np.max(np.abs(yplot)))
+
+	yplot = ha_resid
+	for ii in xrange(len(labels)):
+		ax[1].errorbar(xplot[keys[ii]], yplot[keys[ii]], fmt='o',alpha=0.6,linestyle=' ',color=colors[ii],label=labels[ii],)
+	ax[1].set_xlabel(r'total attenuation [5500 $\AA$]')
+	ax[1].set_ylabel(r'log(Prospectr/obs) [H$_{\alpha}$]')
+	ax[1].axhline(0, linestyle=':', color='grey')
+	ax[1].set_ylim(-np.max(np.abs(yplot)),np.max(np.abs(yplot)))
+	
+	plt.savefig(fldr+'total_attenuation_residuals.png', dpi=300)
+
+	#### sfr_100 residuals
+	fig, ax = plt.subplots(1,2, figsize = (18,8))
+
+	xplot = sfr_100
+	yplot = bdec_resid
+	for ii in xrange(len(labels)):
+		ax[0].errorbar(xplot[keys[ii]], yplot[keys[ii]], fmt='o',alpha=0.6,linestyle=' ',color=colors[ii],label=labels[ii])
+	ax[0].set_xlabel(r'SFR$_{100 \mathrm{ Myr}}$ [M$_{\odot}$/yr]')
+	ax[0].set_ylabel(r'Prospectr - obs [Balmer decrement]')
+	ax[0].legend(loc=3)
+	ax[0].axhline(0, linestyle=':', color='grey')
+	ax[0].set_ylim(-np.max(np.abs(yplot)),np.max(np.abs(yplot)))
+
+	yplot = ha_resid
+	for ii in xrange(len(labels)):
+		ax[1].errorbar(xplot[keys[ii]], yplot[keys[ii]], fmt='o',alpha=0.6,linestyle=' ',color=colors[ii],label=labels[ii],)
+	ax[1].set_xlabel(r'SFR$_{100 \mathrm{ Myr}}$ [M$_{\odot}$/yr]')
+	ax[1].set_ylabel(r'log(Prospectr/obs) [H$_{\alpha}$]')
+	ax[1].axhline(0, linestyle=':', color='grey')
+	ax[1].set_ylim(-np.max(np.abs(yplot)),np.max(np.abs(yplot)))
+	
+	plt.savefig(fldr+'sfr_100_residuals.png', dpi=300)
 
 	#### dust2_index vs dust1/dust2
 	fig, ax = plt.subplots(1,1, figsize = (8,8))
@@ -513,7 +630,6 @@ def residual_plots(alldata,obs_info, bdec_info):
 
 	plt.savefig(fldr+'idx_versus_ratio.png', dpi=300)
 
-	print 1/0
 def plot_emline_comp(alldata,outfolder):
 	'''
 	emission line luminosity comparisons:
@@ -526,20 +642,21 @@ def plot_emline_comp(alldata,outfolder):
 	##### Pull relevant information out of alldata
 	emline_names = alldata[0]['residuals']['emlines']['em_name']
 
-	##### load moustakas information
+	##### load moustakas+10 line flux information
 	objnames = objnames = np.array([f['objname'] for f in alldata])
 	dat = threed_dutils.load_moustakas_data(objnames = list(objnames))
 	
-
 	##### do work
 	compare_model_flux(alldata,emline_names,outname = outfolder+'continuum_model_flux_comparison.png')
 	compare_moustakas_fluxes(alldata,dat,emline_names,objnames,
 							 outname=outfolder+'continuum_model_flux_comparison.png',
 							 outdec=outfolder+'balmer_dec_comparison.png')
 	
-	obs_info = obs_vs_prosp_ha(alldata,emline_names,outname=outfolder+'halpha_comparison.png')
-	bdec_info = obs_vs_model_bdec(alldata,emline_names,outname=outfolder+'bdec_comparison.png')
-	obs_vs_ks_ha(alldata,emline_names,outname=outfolder+'ks_comparison.png')
+	bdec_info = obs_vs_model_bdec(alldata,emline_names, outname=outfolder+'bdec_comparison.png')
+	obs_info = obs_vs_prosp_ha(alldata,emline_names,bdec_info['keep_idx'],outname=outfolder+'halpha_comparison.png')
+	obs_vs_ks_ha(alldata,emline_names,obs_info,
+		         outname=outfolder+'ks_comparison.png',
+		         outname_cloudy=outfolder+'ks_cloudy.png')
 	residual_plots(alldata,obs_info, bdec_info)
 	print 1/0
 
@@ -711,6 +828,77 @@ def plot_relationships(alldata,outfolder):
 	plt.savefig(outfolder+'mass_metallicity.png',dpi=300)
 	plt.close
 
+def prospectr_comparison(alldata,outfolder):
+
+	'''
+	For Prospectr:
+	dust_index versus total attenuation
+	dust_index versus SFR
+	dust1 versus dust2, everything below -0.45 dust index highlighted
+	'''
+	
+	#### find prospectr indexes
+	parnames = alldata[0]['pquantiles']['parnames']
+	idx_mass = parnames == 'mass'
+	didx_idx = parnames == 'dust_index'
+	d1_idx = parnames == 'dust1'
+	d2_idx = parnames == 'dust2'
+
+	#### herschel flag
+	hflag = np.array([True if np.sum(dat['residuals']['phot']['lam_obs'] > 5e5) else False for dat in alldata])
+
+	#### agn flags
+	sfing, composite, agn = return_agn_str(np.ones_like(hflag,dtype=bool))
+	agn_flags = [sfing,composite,agn]
+	colors = ['blue','purple','red']
+	labels = ['SFing/normal','composite', 'AGN']
+
+	#### best-fits
+	d1 = np.array([x['bfit']['maxprob_params'][d1_idx][0] for x in alldata])
+	d2 = np.array([x['bfit']['maxprob_params'][d2_idx][0] for x in alldata])
+	didx = np.array([x['bfit']['maxprob_params'][didx_idx][0] for x in alldata])
+	sfr_100 = np.log10(np.clip([x['bfit']['sfr_100'] for x in alldata],1e-4,np.inf))
+
+	#### total attenuation
+	dusttot = np.zeros_like(d1)
+	for ii in xrange(len(dusttot)): dusttot[ii] = -np.log10(threed_dutils.charlot_and_fall_extinction(5500.,d1[ii],d2[ii],-1.0,didx[ii], kriek=True))
+
+	#### plotting
+	fig, ax = plt.subplots(2,3, figsize = (22,12))
+
+	ax[0,0].errorbar(didx,dusttot, fmt='o',alpha=0.6,linestyle=' ',color='0.4')
+	ax[0,0].set_ylabel(r'total attenuation [5500 $\AA$]')
+	ax[0,0].set_xlabel(r'dust_index')
+	ax[0,0].axis((didx.min()-0.1,didx.max()+0.1,dusttot.min()-0.1,dusttot.max()+0.1))
+
+	for flag,col in zip(agn_flags,colors): ax[0,1].errorbar(didx[flag],sfr_100[flag], fmt='o',alpha=0.6,linestyle=' ',color=col)
+	ax[0,1].set_xlabel(r'dust_index')
+	ax[0,1].set_ylabel(r'SFR$_{100 \mathrm{ Myr}}$ [M$_{\odot}$/yr]')
+	ax[0,1].axis((didx.min()-0.1,didx.max()+0.1,sfr_100.min()-0.1,sfr_100.max()+0.1))
+	for ii in xrange(len(labels)): ax[0,1].text(0.04,0.92-0.08*ii,labels[ii],color=colors[ii],transform = ax[0,1].transAxes,weight='bold')
+
+	l_idx = didx > -0.45
+	h_idx = didx < -0.45
+	ax[0,2].errorbar(d1[h_idx],d2[h_idx], fmt='o',alpha=0.6,linestyle=' ',color='0.4')
+	ax[0,2].errorbar(d1[l_idx],d2[l_idx], fmt='o',alpha=0.6,linestyle=' ',color='blue')
+	ax[0,2].set_xlabel(r'dust1')
+	ax[0,2].set_ylabel(r'dust2')
+	ax[0,2].axis((d1.min()-0.1,d1.max()+0.1,d2.min()-0.1,d2.max()+0.1))
+	ax[1,0].text(0.97,0.05,'dust_index > -0.45',color='blue',transform = ax[0,2].transAxes,weight='bold',ha='right')
+
+	l_idx = didx > -0.45
+	h_idx = didx < -0.45
+	ax[1,0].errorbar(didx[~hflag],d1[~hflag]/d2[~hflag], fmt='o',alpha=0.6,linestyle=' ', label='no herschel',color='0.4')
+	ax[1,0].errorbar(didx[hflag],d1[hflag]/d2[hflag], fmt='o',alpha=0.6,linestyle=' ', label='has herschel',color='red')
+	ax[1,0].set_xlabel(r'dust_index')
+	ax[1,0].set_ylabel(r'dust1/dust2')
+	ax[1,0].axis((didx.min()-0.1,didx.max()+0.1,(d1/d2).min()-0.1,(d1/d2).max()+0.1))
+	ax[1,0].text(0.05,0.92,'Herschel-detected',color='red',transform = ax[1,0].transAxes,weight='bold')
+
+	plt.savefig(outfolder+'bestfit_param_comparison.png', dpi=300)
+	plt.close()
+
+
 def plot_comparison(alldata,outfolder):
 
 	'''
@@ -853,10 +1041,10 @@ def plot_comparison(alldata,outfolder):
 	#### Balmer decrement
 	bdec_magphys, bdec_prospectr = [],[]
 	for ii,dat in enumerate(alldata):
-		tau1 = dat['pquantiles']['maxprob_params'][dust1_idx][0]
-		tau2 = dat['pquantiles']['maxprob_params'][dust2_idx][0]
-		dindex = dat['pquantiles']['maxprob_params'][dinx_idx][0]
-		bdec = threed_dutils.calc_balmer_dec(tau1, tau2, -1.0, dindex)
+		tau1 = dat['bfit']['maxprob_params'][dust1_idx][0]
+		tau2 = dat['bfit']['maxprob_params'][dust2_idx][0]
+		dindex = dat['bfit']['maxprob_params'][dinx_idx][0]
+		bdec = threed_dutils.calc_balmer_dec(tau1, tau2, -1.0, dindex,kriek=True)
 		bdec_prospectr.append(bdec)
 		
 		tau1 = (1-dat['model']['parameters'][mu_idx][0])*dat['model']['parameters'][tauv_idx][0]
@@ -885,11 +1073,14 @@ def plot_comparison(alldata,outfolder):
 	#### Extinction
 	tautot_magphys,tautot_prospectr,taudiff_magphys,taudiff_prospectr = [],[], [], []
 	for ii,dat in enumerate(alldata):
-		tau1 = dat['pquantiles']['maxprob_params'][dust1_idx][0]
-		
-		tau2 = dat['pquantiles']['maxprob_params'][dust2_idx][0]
-		taudiff_prospectr.append(tau2)
-		tautot_prospectr.append(tau1+tau2)
+		tau1 = dat['bfit']['maxprob_params'][dust1_idx][0]
+		tau2 = dat['bfit']['maxprob_params'][dust2_idx][0]
+		dindex = dat['bfit']['maxprob_params'][dinx_idx][0]
+
+		dust2 = charlot_and_fall_extinction(5500.,tau1,tau2,-1.0,dindex, kriek=True, nobc=True)
+		dusttot = charlot_and_fall_extinction(5500.,tau1,tau2,-1.0,dindex, kriek=True)
+		taudiff_prospectr.append(-np.log(dust2))
+		tautot_prospectr.append(-np.log10(dusttot))
 		
 		tau1 = (1-dat['model']['parameters'][mu_idx][0])*dat['model']['parameters'][tauv_idx][0]
 		tau2 = dat['model']['parameters'][mu_idx][0]*dat['model']['parameters'][tauv_idx][0]

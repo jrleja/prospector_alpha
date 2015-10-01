@@ -902,12 +902,13 @@ def make_all_plots(filebase=None,
 										  custom_filter_key=sample_results['run_params'].get('custom_filter_key',None))
 
 	# BEGIN PLOT ROUTINE
-	print 'MAKING PLOTS FOR ' + filename + ' in ' + outfolder
+	print 'MAKING PLOTS FOR ' + filebase.split('/')[-1] + ' in ' + outfolder
 	
 	# do we know the truths?
+	objname = sample_results['run_params']['objname']
 	try:
 		truths = threed_dutils.load_truths(os.getenv('APPS')+'/threed'+sample_results['run_params']['truename'].split('/threed')[1],
-			                              sample_results['run_params']['objname'],
+			                              objname,
 			                              sample_results, sps=sps)
 	except KeyError:
 		truths=None
@@ -919,7 +920,7 @@ def make_all_plots(filebase=None,
 	if plt_chain: 
 		print 'MAKING CHAIN PLOT'
 		show_chain(sample_results,
-	               outname=outfolder+filename+'_'+max(times)+".chain.png",
+	               outname=outfolder+objname+'_.chain.png",
 			       alpha=0.3,truths=truths)
 
 	# triangle plot
@@ -928,7 +929,7 @@ def make_all_plots(filebase=None,
 		chopped_sample_results = copy.deepcopy(sample_results)
 
 		subtriangle(sample_results, sps, copy.deepcopy(sample_results['model']),
-							 outname=outfolder+filename+'_'+max(times),
+							 outname=outfolder+objname+'_',
 							 showpars=None,start=0,
 							 show_titles=True, truths=truths, powell_results=powell_results)
 
@@ -946,7 +947,7 @@ def make_all_plots(filebase=None,
  		# plot
  		pfig = sed_figure(sample_results, sps, copy.deepcopy(sample_results['model']),
  						  maxprob=1,fast=fast,truths=truths,
- 						  outname=outfolder+filename+'_'+max(times)+'.sed.png')
+ 						  outname=outfolder+objname+'_.sed.png')
  		
 def plot_all_driver(runname=None,**extras):
 
