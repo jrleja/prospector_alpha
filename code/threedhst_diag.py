@@ -920,7 +920,7 @@ def make_all_plots(filebase=None,
 	if plt_chain: 
 		print 'MAKING CHAIN PLOT'
 		show_chain(sample_results,
-	               outname=outfolder+objname+'_.chain.png",
+	               outname=outfolder+objname+'.chain.png',
 			       alpha=0.3,truths=truths)
 
 	# triangle plot
@@ -929,7 +929,7 @@ def make_all_plots(filebase=None,
 		chopped_sample_results = copy.deepcopy(sample_results)
 
 		subtriangle(sample_results, sps, copy.deepcopy(sample_results['model']),
-							 outname=outfolder+objname+'_',
+							 outname=outfolder+objname,
 							 showpars=None,start=0,
 							 show_titles=True, truths=truths, powell_results=powell_results)
 
@@ -947,7 +947,7 @@ def make_all_plots(filebase=None,
  		# plot
  		pfig = sed_figure(sample_results, sps, copy.deepcopy(sample_results['model']),
  						  maxprob=1,fast=fast,truths=truths,
- 						  outname=outfolder+objname+'_.sed.png')
+ 						  outname=outfolder+objname+'.sed.png')
  		
 def plot_all_driver(runname=None,**extras):
 

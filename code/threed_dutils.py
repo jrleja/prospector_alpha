@@ -1043,12 +1043,13 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None,
 		sps.params['zred'] = 0.0
 
 		# nebon
-		w,spec_neboff= sps.get_spectrum(tage=sps.params['tage'],peraa=False)
+		wa,spec= sps.get_spectrum(tage=0.0,peraa=False)
 
 		# neboff
 		sps.params['add_neb_emission'] = False
 		sps.params['add_neb_continuum'] = False
-		w, spec_neboff = sps.get_spectrum(tage=sps.params['tage'],peraa=False)
+		wa, spec_neboff = sps.get_spectrum(tage=0.0,peraa=False)
+		print 1/0
 		sps.params['add_neb_emission'] = True
 		sps.params['add_neb_continuum'] = True
 
