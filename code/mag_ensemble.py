@@ -6,7 +6,13 @@ from astropy import constants
 from astropy.cosmology import WMAP9
 import magphys_plot_pref
 
-minsfr = 1e-4
+
+#### set up colors and plot style
+prosp_color = '#e60000'
+obs_color = '#95918C'
+magphys_color = '#1974D2'
+
+minsfr = 1e-3
 
 def translate_line_names(linenames):
 	'''
@@ -39,6 +45,10 @@ def remove_doublets(x, names):
 
 def ret_inf(alldata,field, model='Prospectr',name=None):
 
+	'''
+	returns information from alldata
+	'''
+
 	# fields
 	# flux, flux_errup, flux_errdown, lum, lum_errup, lum_errdown, eqw
 	emline_names = alldata[0]['residuals']['emlines']['em_name']
@@ -48,7 +58,7 @@ def ret_inf(alldata,field, model='Prospectr',name=None):
 	if field == 'eqw_rest':
 		fillvalue = np.zeros(shape=(3,nlines))
 	else:
-		fillvalue = np.zeros(nlines)
+		fillvalue = np.zeros_like(alldata[0]['residuals']['emlines'][model][field])
 
 	if name is None:
 		return np.squeeze(np.array([f['residuals']['emlines'][model][field] if f['residuals']['emlines'] is not None else fillvalue for f in alldata]))
@@ -223,7 +233,7 @@ def compare_model_flux(alldata, emline_names, outname = 'test.png'):
 def obs_vs_ks_ha(alldata,emline_names,obs_info,outname='test.png',outname_cloudy='test_cloudy.png'):
 	
 	#################
-	#### plot observed Halpha versus model Halpha from KS relationship
+	#### plot observed Halpha versus model Halpha from Kennicutt relationship
 	#################
 
 	f_ha = ret_inf(alldata,'flux',model='Prospectr',name='H$\\alpha$')
@@ -254,7 +264,7 @@ def obs_vs_ks_ha(alldata,emline_names,obs_info,outname='test.png',outname_cloudy
 		tau1 = (1-dat['model']['parameters'][mu_idx][0])*dat['model']['parameters'][tauv_idx][0]
 		tau2 = dat['model']['parameters'][mu_idx][0]*dat['model']['parameters'][tauv_idx][0]
 		
-		ha_mag.append(threed_dutils.synthetic_halpha(dat['sfr_10'], tau1, tau2, -1.3, -0.7))
+		ha_mag.append(threed_dutils.synthetic_halpha(dat['bfit']['sfr_10'], tau1, tau2, -1.3, -0.7))
 		#ha_mag.append(threed_dutils.synthetic_halpha(dat['model']['parameters'][dat['model']['parnames'] == 'SFR'][0], tau1, tau2, -1.3, -0.7))
 
 		pc2cm = 3.08567758e18
@@ -273,8 +283,8 @@ def obs_vs_ks_ha(alldata,emline_names,obs_info,outname='test.png',outname_cloudy
 	fig, ax = plt.subplots(1,3, figsize = (22,6))
 
 	ax[0].errorbar(ha_mag, ha_pro, fmt='o',alpha=0.6,linestyle=' ')
-	ax[0].set_xlabel(r'log(KS H$_{\alpha}$) [MAGPHYS]')
-	ax[0].set_ylabel(r'log(KS H$_{\alpha}$) [Prospectr]')
+	ax[0].set_xlabel(r'log(Kennicutt H$_{\alpha}$) [MAGPHYS]')
+	ax[0].set_ylabel(r'log(Kennicutt H$_{\alpha}$) [Prospectr]')
 	ax[0] = threed_dutils.equalize_axes(ax[0], ha_mag, ha_pro)
 	off,scat = threed_dutils.offset_and_scatter(ha_mag, ha_pro,biweight=True)
 	ax[0].text(0.99,0.05, 'biweight scatter='+"{:.3f}".format(scat) +' dex',
@@ -283,7 +293,7 @@ def obs_vs_ks_ha(alldata,emline_names,obs_info,outname='test.png',outname_cloudy
 			      transform = ax[0].transAxes,horizontalalignment='right')
 
 	ax[1].errorbar(ha_mag,np.log10(f_ha[keep_idx]), fmt='o',alpha=0.6,linestyle=' ')
-	ax[1].set_xlabel(r'log(KS H$_{\alpha}$) [MAGPHYS]')
+	ax[1].set_xlabel(r'log(Kennicutt H$_{\alpha}$) [MAGPHYS]')
 	ax[1].set_ylabel(r'log(H$_{\alpha}$) [observed]')
 	ax[1] = threed_dutils.equalize_axes(ax[1], ha_mag, np.log10(f_ha[keep_idx]))
 	off,scat = threed_dutils.offset_and_scatter(ha_mag, np.log10(f_ha[keep_idx]),biweight=True)
@@ -293,7 +303,7 @@ def obs_vs_ks_ha(alldata,emline_names,obs_info,outname='test.png',outname_cloudy
 			      transform = ax[1].transAxes,horizontalalignment='right')
 
 	ax[2].errorbar(ha_pro, np.log10(f_ha[keep_idx]), fmt='o',alpha=0.6,linestyle=' ')
-	ax[2].set_xlabel(r'log(KS H$_{\alpha}$) [Prospectr]')
+	ax[2].set_xlabel(r'log(Kennicutt H$_{\alpha}$) [Prospectr]')
 	ax[2].set_ylabel(r'log(H$_{\alpha}$) [observed]')
 	ax[2] = threed_dutils.equalize_axes(ax[2], ha_pro, np.log10(f_ha[keep_idx]))
 	off,scat = threed_dutils.offset_and_scatter(ha_pro, np.log10(f_ha[keep_idx]),biweight=True)
@@ -309,7 +319,7 @@ def obs_vs_ks_ha(alldata,emline_names,obs_info,outname='test.png',outname_cloudy
 	fig, ax = plt.subplots(1,2, figsize = (16,8))
 
 	ax[0].errorbar(ha_pro, ha_cloudy[:,0], fmt='o',alpha=0.6,linestyle=' ')
-	ax[0].set_xlabel(r'log(KS H$_{\alpha}$) [Prospectr]')
+	ax[0].set_xlabel(r'log(Kennicutt H$_{\alpha}$) [Prospectr]')
 	ax[0].set_ylabel(r'log(CLOUDY H$_{\alpha}$) [Prospectr]')
 	ax[0] = threed_dutils.equalize_axes(ax[0], ha_pro, ha_cloudy[:,0])
 	off,scat = threed_dutils.offset_and_scatter(ha_pro, ha_cloudy[:,0],biweight=True)
@@ -319,7 +329,7 @@ def obs_vs_ks_ha(alldata,emline_names,obs_info,outname='test.png',outname_cloudy
 			      transform = ax[0].transAxes,horizontalalignment='right')
 
 	ax[1].errorbar(ha_pro-ha_cloudy[:,0],pmet, fmt='o',alpha=0.6,linestyle=' ')
-	ax[1].set_xlabel(r'log(KS/COUDY H$_{\alpha}$) [Prospectr]')
+	ax[1].set_xlabel(r'log(Kennicutt/COUDY H$_{\alpha}$) [Prospectr]')
 	ax[1].set_ylabel(r'metallicity [Prospectr]')
 
 	plt.savefig(outname_cloudy,dpi=300)
@@ -332,7 +342,6 @@ def obs_vs_prosp_ha(alldata,emline_names,keep_idx,outname='test.png'):
 	#################
 	# first pull out observed Halphas
 	# add an S/N cut... ? remove later maybe
-	sn_cut = 5
 
 	f_ha = ret_inf(alldata,'flux',model='Prospectr',name='H$\\alpha$')
 	f_ha_errup = ret_inf(alldata,'flux_errup',model='Prospectr',name='H$\\alpha$')
@@ -387,26 +396,102 @@ def obs_vs_prosp_ha(alldata,emline_names,keep_idx,outname='test.png'):
 
 	return pinfo
 
+def obs_vs_model_hdelta_dn(alldata,outname=None):
+
+	hdelta_sn_cut = 2
+
+	### from observations
+	### pull out hdelta, dn4000
+	hdel_obs = -ret_inf(alldata,'hdelta_flux',model='obs')
+	hdel_errup_obs = -ret_inf(alldata,'hdelta_flux_errup',model='obs')
+	hdel_errdown_obs = -ret_inf(alldata,'hdelta_flux_errdown',model='obs')
+	hdel_symerr_obs = (hdel_errup_obs - hdel_errdown_obs) / 2.
+
+	dn4000_obs = ret_inf(alldata,'dn4000',model='obs')
+
+
+	### pull out model info
+	hdel_prosp = np.log10(-ret_inf(alldata,'hdelta_flux',model='Prospectr'))
+	hdel_mag = np.log10(-ret_inf(alldata,'hdelta_flux',model='MAGPHYS'))
+
+	dn4000_prosp = ret_inf(alldata,'Dn4000',model='Prospectr')
+	dn4000_mag = ret_inf(alldata,'Dn4000',model='MAGPHYS')
+
+	### define limits
+	good_idx = (np.abs((hdel_obs / hdel_symerr_obs)) > hdelta_sn_cut) & (hdel_obs > 0) & (hdel_mag[:,0] > -18)
+	hdel_plot_errs = threed_dutils.asym_errors(hdel_obs[good_idx], hdel_errup_obs[good_idx], hdel_errdown_obs[good_idx], log=True)
+	hdel_prosp = hdel_prosp[good_idx]
+	hdel_mag = hdel_mag[good_idx]
+
+
+	### plot comparison
+	fig, ax = plt.subplots(2,2, figsize = (15,15))
+
+	ax[0,0].errorbar(dn4000_obs[good_idx], dn4000_prosp[good_idx], fmt='o',alpha=0.6,linestyle=' ',color='black')
+	ax[0,0].set_xlabel(r'observed D$_n$(4000)')
+	ax[0,0].set_ylabel(r'Prospectr D$_n$(4000)')
+	ax[0,0] = threed_dutils.equalize_axes(ax[0,0], dn4000_obs[good_idx], dn4000_prosp[good_idx])
+	off,scat = threed_dutils.offset_and_scatter(dn4000_obs[good_idx], dn4000_prosp[good_idx],biweight=True)
+	ax[0,0].text(0.99,0.05, 'biweight scatter='+"{:.3f}".format(scat), transform = ax[0,0].transAxes,horizontalalignment='right')
+	ax[0,0].text(0.99,0.1, 'mean offset='+"{:.3f}".format(off), transform = ax[0,0].transAxes,horizontalalignment='right')
+
+	ax[0,1].errorbar(dn4000_obs[good_idx], dn4000_mag[good_idx], fmt='o',alpha=0.6,linestyle=' ', color='black')
+	ax[0,1].set_xlabel(r'observed D$_n$(4000)')
+	ax[0,1].set_ylabel(r'MAGPHYS D$_n$(4000)')
+	ax[0,1] = threed_dutils.equalize_axes(ax[0,1], dn4000_obs[good_idx], dn4000_mag[good_idx])
+	off,scat = threed_dutils.offset_and_scatter(dn4000_obs[good_idx], dn4000_mag[good_idx],biweight=True)
+	ax[0,1].text(0.99,0.05, 'biweight scatter='+"{:.3f}".format(scat), transform = ax[0,1].transAxes,horizontalalignment='right')
+	ax[0,1].text(0.99,0.1, 'mean offset='+"{:.3f}".format(off), transform = ax[0,1].transAxes,horizontalalignment='right')
+
+	ax[1,0].errorbar(np.log10(hdel_obs[good_idx]), hdel_prosp[:,0], xerr=hdel_plot_errs,fmt='o',alpha=0.6,linestyle=' ',color='black')
+	ax[1,0].set_xlabel(r'observed log(H$_{\delta}$)')
+	ax[1,0].set_ylabel(r'Prospectr log(H$_{\delta}$)')
+	ax[1,0] = threed_dutils.equalize_axes(ax[1,0], np.log10(hdel_obs[good_idx]), hdel_prosp[:,0])
+	off,scat = threed_dutils.offset_and_scatter(np.log10(hdel_obs[good_idx]), hdel_prosp[:,0],biweight=True)
+	ax[1,0].text(0.99,0.05, 'biweight scatter='+"{:.3f}".format(scat) + ' dex', transform = ax[1,0].transAxes,horizontalalignment='right')
+	ax[1,0].text(0.99,0.1, 'mean offset='+"{:.3f}".format(off) + ' dex', transform = ax[1,0].transAxes,horizontalalignment='right')
+
+	ax[1,1].errorbar(np.log10(hdel_obs[good_idx]), hdel_mag[:,0], xerr=hdel_plot_errs, fmt='o',alpha=0.6,linestyle=' ', color='black')
+	ax[1,1].set_xlabel(r'observed log(H$_{\delta}$)')
+	ax[1,1].set_ylabel(r'MAGPHYS log(H$_{\delta}$)')
+	ax[1,1] = threed_dutils.equalize_axes(ax[1,1], np.log10(hdel_obs[good_idx]), hdel_mag[:,0])
+	off,scat = threed_dutils.offset_and_scatter(np.log10(hdel_obs[good_idx]), hdel_mag[:,0],biweight=True)
+	ax[1,1].text(0.99,0.05, 'biweight scatter='+"{:.3f}".format(scat), transform = ax[1,1].transAxes,horizontalalignment='right')
+	ax[1,1].text(0.99,0.1, 'mean offset='+"{:.3f}".format(off), transform = ax[1,1].transAxes,horizontalalignment='right')
+
+	plt.savefig(outname, dpi=300)
+	plt.close()
+
+
+
 def obs_vs_model_bdec(alldata,emline_names,outname='test.png'):
 
 	#################
 	#### plot observed Balmer decrement versus expected
 	#################
+	# remove AGNs from this plot
+
 	sn_cut = 5
 
 	f_ha = ret_inf(alldata,'flux',model='Prospectr',name='H$\\alpha$')
-	err_ha = ret_inf(alldata,'flux_errup',model='Prospectr',name='H$\\alpha$') - ret_inf(alldata,'flux_errdown',model='Prospectr',name='H$\\alpha$')
+	err_ha = (ret_inf(alldata,'flux_errup',model='Prospectr',name='H$\\alpha$') - ret_inf(alldata,'flux_errdown',model='Prospectr',name='H$\\alpha$'))/2.
 	f_hb = ret_inf(alldata,'flux',model='Prospectr',name='H$\\beta$')
-	err_hb = ret_inf(alldata,'flux_errup',model='Prospectr',name='H$\\beta$') - ret_inf(alldata,'flux_errdown',model='Prospectr',name='H$\\beta$')
-	
-	sn_ha = f_ha / err_ha
-	sn_hb = f_hb / err_hb
+	err_hb = (ret_inf(alldata,'flux_errup',model='Prospectr',name='H$\\beta$') - ret_inf(alldata,'flux_errdown',model='Prospectr',name='H$\\beta$'))/2.
+	bdec_measured = f_ha / f_hb
+
+	sn_ha = np.abs(f_ha / err_ha)
+	sn_hb = np.abs(f_hb / err_hb)
+
+	eqw_ha = ret_inf(alldata,'eqw_rest',model='Prospectr',name='H$\\alpha$')
+	eqw_hb = ret_inf(alldata,'eqw_rest',model='Prospectr',name='H$\\beta$')
+
+	names = np.array([dat['objname'] for dat in alldata])
 
 	#### for now, aggressive S/N cuts
 	# S/N(Ha) > 10, S/N (Hbeta) > 10
-	keep_idx = np.squeeze((sn_ha > sn_cut) & (sn_hb > sn_cut) & (f_ha > 0) & (f_hb > 0))
+	keep_idx = np.squeeze((sn_ha > sn_cut) & (sn_hb > sn_cut) & (eqw_ha[:,0] > 3) & (eqw_hb[:,0] > 3))
 
-	bdec_measured = f_ha / f_hb
+	
 
 	#### calculate expected Balmer decrement for Prospectr, MAGPHYS
 	# variable names for Prospectr
@@ -436,17 +521,24 @@ def obs_vs_model_bdec(alldata,emline_names,outname='test.png'):
 		bdec = threed_dutils.calc_balmer_dec(tau1, tau2, -1.3, -0.7)
 		bdec_magphys.append(np.squeeze(bdec))
 	
-	pl_bdec_mod = np.array(bdec_mod)[keep_idx]
-	pl_bdec_magphys = np.array(bdec_magphys)[keep_idx]
-	pl_bdec_prospectr = np.array(bdec_prospectr)[keep_idx]
-	pl_bdec_measured = bdec_measured[keep_idx]
+	sfing, composite, agn = return_agn_str(keep_idx)
+
+	pl_bdec_mod = np.array(bdec_mod)[keep_idx][~agn]
+	pl_bdec_magphys = np.array(bdec_magphys)[keep_idx][~agn]
+	pl_bdec_prospectr = np.array(bdec_prospectr)[keep_idx][~agn]
+	pl_bdec_measured = bdec_measured[keep_idx][~agn]
 	pl_bdec_prospectr = pl_bdec_mod
-	
+
+	#### transform from balmer decrement to tau(Hb) - tau(Ha)
+	pl_bdec_prospectr = np.log(pl_bdec_prospectr / 2.86)
+	pl_bdec_magphys = np.log(pl_bdec_magphys / 2.86)
+	pl_bdec_measured = np.log(pl_bdec_measured / 2.86)
+
 	fig, ax = plt.subplots(1,3, figsize = (22,6))
 
 	ax[0].errorbar(pl_bdec_measured, pl_bdec_prospectr, fmt='o',alpha=0.6,linestyle=' ')
-	ax[0].set_xlabel(r'observed H$_{\alpha}$/H$_{\beta}$')
-	ax[0].set_ylabel(r'Prospectr H$_{\alpha}$/H$_{\beta}$')
+	ax[0].set_xlabel(r'observed $\tau_{\mathrm{H}\beta}$ - $\tau_{\mathrm{H}\alpha}$')
+	ax[0].set_ylabel(r'Prospectr $\tau_{\mathrm{H}\beta}$ - $\tau_{\mathrm{H}\alpha}$')
 	ax[0] = threed_dutils.equalize_axes(ax[0], pl_bdec_measured,pl_bdec_prospectr)
 	off,scat = threed_dutils.offset_and_scatter(pl_bdec_measured,pl_bdec_prospectr,biweight=True)
 	ax[0].text(0.99,0.05, 'biweight scatter='+"{:.3f}".format(scat),
@@ -455,8 +547,8 @@ def obs_vs_model_bdec(alldata,emline_names,outname='test.png'):
 			      transform = ax[0].transAxes,horizontalalignment='right')
 
 	ax[1].errorbar(pl_bdec_measured, pl_bdec_magphys, fmt='o',alpha=0.6,linestyle=' ')
-	ax[1].set_xlabel(r'observed H$_{\alpha}$/H$_{\beta}$')
-	ax[1].set_ylabel(r'MAGPHYS H$_{\alpha}$/H$_{\beta}$')
+	ax[1].set_xlabel(r'observed $\tau_{\mathrm{H}\beta}$ - $\tau_{\mathrm{H}\alpha}$')
+	ax[1].set_ylabel(r'MAGPHYS $\tau_{\mathrm{H}\beta}$ - $\tau_{\mathrm{H}\alpha}$')
 	ax[1] = threed_dutils.equalize_axes(ax[1], pl_bdec_measured,pl_bdec_magphys)
 	off,scat = threed_dutils.offset_and_scatter(pl_bdec_measured,pl_bdec_magphys,biweight=True)
 	ax[1].text(0.99,0.05, 'biweight scatter='+"{:.3f}".format(scat),
@@ -465,8 +557,8 @@ def obs_vs_model_bdec(alldata,emline_names,outname='test.png'):
 			      transform = ax[1].transAxes,horizontalalignment='right')
 
 	ax[2].errorbar(pl_bdec_prospectr, pl_bdec_magphys, fmt='o',alpha=0.6,linestyle=' ')
-	ax[2].set_xlabel(r'Prospectr H$_{\alpha}$/H$_{\beta}$')
-	ax[2].set_ylabel(r'MAGPHYS H$_{\alpha}$/H$_{\beta}$')
+	ax[2].set_xlabel(r'Prospectr $\tau_{\mathrm{H}\beta}$ - $\tau_{\mathrm{H}\alpha}$')
+	ax[2].set_ylabel(r'MAGPHYS $\tau_{\mathrm{H}\beta}$ - $\tau_{\mathrm{H}\alpha}$')
 	ax[2] = threed_dutils.equalize_axes(ax[2], pl_bdec_prospectr,pl_bdec_magphys)
 	off,scat = threed_dutils.offset_and_scatter(pl_bdec_prospectr,pl_bdec_magphys,biweight=True)
 	ax[2].text(0.99,0.05, 'biweight scatter='+"{:.3f}".format(scat),
@@ -636,7 +728,7 @@ def plot_emline_comp(alldata,outfolder):
 		(1) Observed luminosity, Prospectr vs MAGPHYS continuum subtraction
 		(2) Moustakas+10 comparisons
 		(3) model Balmer decrement (from dust) versus observed Balmer decrement
-		(4) model Halpha (from KS + dust) versus observed Halpha
+		(4) model Halpha (from Kennicutt + dust) versus observed Halpha
 	'''
 
 	##### Pull relevant information out of alldata
@@ -653,12 +745,13 @@ def plot_emline_comp(alldata,outfolder):
 							 outdec=outfolder+'balmer_dec_comparison.png')
 	
 	bdec_info = obs_vs_model_bdec(alldata,emline_names, outname=outfolder+'bdec_comparison.png')
+	obs_vs_model_hdelta_dn(alldata,outname=outfolder+'hdelta_dn_comp.png')
+
 	obs_info = obs_vs_prosp_ha(alldata,emline_names,bdec_info['keep_idx'],outname=outfolder+'halpha_comparison.png')
 	obs_vs_ks_ha(alldata,emline_names,obs_info,
 		         outname=outfolder+'ks_comparison.png',
 		         outname_cloudy=outfolder+'ks_cloudy.png')
 	residual_plots(alldata,obs_info, bdec_info)
-	print 1/0
 
 def plot_relationships(alldata,outfolder):
 
@@ -825,7 +918,7 @@ def plot_relationships(alldata,outfolder):
 	mz.set_xlabel(r'log(M/M$_{\odot}$)')
 	mz.set_ylabel(r'log(Z/Z$_{\odot}$/yr)')
 
-	plt.savefig(outfolder+'mass_metallicity.png',dpi=300)
+	plt.savefig(outfolder+'relationships.png',dpi=300)
 	plt.close
 
 def prospectr_comparison(alldata,outfolder):
@@ -898,7 +991,6 @@ def prospectr_comparison(alldata,outfolder):
 	plt.savefig(outfolder+'bestfit_param_comparison.png', dpi=300)
 	plt.close()
 
-
 def plot_comparison(alldata,outfolder):
 
 	'''
@@ -908,7 +1000,7 @@ def plot_comparison(alldata,outfolder):
 	'''
 
 	##### set up plots
-	fig = plt.figure(figsize=(15,10))
+	fig = plt.figure(figsize=(18,12))
 	gs1 = mpl.gridspec.GridSpec(2, 3)
 	mass = plt.Subplot(fig, gs1[0])
 	sfr = plt.Subplot(fig, gs1[1])
@@ -963,7 +1055,7 @@ def plot_comparison(alldata,outfolder):
 	           magmass[:,2]-magmass[:,1]]
 	mass.errorbar(promass[:,1],magmass[:,1],
 		          fmt=fmt, alpha=alpha,
-			      xerr=proerrs, yerr=magerrs)
+			      xerr=proerrs, yerr=magerrs, color='0.4')
 
 	# labels
 	mass.set_xlabel(r'log(M$_*$) [Prospectr]',labelpad=13)
@@ -994,7 +1086,7 @@ def plot_comparison(alldata,outfolder):
 	           magsfr[:,2]-magsfr[:,1]]
 	sfr.errorbar(prosfr[:,1],magsfr[:,1],
 		          fmt=fmt, alpha=alpha,
-			      xerr=proerrs, yerr=magerrs)
+			      xerr=proerrs, yerr=magerrs, color='0.4')
 
 	# labels
 	sfr.set_xlabel(r'log(SFR) [Prospectr]')
@@ -1023,7 +1115,7 @@ def plot_comparison(alldata,outfolder):
 	           promet[:,2]-promet[:,1]]
 	met.errorbar(promet[:,1],magmet,
 		          fmt=fmt, alpha=alpha,
-			      xerr=proerrs)
+			      xerr=proerrs, color='0.4')
 
 	# labels
 	met.set_xlabel(r'log(Z/Z$_{\odot}$) [Prospectr]',labelpad=13)
@@ -1056,7 +1148,7 @@ def plot_comparison(alldata,outfolder):
 	bdec_prospectr = np.array(bdec_prospectr)
 
 	balm.errorbar(bdec_prospectr,bdec_magphys,
-		          fmt=fmt, alpha=alpha)
+		          fmt=fmt, alpha=alpha, color='0.4')
 
 	# labels
 	balm.set_xlabel(r'Prospectr H$_{\alpha}$/H$_{\beta}$',labelpad=13)
@@ -1077,8 +1169,8 @@ def plot_comparison(alldata,outfolder):
 		tau2 = dat['bfit']['maxprob_params'][dust2_idx][0]
 		dindex = dat['bfit']['maxprob_params'][dinx_idx][0]
 
-		dust2 = charlot_and_fall_extinction(5500.,tau1,tau2,-1.0,dindex, kriek=True, nobc=True)
-		dusttot = charlot_and_fall_extinction(5500.,tau1,tau2,-1.0,dindex, kriek=True)
+		dust2 = threed_dutils.charlot_and_fall_extinction(5500.,tau1,tau2,-1.0,dindex, kriek=True, nobc=True)
+		dusttot = threed_dutils.charlot_and_fall_extinction(5500.,tau1,tau2,-1.0,dindex, kriek=True)
 		taudiff_prospectr.append(-np.log(dust2))
 		tautot_prospectr.append(-np.log10(dusttot))
 		
@@ -1093,7 +1185,7 @@ def plot_comparison(alldata,outfolder):
 	tautot_prospectr = np.array(tautot_prospectr)
 
 	ext_tot.errorbar(tautot_prospectr,tautot_magphys,
-		          fmt=fmt, alpha=alpha)
+		          fmt=fmt, alpha=alpha, color='0.4')
 
 	# labels
 	ext_tot.set_xlabel(r'Prospectr total $\tau_{5500}$',labelpad=13)
@@ -1105,10 +1197,10 @@ def plot_comparison(alldata,outfolder):
 	ext_tot.text(0.99,0.05, 'biweight scatter='+"{:.2f}".format(scat) + ' dex',
 			  transform = ext_tot.transAxes,horizontalalignment='right')
 	ext_tot.text(0.99,0.1, 'mean offset='+"{:.2f}".format(off) + ' dex',
-		      transform = ext_tot.transAxes,horizontalalignment='right')
+		      transform = ext_tot.transAxes,horizontalalignment='right',)
 
 	ext_diff.errorbar(taudiff_prospectr,taudiff_magphys,
-		          fmt=fmt, alpha=alpha)
+		          fmt=fmt, alpha=alpha, color='0.4')
 
 	# labels
 	ext_diff.set_xlabel(r'Prospectr diffuse $\tau_{5500}$',labelpad=13)
@@ -1123,5 +1215,6 @@ def plot_comparison(alldata,outfolder):
 		      transform = ext_diff.transAxes,horizontalalignment='right')
 
 
+	plt.tight_layout()
 	plt.savefig(outfolder+'basic_comparison.png',dpi=300)
 	plt.close()

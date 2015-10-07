@@ -13,8 +13,3 @@ mpl.rcParams['xtick.minor.width'] = 0.5
 mpl.rcParams['ytick.minor.width'] = 0.5
 mpl.rcParams['lines.markersize'] = 8
 mpl.pyplot.ioff() # don't pop up a window for each plot
-
-#### set up colors and plot style
-prosp_color = '#e60000'
-obs_color = '#95918C'
-magphys_color = '#1974D2'

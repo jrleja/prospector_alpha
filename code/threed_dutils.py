@@ -6,8 +6,83 @@ from scipy.interpolate import interp1d
 from scipy.integrate import simps
 from calc_ml import load_filter_response
 from bsfh.likelihood import LikelihoodFunction
+from astropy.cosmology import WMAP9
 import copy
 
+def return_lir(lam,spec,z=None,alt_file=None):
+
+	# integrates input over wavelength
+	# input must be Lsun / hz
+	# returns erg/s
+
+	# fake LIR filter
+	# 8-1000 microns
+	# note that lam must be in angstroms
+	botlam = np.atleast_1d(8e4-1)
+	toplam = np.atleast_1d(1000e4+1)
+	edgetrans = np.atleast_1d(0)
+	lir_filter = [[np.concatenate((botlam,np.linspace(8e4, 1000e4, num=100),toplam))],
+	              [np.concatenate((edgetrans,np.ones(100),edgetrans))]]
+
+	# calculate integral
+	_,lir     = integrate_mag(lam,spec,lir_filter, z=z, alt_file=alt_file) # comes out in ergs/s
+
+	return lir
+
+def return_luv(lam,spec,z=None,alt_file=None):
+
+	# integrates input over wavelength
+	# input must be Lsun / hz
+	# returns erg/s
+
+	# fake LUV filter
+	# over 1216-3000 angstroms
+	# note that lam must be in angstroms
+	botlam = np.atleast_1d(1216)
+	toplam = np.atleast_1d(3000)
+	edgetrans = np.atleast_1d(0)
+	luv_filter =  [[np.concatenate((botlam-1,np.linspace(botlam, toplam, num=100),toplam+1))],
+	               [np.concatenate((edgetrans,np.ones(100),edgetrans))]]
+
+	# calculate integral
+	_,luv     = integrate_mag(lam,spec,luv_filter, z=z, alt_file=alt_file) # comes out in ergs/s
+
+	return luv
+
+def mips_to_lir(mips_flux,z):
+
+	'''
+	input flux must be in mJy
+	output is in Lsun
+	L_IR [Lsun] = fac_<band>(redshift) * flux [milliJy]
+	'''
+
+	dale_helou_txt = '/Users/joel/code/python/threedhst_bsfh/data/MIPS/dale_helou.txt'
+	with open(dale_helou_txt, 'r') as f: hdr = f.readline().split()[1:]
+	conversion = np.loadtxt(dale_helou_txt, comments = '#', dtype = np.dtype([(n, np.float) for n in hdr]))
+	
+	# if we're at higher redshift, interpolate
+	# it decrease error due to redshift relative to rest-frame template (good)
+	# but adds nonlinear error due to distances (bad)
+	# else, scale the nearest conversion factor by the 
+	# ratio of luminosity distances, since nonlinear error due to distances will dominate
+	if z > 0.1:
+		intfnc = interp1d(conversion['redshift'],conversion['fac_MIPS24um'], bounds_error = True, fill_value = 0)
+		fac = intfnc(z)
+	else:
+		near_idx = np.abs(conversion['redshift']-z).argmin()
+		lumdist_ratio = (WMAP9.luminosity_distance(z).value / WMAP9.luminosity_distance(conversion['redshift'][near_idx]).value)**2
+		zfac_ratio = (1.+conversion['redshift'][near_idx]) / (1.+z)
+		fac = conversion['fac_MIPS24um'][near_idx]*lumdist_ratio*zfac_ratio
+
+	return fac*mips_flux
+
+def sfr_uvir(lir,luv):
+
+	# inputs in Lsun
+	# from Whitaker+14
+	# output is Msun/yr, in Chabrier IMF
+	return 1.09e-10*(lir + 2.2*luv)
 
 def smooth_spectrum(lam,spec,sigma,
 	                minlam=0.0,maxlam=1e50):     
@@ -182,7 +257,7 @@ def synthetic_halpha(sfr,dust1,dust2,dust1_index,dust2_index,kriek=False):
 	mass in Msun
 	'''
 
-	# calculate Halpha luminosity from KS relationship
+	# calculate Halpha luminosity from Kennicutt relationship
 	# comes out in units of [ergs/s]
 	# correct from Chabrier to Salpeter with a factor of 1.7
 	flux = 1.26e41 * (sfr*1.7)
@@ -799,14 +874,14 @@ def integrate_mag(spec_lam,spectra,filter, z=None, alt_file=None):
 		SPEC_LAM: must be in angstroms. if redshift is specified, this should ALREADY be corrected for reddening.
 		SPECTRA: must be in Lsun/Hz (FSPS standard). if redshift is specified, the normalization will be taken care of.
 	OUTPUT:
-		LUMINOSITY: comes out in erg/s
 		MAG: comes out as absolute magnitude
+		LUMINOSITY: comes out in erg/s
 			NOTE: if redshift is specified, INSTEAD RETURN apparent magnitude and flux [erg/s/cm^2]
 	'''
 
 	if type(filter) == str:
 		resp_lam, res = load_filter_response(filter, 
-		                                 	 alt_file='/Users/joel/code/fsps/data/allfilters_threedhst.dat')
+		                                 	 alt_file='/Users/joel/code/python/threedhst_bsfh/filters/allfilters_threedhst.dat')
 	else:
 		resp_lam = filter[0][0]
 		res      = filter[1][0]
@@ -840,7 +915,6 @@ def integrate_mag(spec_lam,spectra,filter, z=None, alt_file=None):
 
 	# if redshift is specified, convert to flux and apparent magnitude
 	if z:
-		from astropy.cosmology import WMAP9
 		dfactor = (WMAP9.luminosity_distance(z).value*1e5)**(-2)*(1+z)
 		luminosity = luminosity*dfactor
 		luminosity_density = luminosity_density*dfactor
@@ -995,7 +1069,8 @@ def integrate_sfh(t1,t2,sfh_params):
 	return tot_sfr
 
 def measure_emline_lum(sps, model = None, obs = None, thetas = None, 
-	                   measure_ir = False, savestr = False, saveplot=True):
+	                   measure_ir = False, savestr = False, saveplot=True,
+	                   spec=None):
 	
 	'''
 	takes spec(on)-spec(off) to measure emission line luminosity
@@ -1026,7 +1101,7 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None,
 		# neboff
 		model.params['add_neb_emission'] = np.array(False)
 		model.params['add_neb_continuum'] = np.array(False)
-		spec_neboff,mags,sm = model.mean_model(thetas, obs, sps=sps)
+		spec_neboff,mags_neboff,sm = model.mean_model(thetas, obs, sps=sps)
 		w = sps.wavelengths
 		model.params['add_neb_emission'] = np.array(True)
 		model.params['add_neb_continuum'] = np.array(True)
@@ -1038,26 +1113,10 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None,
 		model.params['zred'] = z
 
 	else:
-		# save redshift
-		z      = sps.params['zred']
-		sps.params['zred'] = 0.0
-
-		# nebon
-		wa,spec= sps.get_spectrum(tage=0.0,peraa=False)
-
-		# neboff
-		sps.params['add_neb_emission'] = False
-		sps.params['add_neb_continuum'] = False
-		wa, spec_neboff = sps.get_spectrum(tage=0.0,peraa=False)
-		print 1/0
-		sps.params['add_neb_emission'] = True
-		sps.params['add_neb_continuum'] = True
-
-		# subtract, switch to flam
-		factor = 3e18 / w**2
-		spec = (spec-spec_neboff) *factor
-
-		model.params['zred'] = z
+		if spec is None:
+			print 'okay, you need to give me something here'
+			print 1/0
+		w = sps.wavelengths
 
 	emline_flux = np.zeros(len(wavelength))
 	for jj in xrange(len(wavelength)):
@@ -1089,22 +1148,10 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None,
 		mips_index = [i for i, s in enumerate(obs['filters']) if 'mips' in s]
 		if np.sum(mips_index) == 0:
 			mips_index = [i for i, s in enumerate(obs['filters']) if 'MIPS' in s]
-		botlam = np.atleast_1d(8e4-1)
-		toplam = np.atleast_1d(1000e4+1)
-		edgetrans = np.atleast_1d(0)
-		lir_filter = [[np.concatenate((botlam,np.linspace(8e4, 1000e4, num=100),toplam))],
-		              [np.concatenate((edgetrans,np.ones(100),edgetrans))]]
 
-		# calculate z=0 magnitudes
-		spec,mags,sm = model.mean_model(thetas, obs, sps=sps)
-		w = sps.wavelengths
+		lir = return_lir(w,spec, z=None, alt_file=None) # comes out in ergs/s
+		lir /= 3.846e33 #  convert to Lsun
 
-		_,lir     = integrate_mag(w,spec,lir_filter, z=None, alt_file=None) # comes out in ergs/s
-		lir       = lir / 3.846e33 #  convert to Lsun
-
-		# revert to proper redshift, calculate redshifted mips magnitudes
-		model.params['zred'] = np.atleast_1d(z)
-		
 		# if no MIPS flux...
 		try:
 			mips = mags[mips_index][0]*1e10 # comes out in maggies, convert to flux such that AB zeropoint is 25 mags

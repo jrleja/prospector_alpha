@@ -8,8 +8,14 @@ import pickle, math, measure_emline_lum
 import magphys_plot_pref
 import mag_ensemble
 import matplotlib as mpl
+from astropy import constants
 
 c = 3e18   # angstroms per second
+
+#### set up colors and plot style
+prosp_color = '#e60000'
+obs_color = '#95918C'
+magphys_color = '#1974D2'
 
 #### where do the pickle files go?
 outpickle = '/Users/joel/code/magphys/data/pickles'
@@ -360,6 +366,26 @@ def return_sedplot_vars(thetas, sample_results, sps, nufnu=True):
 	# model maggies, observed_maggies-model_maggies/uncertainties
 	return wave_eff, obs_maggies, obs_maggies_unc, mu, (obs_maggies-mu)/obs_maggies_unc, spec, sps.wavelengths
 
+def mask_emission_lines(lam,z):
+
+	# OII, Hbeta, OIII, Halpha, NII, SII
+	lam_temp = lam*1e4
+	mask_lines = np.array([3727, 4861, 4959, 5007, 6563, 6583,6720])*(1.0+z)
+	mask_size = 20 # Angstroms
+	mask = np.ones_like(lam,dtype=bool)
+
+	for line in mask_lines: mask[(lam_temp > line - mask_size) & (lam_temp < line + mask_size)] = 0.0
+
+	return mask
+
+def calc_rms(lam, z, resid):
+
+
+	mask = mask_emission_lines(lam,z)
+	rms = (np.sum((resid[mask]-resid[mask].mean())**2)/np.sum(mask))**0.5
+
+	return rms
+
 def plot_obs_spec(obs_spec, phot, spec_res, alpha, 
 	              modlam, modspec, maglam, magspec,z, 
 	              objname, source, sigsmooth,
@@ -405,15 +431,18 @@ def plot_obs_spec(obs_spec, phot, spec_res, alpha,
 		mag_flux_interp = interp1d(maglam, magspec_smooth,
 		                           bounds_error=False, fill_value=0)
 		magphys_resid = np.log10(obs_spec['flux'][mask]) - np.log10(mag_flux_interp(obslam))
-		spec_res.plot(obslam, 
-			          magphys_resid,
+		nolines = mask_emission_lines(obslam,z)
+
+		spec_res.plot(obslam[nolines], 
+			          magphys_resid[nolines],
 			          color=magphys_color,
 			          alpha=alpha,
 			          linestyle='-')
 
 		#### calculate rms
-		magphys_rms = (np.sum((magphys_resid-magphys_resid.mean())**2)/len(obslam))**0.5
-		prospectr_rms = (np.sum((prospectr_resid-prospectr_resid.mean())**2)/len(obslam))**0.5
+		# mask emission lines
+		magphys_rms = calc_rms(obslam, z, magphys_resid)
+		prospectr_rms = calc_rms(obslam, z, prospectr_resid)
 
 		#### write text, add lines
 		spec_res.text(0.98,0.16, 'RMS='+"{:.2f}".format(prospectr_rms)+' dex',
@@ -504,7 +533,7 @@ def sed_comp_figure(sample_results, sps, model, magphys,
 	# plot the spectrum, photometry, and chi values
 	try:
 		wave_eff, obsmags, obsmags_unc, modmags, chi, modspec, modlam = \
-		return_sedplot_vars(sample_results['quantiles']['maxprob_params'], 
+		return_sedplot_vars(sample_results['bfit']['maxprob_params'], 
 			                sample_results, sps)
 	except KeyError as e:
 		print e
@@ -583,7 +612,9 @@ def sed_comp_figure(sample_results, sps, model, magphys,
 	for ii in xrange(3):
 		
 		if label[ii] == 'Optical':
-			residuals['emlines'] = measure_emline_lum.measure(sample_results, obs_spec, magphys,sps,sigsmooth=sigsmooth[ii])
+			residuals['emlines'] = measure_emline_lum.measure(sample_results, obs_spec, magphys,sps)
+			sigsmooth[ii] = residuals['emlines']['sigsmooth']
+
 		residuals[label[ii]] = plot_obs_spec(obs_spec, phot, resplots[ii], alpha, modlam/1e4, modspec,
 					                         magphys['model']['lam']/1e4, magphys['model']['spec']*spec_fac,
 					                         magphys['metadata']['redshift'], sample_results['run_params']['objname'],
@@ -738,10 +769,11 @@ def collate_data(filebase=None,
 										  custom_filter_key=sample_results['run_params'].get('custom_filter_key',None))
 
 	# load magphys
-	magphys = read_magphys_output(objname=sample_results['run_params']['objname'])
+	objname = sample_results['run_params']['objname']
+	magphys = read_magphys_output(objname=objname)
 
 	# BEGIN PLOT ROUTINE
-	print 'MAKING PLOTS FOR ' + filename + ' in ' + outfolder
+	print 'MAKING PLOTS FOR ' + objname + ' in ' + outfolder
 
 	# sed plot
 	# don't cache emission lines, since we will want to turn them on / off
@@ -750,7 +782,7 @@ def collate_data(filebase=None,
 	# plot
 	residuals = sed_comp_figure(sample_results, sps, copy.deepcopy(sample_results['model']),
 					  magphys, maxprob=1,
-					  outname=outfolder+filename.replace(' ','_')+'.sed.png')
+					  outname=outfolder+objname.replace(' ','_')+'.sed.png')
  		
 	# SAVE OUTPUTS
 	alldata = {}
@@ -780,11 +812,10 @@ def plt_all(runname=None,startup=True,**extras):
 	if startup == True:
 		filebase, parm_basename, ancilname=threed_dutils.generate_basenames(runname)
 		alldata = []
+
 		for jj in xrange(len(filebase)):
 			print 'iteration '+str(jj) 
 
-			#if filebase[jj].split('_')[-1] != 'III Zw 035':
-			#	continue
 
 			dictionary = collate_data(filebase=filebase[jj],\
 			                           outfolder=outfolder,
@@ -798,17 +829,97 @@ def plt_all(runname=None,startup=True,**extras):
 	mag_ensemble.prospectr_comparison(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/pcomp/')
 	mag_ensemble.plot_emline_comp(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/magphys/emlines_comp/')
 	mag_ensemble.plot_relationships(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/magphys/')
-	mag_ensemble.plot_all_residuals(alldata)
+	plot_all_residuals(alldata)
 	mag_ensemble.plot_comparison(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/magphys/')
 
+def add_sfr_info(runname=None, outfolder=None):
+
+	if runname == None:
+		runname = 'brownseds'
+
+	#### load up prospectr results
+	filebase, parm_basename, ancilname=threed_dutils.generate_basenames(runname)
+
+
+
+	output = outpickle+'/alldata.pickle'
+	outname = os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/pcomp/sfrcomp.png'
+
+	with open(output, "rb") as f:
+		alldata=pickle.load(f)
+
+	sps = threed_dutils.setup_sps(custom_filter_key=None)
+
+	sfr_mips_z2, sfr_mips, sfr_uvir, sfr_prosp = [], [], [], []
+	for ii,dat in enumerate(alldata):
+
+		#### load up spec by generating it from model
+		sample_results, powell_results, model = threed_dutils.load_prospectr_data(filebase[ii])
+		maxprob = sample_results['bfit']['maxprob_params']
+		sample_results['model'].params['zred'] = np.array(0.0)
+		spec,mags,sm = sample_results['model'].mean_model(maxprob, sample_results['obs'], sps=sps) # Lsun / Hz
+
+		mips_idx = sample_results['obs']['filters'] == 'MIPS_24'
+
+		obs_mips = sample_results['observables']['mags'][mips_idx,0] # in maggies
+		obs_mips = obs_mips[0] * 3631*1e-23 # to Jy, to erg/s/cm^2/Hz
+
+		z = dat['residuals']['phot']['z']
+
+		# input angstroms, Lsun/Hz
+		# output in erg/s, convert to erg / s
+		luv = threed_dutils.return_luv(sps.wavelengths,spec)/constants.L_sun.cgs.value
+		lir = threed_dutils.return_lir(sps.wavelengths,spec)/constants.L_sun.cgs.value
+
+		# input angstroms, Lsun/Hz
+		# output in apparent magnitude
+		# convert to erg/s/cm^2/Hz
+		mips,_ = threed_dutils.integrate_mag(sps.wavelengths*(1.+z),spec,'MIPS_24um_AEGIS',z=z)
+		mips_fluxdens = 10**((mips+48.60)/(-2.5)) # erg/s/cm^2/Hz
+		mips_z2_mag,_ = threed_dutils.integrate_mag(sps.wavelengths*(1+2.0),spec,'MIPS_24um_AEGIS',z=2.0)
+		mips_z2_fluxdens = 10**((mips_z2_mag+48.60)/(-2.5)) # erg/s/cm^2/Hz
+
+		# goes in in milliJy, comes out in Lsun
+		lir_mips = threed_dutils.mips_to_lir(mips_fluxdens/1e-23/1e-3,z)
+		lir_mips_z2 = threed_dutils.mips_to_lir(mips_z2_fluxdens/1e-23/1e-3,2.0)
+
+		# input in Lsun, output in SFR/yr
+		sfr_uvir.append(threed_dutils.sfr_uvir(lir,luv))
+		sfr_mips.append(threed_dutils.sfr_uvir(lir_mips,luv))
+		sfr_mips_z2.append(threed_dutils.sfr_uvir(lir_mips_z2,luv))
+		sfr_prosp.append(dat['bfit']['sfr_100'])
+
+		print sfr_uvir[-1]
+		print sfr_mips[-1]
+		print sfr_mips_z2[-1]
+		print sfr_prosp[-1]
+
+	fig, ax = plt.subplots(1,3, figsize = (22,8))
+
+	xplot = np.log10(np.clip(sfr_prosp,1e-3,np.inf))
+	yplot = [np.log10(sfr_uvir), np.log10(sfr_mips), np.log10(sfr_mips_z2)]
+	xlabel = r'log(SFR$_{100}$) [Prospectr]'
+	ylabel = [r'log(SFR$_{UV+IR}$)', r'log(SFR$_{UV+IR[mips]}$)',r'log(SFR$_{UV+IR[mips,z=2]}$)']
+
+	for ii in xrange(3):
+		ax[ii].errorbar(xplot, yplot[ii], fmt='o',alpha=0.6,linestyle=' ',color='0.4')
+		ax[ii].set_xlabel(xlabel)
+		ax[ii].set_ylabel(ylabel[ii])
+		ax[ii] = threed_dutils.equalize_axes(ax[ii], xplot, yplot[ii])
+		off,scat = threed_dutils.offset_and_scatter(xplot, yplot[ii], biweight=True)
+		ax[ii].text(0.99,0.05, 'biweight scatter='+"{:.3f}".format(scat) +' dex',
+				  transform = ax[ii].transAxes,horizontalalignment='right')
+		ax[ii].text(0.99,0.1, 'mean offset='+"{:.3f}".format(off)+ ' dex',
+				      transform = ax[ii].transAxes,horizontalalignment='right')
+
+	plt.tight_layout()
+	plt.savefig(outname, dpi=300)
+
+
+	print 1/0
+
 def add_prosp_mag_info(runname=None):
-
-	'''
-	for a list of galaxies, make all plots
-
-	startup: if True, then make all the residual plots and save pickle file
-			 if False, load previous pickle file
-	'''
+	
 	if runname == None:
 		runname = 'brownseds'
 
