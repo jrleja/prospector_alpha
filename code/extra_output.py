@@ -76,7 +76,7 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 	nline = 6 # set by number of lines measured in threed_dutils
 
     ##### initialize output arrays for SFH + emission line posterior draws #####
-	half_time,sfr_10,sfr_100,sfr_1000,ssfr_100,totmass,emp_ha,mips_flux,lir = [np.zeros(shape=(ncalc)) for i in range(9)]
+	half_time,sfr_10,sfr_100,sfr_1000,ssfr_100,totmass,emp_ha,mips_flux,lir,dust_mass = [np.zeros(shape=(ncalc)) for i in range(10)]
 	lineflux = np.empty(shape=(ncalc,nline))
 
 	##### information for empirical emission line calculation ######
@@ -118,6 +118,7 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 		# pass stellar mass to avoid extra model call
 		sfh_params = threed_dutils.find_sfh_params(sample_results['model'],flatchain[jj,:],
 			                                       sample_results['obs'],sps,sm=sm)
+		dust_mass[jj] = sps.dust_mass * sfh_params['mformed']
 
 		##### calculate SFH
 		intsfr[:,jj] = threed_dutils.return_full_sfh(t, sfh_params)
@@ -128,6 +129,7 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 		half_time[jj] = threed_dutils.halfmass_assembly_time(sfh_params,sfh_params['tage'])
 
 		##### calculate time-averaged SFR
+		sfr_inst     = threed_dutils.calculate_sfr(sfh_params, 0.00000000001, minsfr=-np.inf, maxsfr=np.inf)
 		sfr_10[jj]   = threed_dutils.calculate_sfr(sfh_params, 0.01, minsfr=-np.inf, maxsfr=np.inf)
 		sfr_100[jj]  = threed_dutils.calculate_sfr(sfh_params, 0.1,  minsfr=-np.inf, maxsfr=np.inf)
 		sfr_1000[jj] = threed_dutils.calculate_sfr(sfh_params, 1.0,  minsfr=-np.inf, maxsfr=np.inf)
@@ -137,7 +139,7 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 		ssfr_100[jj] = sfr_100[jj] / totmass[jj]
 
 		##### empirical halpha
-		emp_ha[jj] = threed_dutils.synthetic_halpha(sfr_10[jj],flatchain[jj,dust1_index],
+		emp_ha[jj] = threed_dutils.synthetic_halpha(sfr_inst,flatchain[jj,dust1_index],
 			                          flatchain[jj,dust2_index],-1.0,
 			                          flatchain[jj,dust_index_index],
 			                          kriek = (sample_results['model'].params['dust_type'] == 4)[0])
@@ -160,7 +162,7 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 	for kk in xrange(ntheta): q_16[kk], q_50[kk], q_84[kk] = triangle.quantile(sample_results['flatchain'][:,kk], [0.16, 0.5, 0.84])
 	
 	##### CALCULATE Q16,Q50,Q84 FOR EXTRA PARAMETERS
-	extra_flatchain = np.dstack((half_time, sfr_10, sfr_100, sfr_1000, ssfr_100, totmass, emp_ha))[0]
+	extra_flatchain = np.dstack((half_time, sfr_10, sfr_100, sfr_1000, ssfr_100, totmass, emp_ha, dust_mass))[0]
 	nextra = extra_flatchain.shape[1]
 	q_16e, q_50e, q_84e = (np.zeros(nextra)+np.nan for i in range(3))
 	for kk in xrange(nextra): q_16e[kk], q_50e[kk], q_84e[kk] = triangle.quantile(extra_flatchain[:,kk], [0.16, 0.5, 0.84])
@@ -177,7 +179,7 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 
 	#### EXTRA PARAMETER OUTPUTS 
 	extras = {'flatchain': extra_flatchain,
-			  'parnames': np.array(['half_time','sfr_10','sfr_100','sfr_1000','ssfr_100','totmass','emp_ha']),
+			  'parnames': np.array(['half_time','sfr_10','sfr_100','sfr_1000','ssfr_100','totmass','emp_ha','dust_mass']),
 			  'q16': q_16e,
 			  'q50': q_50e,
 			  'q84': q_84e,
@@ -216,6 +218,7 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 	             'mags':mags[:,0]}
 	sample_results['bfit'] = bfit
 
+	print 1/0
 	return sample_results
 
 def post_processing(param_name, add_extra=True, **extras):
