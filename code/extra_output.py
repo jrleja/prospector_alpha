@@ -218,7 +218,6 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 	             'mags':mags[:,0]}
 	sample_results['bfit'] = bfit
 
-	print 1/0
 	return sample_results
 
 def post_processing(param_name, add_extra=True, **extras):
