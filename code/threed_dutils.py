@@ -1208,17 +1208,14 @@ def measure_Dn4000(lam,flux):
 
 def absobs_model(lams):
 
-	from astropy.modeling import functional_models
-
-
 	lams = np.atleast_1d(lams)
 
 	#### ADD ALL MODELS FIRST
 	for ii in xrange(len(lams)):
 		if ii == 0:
-			model = functional_models.Gaussian1D(amplitude=-5e5, mean=lams[ii], stddev=3.0)
+			model = Gaussian1D(amplitude=-5e5, mean=lams[ii], stddev=3.0)
 		else: 
-			model += functional_models.Gaussian1D(amplitude=-5e5, mean=lams[ii], stddev=3.0)
+			model += Gaussian1D(amplitude=-5e5, mean=lams[ii], stddev=3.0)
 
 	#### NOW ADD LINEAR COMPONENT
 	model += functional_models.Linear1D(intercept=1e7)
@@ -1253,7 +1250,41 @@ def measure_hdelta(lam,flux):
 
 	return absflux, abs_eqw
 
+class Gaussian1D(Fittable1DModel):
+	"""
+	One dimensional Gaussian model.
+	stolen from Astropy 1.0.3, which is NOT on odyssey
+	"""
 
+	amplitude = Parameter(default=1)
+	mean = Parameter(default=0)
+	stddev = Parameter(default=1)
+	_bounding_box = 'auto'
+
+	def bounding_box_default(self, factor=5.5):
+
+		x0 = self.mean.value
+		dx = factor * self.stddev
+
+		return (x0 - dx, x0 + dx)
+
+	@staticmethod
+	def evaluate(x, amplitude, mean, stddev):
+		"""
+		Gaussian1D model function.
+		"""
+		return amplitude * np.exp(- 0.5 * (x - mean) ** 2 / stddev ** 2)
+
+	@staticmethod
+	def fit_deriv(x, amplitude, mean, stddev):
+		"""
+		Gaussian1D model function derivatives.
+		"""
+
+		d_amplitude = np.exp(-0.5 / stddev ** 2 * (x - mean) ** 2)
+		d_mean = amplitude * d_amplitude * (x - mean) / stddev ** 2
+		d_stddev = amplitude * d_amplitude * (x - mean) ** 2 / stddev ** 3
+		return [d_amplitude, d_mean, d_stddev]
 
 
 
