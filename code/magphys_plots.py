@@ -826,6 +826,11 @@ def plt_all(runname=None,startup=True,**extras):
 		with open(output, "rb") as f:
 			alldata=pickle.load(f)
 
+	time_res_test = False
+	if time_res_test == True:
+		with open('/Users/joel/code/magphys/data/pickles/old/alldata.pickle', "rb") as f:
+			alldata_low=pickle.load(f)
+		mag_ensemble.time_res_incr_comp(alldata_low,alldata)
 	mag_ensemble.prospectr_comparison(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/pcomp/')
 	mag_ensemble.plot_emline_comp(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/magphys/emlines_comp/')
 	mag_ensemble.plot_relationships(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/magphys/')

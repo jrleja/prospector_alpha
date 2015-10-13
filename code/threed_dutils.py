@@ -477,6 +477,20 @@ def generate_basenames(runname):
 			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+runname+'_'+ids[jj])
 			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
 
+	elif 'virgo' in runname:
+
+		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/virgo/names.txt"
+		ids = np.loadtxt(id_list, dtype='|S20')
+		ngals = len(ids)
+
+		parm_basename = runname+"_params"
+		ancilname=None
+
+		for jj in xrange(ngals):
+			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+runname+'_'+ids[jj])
+			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
+
+
 	else:
 
 		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/"+runname+".ids"
@@ -1080,6 +1094,9 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None,
 	if we pass spec, then avoid the first model call
 
 	flux comes out in Lsun
+
+	if you ever add more emission lines to this, God help you... find all the places where you lazily indexed
+	halpha as 4 and hbeta as 0!
 	'''
 
     # define emission lines
@@ -1096,7 +1113,7 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None,
 		model.params['zred'] = np.array(0.0)
 
 		# nebon
-		spec,mags,sm = model.mean_model(thetas, obs, sps=sps)
+		spec_nebon,mags_nebon,sm = model.mean_model(thetas, obs, sps=sps)
 
 		# neboff
 		model.params['add_neb_emission'] = np.array(False)
@@ -1108,7 +1125,8 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None,
 
 		# subtract, switch to flam
 		factor = 3e18 / w**2
-		spec = (spec-spec_neboff) *factor
+		spec = (spec_nebon-spec_neboff) *factor
+		spec_nebon *= factor
 
 		model.params['zred'] = z
 
@@ -1118,6 +1136,7 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None,
 			print 1/0
 		w = sps.wavelengths
 
+	##### measure emission lines
 	emline_flux = np.zeros(len(wavelength))
 	for jj in xrange(len(wavelength)):
 		integrate_lam = (w > sideband[jj][0]) & (w < sideband[jj][1])
@@ -1142,6 +1161,11 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None,
 			plt.savefig(os.getenv('APPS')+'/threedhst_bsfh/plots/testem/'+emline[jj]+'_'+savestr+'.png',dpi=300)
 			plt.close()
 
+	##### measure absorption lines and Dn4000
+	dn4000 = measure_Dn4000(w,spec_nebon)
+	hdelta_lum,hdelta_eqw = measure_hdelta(w,spec_nebon) # comes out in Lsun and rest-frame EQW
+
+	out = {}
 	if measure_ir:
 
 		# set up filters
@@ -1154,23 +1178,80 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None,
 
 		# if no MIPS flux...
 		try:
-			mips = mags[mips_index][0]*1e10 # comes out in maggies, convert to flux such that AB zeropoint is 25 mags
+			mips = mags_nebon[mips_index][0]*1e10 # comes out in maggies, convert to flux such that AB zeropoint is 25 mags
 		except IndexError:
 			mips = np.nan
 
-		out = {'emline_flux': emline_flux,
-		       'emline_name': emline,
-		       'lir': lir,
-		       'mips': mips}
-	else:
-		out = {'emline_flux': emline_flux,
-			   'emline_name': emline}
+		out['lir'] = lir
+		out['mips'] = mips
+		
+	out['emline_flux'] = emline_flux
+	out['emline_name'] = emline
+	out['dn4000'] = dn4000
+	out['hdelta_lum'] = hdelta_lum
+	out['hdelta_eqw_rest'] = hdelta_eqw
 
 	return out
 
+def measure_Dn4000(lam,flux):
+
+	# D4000, defined as average flux ratio between
+	# [4050,4250] and [3750,3950] (Bruzual 1983; Hamilton 1985)
+
+	# ratio of continuua, measured as defined below 
+	# blue: 3850-3950 . . . 4000-4100 (Balogh 1999)
+
+	blue = (lam > 3850) & (lam < 3950)
+	red  = (lam > 4000) & (lam < 4100)
+
+	return np.mean(flux[red])/np.mean(flux[blue])
+
+def absobs_model(lams):
+
+	from astropy.modeling import functional_models
 
 
+	lams = np.atleast_1d(lams)
 
+	#### ADD ALL MODELS FIRST
+	for ii in xrange(len(lams)):
+		if ii == 0:
+			model = functional_models.Gaussian1D(amplitude=-5e5, mean=lams[ii], stddev=3.0)
+		else: 
+			model += functional_models.Gaussian1D(amplitude=-5e5, mean=lams[ii], stddev=3.0)
+
+	#### NOW ADD LINEAR COMPONENT
+	model += functional_models.Linear1D(intercept=1e7)
+
+	return model
+
+def measure_hdelta(lam,flux):
+
+	from astropy.modeling import fitting
+
+	abs_wave = 4101.74 
+	abs_bbox  = (4020,4200)
+
+	fig, axarr = plt.subplots(1, 1, figsize = (8,8))
+
+	#### define model, fitter
+	absmod = absobs_model(abs_wave)
+	fitter = fitting.LevMarLSQFitter()
+
+	#### define fit region
+	p_idx = (lam > abs_bbox[0]) & (lam < abs_bbox[1])
+	fit_lam = lam[p_idx]
+	fit_dat = flux[p_idx]
+
+	##### smooth
+	fit_smooth = smooth_spectrum(fit_lam,fit_dat,200,minlam=3000,maxlam=5000)
+
+	##### fit, save flux and eqw
+	fit = fitter(absmod, fit_lam, fit_smooth, maxiter=1000)
+	absflux = fit.amplitude_0.value*np.sqrt(2*np.pi*fit.stddev_0.value**2)
+	abs_eqw = absflux / fit[1](abs_wave)
+
+	return absflux, abs_eqw
 
 
 

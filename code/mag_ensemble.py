@@ -70,7 +70,7 @@ def ret_inf(alldata,field, model='Prospectr',name=None):
 		else:
 			return np.squeeze(np.array([f['residuals']['emlines'][model][field] if f['residuals']['emlines'] is not None else fillvalue for f in alldata])[:,idx])
 
-def compare_moustakas_fluxes(alldata,dat,emline_names,objnames,outname='test.png',outdec='bdec.png'):
+def compare_moustakas_fluxes(alldata,dat,emline_names,objnames,outname='test.png',outdec='bdec.png',model='Prospectr'):
 
 	##########
 	#### extract info for objects with measurements in both catalogs
@@ -100,10 +100,10 @@ def compare_moustakas_fluxes(alldata,dat,emline_names,objnames,outname='test.png
 	##### grab Prospectr information
 	ind = np.array(idx_moust,dtype=bool)
 
-	xplot = remove_doublets(np.transpose(ret_inf(alldata,'flux',model='Prospectr')),emline_names)[:,ind]
-	xplot_errup = remove_doublets(np.transpose(ret_inf(alldata,'flux_errup',model='Prospectr')),emline_names)[:,ind]
-	xplot_errdown = remove_doublets(np.transpose(ret_inf(alldata,'flux_errdown',model='Prospectr')),emline_names)[:,ind]
-	eqw = remove_doublets(np.transpose(ret_inf(alldata,'eqw_rest',model='Prospectr'))[:,0,:],emline_names)[:,ind]
+	xplot = remove_doublets(np.transpose(ret_inf(alldata,'flux',model=model)),emline_names)[:,ind]
+	xplot_errup = remove_doublets(np.transpose(ret_inf(alldata,'flux_errup',model=model)),emline_names)[:,ind]
+	xplot_errdown = remove_doublets(np.transpose(ret_inf(alldata,'flux_errdown',model=model)),emline_names)[:,ind]
+	eqw = remove_doublets(np.transpose(ret_inf(alldata,'eqw_rest',model=model))[:,0,:],emline_names)[:,ind]
 
 	#### plot information
 	# remove NaNs from Moustakas here, which are presumably emission lines
@@ -138,13 +138,15 @@ def compare_moustakas_fluxes(alldata,dat,emline_names,objnames,outname='test.png
 			              fmt='o', alpha=0.6,
 			              linestyle=' ')
 
-		axes[ii].set_ylabel('Moustakas+10 - measured '+emline_names_doubrem[ii])
+		axes[ii].set_ylabel('log(Moustakas+10/measured) '+emline_names_doubrem[ii])
 		axes[ii].set_xlabel('EQW '+emline_names_doubrem[ii])
 		off,scat = threed_dutils.offset_and_scatter(np.log10(xp),np.log10(yp),biweight=True)
 		axes[ii].text(0.99,0.05, 'biweight scatter='+"{:.3f}".format(scat) +' dex',
 				  transform = axes[ii].transAxes,horizontalalignment='right')
 		axes[ii].text(0.99,0.1, 'mean offset='+"{:.3f}".format(off) + ' dex',
 			      transform = axes[ii].transAxes,horizontalalignment='right')
+		axes[ii].axhline(0, linestyle=':', color='grey')
+
 
 		# print outliers
 		diff = np.log10(xp) - np.log10(yp)
@@ -204,14 +206,14 @@ def compare_model_flux(alldata, emline_names, outname = 'test.png'):
 		magdat = np.log10(ret_inf(alldata,'lum',model='MAGPHYS',name=emname)) 
 		prodat = np.log10(ret_inf(alldata,'lum',model='Prospectr',name=emname)) 
 		yplot = prodat-magdat
-		xplot = ret_inf(alldata,'eqw_rest',model='Prospectr',name=emname)
+		xplot = np.log10(ret_inf(alldata,'eqw_rest',model='Prospectr',name=emname))
 		idx = np.isfinite(yplot)
 
 		axes[ii].plot(xplot[idx,0], yplot[idx], 
 			    	  'o',
 			    	  alpha=0.6)
 		
-		xlabel = r"{0} EQW [Prospectr]"
+		xlabel = r"log({0} EQW) [Prospectr]"
 		ylabel = r"log(Prosp/MAGPHYS) [{0} flux]"
 		axes[ii].set_xlabel(xlabel.format(emname))
 		axes[ii].set_ylabel(ylabel.format(emname))
@@ -230,7 +232,7 @@ def compare_model_flux(alldata, emline_names, outname = 'test.png'):
 	plt.savefig(outname,dpi=300)
 	plt.close()	
 
-def obs_vs_ks_ha(alldata,emline_names,obs_info,outname='test.png',outname_cloudy='test_cloudy.png'):
+def obs_vs_kennicutt_ha(alldata,emline_names,obs_info,outname='test.png',outname_cloudy='test_cloudy.png'):
 	
 	#################
 	#### plot observed Halpha versus model Halpha from Kennicutt relationship
@@ -249,22 +251,40 @@ def obs_vs_ks_ha(alldata,emline_names,obs_info,outname='test.png',outname_cloudy
 
 	parnames = alldata[0]['pquantiles']['parnames']
 	met_idx = parnames == 'logzsol'
+	slope_idx = parnames == 'sf_tanslope'
+	trunc_idx = parnames == 'delt_trunc'
+	tage_idx = parnames == 'tage'
+
+	##### below code is to calculate SFR_1 Myr
+	runname = 'brownseds'
+	#### load up prospectr results
+	filebase, parm_basename, ancilname=threed_dutils.generate_basenames(runname)
+	sps = threed_dutils.setup_sps(custom_filter_key=None)
+
 
 	##### Pull out empirical Halphas from MAGPHYS + Prospectr
 	##### observed Halphas from pipeline (convert to luminosity)
-	ha_mag, ha_pro, pmet, cloudy_ha = [], [], [], []
+	ha_mag, ha_pro, pmet, cloudy_ha, pslope, ptrunc, ptage, psfr, pssfr, pattn, pd1, pd2, pdind,sfr_1 = [], [], [], [], [], [], [], [], [], [], [], [], [], []
 	for ii,dat in enumerate(alldata):
 
-		#tau1 = dat['bfit']['maxprob_params'][parnames == 'dust1'][0]
-		#tau2 = dat['bfit']['maxprob_params'][parnames == 'dust2'][0]
-		#dind = dat['bfit']['maxprob_params'][parnames == 'dust_index'][0]
-		#ha_pro.append(threed_dutils.synthetic_halpha(dat['bfit']['sfr_100'], tau1, tau2, -1.0, dind))
-		ha_pro.append(dat['bfit']['emp_ha'])
+		'''
+		#### calculate sfr_1myr
+		sample_results, powell_results, model = threed_dutils.load_prospectr_data(filebase[ii])
+		maxprob = sample_results['bfit']['maxprob_params']
+		sfh_params = threed_dutils.find_sfh_params(sample_results['model'],maxprob,
+	                                       sample_results['obs'],sps)
+		sfr_1.append(threed_dutils.calculate_sfr(sfh_params, 0.001, minsfr=-np.inf, maxsfr=np.inf))
+		'''
+
+		# best-fit empirical Halpha, for Prospectr
+		ha_pro.append(threed_dutils.synthetic_halpha(dat['bfit']['sfr_100'], dat['bfit']['maxprob_params'][parnames == 'dust1'][0], dat['bfit']['maxprob_params'][parnames == 'dust2'][0], -1.0, dat['bfit']['maxprob_params'][parnames == 'dust_index'][0]))
+		#ha_pro.append(dat['bfit']['emp_ha'])
+
 
 		tau1 = (1-dat['model']['parameters'][mu_idx][0])*dat['model']['parameters'][tauv_idx][0]
 		tau2 = dat['model']['parameters'][mu_idx][0]*dat['model']['parameters'][tauv_idx][0]
 		
-		ha_mag.append(threed_dutils.synthetic_halpha(dat['bfit']['sfr_10'], tau1, tau2, -1.3, -0.7))
+		ha_mag.append(threed_dutils.synthetic_halpha(dat['model']['parameters'][dat['model']['parnames'] == 'SFR'][0], tau1, tau2, -1.3, -0.7))
 		#ha_mag.append(threed_dutils.synthetic_halpha(dat['model']['parameters'][dat['model']['parnames'] == 'SFR'][0], tau1, tau2, -1.3, -0.7))
 
 		pc2cm = 3.08567758e18
@@ -272,13 +292,39 @@ def obs_vs_ks_ha(alldata,emline_names,obs_info,outname='test.png',outname_cloudy
 		dfactor = (4*np.pi*distance**2)
 		f_ha[ii] = f_ha[ii] * dfactor
 
-		pmet.append(dat['bfit']['maxprob_params'][met_idx][0])
 		cloudy_ha.append(obs_info['model_ha'][ii]*dfactor)
+
+		# prospectr info
+		pmet.append(dat['bfit']['maxprob_params'][met_idx][0])
+		pslope.append(dat['bfit']['maxprob_params'][slope_idx][0])
+		ptrunc.append(dat['bfit']['maxprob_params'][trunc_idx][0])
+		ptage.append(dat['bfit']['maxprob_params'][tage_idx][0])
+		psfr.append(dat['bfit']['sfr_10'])
+		pssfr.append(psfr[-1]/dat['bfit']['maxprob_params'][0])
+		tau1 = dat['bfit']['maxprob_params'][parnames == 'dust1'][0]
+		tau2 = dat['bfit']['maxprob_params'][parnames == 'dust2'][0]
+		dind = dat['bfit']['maxprob_params'][parnames == 'dust_index'][0]
+		pattn.append(threed_dutils.charlot_and_fall_extinction(6563, tau1, tau2, -1.0, dind))
+		pd1.append(tau1)
+		pd2.append(tau2)
+		pdind.append(dind)
+
 
 	ha_mag = np.log10(np.array(ha_mag)[keep_idx])
 	ha_pro = np.log10(np.array(ha_pro)[keep_idx])
 	ha_cloudy = np.log10(np.array(cloudy_ha)[keep_idx])
 	pmet = np.array(pmet)[keep_idx]
+	pslope = np.array(pslope)[keep_idx]
+	ptrunc = np.array(ptrunc)[keep_idx]
+	ptage = np.array(ptage)[keep_idx]
+	psfr = np.array(psfr)[keep_idx]
+	pssfr = np.array(pssfr)[keep_idx]
+	pattn = np.array(pattn)[keep_idx]
+	pd1 = np.array(pd1)[keep_idx]
+	pd2 = np.array(pd2)[keep_idx]
+	pdind = np.array(pdind)[keep_idx]
+
+
 
 	fig, ax = plt.subplots(1,3, figsize = (22,6))
 
@@ -297,20 +343,16 @@ def obs_vs_ks_ha(alldata,emline_names,obs_info,outname='test.png',outname_cloudy
 	ax[1].set_ylabel(r'log(H$_{\alpha}$) [observed]')
 	ax[1] = threed_dutils.equalize_axes(ax[1], ha_mag, np.log10(f_ha[keep_idx]))
 	off,scat = threed_dutils.offset_and_scatter(ha_mag, np.log10(f_ha[keep_idx]),biweight=True)
-	ax[1].text(0.99,0.05, 'biweight scatter='+"{:.3f}".format(scat) +' dex',
-			  transform = ax[1].transAxes,horizontalalignment='right')
-	ax[1].text(0.99,0.1, 'mean offset='+"{:.3f}".format(off)+ ' dex',
-			      transform = ax[1].transAxes,horizontalalignment='right')
+	ax[1].text(0.99,0.05, 'biweight scatter='+"{:.3f}".format(scat) +' dex', transform = ax[1].transAxes,horizontalalignment='right')
+	ax[1].text(0.99,0.1, 'mean offset='+"{:.3f}".format(off)+ ' dex', transform = ax[1].transAxes,horizontalalignment='right')
 
 	ax[2].errorbar(ha_pro, np.log10(f_ha[keep_idx]), fmt='o',alpha=0.6,linestyle=' ')
 	ax[2].set_xlabel(r'log(Kennicutt H$_{\alpha}$) [Prospectr]')
 	ax[2].set_ylabel(r'log(H$_{\alpha}$) [observed]')
 	ax[2] = threed_dutils.equalize_axes(ax[2], ha_pro, np.log10(f_ha[keep_idx]))
 	off,scat = threed_dutils.offset_and_scatter(ha_pro, np.log10(f_ha[keep_idx]),biweight=True)
-	ax[2].text(0.99,0.05, 'biweight scatter='+"{:.3f}".format(scat) +' dex',
-			  transform = ax[2].transAxes,horizontalalignment='right')
-	ax[2].text(0.99,0.1, 'mean offset='+"{:.3f}".format(off)+ ' dex',
-			      transform = ax[2].transAxes,horizontalalignment='right')
+	ax[2].text(0.99,0.05, 'biweight scatter='+"{:.3f}".format(scat) +' dex', transform = ax[2].transAxes,horizontalalignment='right')
+	ax[2].text(0.99,0.1, 'mean offset='+"{:.3f}".format(off)+ ' dex', transform = ax[2].transAxes,horizontalalignment='right')
 
 
 	plt.savefig(outname,dpi=300)
@@ -318,24 +360,58 @@ def obs_vs_ks_ha(alldata,emline_names,obs_info,outname='test.png',outname_cloudy
 
 	fig, ax = plt.subplots(1,2, figsize = (16,8))
 
-	ax[0].errorbar(ha_pro, ha_cloudy[:,0], fmt='o',alpha=0.6,linestyle=' ')
+	ax[0].errorbar(ha_pro, ha_cloudy[:,0], fmt='o',alpha=0.6,linestyle=' ',color='0.4')
 	ax[0].set_xlabel(r'log(Kennicutt H$_{\alpha}$) [Prospectr]')
 	ax[0].set_ylabel(r'log(CLOUDY H$_{\alpha}$) [Prospectr]')
 	ax[0] = threed_dutils.equalize_axes(ax[0], ha_pro, ha_cloudy[:,0])
 	off,scat = threed_dutils.offset_and_scatter(ha_pro, ha_cloudy[:,0],biweight=True)
-	ax[0].text(0.99,0.05, 'biweight scatter='+"{:.3f}".format(scat) +' dex',
-			  transform = ax[0].transAxes,horizontalalignment='right')
-	ax[0].text(0.99,0.1, 'mean offset='+"{:.3f}".format(off)+ ' dex',
-			      transform = ax[0].transAxes,horizontalalignment='right')
+	ax[0].text(0.99,0.05, 'biweight scatter='+"{:.3f}".format(scat) +' dex', transform = ax[0].transAxes,horizontalalignment='right')
+	ax[0].text(0.99,0.1, 'mean offset='+"{:.3f}".format(off)+ ' dex', transform = ax[0].transAxes,horizontalalignment='right')
 
-	ax[1].errorbar(ha_pro-ha_cloudy[:,0],pmet, fmt='o',alpha=0.6,linestyle=' ')
-	ax[1].set_xlabel(r'log(Kennicutt/COUDY H$_{\alpha}$) [Prospectr]')
-	ax[1].set_ylabel(r'metallicity [Prospectr]')
+	#cm = plt.cm.get_cmap('RdYlBu')
+	#sc=ax[1].scatter(pmet, ha_pro-ha_cloudy[:,0], c=pslope, marker='o',alpha=0.6,linewidth=1.0,cmap=cm)
+	#plt.colorbar(sc)
+	ax[1].errorbar(pmet, ha_pro-ha_cloudy[:,0],fmt='o', alpha=0.6, linestyle=' ', color='0.4')
+	ax[1].set_ylabel(r'log(Kennicutt/CLOUDY H$_{\alpha}$) [Prospectr]')
+	ax[1].set_xlabel(r'log(metallicity) [Prospectr]')
 
+	plt.tight_layout()
 	plt.savefig(outname_cloudy,dpi=300)
 	plt.close()
 
-def obs_vs_prosp_ha(alldata,emline_names,keep_idx,outname='test.png'):
+	# trunc time versus Halpha flux
+	fig, ax = plt.subplots(1,2, figsize = (16,8))
+
+	trunc_time = np.log10(ptage*(1-ptrunc))
+	ax[0].errorbar(ha_cloudy[:,0], trunc_time, fmt='o',alpha=0.6,linestyle=' ',color='0.4')
+	ax[0].set_xlabel(r'log(CLOUDY H$_{\alpha}$) [Prospectr]')
+	ax[0].set_ylabel(r'log(time since truncation) [Gyr]')
+
+	recent = trunc_time < 0.0
+	ax[1].errorbar(ha_cloudy[recent,0], pslope[recent], fmt='o',alpha=0.6,linestyle=' ',color='red')
+	ax[1].errorbar(ha_cloudy[~recent,0], pslope[~recent], fmt='o',alpha=0.6,linestyle=' ',color='0.4')
+	ax[1].set_xlabel(r'log(CLOUDY H$_{\alpha}$) [Prospectr]')
+	ax[1].set_ylabel(r'tan(sf_slope)')
+	ax[1].text(0.99,0.05, 'truncated in last Gyr', transform = ax[1].transAxes,horizontalalignment='right',color='red')
+
+
+	plt.tight_layout()
+	plt.savefig('/Users/joel/code/python/threedhst_bsfh/plots/brownseds/pcomp/cloudyha_versus_truncation.png',dpi=300)
+	plt.close()
+
+	# trunc_time < 1 Gyr, slope versus Halpha flux
+	recent = trunc_time < 0.0
+	fig, ax = plt.subplots(1,1, figsize = (8,8))
+
+	ax.errorbar(ha_cloudy[recent,0], pslope[recent], fmt='o',alpha=0.6,linestyle=' ',color='0.4')
+	ax.set_xlabel(r'log(CLOUDY H$_{\alpha}$) [Prospectr]')
+	ax.set_ylabel(r'log(time since truncation) [Gyr]')
+
+	plt.tight_layout()
+	plt.savefig('/Users/joel/code/python/threedhst_bsfh/plots/brownseds/pcomp/cloudyha_versus_slope.png',dpi=300)
+	plt.close()
+
+def obs_vs_prosp_ha(alldata,emline_names,keep_idx,outname='test.png',model='Prospectr'):
 
 	#################
 	#### plot observed Halpha versus expected (PROSPECTR ONLY)
@@ -343,9 +419,9 @@ def obs_vs_prosp_ha(alldata,emline_names,keep_idx,outname='test.png'):
 	# first pull out observed Halphas
 	# add an S/N cut... ? remove later maybe
 
-	f_ha = ret_inf(alldata,'flux',model='Prospectr',name='H$\\alpha$')
-	f_ha_errup = ret_inf(alldata,'flux_errup',model='Prospectr',name='H$\\alpha$')
-	f_ha_errdown = ret_inf(alldata,'flux_errdown',model='Prospectr',name='H$\\alpha$')
+	f_ha = ret_inf(alldata,'flux',model=model,name='H$\\alpha$')
+	f_ha_errup = ret_inf(alldata,'flux_errup',model=model,name='H$\\alpha$')
+	f_ha_errdown = ret_inf(alldata,'flux_errdown',model=model,name='H$\\alpha$')
 
 	ha_p_idx = alldata[0]['model_emline']['name'] == 'Halpha'
 	model_ha = np.zeros(shape=(len(alldata),3))
@@ -472,6 +548,7 @@ def obs_vs_model_bdec(alldata,emline_names,outname='test.png'):
 	# remove AGNs from this plot
 
 	sn_cut = 5
+	eqw_cut = 3
 
 	f_ha = ret_inf(alldata,'flux',model='Prospectr',name='H$\\alpha$')
 	err_ha = (ret_inf(alldata,'flux_errup',model='Prospectr',name='H$\\alpha$') - ret_inf(alldata,'flux_errdown',model='Prospectr',name='H$\\alpha$'))/2.
@@ -489,7 +566,7 @@ def obs_vs_model_bdec(alldata,emline_names,outname='test.png'):
 
 	#### for now, aggressive S/N cuts
 	# S/N(Ha) > 10, S/N (Hbeta) > 10
-	keep_idx = np.squeeze((sn_ha > sn_cut) & (sn_hb > sn_cut) & (eqw_ha[:,0] > 3) & (eqw_hb[:,0] > 3))
+	keep_idx = np.squeeze((sn_ha > sn_cut) & (sn_hb > sn_cut) & (eqw_ha[:,0] > eqw_cut) & (eqw_hb[:,0] > eqw_cut))
 
 	
 
@@ -741,16 +818,16 @@ def plot_emline_comp(alldata,outfolder):
 	##### do work
 	compare_model_flux(alldata,emline_names,outname = outfolder+'continuum_model_flux_comparison.png')
 	compare_moustakas_fluxes(alldata,dat,emline_names,objnames,
-							 outname=outfolder+'continuum_model_flux_comparison.png',
+							 outname=outfolder+'moustakas_comparison.png',
 							 outdec=outfolder+'balmer_dec_comparison.png')
 	
 	bdec_info = obs_vs_model_bdec(alldata,emline_names, outname=outfolder+'bdec_comparison.png')
 	obs_vs_model_hdelta_dn(alldata,outname=outfolder+'hdelta_dn_comp.png')
 
 	obs_info = obs_vs_prosp_ha(alldata,emline_names,bdec_info['keep_idx'],outname=outfolder+'halpha_comparison.png')
-	obs_vs_ks_ha(alldata,emline_names,obs_info,
-		         outname=outfolder+'ks_comparison.png',
-		         outname_cloudy=outfolder+'ks_cloudy.png')
+	obs_vs_kennicutt_ha(alldata,emline_names,obs_info,
+		         outname=outfolder+'kennicutt_comparison.png',
+		         outname_cloudy=outfolder+'kennicutt_cloudy.png')
 	residual_plots(alldata,obs_info, bdec_info)
 
 def plot_relationships(alldata,outfolder):
@@ -1218,3 +1295,126 @@ def plot_comparison(alldata,outfolder):
 	plt.tight_layout()
 	plt.savefig(outfolder+'basic_comparison.png',dpi=300)
 	plt.close()
+
+def time_res_incr_comp(alldata_2,alldata_7):
+
+	'''
+	compare time_res_incr = 2, 7. input is 7. load 2 separately.
+	'''
+
+	mass_2 = np.array([f['bfit']['maxprob_params'][0] for f in alldata_2])
+	mass_7 = np.array([f['bfit']['maxprob_params'][0] for f in alldata_7])
+
+	sfr_2 = np.log10(np.clip([f['bfit']['sfr_100'] for f in alldata_2],1e-4,np.inf))
+	sfr_7 = np.log10(np.clip([f['bfit']['sfr_100'] for f in alldata_7],1e-4,np.inf))
+
+	fig, ax = plt.subplots(1,2, figsize = (18,8))
+
+	ax[0].errorbar(np.log10(mass_2), np.log10(mass_7), fmt='o',alpha=0.6,linestyle=' ',color='0.4')
+	ax[0].set_xlabel(r'log(best-fit M/M$_{\odot}$) [tres = 2]')
+	ax[0].set_ylabel(r'log(best-fit M/M$_{\odot}$) [tres = 7]')
+	ax[0] = threed_dutils.equalize_axes(ax[0], np.log10(mass_2),np.log10(mass_7))
+	off,scat = threed_dutils.offset_and_scatter(np.log10(mass_2),np.log10(mass_7),biweight=True)
+	ax[0].text(0.99,0.05, 'biweight scatter='+"{:.3f}".format(scat),
+			  transform = ax[0].transAxes,horizontalalignment='right')
+	ax[0].text(0.99,0.1, 'mean offset='+"{:.3f}".format(off),
+			      transform = ax[0].transAxes,horizontalalignment='right')
+
+	ax[1].errorbar(sfr_2,sfr_7, fmt='o',alpha=0.6,linestyle=' ',color='0.4')
+	ax[1].set_xlabel(r'log(best-fit SFR) [tres = 2]')
+	ax[1].set_ylabel(r'log(best-fit SFR) [tres = 7]')
+	ax[1] = threed_dutils.equalize_axes(ax[1], sfr_2,sfr_7)
+	off,scat = threed_dutils.offset_and_scatter(sfr_2,sfr_7,biweight=True)
+	ax[1].text(0.99,0.05, 'biweight scatter='+"{:.3f}".format(scat),
+			  transform = ax[1].transAxes,horizontalalignment='right')
+	ax[1].text(0.99,0.1, 'mean offset='+"{:.3f}".format(off),
+			      transform = ax[1].transAxes,horizontalalignment='right')
+
+	plt.savefig(os.getenv('APPS')+'/threedhst_bsfh/plots/brownseds/pcomp/bestfit_mass_sfr_comp.png',dpi=300)
+	plt.close()
+
+	nparams = len(alldata_2[0]['bfit']['maxprob_params'])
+	parnames = alldata_2[0]['pquantiles']['parnames']
+	fig, ax = plt.subplots(4,3, figsize = (23/1.5,30/1.5))
+	ax = np.ravel(ax)
+	for ii in xrange(nparams):
+		
+		cent2 = np.array([dat['pquantiles']['q50'][ii] for dat in alldata_2])
+		up2 = np.array([dat['pquantiles']['q84'][ii] for dat in alldata_2])
+		down2 = np.array([dat['pquantiles']['q16'][ii] for dat in alldata_2])
+
+		cent7 = np.array([dat['pquantiles']['q50'][ii] for dat in alldata_7])
+		up7 = np.array([dat['pquantiles']['q84'][ii] for dat in alldata_7])
+		down7 = np.array([dat['pquantiles']['q16'][ii] for dat in alldata_7])
+
+		if ii == 0:
+			errs2 = threed_dutils.asym_errors(cent2, up2, down2, log=True)
+			cent2 = np.log10(cent2)
+			errs7 = threed_dutils.asym_errors(cent7, up7, down7, log=True)
+			cent7 = np.log10(cent7)
+		else:
+			errs2 = threed_dutils.asym_errors(cent2, up2, down2, log=False)
+			errs7 = threed_dutils.asym_errors(cent7, up7, down7, log=False)
+
+		ax[ii].errorbar(cent2,cent7,xerr=errs2,yerr=errs7,fmt='o',color='0.4',alpha=0.6)
+		ax[ii].set_xlabel(parnames[ii]+' tres=2')
+		ax[ii].set_ylabel(parnames[ii]+' tres=7')
+
+		ax[ii] = threed_dutils.equalize_axes(ax[ii], cent2,cent7)
+		off,scat = threed_dutils.offset_and_scatter(cent2,cent7,biweight=True)
+		ax[ii].text(0.99,0.05, 'biweight scatter='+"{:.3f}".format(scat),
+			  transform = ax[ii].transAxes,horizontalalignment='right')
+		ax[ii].text(0.99,0.1, 'mean offset='+"{:.3f}".format(off),
+			      transform = ax[ii].transAxes,horizontalalignment='right')
+
+	plt.tight_layout()
+	plt.savefig(os.getenv('APPS')+'/threedhst_bsfh/plots/brownseds/pcomp/model_params_comp.png',dpi=100)
+	plt.close()
+
+	nparams = len(alldata_2[0]['pextras']['parnames'])
+	parnames = alldata_2[0]['pextras']['parnames']
+	fig, ax = plt.subplots(3,3, figsize = (18,18))
+	ax = np.ravel(ax)
+	for ii in xrange(nparams):
+		
+		cent2 = np.array([dat['pextras']['q50'][ii] for dat in alldata_2])
+		up2 = np.array([dat['pextras']['q84'][ii] for dat in alldata_2])
+		down2 = np.array([dat['pextras']['q16'][ii] for dat in alldata_2])
+
+		cent7 = np.array([dat['pextras']['q50'][ii] for dat in alldata_7])
+		up7 = np.array([dat['pextras']['q84'][ii] for dat in alldata_7])
+		down7 = np.array([dat['pextras']['q16'][ii] for dat in alldata_7])
+
+		errs2 = threed_dutils.asym_errors(cent2, up2, down2, log=True)
+		errs7 = threed_dutils.asym_errors(cent7, up7, down7, log=True)
+		if 'ssfr' in parnames[ii]:
+			cent2 = np.log10(np.clip(cent2,1e-13,np.inf))
+			cent7 = np.log10(np.clip(cent7,1e-13,np.inf))
+		elif 'sfr' in parnames[ii]:
+			cent2 = np.log10(np.clip(cent2,1e-4,np.inf))
+			cent7 = np.log10(np.clip(cent7,1e-4,np.inf))
+		elif 'emp_ha' in parnames[ii]:
+			cent2 = np.log10(np.clip(cent2,1e37,np.inf))
+			cent7 = np.log10(np.clip(cent7,1e37,np.inf))
+		else:
+			cent2 = np.log10(cent2)
+			cent7 = np.log10(cent7)
+
+
+		ax[ii].errorbar(cent2,cent7,xerr=errs2,yerr=errs7,fmt='o',color='0.4',alpha=0.6)
+		ax[ii].set_xlabel('log('+parnames[ii]+') tres=2')
+		ax[ii].set_ylabel('log('+parnames[ii]+') tres=7')
+
+		ax[ii] = threed_dutils.equalize_axes(ax[ii], cent2,cent7)
+		off,scat = threed_dutils.offset_and_scatter(cent2,cent7,biweight=True)
+		ax[ii].text(0.99,0.05, 'biweight scatter='+"{:.3f}".format(scat)+' dex',
+			  transform = ax[ii].transAxes,horizontalalignment='right')
+		ax[ii].text(0.99,0.1, 'mean offset='+"{:.3f}".format(off)+ 'dex',
+			      transform = ax[ii].transAxes,horizontalalignment='right')
+
+	plt.tight_layout()
+	plt.savefig(os.getenv('APPS')+'/threedhst_bsfh/plots/brownseds/pcomp/derived_params_comp.png',dpi=100)
+	plt.close()
+
+
+
