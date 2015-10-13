@@ -159,8 +159,8 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 		mips_flux[jj]  = modelout['mips']
 		lir[jj]        = modelout['lir']
 
-		hdelta_flux[jj] = modelout['hdelta_lum']
-		hdelta_eqw_rest[jj] = modelout['hdelta_eqw_rest']
+		#hdelta_flux[jj] = modelout['hdelta_lum']
+		#hdelta_eqw_rest[jj] = modelout['hdelta_eqw_rest']
 		dn4000[jj] = modelout['dn4000']
 
 

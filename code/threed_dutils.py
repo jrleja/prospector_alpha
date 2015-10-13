@@ -8,8 +8,6 @@ from calc_ml import load_filter_response
 from bsfh.likelihood import LikelihoodFunction
 from astropy.cosmology import WMAP9
 import copy
-from astropy.modeling.core import Fittable1DModel
-from astropy.modeling import Parameter
 
 def return_lir(lam,spec,z=None,alt_file=None):
 
@@ -1086,7 +1084,7 @@ def integrate_sfh(t1,t2,sfh_params):
 
 def measure_emline_lum(sps, model = None, obs = None, thetas = None, 
 	                   measure_ir = False, savestr = False, saveplot=True,
-	                   spec=None):
+	                   spec=None, hdelta = False):
 	
 	'''
 	takes spec(on)-spec(off) to measure emission line luminosity
@@ -1099,7 +1097,12 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None,
 
 	if you ever add more emission lines to this, God help you... find all the places where you lazily indexed
 	halpha as 4 and hbeta as 0!
+
+	measuring hdelta requires an updated version of Astropy, which is currently not available on Odyssey
+	it's turned off for now, will just use best fits
 	'''
+	out = {}
+
 
     # define emission lines
 	emline = np.array(['[OII]','Hbeta','[OIII]1','[OIII]2','Halpha','[SII]'])
@@ -1165,9 +1168,11 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None,
 
 	##### measure absorption lines and Dn4000
 	dn4000 = measure_Dn4000(w,spec_nebon)
-	hdelta_lum,hdelta_eqw = measure_hdelta(w,spec_nebon) # comes out in Lsun and rest-frame EQW
+	if hdelta:
+		hdelta_lum,hdelta_eqw = measure_hdelta(w,spec_nebon) # comes out in Lsun and rest-frame EQW
+		out['hdelta_lum'] = hdelta_lum
+		out['hdelta_eqw_rest'] = hdelta_eqw
 
-	out = {}
 	if measure_ir:
 
 		# set up filters
@@ -1190,8 +1195,6 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None,
 	out['emline_flux'] = emline_flux
 	out['emline_name'] = emline
 	out['dn4000'] = dn4000
-	out['hdelta_lum'] = hdelta_lum
-	out['hdelta_eqw_rest'] = hdelta_eqw
 
 	return out
 
@@ -1210,17 +1213,19 @@ def measure_Dn4000(lam,flux):
 
 def absobs_model(lams):
 
+	from astropy.modeling import functional_models
+
 	lams = np.atleast_1d(lams)
 
 	#### ADD ALL MODELS FIRST
 	for ii in xrange(len(lams)):
 		if ii == 0:
-			model = Gaussian1D(amplitude=-5e5, mean=lams[ii], stddev=3.0)
+			model = functional_models.Gaussian1D(amplitude=-5e5, mean=lams[ii], stddev=3.0)
 		else: 
-			model += Gaussian1D(amplitude=-5e5, mean=lams[ii], stddev=3.0)
+			model += functional_models.Gaussian1D(amplitude=-5e5, mean=lams[ii], stddev=3.0)
 
 	#### NOW ADD LINEAR COMPONENT
-	model += Linear1D(intercept=1e7)
+	model += functional_models.Linear1D(intercept=1e7)
 
 	return model
 
@@ -1252,61 +1257,8 @@ def measure_hdelta(lam,flux):
 
 	return absflux, abs_eqw
 
-class Gaussian1D(Fittable1DModel):
-	"""
-	One dimensional Gaussian model.
-	stolen from Astropy 1.0.3, which is NOT on odyssey
-	"""
 
-	amplitude = Parameter(default=1)
-	mean = Parameter(default=0)
-	stddev = Parameter(default=1)
-	_bounding_box = 'auto'
 
-	def bounding_box_default(self, factor=5.5):
-
-		x0 = self.mean.value
-		dx = factor * self.stddev
-
-		return (x0 - dx, x0 + dx)
-
-	@staticmethod
-	def evaluate(x, amplitude, mean, stddev):
-		"""
-		Gaussian1D model function.
-		"""
-		return amplitude * np.exp(- 0.5 * (x - mean) ** 2 / stddev ** 2)
-
-	@staticmethod
-	def fit_deriv(x, amplitude, mean, stddev):
-		"""
-		Gaussian1D model function derivatives.
-		"""
-
-		d_amplitude = np.exp(-0.5 / stddev ** 2 * (x - mean) ** 2)
-		d_mean = amplitude * d_amplitude * (x - mean) / stddev ** 2
-		d_stddev = amplitude * d_amplitude * (x - mean) ** 2 / stddev ** 3
-		return [d_amplitude, d_mean, d_stddev]
-
-class Linear1D(Fittable1DModel):
-
-	slope = Parameter(default=1)
-	intercept = Parameter(default=0)
-	linear = True
-
-	@staticmethod
-	def evaluate(x, slope, intercept):
-		"""One dimensional Line model function"""
-
-		return slope * x + intercept
-
-	@staticmethod
-	def fit_deriv(x, slope, intercept):
-		"""One dimensional Line model derivative with respect to parameters"""
-
-		d_slope = x
-		d_intercept = np.ones_like(x)
-		return [d_slope, d_intercept]
 
 
 

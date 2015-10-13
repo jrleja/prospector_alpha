@@ -11,6 +11,7 @@ import magphys_plot_pref
 prosp_color = '#e60000'
 obs_color = '#95918C'
 magphys_color = '#1974D2'
+hsym = '*'
 
 minsfr = 1e-3
 
@@ -540,7 +541,7 @@ def obs_vs_model_hdelta_dn(alldata,outname=None):
 
 
 
-def obs_vs_model_bdec(alldata,emline_names,outname='test.png'):
+def obs_vs_model_bdec(alldata,emline_names,hflag,outname='test.png'):
 
 	#################
 	#### plot observed Balmer decrement versus expected
@@ -604,6 +605,7 @@ def obs_vs_model_bdec(alldata,emline_names,outname='test.png'):
 	pl_bdec_magphys = np.array(bdec_magphys)[keep_idx][~agn]
 	pl_bdec_prospectr = np.array(bdec_prospectr)[keep_idx][~agn]
 	pl_bdec_measured = bdec_measured[keep_idx][~agn]
+	temp_hflag = hflag[~agn]
 	pl_bdec_prospectr = pl_bdec_mod
 
 	#### transform from balmer decrement to tau(Hb) - tau(Ha)
@@ -613,7 +615,8 @@ def obs_vs_model_bdec(alldata,emline_names,outname='test.png'):
 
 	fig, ax = plt.subplots(1,3, figsize = (22,6))
 
-	ax[0].errorbar(pl_bdec_measured, pl_bdec_prospectr, fmt='o',alpha=0.6,linestyle=' ')
+	ax[0].errorbar(pl_bdec_measured[~hflag], pl_bdec_prospectr[~hflag], fmt='o',alpha=0.6,linestyle=' ')
+	ax[0].errorbar(pl_bdec_measured[hflag], pl_bdec_prospectr[hflag], fmt=hsym,alpha=0.6,linestyle=' ')
 	ax[0].set_xlabel(r'observed $\tau_{\mathrm{H}\beta}$ - $\tau_{\mathrm{H}\alpha}$')
 	ax[0].set_ylabel(r'Prospectr $\tau_{\mathrm{H}\beta}$ - $\tau_{\mathrm{H}\alpha}$')
 	ax[0] = threed_dutils.equalize_axes(ax[0], pl_bdec_measured,pl_bdec_prospectr)
@@ -623,7 +626,8 @@ def obs_vs_model_bdec(alldata,emline_names,outname='test.png'):
 	ax[0].text(0.99,0.1, 'mean offset='+"{:.3f}".format(off),
 			      transform = ax[0].transAxes,horizontalalignment='right')
 
-	ax[1].errorbar(pl_bdec_measured, pl_bdec_magphys, fmt='o',alpha=0.6,linestyle=' ')
+	ax[1].errorbar(pl_bdec_measured[~hflag], pl_bdec_magphys[~hflag], fmt='o',alpha=0.6,linestyle=' ')
+	ax[1].errorbar(pl_bdec_measured[~hflag], pl_bdec_magphys[~hflag], fmt=hsym,alpha=0.6,linestyle=' ')
 	ax[1].set_xlabel(r'observed $\tau_{\mathrm{H}\beta}$ - $\tau_{\mathrm{H}\alpha}$')
 	ax[1].set_ylabel(r'MAGPHYS $\tau_{\mathrm{H}\beta}$ - $\tau_{\mathrm{H}\alpha}$')
 	ax[1] = threed_dutils.equalize_axes(ax[1], pl_bdec_measured,pl_bdec_magphys)
@@ -633,7 +637,8 @@ def obs_vs_model_bdec(alldata,emline_names,outname='test.png'):
 	ax[1].text(0.99,0.1, 'mean offset='+"{:.3f}".format(off),
 			      transform = ax[1].transAxes,horizontalalignment='right')
 
-	ax[2].errorbar(pl_bdec_prospectr, pl_bdec_magphys, fmt='o',alpha=0.6,linestyle=' ')
+	ax[2].errorbar(pl_bdec_prospectr[~hflag], pl_bdec_magphys[~hflag], fmt='o',alpha=0.6,linestyle=' ')
+	ax[2].errorbar(pl_bdec_prospectr[~hflag], pl_bdec_magphys[~hflag], fmt=hsym,alpha=0.6,linestyle=' ')
 	ax[2].set_xlabel(r'Prospectr $\tau_{\mathrm{H}\beta}$ - $\tau_{\mathrm{H}\alpha}$')
 	ax[2].set_ylabel(r'MAGPHYS $\tau_{\mathrm{H}\beta}$ - $\tau_{\mathrm{H}\alpha}$')
 	ax[2] = threed_dutils.equalize_axes(ax[2], pl_bdec_prospectr,pl_bdec_magphys)
@@ -821,7 +826,7 @@ def plot_emline_comp(alldata,outfolder,hflag):
 							 outname=outfolder+'moustakas_comparison.png',
 							 outdec=outfolder+'balmer_dec_comparison.png')
 	
-	bdec_info = obs_vs_model_bdec(alldata,emline_names, outname=outfolder+'bdec_comparison.png')
+	bdec_info = obs_vs_model_bdec(alldata,emline_names, hflag, outname=outfolder+'bdec_comparison.png')
 	obs_vs_model_hdelta_dn(alldata,outname=outfolder+'hdelta_dn_comp.png')
 
 	obs_info = obs_vs_prosp_ha(alldata,emline_names,bdec_info['keep_idx'],outname=outfolder+'halpha_comparison.png')
