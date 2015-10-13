@@ -8,6 +8,7 @@ from calc_ml import load_filter_response
 from bsfh.likelihood import LikelihoodFunction
 from astropy.cosmology import WMAP9
 import copy
+from astropy.modeling.core import Fittable1DModel
 
 def return_lir(lam,spec,z=None,alt_file=None):
 

@@ -998,7 +998,7 @@ def plot_relationships(alldata,outfolder):
 	plt.savefig(outfolder+'relationships.png',dpi=300)
 	plt.close
 
-def prospectr_comparison(alldata,outfolder):
+def prospectr_comparison(alldata,outfolder,hflag):
 
 	'''
 	For Prospectr:
@@ -1013,9 +1013,6 @@ def prospectr_comparison(alldata,outfolder):
 	didx_idx = parnames == 'dust_index'
 	d1_idx = parnames == 'dust1'
 	d2_idx = parnames == 'dust2'
-
-	#### herschel flag
-	hflag = np.array([True if np.sum(dat['residuals']['phot']['lam_obs'] > 5e5) else False for dat in alldata])
 
 	#### agn flags
 	sfing, composite, agn = return_agn_str(np.ones_like(hflag,dtype=bool))
