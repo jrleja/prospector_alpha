@@ -837,7 +837,7 @@ def plt_all(runname=None,startup=True,**extras):
 		mag_ensemble.time_res_incr_comp(alldata_low,alldata)
 
 	mag_ensemble.prospectr_comparison(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/pcomp/',hflag)
-	mag_ensemble.plot_emline_comp(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/magphys/emlines_comp/')
+	mag_ensemble.plot_emline_comp(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/magphys/emlines_comp/',hflag)
 	mag_ensemble.plot_relationships(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/magphys/')
 	plot_all_residuals(alldata)
 	mag_ensemble.plot_comparison(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/magphys/')

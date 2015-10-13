@@ -799,7 +799,7 @@ def residual_plots(alldata,obs_info, bdec_info):
 
 	plt.savefig(fldr+'idx_versus_ratio.png', dpi=300)
 
-def plot_emline_comp(alldata,outfolder):
+def plot_emline_comp(alldata,outfolder,hflag):
 	'''
 	emission line luminosity comparisons:
 		(1) Observed luminosity, Prospectr vs MAGPHYS continuum subtraction
@@ -1030,7 +1030,7 @@ def prospectr_comparison(alldata,outfolder,hflag):
 	dusttot = np.zeros_like(d1)
 	for ii in xrange(len(dusttot)): dusttot[ii] = -np.log10(threed_dutils.charlot_and_fall_extinction(5500.,d1[ii],d2[ii],-1.0,didx[ii], kriek=True))
 
-	#### plotting
+	#### plotting series of comparisons
 	fig, ax = plt.subplots(2,3, figsize = (22,12))
 
 	ax[0,0].errorbar(didx,dusttot, fmt='o',alpha=0.6,linestyle=' ',color='0.4')

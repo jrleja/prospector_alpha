@@ -9,6 +9,7 @@ from bsfh.likelihood import LikelihoodFunction
 from astropy.cosmology import WMAP9
 import copy
 from astropy.modeling.core import Fittable1DModel
+from astropy.modeling import Parameter
 
 def return_lir(lam,spec,z=None,alt_file=None):
 
@@ -1219,7 +1220,7 @@ def absobs_model(lams):
 			model += Gaussian1D(amplitude=-5e5, mean=lams[ii], stddev=3.0)
 
 	#### NOW ADD LINEAR COMPONENT
-	model += functional_models.Linear1D(intercept=1e7)
+	model += Linear1D(intercept=1e7)
 
 	return model
 
@@ -1287,6 +1288,25 @@ class Gaussian1D(Fittable1DModel):
 		d_stddev = amplitude * d_amplitude * (x - mean) ** 2 / stddev ** 3
 		return [d_amplitude, d_mean, d_stddev]
 
+class Linear1D(Fittable1DModel):
+
+	slope = Parameter(default=1)
+	intercept = Parameter(default=0)
+	linear = True
+
+	@staticmethod
+	def evaluate(x, slope, intercept):
+		"""One dimensional Line model function"""
+
+		return slope * x + intercept
+
+	@staticmethod
+	def fit_deriv(x, slope, intercept):
+		"""One dimensional Line model derivative with respect to parameters"""
+
+		d_slope = x
+		d_intercept = np.ones_like(x)
+		return [d_slope, d_intercept]
 
 
 
