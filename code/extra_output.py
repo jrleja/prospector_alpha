@@ -271,7 +271,7 @@ def post_processing(param_name, add_extra=True, **extras):
 		print 'ADDING EXTRA OUTPUT FOR ' + sample_results['run_params']['objname'] + ' in ' + outfolder
 		sample_results['flatchain'] = threed_dutils.chop_chain(sample_results['chain'])
 		sample_results = calc_extra_quantities(sample_results,**extras)
-		print 1/0
+
 		### SAVE OUTPUT HERE
 		pickle.dump(sample_results,open(mcmc_filename, "wb"))
 
