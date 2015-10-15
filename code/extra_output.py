@@ -154,7 +154,7 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 											        saveplot=False,measure_ir=True)
 
 		##### Balmer decrements
-		bdec_cloudy[jj] = modelout['emline_flux'][4] / modelout['emline_flux'][0]
+		bdec_cloudy[jj] = modelout['emline_flux'][4] / modelout['emline_flux'][1]
 		bdec_calc[jj] = threed_dutils.calc_balmer_dec(flatchain[jj,dust1_index], flatchain[jj,dust2_index], -1.0, 
 			                                          flatchain[jj,dust_index_index],
 			                                          kriek = (sample_results['model'].params['dust_type'] == 4)[0])
@@ -250,6 +250,15 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 
 	return sample_results
 
+def update_all(runname):
+	'''
+	change some parameters, need to update the post-processing?
+	run this!
+	'''
+	filebase, parm_basename, ancilname=threed_dutils.generate_basenames(runname)
+	for param in parm_basename:
+		post_processing(param)
+
 def post_processing(param_name, add_extra=True, **extras):
 
 	'''
@@ -281,7 +290,7 @@ def post_processing(param_name, add_extra=True, **extras):
 		### SAVE OUTPUT HERE
 		mcmc_filename, model_filename = threed_dutils.create_prosp_filename(outname)
 		pickle.dump(sample_results,open(mcmc_filename, "wb"))
-		print 1/0
+
 	### PLOT HERE
 	threedhst_diag.make_all_plots(sample_results=sample_results,filebase=outname,outfolder=outfolder)
 
