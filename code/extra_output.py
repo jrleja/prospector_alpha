@@ -76,7 +76,7 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 	nline = 6 # set by number of lines measured in threed_dutils
 
     ##### initialize output arrays for SFH + emission line posterior draws #####
-	half_time,sfr_10,sfr_100,sfr_1000,ssfr_100,totmass,emp_ha,mips_flux,lir,dust_mass,bdec,ext_5500,hdelta_flux,hdelta_eqw_rest,dn4000 = [np.zeros(shape=(ncalc)) for i in range(15)]
+	half_time,sfr_10,sfr_100,sfr_1000,ssfr_100,totmass,emp_ha,mips_flux,lir,dust_mass,bdec_cloudy,bdec_calc,ext_5500,hdelta_flux,hdelta_eqw_rest,dn4000 = [np.zeros(shape=(ncalc)) for i in range(16)]
 	lineflux = np.empty(shape=(ncalc,nline))
 
 	##### information for empirical emission line calculation ######
@@ -153,7 +153,12 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 											        savestr=sample_results['run_params']['objname'], 
 											        saveplot=False,measure_ir=True)
 
-		bdec[jj] = modelout['emline_flux'][4] / modelout['emline_flux'][0]
+		##### Balmer decrements
+		bdec_cloudy[jj] = modelout['emline_flux'][4] / modelout['emline_flux'][0]
+		bdec_calc[jj] = threed_dutils.calc_balmer_dec(flatchain[jj,dust1_index], flatchain[jj,dust2_index], -1.0, 
+			                                          flatchain[jj,dust_index_index],
+			                                          kriek = (sample_results['model'].params['dust_type'] == 4)[0])
+
 
 		lineflux[jj,:] = modelout['emline_flux']
 		mips_flux[jj]  = modelout['mips']
@@ -170,7 +175,7 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 	for kk in xrange(ntheta): q_16[kk], q_50[kk], q_84[kk] = triangle.quantile(sample_results['flatchain'][:,kk], [0.16, 0.5, 0.84])
 	
 	##### CALCULATE Q16,Q50,Q84 FOR EXTRA PARAMETERS
-	extra_flatchain = np.dstack((half_time, sfr_10, sfr_100, sfr_1000, ssfr_100, totmass, emp_ha, dust_mass, bdec, ext_5500))[0]
+	extra_flatchain = np.dstack((half_time, sfr_10, sfr_100, sfr_1000, ssfr_100, totmass, emp_ha, dust_mass, bdec_cloudy,bdec_calc, ext_5500))[0]
 	nextra = extra_flatchain.shape[1]
 	q_16e, q_50e, q_84e = (np.zeros(nextra)+np.nan for i in range(3))
 	for kk in xrange(nextra): q_16e[kk], q_50e[kk], q_84e[kk] = triangle.quantile(extra_flatchain[:,kk], [0.16, 0.5, 0.84])
@@ -199,7 +204,7 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 
 	#### EXTRA PARAMETER OUTPUTS 
 	extras = {'flatchain': extra_flatchain,
-			  'parnames': np.array(['half_time','sfr_10','sfr_100','sfr_1000','ssfr_100','totmass','emp_ha','dust_mass','balmer_decrement','total_ext5500']),
+			  'parnames': np.array(['half_time','sfr_10','sfr_100','sfr_1000','ssfr_100','totmass','emp_ha','dust_mass','bdec_cloudy','bdec_calc','total_ext5500']),
 			  'q16': q_16e,
 			  'q50': q_50e,
 			  'q84': q_84e,
@@ -236,7 +241,8 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 	             'halpha_flux':lineflux[0,4],
 	             'hbeta_flux':lineflux[0,1],
 	             'hdelta_flux':hdelta_flux[0],
-	             'balmer_decrement':bdec[0],
+	             'bdec_cloudy':bdec_cloudy[0],
+	             'bdec_calc':bdec_calc[0],
 	             'dn4000':dn4000[0],
 	             'spec':spec[:,0],
 	             'mags':mags[:,0]}
@@ -275,7 +281,7 @@ def post_processing(param_name, add_extra=True, **extras):
 		### SAVE OUTPUT HERE
 		mcmc_filename, model_filename = threed_dutils.create_prosp_filename(outname)
 		pickle.dump(sample_results,open(mcmc_filename, "wb"))
-
+		print 1/0
 	### PLOT HERE
 	threedhst_diag.make_all_plots(sample_results=sample_results,filebase=outname,outfolder=outfolder)
 
