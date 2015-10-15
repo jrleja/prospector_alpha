@@ -599,7 +599,7 @@ def asym_errors(center, up, down, log=False):
 
 	return errarray
 
-def equalize_axes(ax, x,y, dynrange=0.1, line_of_equality=True, log=False):
+def equalize_axes(ax, x,y, dynrange=0.1, line_of_equality=True, log=False, axlims=None):
 	
 	''' 
 	sets up an equal x and y range that encompasses all of the data
@@ -622,8 +622,12 @@ def equalize_axes(ax, x,y, dynrange=0.1, line_of_equality=True, log=False):
 	else:
 		max = np.nanmax(y)+dyny
 
-	ax.set_xlim(min,max)
-	ax.set_ylim(min,max)
+	if axlims is None:
+		ax.set_xlim(min,max)
+		ax.set_ylim(min,max)
+	else:
+		ax.set_xlim(axlims)
+		ax.set_ylim(axlims)
 
 	if line_of_equality:
 		ax.plot([min,max],[min,max],linestyle='--',color='0.1',alpha=0.8)
@@ -648,9 +652,8 @@ def integral_average(x,y,x0,x1):
 
 	return I1
 
-def load_prospectr_data(filebase):
 
-	from bsfh import read_results
+def create_prosp_filename(filebase):
 
 	# find most recent output file
 	# with the objname
@@ -668,6 +671,13 @@ def load_prospectr_data(filebase):
 	mcmc_filename=filebase+'_'+max(times)+"_mcmc"
 	model_filename=filebase+'_'+max(times)+"_model"
 
+	return mcmc_filename,model_filename
+
+def load_prospectr_data(filebase):
+
+	from bsfh import read_results
+
+	mcmc_filename, model_filename = create_prosp_filename(filebase)
 	sample_results, powell_results, model = read_results.read_pickles(mcmc_filename, model_file=model_filename,inmod=None)
 
 	return sample_results, powell_results, model

@@ -273,6 +273,7 @@ def post_processing(param_name, add_extra=True, **extras):
 		sample_results = calc_extra_quantities(sample_results,**extras)
 
 		### SAVE OUTPUT HERE
+		mcmc_filename, model_filename = threed_dutils.create_prosp_filename(outname)
 		pickle.dump(sample_results,open(mcmc_filename, "wb"))
 
 	### PLOT HERE
