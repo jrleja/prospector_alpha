@@ -87,6 +87,7 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 		                            (x == 'dust2') else 
 		                            False for x in parnames])
 	dust_index_index = np.array([True if x == 'dust_index' else False for x in parnames])
+	met_idx = np.array([True if x == 'logzsol' else False for x in parnames])
 
 	##### use randomized, flattened, thinned chain for posterior draws
 	# don't allow things outside the priors
@@ -112,6 +113,7 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 		
 		##### model call, to set parameters
 		thetas = flatchain[jj,:]
+		sample_results['model'].params['gas_logz'] = thetas[met_idx]
 		spec[:,jj],mags[:,jj],sm = sample_results['model'].mean_model(thetas, sample_results['obs'], sps=sps)
 
 		##### extract sfh parameters
