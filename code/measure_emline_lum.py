@@ -331,19 +331,6 @@ def umbrella_model(lams, amp_tied, lam_tied, sig_tied):
 
 	return model
 
-def measure_Dn4000(lam,flux):
-
-	# D4000, defined as average flux ratio between
-	# [4050,4250] and [3750,3950] (Bruzual 1983; Hamilton 1985)
-
-	# ratio of continuua, measured as defined below 
-	# blue: 3850-3950 . . . 4000-4100 (Balogh 1999)
-
-	blue = (lam > 3850) & (lam < 3950)
-	red  = (lam > 4000) & (lam < 4100)
-
-	return np.mean(flux[red])/np.mean(flux[blue])
-
 def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 	
 	'''
@@ -510,10 +497,10 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 	#######################
 	##### Dn(4000) ########
 	#######################
-	dn4000_obs = measure_Dn4000(obslam,obsflux)
+	dn4000_obs = threed_dutils.measure_Dn4000(obslam,obsflux)
 	dn4000_mod = []
 	for flux,lam in zip(model_fluxes,model_lams):
-		dn4000_mod.append(measure_Dn4000(lam,flux))
+		dn4000_mod.append(threed_dutils.measure_Dn4000(lam,flux))
 	dn4000_mod = np.array(dn4000_mod)
 
 

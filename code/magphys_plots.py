@@ -666,6 +666,8 @@ def sed_comp_figure(sample_results, sps, model, magphys,
 	ax_loc = [0.38,0.68,0.13,0.13]
 	text_size = 1.5
 	ax_inset = add_sfh_plot(sample_results,fig,ax_loc,sps,text_size=text_size)
+
+	##### add MAGPHYS SFH
 	magmass = magphys['model']['full_parameters'][[magphys['model']['full_parnames'] == 'M*/Msun']]
 	magsfr = np.log10(magphys['sfh']['sfr']*magmass)
 	magtime = np.abs(np.max(magphys['sfh']['age']) - magphys['sfh']['age'])/1e9

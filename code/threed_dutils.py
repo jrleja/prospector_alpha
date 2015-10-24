@@ -118,7 +118,7 @@ def smooth_spectrum(lam,spec,sigma,
 def offset_and_scatter(x,y,biweight=True):
 
 	n = len(x)
-	mean_offset = np.sum(x-y)/n
+	mean_offset = np.nanmean(x-y)
 
 	if biweight:
 		diff = y-x
@@ -613,21 +613,22 @@ def equalize_axes(ax, x,y, dynrange=0.1, line_of_equality=True, log=False, axlim
 	else:
 		dynx, dyny = (np.nanmax(x)-np.nanmin(x))*dynrange,\
 	                 (np.nanmax(y)-np.nanmin(y))*dynrange
-	if np.nanmin(x)-dynx > np.nanmin(y)-dyny:
-		min = np.nanmin(y)-dyny
-	else:
-		min = np.nanmin(x)-dynx
-	if np.nanmax(x)+dynx > np.nanmax(y)+dyny:
-		max = np.nanmax(x)+dynx
-	else:
-		max = np.nanmax(y)+dyny
-
+	
 	if axlims is None:
-		ax.set_xlim(min,max)
-		ax.set_ylim(min,max)
+		if np.nanmin(x)-dynx > np.nanmin(y)-dyny:
+			min = np.nanmin(y)-dyny
+		else:
+			min = np.nanmin(x)-dynx
+		if np.nanmax(x)+dynx > np.nanmax(y)+dyny:
+			max = np.nanmax(x)+dynx
+		else:
+			max = np.nanmax(y)+dyny
 	else:
-		ax.set_xlim(axlims)
-		ax.set_ylim(axlims)
+		min = axlims[0]
+		max = axlims[1]
+
+	ax.set_xlim(min,max)
+	ax.set_ylim(min,max)
 
 	if line_of_equality:
 		ax.plot([min,max],[min,max],linestyle='--',color='0.1',alpha=0.8)
@@ -938,7 +939,7 @@ def integrate_mag(spec_lam,spectra,filter, z=None, alt_file=None):
 	luminosity_density = simps(spectra*(resp_interp/norm)/spec_lam,spec_lam)
 
 	# if redshift is specified, convert to flux and apparent magnitude
-	if z:
+	if z is not None:
 		dfactor = (WMAP9.luminosity_distance(z).value*1e5)**(-2)*(1+z)
 		luminosity = luminosity*dfactor
 		luminosity_density = luminosity_density*dfactor
@@ -1106,7 +1107,7 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None,
 	flux comes out in Lsun
 
 	if you ever add more emission lines to this, God help you... find all the places where you lazily indexed
-	halpha as 4 and hbeta as 0!
+	halpha as 4 and hbeta as 1!
 
 	measuring hdelta requires an updated version of Astropy, which is currently not available on Odyssey
 	it's turned off for now, will just use best fits
