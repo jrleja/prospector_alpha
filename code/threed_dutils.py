@@ -1116,9 +1116,9 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None,
 
 
     # define emission lines
-	emline = np.array(['[OII]','Hbeta','[OIII]1','[OIII]2','Halpha','[SII]'])
-	wavelength = np.array([3728,4861.33,4959,5007,6562,6732.71])
-	sideband   = [(3723,3736),(4857,4868),(4954,4968),(5001,5015),(6556,6573),(6710,6728)]
+	emline = np.array(['[OII]','Hbeta','[OIII]1','[OIII]2','Halpha','[NII]','[SII]'])
+	wavelength = np.array([3728,4861.33,4959,5007,6562,6583,6732.71])
+	sideband   = [(3723,3736),(4857,4868),(4954,4968),(5001,5015),(6556,6573),(6573,6593),(6710,6728)]
 	nline = len(emline)
 
 	# get spectrum
