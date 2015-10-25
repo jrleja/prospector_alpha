@@ -73,7 +73,7 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 	##### set call parameters
 	sample_results['ncomp'] = np.sum(['mass' in x for x in sample_results['model'].theta_labels()])
 	deltat=[0.01,0.1,1.0] # for averaging SFR over, in Gyr
-	nline = 6 # set by number of lines measured in threed_dutils
+	nline = 7 # set by number of lines measured in threed_dutils
 
     ##### initialize output arrays for SFH + emission line posterior draws #####
 	half_time,sfr_10,sfr_100,sfr_1000,ssfr_100,totmass,emp_ha,mips_flux,lir,dust_mass,bdec_cloudy,bdec_calc,ext_5500,hdelta_flux,hdelta_eqw_rest,dn4000 = [np.zeros(shape=(ncalc)) for i in range(16)]
