@@ -199,8 +199,7 @@ def bootstrap(obslam, obsflux, model, fitter, noise, line_lam,
 
 		# calculate emission line flux + rest EQW
 		if flux_flag:
-			for j in xrange(nlines):
-				flux[i,j] = getattr(fit, 'amplitude_'+str(j)).value*np.sqrt(2*np.pi*getattr(fit, 'stddev_'+str(j)).value**2) * constants.L_sun.cgs.value
+			for j in xrange(nlines): flux[i,j] = getattr(fit, 'amplitude_'+str(j)).value*np.sqrt(2*np.pi*getattr(fit, 'stddev_'+str(j)).value**2) * constants.L_sun.cgs.value
 
 	# now get median + percentiles
 	medianpar = np.percentile(params, 50,axis=1)
@@ -296,21 +295,27 @@ def sig_ret(model):
 
 	return sig
 
-def umbrella_model(lams, amp_tied, lam_tied, sig_tied):
+def umbrella_model(lams, amp_tied, lam_tied, sig_tied,continuum_6400):
 	'''
 	return model for [OIII], Hbeta, [NII], Halpha, + constant
 	centers are all tied to redshift parameter
 	'''
 
+	#### EQW initial
+	# OIII 1, OIII 2, Hbeta, NII 1, NII 2, Halpha
+	eqw_init = np.array([3.,9.,4.,1.,3.,12.])*4	
+	stddev_init = 3.5
+
 	#### ADD ALL MODELS FIRST
 	for ii in xrange(len(lams)):
+		amp_init = continuum_6400*eqw_init[ii] / (np.sqrt(2.*np.pi*stddev_init**2))
 		if ii == 0:
-			model = functional_models.Gaussian1D(amplitude=1e7, mean=lams[ii], stddev=5.0)
+			model = functional_models.Gaussian1D(amplitude=amp_init, mean=lams[ii], stddev=stddev_init)
 		else: 
-			model += functional_models.Gaussian1D(amplitude=1e7, mean=lams[ii], stddev=5.0)
+			model += functional_models.Gaussian1D(amplitude=amp_init, mean=lams[ii], stddev=stddev_init)
 
 	# add slope + constant
-	model += bLinear1D(intercept_low=1e7,intercept_high=1e7)
+	model += bLinear1D(intercept_low=continuum_6400,intercept_high=continuum_6400)
 
 	#### NOW TIE THEM TOGETHER
 	for ii in xrange(len(lams)):
@@ -327,14 +332,15 @@ def umbrella_model(lams, amp_tied, lam_tied, sig_tied):
 		if sig_tied[ii] is not None:
 			getattr(model, 'stddev_'+str(ii)).tied = sig_tied[ii]
 
-		getattr(model, 'stddev_'+str(ii)).max = 25
+		getattr(model, 'stddev_'+str(ii)).max = 10
+
 
 	return model
 
 def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 	
 	'''
-	measure rest-frame emission line luminosities using two different continuum models, MAGPHYS and Prospectr
+	measure rest-frame emission line luminosities using two different continuum models, MAGPHYS and Prospector
 
 	ALGORITHM:
 	convert to rest-frame spectrum in proper units
@@ -376,7 +382,7 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 		print 'too low resolution, not measuring fluxes for '+sample_results['run_params']['objname']
 		return None
 
-	#### smoothing (prospectr, magphys) in km/s
+	#### smoothing (prospector, magphys) in km/s
 	smooth       = [200,200]
 
 	#### output names
@@ -403,7 +409,7 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 	nabs = len(abs_wave)             
 
 	#### put all spectra in proper units (Lsun/AA, rest wavelength in Angstroms)
-	# first, get rest-frame Prospectr spectrum w/o emission lines
+	# first, get rest-frame Prospector spectrum w/o emission lines
 	# with z=0.0, it arrives in Lsun/Hz, and rest lambda
 	# save redshift, restore at end
 	z = sample_results['model'].params.get('zred', np.array(0.0))
@@ -516,7 +522,8 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 	smoothed_absflux = []
 
 	#### define model, fitting region
-	emmod =  umbrella_model(em_wave, amp_tied, lam_tied, sig_tied)
+	continuum_6400 = obsflux[(np.abs(obslam-6400)).argmin()]
+	emmod =  umbrella_model(em_wave, amp_tied, lam_tied, sig_tied, continuum_6400=continuum_6400)
 	p_idx = np.zeros_like(obslam,dtype=bool)
 	for bbox in em_bbox:p_idx[(obslam > bbox[0]) & (obslam < bbox[1])] = True
 
@@ -535,6 +542,7 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 	# take two highest EQW lines
 	high_eqw = tmpeqw.argsort()[-2:][::-1]
 	sigma_spec = np.mean(np.array(sig_ret(gauss_fit))[high_eqw]/em_wave[high_eqw])*c_kms
+	sigma_spec = np.clip(sigma_spec,10.0,300.0)
 
 	test_plot = False
 	if test_plot:
@@ -545,6 +553,8 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 		print 1/0
 
 	#### now interact with model
+	# normalize continuum model to observations
+	# subtract and fit Gaussian to residuals ---> noise
 	for jj in xrange(nmodel):
 
 		model_norm = model_fluxes[jj]
@@ -629,7 +639,7 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 	# flux come out of bootstrap as (nlines,[median,errup,errdown])
 	tnoise = np.min(emline_noise)
 
-	#### now interact with model
+	#### now measure emission line fluxes
 	for jj in xrange(nmodel):
 
 		bfit_mod, emline_flux_local = bootstrap(obslam[p_idx],residuals[jj],emmod,fitter,tnoise,em_wave)
@@ -656,9 +666,11 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 
 			p_idx_em = ((obslam[p_idx] > bbox[0]) & (obslam[p_idx] < bbox[1]))
 
+			# observations
 			axarr[ii].plot(obslam[p_idx][p_idx_em],obsflux[p_idx][p_idx_em],color='black',drawstyle='steps-mid')
+			# emission model + continuum model
 			axarr[ii].plot(obslam[p_idx][p_idx_em],bfit_mod(obslam[p_idx][p_idx_em])+smoothed_absflux[jj][p_idx_em],color='red')
-
+			# continuum model + zeroth-order emission continuum
 			axarr[ii].plot(obslam[p_idx][p_idx_em],smoothed_absflux[jj][p_idx_em]+bfit_mod[6](obslam[p_idx][p_idx_em]),color='#1E90FF')
 
 			axarr[ii].set_ylabel(r'flux [L$_{\odot}/\AA$]')
@@ -690,7 +702,6 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 		plt.tight_layout()
 		plt.savefig(out_em[jj], dpi = 300)
 		plt.close()
-
 
 	##### MEASURE OBSERVED ABSORPTION LINES
 	# currently only hdelta
@@ -726,6 +737,8 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 
 	plt.savefig(out_absobs, dpi = 300)
 	plt.close()
+
+	print 1/0
 
 	out = {}
 	# save fluxes
