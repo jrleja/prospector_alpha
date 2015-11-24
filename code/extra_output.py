@@ -263,7 +263,6 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 	             'mags':mags[:,0]}
 	sample_results['bfit'] = bfit
 
-	print 1/0
 	return sample_results
 
 def update_all(runname):
