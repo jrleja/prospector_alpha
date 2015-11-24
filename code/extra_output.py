@@ -7,7 +7,7 @@ from astropy import constants
 
 def calc_emp_ha(mass,sfr,dust1,dust2,dustindex,ncomp=1):
 
-	# dust1 is hardcoded here, be careful!!!!
+	# calculate empirical halpha
 
 	ha_flux=0.0
 	oiii_flux=0.0
@@ -73,11 +73,10 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 	##### set call parameters
 	sample_results['ncomp'] = np.sum(['mass' in x for x in sample_results['model'].theta_labels()])
 	deltat=[0.01,0.1,1.0] # for averaging SFR over, in Gyr
-	nline = 7 # set by number of lines measured in threed_dutils
 
     ##### initialize output arrays for SFH + emission line posterior draws #####
-	half_time,sfr_10,sfr_100,sfr_1000,ssfr_100,totmass,emp_ha,mips_flux,lir,dust_mass,bdec_cloudy,bdec_calc,ext_5500,hdelta_flux,hdelta_eqw_rest,dn4000 = [np.zeros(shape=(ncalc)) for i in range(16)]
-	lineflux = np.empty(shape=(ncalc,nline))
+	half_time,sfr_10,sfr_100,sfr_1000,ssfr_100,totmass,emp_ha,mips_flux,lir,dust_mass,bdec_cloudy,bdec_calc,ext_5500,hdelta_flux,hdelta_eqw_rest,dn4000,bdec_nodust = [np.zeros(shape=(ncalc)) for i in range(17)]
+	
 
 	##### information for empirical emission line calculation ######
 	dust1_index = np.array([True if (x[:-sample_results['ncomp']] == 'dust1') or 
@@ -155,12 +154,25 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 											        savestr=sample_results['run_params']['objname'], 
 											        saveplot=False,measure_ir=True)
 
+		##### no dust, to get the intrinsic balmer decrement
+		nd_thetas = copy(thetas)
+		nd_thetas[dust1_index] = 0.0
+		nd_thetas[dust2_index] = 0.0
+		modelout_nodust = threed_dutils.measure_emline_lum(sps, thetas = nd_thetas,
+			 										       model=sample_results['model'], obs = sample_results['obs'],
+											               savestr=None, 
+											               saveplot=False,measure_ir=False)
+
 		##### Balmer decrements
-		bdec_cloudy[jj] = modelout['emline_flux'][4] / modelout['emline_flux'][1]
+		bdec_cloudy[jj] = modelout['emline_flux'][modelout['emline_name'] == 'Halpha'] / modelout['emline_flux'][modelout['emline_name'] == 'Hbeta']
 		bdec_calc[jj] = threed_dutils.calc_balmer_dec(flatchain[jj,dust1_index], flatchain[jj,dust2_index], -1.0, 
 			                                          flatchain[jj,dust_index_index],
 			                                          kriek = (sample_results['model'].params['dust_type'] == 4)[0])
-
+		bdec_nodust[jj] = modelout_nodust['emline_flux'][modelout['emline_name'] == 'Halpha'] / modelout_nodust['emline_flux'][modelout['emline_name'] == 'Hbeta']
+		
+		if jj == 0:
+			nline = len(modelout['emline_flux']) # set by number of lines measured in threed_dutils
+			lineflux = np.empty(shape=(ncalc,nline))
 
 		lineflux[jj,:] = modelout['emline_flux']
 		mips_flux[jj]  = modelout['mips']
@@ -177,7 +189,7 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 	for kk in xrange(ntheta): q_16[kk], q_50[kk], q_84[kk] = triangle.quantile(sample_results['flatchain'][:,kk], [0.16, 0.5, 0.84])
 	
 	##### CALCULATE Q16,Q50,Q84 FOR EXTRA PARAMETERS
-	extra_flatchain = np.dstack((half_time, sfr_10, sfr_100, sfr_1000, ssfr_100, totmass, emp_ha, dust_mass, bdec_cloudy,bdec_calc, ext_5500))[0]
+	extra_flatchain = np.dstack((half_time, sfr_10, sfr_100, sfr_1000, ssfr_100, totmass, emp_ha, dust_mass, bdec_cloudy,bdec_calc, bdec_nodust,ext_5500))[0]
 	nextra = extra_flatchain.shape[1]
 	q_16e, q_50e, q_84e = (np.zeros(nextra)+np.nan for i in range(3))
 	for kk in xrange(nextra): q_16e[kk], q_50e[kk], q_84e[kk] = triangle.quantile(extra_flatchain[:,kk], [0.16, 0.5, 0.84])
@@ -206,7 +218,7 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 
 	#### EXTRA PARAMETER OUTPUTS 
 	extras = {'flatchain': extra_flatchain,
-			  'parnames': np.array(['half_time','sfr_10','sfr_100','sfr_1000','ssfr_100','totmass','emp_ha','dust_mass','bdec_cloudy','bdec_calc','total_ext5500']),
+			  'parnames': np.array(['half_time','sfr_10','sfr_100','sfr_1000','ssfr_100','totmass','emp_ha','dust_mass','bdec_cloudy','bdec_calc','bdec_nodust','total_ext5500']),
 			  'q16': q_16e,
 			  'q50': q_50e,
 			  'q84': q_84e,
@@ -245,11 +257,13 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 	             'hdelta_flux':hdelta_flux[0],
 	             'bdec_cloudy':bdec_cloudy[0],
 	             'bdec_calc':bdec_calc[0],
+	             'bdec_nodust':bdec_nodust[0],
 	             'dn4000':dn4000[0],
 	             'spec':spec[:,0],
 	             'mags':mags[:,0]}
 	sample_results['bfit'] = bfit
 
+	print 1/0
 	return sample_results
 
 def update_all(runname):
@@ -282,7 +296,7 @@ def post_processing(param_name, add_extra=True, **extras):
 	except OSError:
 		pass
 
- 	sample_results, powell_results, model = threed_dutils.load_prospectr_data(outname)
+ 	sample_results, powell_results, model = threed_dutils.load_prospector_data(outname)
 
 	if add_extra:
 		print 'ADDING EXTRA OUTPUT FOR ' + sample_results['run_params']['objname'] + ' in ' + outfolder
@@ -306,7 +320,7 @@ def write_kinney_txt():
 	mass, sfr10, sfr100, cloudyha, dmass = [np.zeros(shape=(3,ngals)) for i in xrange(5)]
 	names = []
 	for jj in xrange(ngals):
-		sample_results, powell_results, model = threed_dutils.load_prospectr_data(filebase[jj])
+		sample_results, powell_results, model = threed_dutils.load_prospector_data(filebase[jj])
 		
 		if jj == 0:
 			dmass_ind = sample_results['extras']['parnames'] == 'dust_mass'
