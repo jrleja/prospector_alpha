@@ -277,10 +277,13 @@ def synthetic_halpha(sfr,dust1,dust2,dust1_index,dust2_index,kriek=False):
 	# comes out in ergs/s
 	return flux
 
-def charlot_and_fall_extinction(lam,dust1,dust2,dust1_index,dust2_index, kriek=False, nobc=False):
+def charlot_and_fall_extinction(lam,dust1,dust2,dust1_index,dust2_index, kriek=False, nobc=False, nodiff=False):
 
 	dust1_ext = np.exp(-dust1*(lam/5500.)**dust1_index)
 	dust2_ext = np.exp(-dust2*(lam/5500.)**dust2_index)
+
+	# sanitize inputs
+	lam = np.atleast_1d(lam)
 
 	# are we using Kriek & Conroy 13?
 	if kriek == True:
@@ -290,10 +293,13 @@ def charlot_and_fall_extinction(lam,dust1,dust2,dust1_index,dust2_index, kriek=F
 		lamuvb=2175.0
 
 		#Calzetti curve, below 6300 Angstroms, else no addition
-		if lam > dd63:
-			cal00 = 1.17*( -1.857+1.04*(1e4/lam) ) + 1.78
-		else:
-			cal00  = 1.17*(-2.156+1.509*(1e4/lam)-0.198*(1E4/lam)**2 + 0.011*(1E4/lam)**3) + 1.78
+		cal00 = np.zeros_like(lam)
+		gt_dd63 = lam > dd63
+		le_dd63 = ~gt_dd63
+		if np.sum(gt_dd63) > 0:
+			cal00[gt_dd63] = 1.17*( -1.857+1.04*(1e4/lam[gt_dd63]) ) + 1.78
+		if np.sum(le_dd63) > 0:
+			cal00[le_dd63]  = 1.17*(-2.156+1.509*(1e4/lam[le_dd63])-0.198*(1E4/lam[le_dd63])**2 + 0.011*(1E4/lam[le_dd63])**3) + 1.78
 		cal00 = cal00/0.44/4.05 
 
 		eb = 0.85 - 1.9 * dust2_index  #KC13 Eqn 3
@@ -306,6 +312,8 @@ def charlot_and_fall_extinction(lam,dust1,dust2,dust1_index,dust2_index, kriek=F
 
 	if nobc:
 		ext_tot = dust2_ext
+	elif nodiff:
+		ext_tot = dust1_ext
 	else:
 		ext_tot = dust2_ext*dust1_ext
 
@@ -674,7 +682,7 @@ def create_prosp_filename(filebase):
 
 	return mcmc_filename,model_filename
 
-def load_prospectr_data(filebase):
+def load_prospector_data(filebase):
 
 	from bsfh import read_results
 
@@ -890,13 +898,14 @@ def load_fast_3dhst(filename, objnum):
 
 	return values, fields
 
-def integrate_mag(spec_lam,spectra,filter, z=None, alt_file=None):
+def integrate_mag(spec_lam,spectra,filter, z=None, alt_file='/Users/joel/code/python/threedhst_bsfh/filters/allfilters_threedhst.dat'):
 
 	'''
 	borrowed from calc_ml
 	given a filter name and spectrum, calculate magnitude/luminosity in filter (see alt_file for filter names)
 	INPUT: 
-		SPEC_LAM: must be in angstroms. if redshift is specified, this should ALREADY be corrected for reddening.
+		SPEC_LAM: must be in angstroms. this will NOT BE corrected for reddening even if redshift is specified. this
+		allows you to calculate magnitudes in rest or observed frame.
 		SPECTRA: must be in Lsun/Hz (FSPS standard). if redshift is specified, the normalization will be taken care of.
 	OUTPUT:
 		MAG: comes out as absolute magnitude
@@ -906,7 +915,7 @@ def integrate_mag(spec_lam,spectra,filter, z=None, alt_file=None):
 
 	if type(filter) == str:
 		resp_lam, res = load_filter_response(filter, 
-		                                 	 alt_file='/Users/joel/code/python/threedhst_bsfh/filters/allfilters_threedhst.dat')
+		                                 	 alt_file=alt_file)
 	else:
 		resp_lam = filter[0][0]
 		res      = filter[1][0]
@@ -1022,8 +1031,8 @@ def integrate_linramp(t1,t2,sfh):
 		t1           = np.clip(t1,sfh['sf_trunc']-sfh['sf_start'],t_zero_cross)
 		t2           = np.clip(t2,sfh['sf_trunc']-sfh['sf_start'],t_zero_cross)
 
+	# initial integral: SFR = SFR[t=t_trunc] * [1 + s(t-t_trunc)]
 	intsfr = cs*(t2-t1)*(1-sfh['sf_trunc']*sfh['sf_slope']) + cs*sfh['sf_slope']*0.5*((t2+sfh['sf_start'])**2-(t1+sfh['sf_start'])**2)
-	#intsfr = (t2-t1)*(c-sfh['sf_slope']*sfh['sf_trunc'])+0.5*sfh['sf_slope']*(t2**2-t1**2)
 
 	return intsfr
 
@@ -1116,9 +1125,9 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None,
 
 
     # define emission lines
-	emline = np.array(['[OII]','Hbeta','[OIII]1','[OIII]2','Halpha','[NII]','[SII]'])
-	wavelength = np.array([3728,4861.33,4959,5007,6562,6583,6732.71])
-	sideband   = [(3723,3736),(4857,4868),(4954,4968),(5001,5015),(6556,6573),(6573,6593),(6710,6728)]
+	emline = np.array(['[OII]','Hdelta','Hbeta','[OIII]1','[OIII]2','Halpha','[NII]','[SII]'])
+	wavelength = np.array([3728,4102.0,4861.33,4959,5007,6562,6583,6732.71])
+	sideband   = [(3723,3736),(4090,4110),(4857,4868),(4954,4968),(5001,5015),(6556,6573),(6573,6593),(6710,6728)]
 	nline = len(emline)
 
 	# get spectrum
@@ -1169,8 +1178,8 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None,
 				plotlines=['[SIII]','[NII]','Halpha','[SII]']
 				plotlam  =np.array([6312,6583,6563,6725])
 			elif jj == 1:
-				plotlines = ['Hbeta']
-				plotlam = np.array(4861)
+				plotlines = ['Hdelta']
+				plotlam = np.atleast_1d(4102)
 			for kk in xrange(len(plotlam)):
 				plt.vlines(plotlam[kk],plt.ylim()[0],plt.ylim()[1],color='0.5',linestyle='--')
 				plt.text(plotlam[kk],(plt.ylim()[0]+plt.ylim()[1])/2.*(1.0-kk/6.0),plotlines[kk])

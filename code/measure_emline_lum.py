@@ -465,7 +465,7 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 			fit_dat = model_fluxes[jj][p_idx]
 			fit_smooth = threed_dutils.smooth_spectrum(fit_lam,fit_dat,smooth[jj])
 
-			abs_fit,_ = bootstrap(fit_lam, fit_smooth, absmod, fitter, np.min(fit_smooth)*0.001, [1], 
+			abs_fit,absorption_flux = bootstrap(fit_lam, fit_smooth, absmod, fitter, np.min(fit_smooth)*0.001, [1], 
 		                          flux_flag=True, nboot=10)
 
 			# Voigt profile is too complex to integrate analytically
@@ -473,7 +473,7 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 			#I1 = simps(abs_fit(fit_lam), fit_lam)
 			#I2 = simps(abs_fit[1](fit_lam), fit_lam)
 			#mod_abs_flux[jj,kk] = -(I2 - I1) * constants.L_sun.cgs.value
-			mod_abs_flux[jj,kk] = np.squeeze(_[0])
+			mod_abs_flux[jj,kk] = np.squeeze(absorption_flux[0])
 			mod_abs_eqw[jj,kk] = mod_abs_flux[jj,kk] / abs_fit[1](abs_wave[kk]) / constants.L_sun.cgs.value
 
 			tmp.append(abs_fit)
@@ -529,7 +529,7 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 
 	### initial fit to emission
 	gauss_fit,_ = bootstrap(obslam[p_idx], obsflux[p_idx], emmod, fitter, np.min(obsflux[p_idx])*0.001, [1], 
-	                          flux_flag=False, nboot=10)
+	                          flux_flag=False, nboot=1)
 	
 	### find proper smoothing
 	tmpflux = np.zeros(nline)
@@ -600,7 +600,7 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 		ngauss_init.mean.fixed = True
 		ngauss_init.stddev.max = np.max(np.abs(bin_edges))*0.6
 		noise_gauss,_ = bootstrap((bin_edges[1:]+bin_edges[:-1])/2., hist, ngauss_init, fitter, np.min(hist)*0.001, [1], 
-                      flux_flag=False, nboot=10)
+                      flux_flag=False, nboot=1)
 
 		##### TEST PLOT
 		test_plot = False
@@ -638,11 +638,13 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 	# use lower of two error estimates
 	# flux come out of bootstrap as (nlines,[median,errup,errdown])
 	tnoise = np.min(emline_noise)
+	bfit_mod_save = []
 
 	#### now measure emission line fluxes
 	for jj in xrange(nmodel):
 
 		bfit_mod, emline_flux_local = bootstrap(obslam[p_idx],residuals[jj],emmod,fitter,tnoise,em_wave)
+		bfit_mod_save.append(bfit_mod)
 		emline_flux.append(emline_flux_local)
 
 		#### measure fluxes, EQW
@@ -698,6 +700,38 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 			axarr[ii].text(0.98, 0.845, 'abs model', fontsize=16, transform = axarr[ii].transAxes,ha='right',color='#1E90FF')
 			axarr[ii].text(0.98, 0.76, 'observations', fontsize=16, transform = axarr[ii].transAxes,ha='right')
 
+			###############################
+			##### ARE HBETAS WRONG? #######
+			###############################
+			ha_idx = emline == r'H$\alpha$'
+			hb_idx = emline == r'H$\beta$'
+
+			# Prospector values
+			ha_flux = emline_flux[0][0,ha_idx][0]
+			hb_flux = emline_flux[0][0,hb_idx][0]
+
+			# only do this if observed ha and hb flux is non-negative, and we're in the Hbeta plot
+			if (ha_flux > 0) & (hb_flux > 0) and (ii == 0):
+
+				# determine model balmer decrement
+				bdec_idx = sample_results['extras']['parnames'] == 'bdec_cloudy'
+				mod_bdec = sample_results['extras']['q50'][bdec_idx][0]
+
+				# adjust Hbeta flux
+				hb_flux_adj = (ha_flux / hb_flux) / mod_bdec
+				bfit_mod.amplitude_2.value *= hb_flux_adj
+
+				# replot
+				axarr[ii].plot(obslam[p_idx][p_idx_em],bfit_mod(obslam[p_idx][p_idx_em])+smoothed_absflux[jj][p_idx_em],color='purple')
+
+				# put Balmer decrements up
+				axarr[ii].text(0.03, 0.2, r'H$\beta$ adjust = '+"{:.2f}".format(hb_flux_adj),
+						       fontsize=16, transform = axarr[ii].transAxes, color='purple')				
+				axarr[ii].text(0.03, 0.115, 'model bdec = '+"{:.2f}".format(mod_bdec),
+						       fontsize=16, transform = axarr[ii].transAxes)
+				axarr[ii].text(0.03, 0.03, 'obs bdec = '+"{:.2f}".format(ha_flux / hb_flux),
+						       fontsize=16, transform = axarr[ii].transAxes)
+				
 
 		plt.tight_layout()
 		plt.savefig(out_em[jj], dpi = 300)
@@ -705,7 +739,9 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 
 	##### MEASURE OBSERVED ABSORPTION LINES
 	# currently only hdelta
-	absobs = absobs_model(abs_wave[0])
+	# use redshift from emission line fit
+	zadj = bfit_mod_save[0].mean_0.value / 4958.92 - 1
+	absobs = absobs_model((1+zadj) * abs_wave[0])
 	p_idx = (obslam > abs_bbox[0][0]) & (obslam < abs_bbox[0][1])
 	bfit_abs_mod, abs_flux = bootstrap(obslam[p_idx],obsflux[p_idx],absobs,fitter,tnoise,abs_wave[0])
 
@@ -737,8 +773,6 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 
 	plt.savefig(out_absobs, dpi = 300)
 	plt.close()
-
-	print 1/0
 
 	out = {}
 	# save fluxes

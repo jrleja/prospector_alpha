@@ -891,7 +891,7 @@ def make_all_plots(filebase=None,
 	if not os.path.isdir(outfolder):
 		os.makedirs(outfolder)
 
-	sample_results, powell_results, model = threed_dutils.load_prospectr_data(filebase)
+	sample_results, powell_results, model = threed_dutils.load_prospector_data(filebase)
 
 	if not sps:
 		# load stellar population, set up custom filters

@@ -77,7 +77,7 @@ def median_by_band(x,y,avg=False):
 def plot_all_residuals(alldata):
 
 	'''
-	show all residuals for spectra + photometry, magphys + prospectr
+	show all residuals for spectra + photometry, magphys + prospector
 	'''
 
 	##### set up plots
@@ -216,7 +216,7 @@ def plot_all_residuals(alldata):
 			if data:
 				if data['residuals'][label[i]]:
 					res_magphys = np.append(res_magphys,data['residuals'][label[i]]['magphys_resid'])
-					res_prosp = np.append(res_prosp,data['residuals'][label[i]]['prospectr_resid'])
+					res_prosp = np.append(res_prosp,data['residuals'][label[i]]['prospector_resid'])
 					obs_restlam = np.append(obs_restlam,data['residuals'][label[i]]['obs_restlam'])
 
 					plot.plot(data['residuals'][label[i]]['obs_restlam'], 
@@ -227,14 +227,14 @@ def plot_all_residuals(alldata):
 						      )
 
 					plot.plot(data['residuals'][label[i]]['obs_restlam'], 
-						      data['residuals'][label[i]]['prospectr_resid'],
+						      data['residuals'][label[i]]['prospector_resid'],
 						      alpha=alpha_minor,
 						      color=prosp_color,
 						      lw=lw_minor
 						      )
 
 					rms_mag = np.append(rms_mag,data['residuals'][label[i]]['magphys_rms'])
-					rms_pro = np.append(rms_pro,data['residuals'][label[i]]['prospectr_rms'])
+					rms_pro = np.append(rms_pro,data['residuals'][label[i]]['prospector_rms'])
 
 		##### calculate and plot running median
 		magbins, magmedian = threed_dutils.running_median(obs_restlam,res_magphys,nbins=nbins[i])
@@ -420,9 +420,9 @@ def plot_obs_spec(obs_spec, phot, spec_res, alpha,
 			                       modspec_smooth, 
 			                       bounds_error = False, fill_value = 0)
 
-		prospectr_resid = np.log10(obs_spec['flux'][mask]) - np.log10(pro_flux_interp(obslam))
+		prospector_resid = np.log10(obs_spec['flux'][mask]) - np.log10(pro_flux_interp(obslam))
 		spec_res.plot(obslam, 
-			          prospectr_resid,
+			          prospector_resid,
 			          color=prosp_color,
 			          alpha=alpha,
 			          linestyle='-')
@@ -442,10 +442,10 @@ def plot_obs_spec(obs_spec, phot, spec_res, alpha,
 		#### calculate rms
 		# mask emission lines
 		magphys_rms = calc_rms(obslam, z, magphys_resid)
-		prospectr_rms = calc_rms(obslam, z, prospectr_resid)
+		prospector_rms = calc_rms(obslam, z, prospector_resid)
 
 		#### write text, add lines
-		spec_res.text(0.98,0.16, 'RMS='+"{:.2f}".format(prospectr_rms)+' dex',
+		spec_res.text(0.98,0.16, 'RMS='+"{:.2f}".format(prospector_rms)+' dex',
 			          transform = spec_res.transAxes,ha='right',
 			          color=prosp_color,fontsize=14)
 		spec_res.text(0.98,0.05, 'RMS='+"{:.2f}".format(magphys_rms)+' dex',
@@ -470,8 +470,8 @@ def plot_obs_spec(obs_spec, phot, spec_res, alpha,
 			   'magphys_resid': magphys_resid,
 			   'magphys_rms': magphys_rms,
 			   'obs_obslam': obslam,
-			   'prospectr_resid': prospectr_resid,
-			   'prospectr_rms': prospectr_rms
+			   'prospector_resid': prospector_resid,
+			   'prospector_rms': prospector_rms
 			   }
 
 		return out
@@ -487,6 +487,7 @@ def update_model_info(alldata, sample_results, magphys):
 	alldata['magphys'] = magphys['pdfs']
 	alldata['model'] = magphys['model']
 	alldata['pquantiles'] = sample_results['quantiles']
+	alldata['spec_info'] = sample_results['spec_info']
 	alldata['model_emline'] = sample_results['model_emline']
 	alldata['lir'] = sample_results['observables']['L_IR']
 	alldata['pextras'] = sample_results['extras']
@@ -506,7 +507,7 @@ def sed_comp_figure(sample_results, sps, model, magphys,
 
 	Returns a dictionary called 'residuals', which contains the 
 	photometric + spectroscopic residuals for this object, for both
-	magphys and prospectr.
+	magphys and prospector.
 	"""
 
 
@@ -529,7 +530,7 @@ def sed_comp_figure(sample_results, sps, model, magphys,
 	#### setup output
 	residuals={}
 
-	##### Prospectr maximum probability model ######
+	##### Prospector maximum probability model ######
 	# plot the spectrum, photometry, and chi values
 	try:
 		wave_eff, obsmags, obsmags_unc, modmags, chi, modspec, modlam = \
@@ -537,7 +538,7 @@ def sed_comp_figure(sample_results, sps, model, magphys,
 			                sample_results, sps)
 	except KeyError as e:
 		print e
-		print "You must run post-processing on the Prospectr " + \
+		print "You must run post-processing on the Prospector " + \
 			  "data for " + sample_results['run_params']['objname']
 		return None
 
@@ -567,8 +568,8 @@ def sed_comp_figure(sample_results, sps, model, magphys,
 	res.axhline(0, linestyle=':', color='grey')
 
 	##### magphys: spectrum + photometry #####
-	# note: we steal the filter effective wavelengths from Prospectr here
-	# if filters are mismatched in Prospectr vs MAGPHYS, this will do weird things
+	# note: we steal the filter effective wavelengths from Prospector here
+	# if filters are mismatched in Prospector vs MAGPHYS, this will do weird things
 	# not fixing it, since it may serve as an "alarm bell"
 	m = magphys['obs']['phot_mask']
 
@@ -586,7 +587,7 @@ def sed_comp_figure(sample_results, sps, model, magphys,
 		print sample_results['obs']['phot_mask']
 		print magphys['obs']['phot_mask']
 		print sample_results['run_params']['objname']
-		print 'Mismatch between Prospectr and MAGPHYS photometry!'
+		print 'Mismatch between Prospector and MAGPHYS photometry!'
 		plt.close()
 		print 1/0
 		return None
@@ -605,6 +606,7 @@ def sed_comp_figure(sample_results, sps, model, magphys,
 
 	##### observed spectra + residuals #####
 	obs_spec = load_spectra(sample_results['run_params']['objname'])
+	#obs_spec = perform_wavelength_cal(obs_spec,sample_results['run_params']['objname'])
 
 	label = ['Optical','Akari', 'Spitzer IRS']
 	resplots = [spec_res_opt, spec_res_akari, spec_res_spit]
@@ -613,7 +615,10 @@ def sed_comp_figure(sample_results, sps, model, magphys,
 		
 		if label[ii] == 'Optical':
 			residuals['emlines'] = measure_emline_lum.measure(sample_results, obs_spec, magphys,sps)
-			sigsmooth[ii] = residuals['emlines']['sigsmooth']
+			if residuals['emlines'] is not None:
+				sigsmooth[ii] = residuals['emlines']['sigsmooth']
+			else:
+				sigsmooth[ii] = 450.0
 
 		residuals[label[ii]] = plot_obs_spec(obs_spec, phot, resplots[ii], alpha, modlam/1e4, modspec,
 					                         magphys['model']['lam']/1e4, magphys['model']['spec']*spec_fac,
@@ -760,7 +765,7 @@ def collate_data(filebase=None,
 	if not os.path.isdir(outfolder):
 		os.makedirs(outfolder)
 
-	sample_results, powell_results, model = threed_dutils.load_prospectr_data(filebase)
+	sample_results, powell_results, model = threed_dutils.load_prospector_data(filebase)
 
 	if not sps:
 		# load stellar population, set up custom filters
@@ -818,6 +823,8 @@ def plt_all(runname=None,startup=True,**extras):
 		for jj in xrange(len(filebase)):
 			print 'iteration '+str(jj) 
 
+			#if filebase[jj].split('_')[-1] != 'NGC 7331':
+			#	continue
 
 			dictionary = collate_data(filebase=filebase[jj],\
 			                           outfolder=outfolder,
@@ -838,18 +845,194 @@ def plt_all(runname=None,startup=True,**extras):
 			alldata_low=pickle.load(f)
 		mag_ensemble.time_res_incr_comp(alldata_low,alldata)
 
-	mag_ensemble.prospectr_comparison(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/pcomp/',hflag)
+	mag_ensemble.prospector_comparison(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/pcomp/',hflag)
 	mag_ensemble.plot_emline_comp(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/magphys/emlines_comp/',hflag)
 	mag_ensemble.plot_relationships(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/magphys/')
 	plot_all_residuals(alldata)
 	mag_ensemble.plot_comparison(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/magphys/')
 
-def add_sfr_info(runname=None, outfolder=None):
+def perform_wavelength_cal(spec_dict, objname):
+	'''
+	(1) fit a polynomial to ratio
+	(2) apply polynomial correction to obs_spec
+	'''
+
+	with open(outpickle+'/spec_calibration.pickle', "rb") as f:
+		spec_cal=pickle.load(f)
+
+	#### find matching galaxy by loading basenames for BROWNSEDS
+	filebase, parm_basename, ancilname=threed_dutils.generate_basenames('brownseds')
+	match = np.array([f.split('_')[-1] for f in filebase]) == objname
+
+	#### find ratio, calculate polynomial
+	# u, g, r pivot wavelengths
+	lam = np.array([3556.52396991,4702.49527923,6175.5788808])
+	ratio = spec_cal['obs_phot'][:,match] / spec_cal['spec_phot'][:,match]
+	co = np.polyfit(lam, ratio, 2)
+
+	#### correct optical spectra
+	opt_idx = spec_dict['source'] == 1
+	correction = co[0]*spec_dict['obs_lam'][opt_idx]**2+co[1]*spec_dict['obs_lam'][opt_idx]+co[2]
+	spec_dict['flux'][opt_idx] = spec_dict['flux'][opt_idx]*correction
+
+	return spec_dict
+
+def compute_specmags(runname=None, outfolder=None):
+
+	'''
+	step 1: load observed spectra, model spectra, photometry
+	step 2: normalize model spectra to observed spectra (at red end, + blue if using u-band)
+	step 3: meld them together
+	step 4: calculate u, g, r mags from spectra
+	step 5: plot spectral u, g, r versus photometric u, g, r
+
+	dump into pickle file, call perform_wavelength_cal() to apply
+
+	future steps: don't use super low-res spectra
+	'''
+
+	from bsfh import model_setup
+	from astropy.cosmology import WMAP9
 
 	if runname == None:
 		runname = 'brownseds'
 
-	#### load up prospectr results
+	#### load up prospector results
+	filebase, parm_basename, ancilname=threed_dutils.generate_basenames(runname)
+
+	output = outpickle+'/alldata.pickle'
+	outname = os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/pcomp/sfrcomp.png'
+	outphot = outpickle+'/spec_calibration.pickle'
+
+	with open(output, "rb") as f:
+		alldata=pickle.load(f)
+
+	sps = threed_dutils.setup_sps(custom_filter_key=None)
+
+	optphot = np.zeros(shape=(3,len(alldata)))
+	obsphot = np.zeros(shape=(3,len(alldata)))
+	for ii,dat in enumerate(alldata):
+
+		#### load up model spec
+		z = dat['residuals']['phot']['z']
+		mod_spec = dat['bfit']['spec']
+		mod_wav = sps.wavelengths
+
+		#### load up observed spec
+		# arrives in maggies * Hz
+		# change to maggies
+		spec_dict = load_spectra(dat['objname'])
+		opt_idx = spec_dict['source'] == 1
+		obs_wav = spec_dict['obs_lam'][opt_idx]
+		obs_spec = spec_dict['flux'][opt_idx] / (3e18 / obs_wav)
+
+		#### find adjoining sections in model
+		minwav = np.min(obs_wav)
+		maxwav = np.max(obs_wav)
+
+		lamlim = (2800,7500)
+		lower_join = (mod_wav > lamlim[0]) & (mod_wav < minwav)
+		upper_join = (mod_wav < lamlim[1]) & (mod_wav > maxwav)
+
+		#### normalize and combine
+		# take 300 angstrom slices on either side
+		dellam = 300
+		low_obs = obs_wav < minwav+dellam
+		low_mod = (mod_wav < minwav + dellam) & (mod_wav > minwav)
+		up_obs = obs_wav > maxwav-dellam
+		up_mod = (mod_wav > maxwav - dellam) & (mod_wav < maxwav)
+
+		# avoid known emission lines: [OII], [NII], Halpha, [SII]
+		elines = np.array([3727,6549,6563,6583,6717,6731])
+		lambuff = 22
+		for line in elines:
+			low_obs[(obs_wav > line - lambuff) & (obs_wav < line + lambuff)] = False
+			low_mod[(mod_wav > line - lambuff) & (mod_wav < line + lambuff)] = False
+			up_obs[(obs_wav > line - lambuff) & (obs_wav < line + lambuff)] = False
+			up_mod[(mod_wav > line - lambuff) & (mod_wav < line + lambuff)] = False
+
+		# calculate mean
+		lownorm = np.mean(obs_spec[low_obs]) / np.mean(mod_spec[low_mod])
+		upnorm = np.mean(obs_spec[up_obs]) / np.mean(mod_spec[up_mod])
+
+		# combine
+		comblam = np.concatenate((mod_wav[lower_join],obs_wav,mod_wav[upper_join]))
+		combspec = np.concatenate((mod_spec[lower_join]*lownorm,obs_spec,mod_spec[upper_join]*upnorm))
+
+		# plot conjoined spectra
+		if True:
+			# observed spectra
+			plt.plot(obs_wav,np.log10(obs_spec),color='black')
+			#plt.plot(obs_wav[up_obs],np.log10(obs_spec[up_obs]),color='purple')
+			#plt.plot(mod_wav[up_mod],np.log10(mod_spec[up_mod]),color='green')
+
+			# post-break model
+			plt.plot(mod_wav[lower_join],np.log10(mod_spec[lower_join]*lownorm),color='red')
+			plt.plot(mod_wav[upper_join],np.log10(mod_spec[upper_join]*upnorm),color='red')
+			plt.plot(mod_wav[lower_join],np.log10(mod_spec[lower_join]),color='grey')
+			plt.plot(mod_wav[upper_join],np.log10(mod_spec[upper_join]),color='grey')
+
+			# limits, save
+			plt.xlim(2800,7200)
+			plt.savefig('/Users/joel/code/python/threedhst_bsfh/plots/brownseds/pcomp/specnorm/'+dat['objname']+'.png',dpi=100)
+			plt.close()
+
+		#### convert combspec from maggies to Lsun/Hz
+		pc2cm =  3.08568E18
+		dfactor = (1+z) / ( 4.0 * np.pi * (WMAP9.luminosity_distance(z).value*1e6*pc2cm)**2)
+		combspec *= 3631*1e-23 / constants.L_sun.cgs.value / dfactor # to Jy, to erg/s/cm^2/Hz, to Lsun/cm^2/Hz, to Lsun/Hz
+
+		#### integrate spectra, save mags
+		optphot[0,ii],_ = threed_dutils.integrate_mag(comblam,combspec,'SDSS Camera u',alt_file='/Users/joel/code/fsps/data/allfilters.dat',z=z)
+		optphot[1,ii],_ = threed_dutils.integrate_mag(comblam,combspec,'SDSS Camera g',alt_file='/Users/joel/code/fsps/data/allfilters.dat',z=z)
+		optphot[2,ii],_ = threed_dutils.integrate_mag(comblam,combspec,'SDSS Camera r',alt_file='/Users/joel/code/fsps/data/allfilters.dat',z=z)
+		optphot[:,ii] =  10**(-0.4*optphot[:,ii])
+
+		#### save observed mags
+		run_params = model_setup.get_run_params(param_file=parm_basename[ii])
+		obs = model_setup.load_obs(**run_params)
+		obsphot[0,ii] = obs['maggies'][obs['filters'] == 'SDSS_u']
+		obsphot[1,ii] = obs['maggies'][obs['filters'] == 'SDSS_g']
+		obsphot[2,ii] = obs['maggies'][obs['filters'] == 'SDSS_r']
+
+	##### plot
+	kwargs = {'color':'0.5','alpha':0.8,'histtype':'bar','lw':2,'normed':1,'range':(0.5,2.0)}
+	nbins = 80
+
+	x = obsphot / optphot
+	tits = [r'(photometric flux / spectral flux) [u-band]',
+	        r'(photometric flux / spectral flux) [g-band]',
+	        r'(photometric flux / spectral flux) [r-band]']
+
+	#### ALL GALAXIES
+	fig, axes = plt.subplots(1, 3, figsize = (18.75,6))
+	for ii, ax in enumerate(axes):
+		num, b, p = ax.hist(x[ii,:],nbins,**kwargs)
+		save_xlim = ax.get_xlim()
+		b = (b[:-1] + b[1:])/2.
+		ax.set_ylabel('N')
+		ax.set_xlabel(tits[ii])
+		ax.set_xlim(save_xlim)
+		ax.xaxis.set_major_locator(MaxNLocator(5))
+	plt.savefig('/Users/joel/code/python/threedhst_bsfh/plots/brownseds/pcomp/spectral_integration.png',dpi=150)
+	plt.close()
+
+	out = {'obs_phot':obsphot,'spec_phot':optphot}
+	pickle.dump(out,open(outphot, "wb"))
+
+	print 1/0
+
+
+def add_sfr_info(runname=None, outfolder=None):
+
+	'''
+	This calculates UV + IR SFRs based on the Dale & Helou IR templates & MIPS flux
+	'''
+
+	if runname == None:
+		runname = 'brownseds'
+
+	#### load up prospector results
 	filebase, parm_basename, ancilname=threed_dutils.generate_basenames(runname)
 
 
@@ -866,7 +1049,7 @@ def add_sfr_info(runname=None, outfolder=None):
 	for ii,dat in enumerate(alldata):
 
 		#### load up spec by generating it from model
-		sample_results, powell_results, model = threed_dutils.load_prospectr_data(filebase[ii])
+		sample_results, powell_results, model = threed_dutils.load_prospector_data(filebase[ii])
 		maxprob = sample_results['bfit']['maxprob_params']
 		sample_results['model'].params['zred'] = np.array(0.0)
 		spec,mags,sm = sample_results['model'].mean_model(maxprob, sample_results['obs'], sps=sps) # Lsun / Hz
@@ -910,7 +1093,7 @@ def add_sfr_info(runname=None, outfolder=None):
 
 	xplot = np.log10(np.clip(sfr_prosp,1e-3,np.inf))
 	yplot = [np.log10(sfr_uvir), np.log10(sfr_mips), np.log10(sfr_mips_z2)]
-	xlabel = r'log(SFR$_{100}$) [Prospectr]'
+	xlabel = r'log(SFR$_{100}$) [Prospector]'
 	ylabel = [r'log(SFR$_{UV+IR}$)', r'log(SFR$_{UV+IR[mips]}$)',r'log(SFR$_{UV+IR[mips,z=2]}$)']
 
 	for ii in xrange(3):
@@ -943,7 +1126,7 @@ def add_prosp_mag_info(runname=None):
 
 	filebase, parm_basename, ancilname=threed_dutils.generate_basenames(runname)
 	for ii,dat in enumerate(alldata):
-		sample_results, powell_results, model = threed_dutils.load_prospectr_data(filebase[ii])
+		sample_results, powell_results, model = threed_dutils.load_prospector_data(filebase[ii])
 		magphys = read_magphys_output(objname=dat['objname'])
 		dat = update_model_info(dat, sample_results, magphys)
 		print str(ii)+' done'
