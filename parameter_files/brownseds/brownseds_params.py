@@ -261,6 +261,10 @@ def add_dust1(dust2=None, **extras):
 
     return 0.86*dust2
 
+def tie_gas_logz(logzsol=None, **extras):
+
+    return logzsol
+
 #### SET SFH PRIORS #####
 ###### REDSHIFT ######
 hdulist = fits.open(run_params['datname'])
@@ -526,6 +530,7 @@ model_params.append({'name': 'add_neb_continuum', 'N': 1,
 model_params.append({'name': 'gas_logz', 'N': 1,
                         'isfree': False,
                         'init': 0.0,
+                        'depends_on': tie_gas_logz,
                         'units': r'log Z/Z_\odot',
                         'prior_function': tophat,
                         'prior_args': {'mini':-2.0, 'maxi':0.5}})
