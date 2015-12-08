@@ -164,17 +164,28 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 											               saveplot=False,measure_ir=False)
 
 		##### Balmer decrements
-		bdec_cloudy[jj] = modelout['emline_flux'][modelout['emline_name'] == 'Halpha'] / modelout['emline_flux'][modelout['emline_name'] == 'Hbeta']
+		bdec_cloudy[jj] = modelout['emlines']['Halpha']['flux'] / modelout['emlines']['Hbeta']['flux']
 		bdec_calc[jj] = threed_dutils.calc_balmer_dec(flatchain[jj,dust1_index], flatchain[jj,dust2_index], -1.0, 
 			                                          flatchain[jj,dust_index_index],
 			                                          kriek = (sample_results['model'].params['dust_type'] == 4)[0])
-		bdec_nodust[jj] = modelout_nodust['emline_flux'][modelout['emline_name'] == 'Halpha'] / modelout_nodust['emline_flux'][modelout['emline_name'] == 'Hbeta']
+		bdec_nodust[jj] = modelout_nodust['emlines']['Halpha']['flux']  / modelout_nodust['emlines']['Hbeta']['flux']
 		
 		if jj == 0:
-			nline = len(modelout['emline_flux']) # set by number of lines measured in threed_dutils
-			lineflux = np.empty(shape=(ncalc,nline))
+			emnames = modelout['emlines'].keys()
+			nline = len(emnames)
+			emflux = np.empty(shape=(ncalc,nline))
+			emeqw = np.empty(shape=(ncalc,nline))
 
-		lineflux[jj,:] = modelout['emline_flux']
+			absnames = modelout['abslines'].keys()
+			nabs = len(absnames)
+			absflux = np.empty(shape=(ncalc,nabs))
+			abseqw = np.empty(shape=(ncalc,nabs))
+
+		absflux[jj,:]  = np.array([modelout['abslines'][line]['flux'] for line in absnames])
+		abseqw[jj,:]  = np.array([modelout['abslines'][line]['eqw'] for line in absnames])
+		emflux[jj,:] = np.array([modelout['emlines'][line]['flux'] for line in emnames])
+		emeqw[jj,:] = np.array([modelout['emlines'][line]['eqw'] for line in emnames])
+
 		mips_flux[jj]  = modelout['mips']
 		lir[jj]        = modelout['lir']
 
@@ -195,25 +206,41 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 	for kk in xrange(nextra): q_16e[kk], q_50e[kk], q_84e[kk] = triangle.quantile(extra_flatchain[:,kk], [0.16, 0.5, 0.84])
 
 	##### FORMAT EMLINE OUTPUT 
-	q_16em, q_50em, q_84em, thetamaxem = (np.zeros(nline)+np.nan for i in range(4))
-	for kk in xrange(nline): q_16em[kk], q_50em[kk], q_84em[kk] = triangle.quantile(lineflux[:,kk], [0.16, 0.5, 0.84])
-	emline_info = {'name':modelout['emline_name'],
-	               'fluxchain':lineflux,
-	               'q16':q_16em,
-	               'q50':q_50em,
-	               'q84':q_84em}
+	q_16flux, q_50flux, q_84flux, q_16eqw, q_50eqw, q_84eqw = (np.zeros(nline)+np.nan for i in range(6))
+	for kk in xrange(nline): q_16flux[kk], q_50flux[kk], q_84flux[kk] = triangle.quantile(emflux[:,kk], [0.16, 0.5, 0.84])
+	for kk in xrange(nline): q_16eqw[kk], q_50eqw[kk], q_84eqw[kk] = triangle.quantile(emeqw[:,kk], [0.16, 0.5, 0.84])
+	emline_info = {}
+	emline_info['eqw'] = {'chain':emeqw,
+						'q16':q_16eqw,
+						'q50':q_50eqw,
+						'q84':q_84eqw}
+	emline_info['flux'] = {'chain':emflux,
+						'q16':q_16flux,
+						'q50':q_50flux,
+						'q84':q_84flux}
+	emline_info['emnames'] = emnames
 	sample_results['model_emline'] = emline_info
 
 	##### SPECTRAL QUANTITIES
-	q_16hd, q_50hd, q_84hd = triangle.quantile(hdelta_flux, [0.16, 0.5, 0.84])
-	q_16hdeq, q_50hdeq, q_84hdeq = triangle.quantile(hdelta_eqw_rest, [0.16, 0.5, 0.84])
+	q_16flux, q_50flux, q_84flux, q_16eqw, q_50eqw, q_84eqw = (np.zeros(nabs)+np.nan for i in range(6))
+	for kk in xrange(nline): q_16flux[kk], q_50flux[kk], q_84flux[kk] = triangle.quantile(absflux[:,kk], [0.16, 0.5, 0.84])
+	for kk in xrange(nline): q_16eqw[kk], q_50eqw[kk], q_84eqw[kk] = triangle.quantile(abseqw[:,kk], [0.16, 0.5, 0.84])
 	q_16dn, q_50dn, q_84dn = triangle.quantile(dn4000, [0.16, 0.5, 0.84])
-	spec_info = {'name':np.array(['hdelta_flux','hdelta_eqw_rest','dn4000']),
-	             'chain': np.vstack((hdelta_flux,hdelta_eqw_rest,dn4000)),
-	             'q16': np.vstack((q_16hd,q_16hdeq,q_16dn)),
-	             'q50': np.vstack((q_50hd,q_50hdeq,q_50dn)),
-	             'q84': np.vstack((q_84hd,q_84hdeq,q_84dn)),
-	             }
+	
+	spec_info = {}
+	spec_info['dn4000'] = {'chain':dn4000,
+						   'q16':q_16dn,
+						   'q50':q_50dn,
+						   'q84':q_84dn}
+	spec_info['eqw'] = {'chain':abseqw,
+						'q16':q_16eqw,
+						'q50':q_50eqw,
+						'q84':q_84eqw}
+	spec_info['flux'] = {'chain':absflux,
+						'q16':q_16flux,
+						'q50':q_50flux,
+						'q84':q_84flux}
+	spec_info['absnames'] = absnames
 	sample_results['spec_info'] = spec_info
 
 	#### EXTRA PARAMETER OUTPUTS 

@@ -487,6 +487,10 @@ def update_model_info(alldata, sample_results, magphys):
 	alldata['magphys'] = magphys['pdfs']
 	alldata['model'] = magphys['model']
 	alldata['pquantiles'] = sample_results['quantiles']
+	npars = len(sample_results['initial_theta'])
+	ransamp = np.zeros(shape=(2000,npars))
+	for kk in xrange(npars): ransamp[:,kk] = np.random.choice(sample_results['flatchain'][:,kk],replace=False,size=2000)
+	alldata['pquantiles']['random_chain'] = ransamp
 	alldata['spec_info'] = sample_results['spec_info']
 	alldata['model_emline'] = sample_results['model_emline']
 	alldata['lir'] = sample_results['observables']['L_IR']

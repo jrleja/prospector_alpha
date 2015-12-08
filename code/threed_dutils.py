@@ -1104,7 +1104,7 @@ def integrate_sfh(t1,t2,sfh_params):
 
 def measure_emline_lum(sps, model = None, obs = None, thetas = None, 
 	                   measure_ir = False, savestr = False, saveplot=True,
-	                   spec=None, hdelta = False):
+	                   spec=None, abslines=True):
 	
 	'''
 	takes spec(on)-spec(off) to measure emission line luminosity
@@ -1117,18 +1117,8 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None,
 
 	if you ever add more emission lines to this, God help you... find all the places where you lazily indexed
 	halpha as 4 and hbeta as 1!
-
-	measuring hdelta requires an updated version of Astropy, which is currently not available on Odyssey
-	it's turned off for now, will just use best fits
 	'''
 	out = {}
-
-
-    # define emission lines
-	emline = np.array(['[OII]','Hdelta','Hbeta','[OIII]1','[OIII]2','Halpha','[NII]','[SII]'])
-	wavelength = np.array([3728,4102.0,4861.33,4959,5007,6562,6583,6732.71])
-	sideband   = [(3723,3736),(4090,4110),(4857,4868),(4954,4968),(5001,5015),(6556,6573),(6573,6593),(6710,6728)]
-	nline = len(emline)
 
 	# get spectrum
 	if model:
@@ -1152,6 +1142,7 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None,
 		factor = 3e18 / w**2
 		spec = (spec_nebon-spec_neboff) *factor
 		spec_nebon *= factor
+		spec_neboff *= factor
 
 		model.params['zred'] = z
 
@@ -1161,37 +1152,15 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None,
 			print 1/0
 		w = sps.wavelengths
 
-	##### measure emission lines
-	emline_flux = np.zeros(len(wavelength))
-	for jj in xrange(len(wavelength)):
-		integrate_lam = (w > sideband[jj][0]) & (w < sideband[jj][1])
-		baseline      = spec[np.abs(w-sideband[jj][0]) == np.min(np.abs(w-sideband[jj][0]))][0]
-		
-		emline_flux[jj] = np.trapz(spec[integrate_lam]-baseline, w[integrate_lam])
-		if saveplot and (jj==4 or jj==1):
-			plt.plot(w,spec,'ro',linestyle='-')
-			plt.plot(w[integrate_lam], spec[integrate_lam], 'bo',linestyle=' ')
-			plt.xlim(wavelength[jj]-40,wavelength[jj]+40)
-			plt.ylim(-np.max(spec[integrate_lam])*0.2,np.max(spec[integrate_lam])*1.2)
-			
-			if jj == 4:
-				plotlines=['[SIII]','[NII]','Halpha','[SII]']
-				plotlam  =np.array([6312,6583,6563,6725])
-			elif jj == 1:
-				plotlines = ['Hdelta']
-				plotlam = np.atleast_1d(4102)
-			for kk in xrange(len(plotlam)):
-				plt.vlines(plotlam[kk],plt.ylim()[0],plt.ylim()[1],color='0.5',linestyle='--')
-				plt.text(plotlam[kk],(plt.ylim()[0]+plt.ylim()[1])/2.*(1.0-kk/6.0),plotlines[kk])
-			plt.savefig(os.getenv('APPS')+'/threedhst_bsfh/plots/testem/'+emline[jj]+'_'+savestr+'.png',dpi=300)
-			plt.close()
 
 	##### measure absorption lines and Dn4000
-	dn4000 = measure_Dn4000(w,spec_nebon)
-	if hdelta:
-		hdelta_lum,hdelta_eqw = measure_hdelta(w,spec_nebon) # comes out in Lsun and rest-frame EQW
-		out['hdelta_lum'] = hdelta_lum
-		out['hdelta_eqw_rest'] = hdelta_eqw
+	out['dn4000'] = measure_Dn4000(w,spec_nebon)
+	if abslines:
+		smooth_spec = smooth_spectrum(w,spec_neboff,200.0,minlam=3e3,maxlam=8e3)
+		out['abslines'] = measure_abslines(w,smooth_spec) # comes out in Lsun and rest-frame EQW
+
+	##### measure emission lines
+	out['emlines'] = measure_emlines(w,spec,smooth_spec)
 
 	if measure_ir:
 
@@ -1211,11 +1180,7 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None,
 
 		out['lir'] = lir
 		out['mips'] = mips
-		
-	out['emline_flux'] = emline_flux
-	out['emline_name'] = emline
-	out['dn4000'] = dn4000
-
+	
 	return out
 
 def measure_Dn4000(lam,flux):
@@ -1231,51 +1196,187 @@ def measure_Dn4000(lam,flux):
 
 	return np.mean(flux[red])/np.mean(flux[blue])
 
-def absobs_model(lams):
+def measure_emlines(lam,flux_emline, flux_abs):
 
-	from astropy.modeling import functional_models
+	'''
+	Nelan et al. (2005)
+	Halpha wide: 6515-6540, 6554-6575, 6575-6585
+	Halpha narrow: 6515-6540, 6554-6568, 6568-6575
 
-	lams = np.atleast_1d(lams)
+	Worthey et al. 1994
+	Hbeta: 4827.875-4847.875, 4847.875-4876.625, 4876.625-4891
 
-	#### ADD ALL MODELS FIRST
-	for ii in xrange(len(lams)):
-		if ii == 0:
-			model = functional_models.Gaussian1D(amplitude=-5e5, mean=lams[ii], stddev=3.0)
-		else: 
-			model += functional_models.Gaussian1D(amplitude=-5e5, mean=lams[ii], stddev=3.0)
+	Worthey et al. 1997
+	hdelta wide: 4041.6-4079.75, 4083.5-4122.25, 4128.5-4161.0
+	hdelta narrow: 4057.25-4088.5, 4091-4112.25, 4114.75-4137.25
 
-	#### NOW ADD LINEAR COMPONENT
-	model += functional_models.Linear1D(intercept=1e7)
+	WIDENED HALPHA AND HBETA BECAUSE OF SMOOTHING
+	'''
 
-	return model
+	out = {}
 
-def measure_hdelta(lam,flux):
+    # define emission lines
+	lines = np.array(['[OII]','Hdelta','Hbeta','[OIII]1','[OIII]2','Halpha','[NII]','[SII]'])
+	wavelength = np.array([3728,4102.0,4861.33,4959,5007,6562,6583,6732.71])
+	sideband   = [(3723,3736),(4090,4110),(4857,4868),(4954,4968),(5001,5015),(6556,6573),(6573,6593),(6710,6728)]
 
-	from astropy.modeling import fitting
+	up   = [(3742.,3750.),(4128.5,4161.00),(4884.625,4900.000),(4970.,4979.),(5025.,5035.),(6595.,6605.),(6595.,6605.),(6730.,6740.)]
+	down = [(3713.,3720.),(4041.6,4079.75),(4817.875,4845.875),(4946.,4955.),(4985.,4995.),(6515.,6540.),(6515.,6540.),(6700.,6710.)]
 
-	abs_wave = 4101.74 
-	abs_bbox  = (4020,4200)
+	#fig, ax = plt.subplots(2,4, figsize = (25,12))
+	#ax = np.ravel(ax)
 
-	fig, axarr = plt.subplots(1, 1, figsize = (8,8))
+	##### measure emission line flux + EQW
+	for jj in xrange(len(lines)):
+		dic = {}
+		dic['flux'], dic['eqw'] = measure_em(lam,flux_emline,flux_abs,wavelength[jj],sideband[jj],up[jj],down[jj],ax=None)
+		out[lines[jj]] = dic
 
-	#### define model, fitter
-	absmod = absobs_model(abs_wave)
-	fitter = fitting.LevMarLSQFitter()
+	#plt.savefig('test.png',dpi=150)
+	#os.system('open test.png')
+	#plt.savefig(os.getenv('APPS')+'/threedhst_bsfh/plots/testem/'+savestr+'.png',dpi=150)
+	#plt.close()
 
-	#### define fit region
-	p_idx = (lam > abs_bbox[0]) & (lam < abs_bbox[1])
-	fit_lam = lam[p_idx]
-	fit_dat = flux[p_idx]
+	return out
 
-	##### smooth
-	fit_smooth = smooth_spectrum(fit_lam,fit_dat,200,minlam=3000,maxlam=5000)
 
-	##### fit, save flux and eqw
-	fit = fitter(absmod, fit_lam, fit_smooth, maxiter=1000)
-	absflux = fit.amplitude_0.value*np.sqrt(2*np.pi*fit.stddev_0.value**2)
-	abs_eqw = absflux / fit[1](abs_wave)
+def measure_em(w,spec,spec_abs,wavelength,sideband,up, down, ax=None,savestr=None):
 
-	return absflux, abs_eqw
+	#### emission line flux
+	integrate_lam = (w > sideband[0]) & (w < sideband[1])
+	baseline      = np.min(spec[integrate_lam])
+	emline_flux = np.trapz(spec[integrate_lam]-baseline, w[integrate_lam])
+
+	# plot emission lines
+	if False:
+		ax.plot(w,spec,'ro',linestyle='-')
+		ax.plot(w[integrate_lam], spec[integrate_lam], 'bo',linestyle=' ')
+
+		plotlines=['[SIII]','[NII]','Halpha','[SII]']
+		plotlam  =np.array([6312,6583,6563,6725])
+		for kk in xrange(len(plotlam)):
+			ax.vlines(plotlam[kk],plt.ylim()[0],plt.ylim()[1],color='0.5',linestyle='--')
+			ax.text(plotlam[kk],(plt.ylim()[0]+plt.ylim()[1])/2.*(1.0-kk/6.0),plotlines[kk])
+		
+		ax.set_xlim(wavelength-40,wavelength+40)
+		ax.set_ylim(-np.max(spec[integrate_lam])*0.2,np.max(spec[integrate_lam])*1.2)
+
+	#### measure continuum
+	# identify average flux, average wavelength
+	low_cont = (w > down[0]) & (w < down[1])
+	high_cont = (w > up[0]) & (w < up[1])
+
+	low_flux = np.mean(spec_abs[low_cont])
+	high_flux = np.mean(spec_abs[high_cont])
+
+	low_lam = np.mean(down)
+	high_lam = np.mean(up)
+
+	# draw straight line between midpoints
+	m = (high_flux-low_flux)/(high_lam-low_lam)
+	b = high_flux - m*high_lam
+	contflux = m*np.mean(sideband)+b
+	emline_eqw = emline_flux / contflux
+
+	##### plot if necessary
+	if ax is not None:
+		ax.plot(w,spec_abs,color='black', drawstyle='steps-mid')
+		ax.plot([low_lam,high_lam],[contflux,contflux],color='red')
+
+		ax.set_xlim(np.min(down)-50,np.max(up)+50)
+		plt_lam_idx = (w > down[0]) & (w< up[1])
+		ax.set_ylim(np.min(spec_abs[plt_lam_idx])*0.96,np.max(spec_abs[plt_lam_idx])*1.04)
+
+
+	return emline_flux, emline_eqw
+
+def measure_abslines(lam,flux):
+
+	'''
+	Nelan et al. (2005)
+	Halpha wide: 6515-6540, 6554-6575, 6575-6585
+	Halpha narrow: 6515-6540, 6554-6568, 6568-6575
+
+	Worthey et al. 1994
+	Hbeta: 4827.875-4847.875, 4847.875-4876.625, 4876.625-4891
+
+	Worthey et al. 1997
+	hdelta wide: 4041.6-4079.75, 4083.5-4122.25, 4128.5-4161.0
+	hdelta narrow: 4057.25-4088.5, 4091-4112.25, 4114.75-4137.25
+
+	WIDENED HALPHA AND HBETA BECAUSE OF SMOOTHING
+	'''
+
+	out = {}
+
+	# define lines and indexes
+	lines = np.array(['halpha_wide', 'halpha_narrow',
+	                  'hbeta',
+	                  'hdelta_wide', 'hdelta_narrow'])
+
+	index = [(6544.,6585.),(6544.,6585.),(4845.875,4884.625),(4083.5,4122.25),(4091.00,4112.25)]
+	up =    [(6595.,6605.),(6580.,6590.),(4884.625,4900.000),(4128.5,4161.00),(4114.75,4137.25)]
+	down =  [(6515.,6540.),(6515.,6540.),(4817.875,4845.875),(4041.6,4079.75),(4057.25,4088.50)]
+
+
+	#fig, ax = plt.subplots(2,3, figsize = (18.75,12))
+	#ax = np.ravel(ax)
+
+	# measure the absorption flux
+	for ii in xrange(len(lines)):
+		dic = {}
+		dic['flux'], dic['eqw'] = measure_idx(lam,flux,index[ii],up[ii],down[ii],ax=None)
+		out[lines[ii]] = dic
+
+	#plt.savefig('test.png',dpi=150)
+	#os.system('open test.png')
+
+	return out
+
+def measure_idx(lam,flux,index,up,down,ax=None):
+
+	'''
+	measures absorption depths
+	'''
+
+	##### identify average flux, average wavelength
+	low_cont = (lam > down[0]) & (lam < down[1])
+	high_cont = (lam > up[0]) & (lam < up[1])
+	abs_idx = (lam > index[0]) & (lam < index[1])
+
+	low_flux = np.mean(flux[low_cont])
+	high_flux = np.mean(flux[high_cont])
+
+	low_lam = np.mean(down)
+	high_lam = np.mean(up)
+
+	##### draw straight line between midpoints
+	# y = mx + b
+	# m = (y2 - y1) / (x2 - x1)
+	# b = y0 - mx0
+	m = (high_flux-low_flux)/(high_lam-low_lam)
+	b = high_flux - m*high_lam
+
+	##### integrate the flux and the straight line, take the difference
+	yline = m*lam[abs_idx]+b
+	absflux = np.trapz(yline,lam[abs_idx]) - np.trapz(flux[abs_idx], lam[abs_idx])
+	abseqw = absflux/(m*np.mean(lam[abs_idx])+b)
+
+	##### plot if necessary
+	if ax is not None:
+		ax.plot(lam,flux,color='black', drawstyle='steps-mid')
+		ax.plot(lam[abs_idx],yline,color='red')
+		ax.plot(lam[abs_idx],flux[abs_idx],color='blue')
+		ax.plot(lam[low_cont],flux[low_cont],color='cyan')
+		ax.plot(lam[high_cont],flux[high_cont],color='cyan')
+
+		ax.text(0.96,0.05, 'EQW='+"{:.2f}".format(abseqw), transform = ax.transAxes,horizontalalignment='right')
+		ax.set_xlim(np.min(down)-50,np.max(up)+50)
+
+		plt_lam_idx = (lam > down[0]) & (lam < up[1])
+		ax.set_ylim(np.min(flux[plt_lam_idx])*0.96,np.max(flux[plt_lam_idx])*1.04)
+
+	return absflux, abseqw
 
 
 

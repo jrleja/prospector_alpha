@@ -639,6 +639,7 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 	# flux come out of bootstrap as (nlines,[median,errup,errdown])
 	tnoise = np.min(emline_noise)
 	bfit_mod_save = []
+	continuum_obs = np.zeros(shape=(3,2)) # (hdelta, OIII / Hbeta, NII / Halpha), (Prospector,magphys)
 
 	#### now measure emission line fluxes
 	for jj in xrange(nmodel):
@@ -649,11 +650,14 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 
 		#### measure fluxes, EQW
 		# estimate continuum
+		# do it from model continuum with fit offset from observations
 		low_idx = (obslam[p_idx] > 5030) & (obslam[p_idx] < 5100)
-		cont_low = np.mean(bfit_mod[6](obslam[p_idx][low_idx]) + smoothed_absflux[jj][low_idx])*constants.L_sun.cgs.value
+		cont_low = np.mean(bfit_mod[6](obslam[p_idx][low_idx]) + smoothed_absflux[jj][low_idx])
+		continuum_obs[1,jj] = cont_low
 
 		high_idx = (obslam[p_idx] > 6400) & (obslam[p_idx] < 6500)
-		cont_high = np.mean(bfit_mod[6](obslam[p_idx][high_idx]) + smoothed_absflux[jj][high_idx])*constants.L_sun.cgs.value
+		cont_high = np.mean(bfit_mod[6](obslam[p_idx][high_idx]) + smoothed_absflux[jj][high_idx])
+		continuum_obs[2,jj] = cont_high
 
 		eqw = np.concatenate((emline_flux_local[:,:3] / cont_low, emline_flux_local[:,3:] / cont_high),axis=1)
 		eqw_percs.append(eqw)
@@ -745,8 +749,10 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 	p_idx = (obslam > abs_bbox[0][0]) & (obslam < abs_bbox[0][1])
 	bfit_abs_mod, abs_flux = bootstrap(obslam[p_idx],obsflux[p_idx],absobs,fitter,tnoise,abs_wave[0])
 
+	# calculate equivalent width
 	absobs.parameters = bfit_abs_mod.parameters
-	absobs_eqw =  abs_flux / absobs[1](abs_wave[0]) / constants.L_sun.cgs.value
+	continuum_obs[0,:] = absobs[1](abs_wave[0]) * constants.L_sun.cgs.value
+	absobs_eqw =  abs_flux / continuum_obs[0,0]
 
 	# plot
 	fig, ax = plt.subplots(1, 1, figsize = (10,10))
@@ -802,6 +808,8 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 	obs['hdelta_lum'] = abs_flux[0][0]
 	obs['hdelta_lum_errup'] = abs_flux[1][0]
 	obs['hdelta_lum_errdown'] = abs_flux[2][0]
+	obs['continuum_obs'] = continuum_obs
+	obs['continuum_lam'] = np.array([4101.74, 4861.0, 6563.0])
 
 	obs['hdelta_flux'] = abs_flux[0][0] / dfactor / (1+magphys['metadata']['redshift'])
 	obs['hdelta_flux_errup'] = abs_flux[1][0]/ dfactor / (1+magphys['metadata']['redshift'])
