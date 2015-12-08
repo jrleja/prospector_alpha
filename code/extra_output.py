@@ -75,7 +75,7 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 	deltat=[0.01,0.1,1.0] # for averaging SFR over, in Gyr
 
     ##### initialize output arrays for SFH + emission line posterior draws #####
-	half_time,sfr_10,sfr_100,sfr_1000,ssfr_100,totmass,emp_ha,mips_flux,lir,dust_mass,bdec_cloudy,bdec_calc,ext_5500,hdelta_flux,hdelta_eqw_rest,dn4000,bdec_nodust = [np.zeros(shape=(ncalc)) for i in range(17)]
+	half_time,sfr_10,sfr_100,sfr_1000,ssfr_100,totmass,emp_ha,mips_flux,lir,dust_mass,bdec_cloudy,bdec_calc,ext_5500,dn4000,bdec_nodust = [np.zeros(shape=(ncalc)) for i in range(15)]
 	
 
 	##### information for empirical emission line calculation ######
@@ -171,12 +171,12 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 		bdec_nodust[jj] = modelout_nodust['emlines']['Halpha']['flux']  / modelout_nodust['emlines']['Hbeta']['flux']
 		
 		if jj == 0:
-			emnames = modelout['emlines'].keys()
+			emnames = np.array(modelout['emlines'].keys())
 			nline = len(emnames)
 			emflux = np.empty(shape=(ncalc,nline))
 			emeqw = np.empty(shape=(ncalc,nline))
 
-			absnames = modelout['abslines'].keys()
+			absnames = np.array(modelout['abslines'].keys())
 			nabs = len(absnames)
 			absflux = np.empty(shape=(ncalc,nabs))
 			abseqw = np.empty(shape=(ncalc,nabs))
@@ -188,9 +188,6 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 
 		mips_flux[jj]  = modelout['mips']
 		lir[jj]        = modelout['lir']
-
-		#hdelta_flux[jj] = modelout['hdelta_lum']
-		#hdelta_eqw_rest[jj] = modelout['hdelta_eqw_rest']
 		dn4000[jj] = modelout['dn4000']
 
 
@@ -279,9 +276,12 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 	             'lir':lir[0],
 	             'mips_flux':mips_flux[0],
 	             'dust_mass': dust_mass[0],
-	             'halpha_flux':lineflux[0,4],
-	             'hbeta_flux':lineflux[0,1],
-	             'hdelta_flux':hdelta_flux[0],
+	             'halpha_flux':emflux[0,emnames == 'Halpha'],
+	             'hbeta_flux':emflux[0,emnames == 'Hbeta'],
+	             'hdelta_flux':emflux[0,emnames == 'Hdelta'],
+	             'halpha_abs':absflux[0,absnames == 'halpha_wide'],
+	             'hbeta_abs':absflux[0,absnames == 'hbeta'],
+	             'hdelta_abs':absflux[0,absnames == 'hdelta_wide'],	             
 	             'bdec_cloudy':bdec_cloudy[0],
 	             'bdec_calc':bdec_calc[0],
 	             'bdec_nodust':bdec_nodust[0],
