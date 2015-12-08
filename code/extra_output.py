@@ -223,8 +223,8 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 
 	##### SPECTRAL QUANTITIES
 	q_16flux, q_50flux, q_84flux, q_16eqw, q_50eqw, q_84eqw = (np.zeros(nabs)+np.nan for i in range(6))
-	for kk in xrange(nline): q_16flux[kk], q_50flux[kk], q_84flux[kk] = triangle.quantile(absflux[:,kk], [0.16, 0.5, 0.84])
-	for kk in xrange(nline): q_16eqw[kk], q_50eqw[kk], q_84eqw[kk] = triangle.quantile(abseqw[:,kk], [0.16, 0.5, 0.84])
+	for kk in xrange(nabs): q_16flux[kk], q_50flux[kk], q_84flux[kk] = triangle.quantile(absflux[:,kk], [0.16, 0.5, 0.84])
+	for kk in xrange(nabs): q_16eqw[kk], q_50eqw[kk], q_84eqw[kk] = triangle.quantile(abseqw[:,kk], [0.16, 0.5, 0.84])
 	q_16dn, q_50dn, q_84dn = triangle.quantile(dn4000, [0.16, 0.5, 0.84])
 	
 	spec_info = {}
