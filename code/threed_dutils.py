@@ -1220,8 +1220,8 @@ def measure_emlines(lam,flux_emline, flux_abs):
 	wavelength = np.array([3728,4102.0,4861.33,4959,5007,6562,6583,6732.71])
 	sideband   = [(3723,3736),(4090,4110),(4857,4868),(4954,4968),(5001,5015),(6556,6573),(6573,6593),(6710,6728)]
 
-	up   = [(3742.,3750.),(4128.5,4161.00),(4884.625,4900.000),(4970.,4979.),(5025.,5035.),(6595.,6605.),(6595.,6605.),(6730.,6740.)]
-	down = [(3713.,3720.),(4041.6,4079.75),(4817.875,4845.875),(4946.,4955.),(4985.,4995.),(6515.,6540.),(6515.,6540.),(6700.,6710.)]
+	up   = [(3742.,3750.),(4128.5,4161.00),(4894.625,4910.000),(4970.,4979.),(5025.,5035.),(6610.,6625.),(6595.,6605.),(6730.,6740.)]
+	down = [(3713.,3720.),(4041.6,4079.75),(4817.875,4835.875),(4946.,4955.),(4985.,4995.),(6515.,6540.),(6515.,6540.),(6700.,6710.)]
 
 	#fig, ax = plt.subplots(2,4, figsize = (25,12))
 	#ax = np.ravel(ax)
@@ -1290,7 +1290,7 @@ def measure_em(w,spec,spec_abs,wavelength,sideband,up, down, ax=None,savestr=Non
 
 	return emline_flux, emline_eqw
 
-def measure_abslines(lam,flux):
+def measure_abslines(lam,flux,plot=False):
 
 	'''
 	Nelan et al. (2005)
@@ -1314,22 +1314,28 @@ def measure_abslines(lam,flux):
 	                  'hbeta',
 	                  'hdelta_wide', 'hdelta_narrow'])
 
-	index = [(6544.,6585.),(6544.,6585.),(4845.875,4884.625),(4083.5,4122.25),(4091.00,4112.25)]
-	up =    [(6595.,6605.),(6580.,6590.),(4884.625,4900.000),(4128.5,4161.00),(4114.75,4137.25)]
-	down =  [(6515.,6540.),(6515.,6540.),(4817.875,4845.875),(4041.6,4079.75),(4057.25,4088.50)]
+	# if you change these, change them in measure_emlines if necessary
+	# if you want to change these a lot, put them in a separate file
+	index = [(6544.,6585.),(6544.,6585.),(4842.875,4884.625),(4083.5,4122.25),(4091.00,4112.25)]
+	up =    [(6610.,6625.),(6580.,6590.),(4894.625,4910.000),(4128.5,4161.00),(4114.75,4137.25)]
+	down =  [(6515.,6540.),(6515.,6540.),(4817.875,4835.875),(4041.6,4079.75),(4057.25,4088.50)]
 
-
-	#fig, ax = plt.subplots(2,3, figsize = (18.75,12))
-	#ax = np.ravel(ax)
+	if plot:
+		fig, ax = plt.subplots(2,3, figsize = (18.75,12))
+		ax = np.ravel(ax)
 
 	# measure the absorption flux
 	for ii in xrange(len(lines)):
 		dic = {}
-		dic['flux'], dic['eqw'] = measure_idx(lam,flux,index[ii],up[ii],down[ii],ax=None)
+		if plot: 
+			dic['flux'], dic['eqw'], dic['lam'] = measure_idx(lam,flux,index[ii],up[ii],down[ii],ax=ax[ii])
+		else: 
+			dic['flux'], dic['eqw'], dic['lam'] = measure_idx(lam,flux,index[ii],up[ii],down[ii],ax=None)
 		out[lines[ii]] = dic
 
-	#plt.savefig('test.png',dpi=150)
-	#os.system('open test.png')
+	if plot:
+		out['ax'] = ax
+		out['fig'] = fig
 
 	return out
 
@@ -1360,7 +1366,9 @@ def measure_idx(lam,flux,index,up,down,ax=None):
 	##### integrate the flux and the straight line, take the difference
 	yline = m*lam[abs_idx]+b
 	absflux = np.trapz(yline,lam[abs_idx]) - np.trapz(flux[abs_idx], lam[abs_idx])
-	abseqw = absflux/(m*np.mean(lam[abs_idx])+b)
+
+	lamcont = np.mean(lam[abs_idx])
+	abseqw = absflux/(m*lamcont+b)
 
 	##### plot if necessary
 	if ax is not None:
@@ -1376,7 +1384,7 @@ def measure_idx(lam,flux,index,up,down,ax=None):
 		plt_lam_idx = (lam > down[0]) & (lam < up[1])
 		ax.set_ylim(np.min(flux[plt_lam_idx])*0.96,np.max(flux[plt_lam_idx])*1.04)
 
-	return absflux, abseqw
+	return absflux, abseqw, lamcont
 
 
 

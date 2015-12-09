@@ -5,11 +5,11 @@
 ### Requested number of nodes
 #SBATCH -N 1
 ### Requested computing time in minutes
-#SBATCH -t 120
+#SBATCH -t 240
 ### Partition or queue name
 #SBATCH -p conroy,general
 ### memory per cpu, in MB
-#SBATCH --mem-per-cpu=4000
+#SBATCH --mem-per-cpu=6000
 ### Job name
 #SBATCH -J 'brownsedsec'
 ### output and error logs
