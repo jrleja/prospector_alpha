@@ -788,7 +788,7 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 	obs['hdelta_lum'] = absflux[0]
 	obs['hdelta_lum_errup'] = absflux[1]
 	obs['hdelta_lum_errdown'] = absflux[2]
-	obs['continuum_obs'] = absflux[0] / abseqw[0]
+	obs['continuum_obs'] = absflux[:,0] / abseqw[:,0]
 	obs['continuum_lam'] = obs_lam_cont
 
 	obs['hdelta_flux'] = absflux[0] / dfactor / (1+magphys['metadata']['redshift'])

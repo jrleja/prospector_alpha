@@ -257,12 +257,13 @@ def fmt_emline_info(alldata,add_abs_err = True):
 	obslines = {}
 	mag      = {}
 	prosp    = {}
-
+	objnames = np.array([f['objname'] for f in alldata])
+	print 1/0
 	##### continuum first
 	continuum =  ret_inf(alldata,'continuum_obs',model='obs')
-	continuum[:,0,:] *= constants.L_sun.cgs.value # this factor needs to be removed after rerunning measure_emline_lum
-	continuum[:,1:,:] /= constants.L_sun.cgs.value # this factor needs to be removed after rerunning measure_emline_lum
+	continuum = np.swapaxes(np.array([continuum,continuum,continuum]),0,1)# this factor needs to be removed after rerunning measure_emline_lum
 	lam_continuum = ret_inf(alldata,'continuum_lam',model='obs')
+	
 	obslines['continuum'] = continuum
 
 	##### emission line EQWs and fluxes
@@ -285,22 +286,22 @@ def fmt_emline_info(alldata,add_abs_err = True):
 		                             ret_inf(alldata,'lum_errup',model='Prospectr',name='[NII] 6583'),
 		                             ret_inf(alldata,'lum_errdown',model='Prospectr',name='[NII] 6583')]) / constants.L_sun.cgs.value
 	obslines['err_nii'] = (obslines['f_nii'][:,1] - obslines['f_nii'][:,2])/2.
-	obslines['eqw_nii'] = obslines['f_nii'] / continuum[:,2,0,None]
-	obslines['eqw_err_nii'] = obslines['err_nii'] / continuum[:,2,0]
+	obslines['eqw_nii'] = obslines['f_nii'] / continuum[:,0,None]
+	obslines['eqw_err_nii'] = obslines['err_nii'] / continuum[:,0,None]
 
 	# sum [OIII] lines
 	obslines['f_oiii'] = np.transpose([ret_inf(alldata,'lum',model='Prospectr',name='[OIII] 5007'),
 		                             ret_inf(alldata,'lum_errup',model='Prospectr',name='[OIII] 5007'),
 		                             ret_inf(alldata,'lum_errdown',model='Prospectr',name='[OIII] 5007')])  / constants.L_sun.cgs.value
 	obslines['err_oiii'] = (obslines['f_oiii'][:,1] - obslines['f_oiii'][:,2])/2.
-	obslines['eqw_oiii'] = obslines['f_oiii'] / continuum[:,1,0,None]
-	obslines['eqw_err_oiii'] = obslines['err_oiii'] / continuum[:,1,0]
+	obslines['eqw_oiii'] = obslines['f_oiii'] / continuum[:,1,None]
+	obslines['eqw_err_oiii'] = obslines['err_oiii'] / continuum[:,1,None]
 
 	##### SIGNAL TO NOISE AND EQW CUTS
 	# cuts
 	obslines['sn_cut'] = 0.0
-	obslines['eqw_cut'] = 7.0
-	obslines['hdelta_sn_cut'] = 7
+	obslines['eqw_cut'] = 3.0
+	obslines['hdelta_sn_cut'] = 3
 
 	'''
 	obslines['sn_cut'] = 0.0
@@ -311,8 +312,8 @@ def fmt_emline_info(alldata,add_abs_err = True):
 	####### absorption lines and Dn4000
 	obslines['hdel'] = np.transpose([-ret_inf(alldata,'hdelta_lum',model='obs'),-ret_inf(alldata,'hdelta_lum_errup',model='obs'),-ret_inf(alldata,'hdelta_lum_errdown',model='obs')])/constants.L_sun.cgs.value
 	obslines['hdel_err'] = (obslines['hdel'][:,1] - obslines['hdel'][:,2]) / 2.
-	obslines['eqw_hdel'] = obslines['hdel'] / continuum[:,0,0,None]
-	obslines['eqw_err_hdel'] = obslines['hdel_err'] / continuum[:,0,0]
+	obslines['eqw_hdel'] = obslines['hdel_eqw']
+	obslines['eqw_err_hdel'] = (obslines['hdel_eqw_errup'] - obslines['hdel_eqw_errdown'])/2.
 
 	obslines['dn4000'] = ret_inf(alldata,'dn4000',model='obs')
 
@@ -352,11 +353,11 @@ def fmt_emline_info(alldata,add_abs_err = True):
 
 	##### Balmer series emission line EQWs
 	# here so that the error adjustment above is propagated into EQWs
-	obslines['eqw_ha'] = obslines['f_ha'] / continuum[:,2,0,None]
-	obslines['eqw_err_ha'] = obslines['err_ha'] / continuum[:,2,0]
+	obslines['eqw_ha'] = obslines['f_ha'] / continuum[:,0,None]
+	obslines['eqw_err_ha'] = obslines['err_ha'] / continuum[:,0,None]
 
-	obslines['eqw_hb'] = obslines['f_hb'] / continuum[:,1,0,None]
-	obslines['eqw_err_hb'] = obslines['err_hb'] / continuum[:,1,0]
+	obslines['eqw_hb'] = obslines['f_hb'] / continuum[:,1,None]
+	obslines['eqw_err_hb'] = obslines['err_hb'] / continuum[:,1,None]
 
 	##### names
 	objnames = np.array([f['objname'] for f in alldata])
