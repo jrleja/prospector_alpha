@@ -4,21 +4,19 @@ from magphys import read_magphys_output
 import os, copy, threed_dutils
 from scipy.interpolate import interp1d
 from matplotlib.ticker import MaxNLocator
-import pickle, math, measure_emline_lum
+import math, measure_emline_lum, brown_io
 import magphys_plot_pref
 import mag_ensemble
 import matplotlib as mpl
 from astropy import constants
 
 c = 3e18   # angstroms per second
+dpi = 150
 
 #### set up colors and plot style
 prosp_color = '#e60000'
 obs_color = '#95918C'
 magphys_color = '#1974D2'
-
-#### where do the pickle files go?
-outpickle = '/Users/joel/code/magphys/data/pickles'
 
 class jLogFormatter(mpl.ticker.LogFormatter):
 	'''
@@ -74,7 +72,7 @@ def median_by_band(x,y,avg=False):
 
 	return avglam, outval
 
-def plot_all_residuals(alldata):
+def plot_all_residuals(alldata,runname):
 
 	'''
 	show all residuals for spectra + photometry, magphys + prospector
@@ -302,9 +300,9 @@ def plot_all_residuals(alldata):
 		dynx = (np.max(magbins) - np.min(magbins))*0.05
 		plot.set_xlim(np.min(magbins)-dynx,np.max(magbins)+dynx)
 
-	outfolder = os.getenv('APPS')+'/threedhst_bsfh/plots/brownseds/magphys/'
+	outfolder = os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/magphys/'
 	
-	plt.savefig(outfolder+'median_residuals.png',dpi=300)
+	plt.savefig(outfolder+'median_residuals.png',dpi=dpi)
 	plt.close()
 
 def load_spectra(objname, nufnu=True):
@@ -488,8 +486,12 @@ def update_model_info(alldata, sample_results, magphys):
 	alldata['model'] = magphys['model']
 	alldata['pquantiles'] = sample_results['quantiles']
 	npars = len(sample_results['initial_theta'])
-	ransamp = np.zeros(shape=(2000,npars))
-	for kk in xrange(npars): ransamp[:,kk] = np.random.choice(sample_results['flatchain'][:,kk],replace=False,size=2000)
+	
+	# choose 2000 random samples
+	in_priors = np.isfinite(threed_dutils.chop_chain(sample_results['lnprobability'])) == True
+	flatchain = sample_results['flatchain'][in_priors]
+	ransamp = flatchain[np.random.choice(flatchain.shape[0], 2000, replace=False),:]
+
 	alldata['pquantiles']['random_chain'] = ransamp
 	alldata['spec_info'] = sample_results['spec_info']
 	alldata['model_emline'] = sample_results['model_emline']
@@ -632,9 +634,9 @@ def sed_comp_figure(sample_results, sps, model, magphys,
 
 
 	# diagnostic text
-	textx = 0.98
+	textx = 0.9
 	texty = 0.15
-	deltay = 0.045
+	deltay = 0.05
 
 
 	#### SFR and mass
@@ -644,13 +646,13 @@ def sed_comp_figure(sample_results, sps, model, magphys,
 	mag_mass = np.log10(magphys['model']['parameters'][magphys['model']['parnames'] == 'M*'][0])
 	mag_sfr = magphys['model']['parameters'][magphys['model']['parnames'] == 'SFR'][0]
 	
-	phot.text(0.02, 0.95, r'log(M$_{\mathrm{q50}}$)='+"{:.2f}".format(prosp_mass),
+	phot.text(0.025, 0.93, r'log(M$_{\mathrm{q50}}$)='+"{:.2f}".format(prosp_mass),
 			              fontsize=14, color=prosp_color,transform = phot.transAxes)
-	phot.text(0.02, 0.95-deltay, r'SFR$_{\mathrm{q50}}$='+"{:.2f}".format(prosp_sfr),
+	phot.text(0.025, 0.93-deltay, r'SFR$_{\mathrm{q50}}$='+"{:.2f}".format(prosp_sfr),
 			                       fontsize=14, color=prosp_color,transform = phot.transAxes)
-	phot.text(0.02, 0.95-2*deltay, r'log(M$_{\mathrm{best}}$)='+"{:.2f}".format(mag_mass),
+	phot.text(0.025, 0.93-2*deltay, r'log(M$_{\mathrm{best}}$)='+"{:.2f}".format(mag_mass),
 			                     fontsize=14, color=magphys_color,transform = phot.transAxes)
-	phot.text(0.02, 0.95-3*deltay, r'SFR$_{\mathrm{best}}$='+"{:.2f}".format(mag_sfr),
+	phot.text(0.025, 0.93-3*deltay, r'SFR$_{\mathrm{best}}$='+"{:.2f}".format(mag_sfr),
 			                     fontsize=14, color=magphys_color,transform = phot.transAxes)
 
 	# calculate reduced chi-squared
@@ -702,7 +704,7 @@ def sed_comp_figure(sample_results, sps, model, magphys,
 			    
     # set labels
 	res.set_ylabel( r'$\chi$')
-	for plot in resplots: plot.set_ylabel( r'log(f$_{\mathrm{obs}}/$f$_{\mathrm{mod}}$)')
+	for plot in resplots: plot.set_ylabel(r'log(f$_{\mathrm{obs}}/$f$_{\mathrm{mod}}$)')
 	phot.set_ylabel(r'$\nu f_{\nu}$')
 	spec_res_spit.set_xlabel(r'$\lambda_{obs}$ [$\mathrm{\mu}$m]')
 	res.set_xlabel(r'$\lambda_{obs}$ [$\mathrm{\mu}$m]')
@@ -740,7 +742,7 @@ def sed_comp_figure(sample_results, sps, model, magphys,
 	phot.set_xticklabels([])
     
 	if outname is not None:
-		fig.savefig(outname, bbox_inches='tight', dpi=500)
+		fig.savefig(outname, bbox_inches='tight', dpi=dpi)
 		#os.system('open '+outname)
 		plt.close()
 
@@ -817,7 +819,6 @@ def plt_all(runname=None,startup=True,**extras):
 	if runname == None:
 		runname = 'brownseds'
 
-	output = outpickle+'/alldata.pickle'
 	outfolder = os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/magphys/sed_residuals/'
 
 	if startup == True:
@@ -834,10 +835,9 @@ def plt_all(runname=None,startup=True,**extras):
 			                           outfolder=outfolder,
 			                           **extras)
 			alldata.append(dictionary)
-		pickle.dump(alldata,open(output, "wb"))
+		brown_io.save_alldata(alldata,runname=runname)
 	else:
-		with open(output, "rb") as f:
-			alldata=pickle.load(f)
+		alldata = brown_io.load_alldata(runname=runname)
 
 	#### herschel flag
 	hflag = np.array([True if np.sum(dat['residuals']['phot']['lam_obs'] > 5e5) else False for dat in alldata])
@@ -852,7 +852,7 @@ def plt_all(runname=None,startup=True,**extras):
 	mag_ensemble.prospector_comparison(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/pcomp/',hflag)
 	mag_ensemble.plot_emline_comp(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/magphys/emlines_comp/',hflag)
 	mag_ensemble.plot_relationships(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/magphys/')
-	plot_all_residuals(alldata)
+	plot_all_residuals(alldata,runname)
 	mag_ensemble.plot_comparison(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/magphys/')
 
 def perform_wavelength_cal(spec_dict, objname):
@@ -861,8 +861,7 @@ def perform_wavelength_cal(spec_dict, objname):
 	(2) apply polynomial correction to obs_spec
 	'''
 
-	with open(outpickle+'/spec_calibration.pickle', "rb") as f:
-		spec_cal=pickle.load(f)
+	spec_cal = brown_io.load_spec_cal(runname=None)
 
 	#### find matching galaxy by loading basenames for BROWNSEDS
 	filebase, parm_basename, ancilname=threed_dutils.generate_basenames('brownseds')
@@ -903,14 +902,8 @@ def compute_specmags(runname=None, outfolder=None):
 
 	#### load up prospector results
 	filebase, parm_basename, ancilname=threed_dutils.generate_basenames(runname)
-
-	output = outpickle+'/alldata.pickle'
 	outname = os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/pcomp/sfrcomp.png'
-	outphot = outpickle+'/spec_calibration.pickle'
-
-	with open(output, "rb") as f:
-		alldata=pickle.load(f)
-
+	alldata = brown_io.load_alldata(runname=runname)
 	sps = threed_dutils.setup_sps(custom_filter_key=None)
 
 	optphot = np.zeros(shape=(3,len(alldata)))
@@ -978,7 +971,7 @@ def compute_specmags(runname=None, outfolder=None):
 
 			# limits, save
 			plt.xlim(2800,7200)
-			plt.savefig('/Users/joel/code/python/threedhst_bsfh/plots/brownseds/pcomp/specnorm/'+dat['objname']+'.png',dpi=100)
+			plt.savefig('/Users/joel/code/python/threedhst_bsfh/plots/'+runname+'/pcomp/specnorm/'+dat['objname']+'.png',dpi=100)
 			plt.close()
 
 		#### convert combspec from maggies to Lsun/Hz
@@ -1018,11 +1011,11 @@ def compute_specmags(runname=None, outfolder=None):
 		ax.set_xlabel(tits[ii])
 		ax.set_xlim(save_xlim)
 		ax.xaxis.set_major_locator(MaxNLocator(5))
-	plt.savefig('/Users/joel/code/python/threedhst_bsfh/plots/brownseds/pcomp/spectral_integration.png',dpi=150)
+	plt.savefig('/Users/joel/code/python/threedhst_bsfh/plots/'+runname+'/pcomp/spectral_integration.png',dpi=dpi)
 	plt.close()
 
 	out = {'obs_phot':obsphot,'spec_phot':optphot}
-	pickle.dump(out,open(outphot, "wb"))
+	brown_io.save_spec_cal(out,runname=runname)
 
 	print 1/0
 
@@ -1038,16 +1031,11 @@ def add_sfr_info(runname=None, outfolder=None):
 
 	#### load up prospector results
 	filebase, parm_basename, ancilname=threed_dutils.generate_basenames(runname)
-
-
-
-	output = outpickle+'/alldata.pickle'
+	alldata = brown_io.load_alldata(runname=runname)
+	sps = threed_dutils.setup_sps(custom_filter_key=None)
 	outname = os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/pcomp/sfrcomp.png'
 
-	with open(output, "rb") as f:
-		alldata=pickle.load(f)
 
-	sps = threed_dutils.setup_sps(custom_filter_key=None)
 
 	sfr_mips_z2, sfr_mips, sfr_uvir, sfr_prosp = [], [], [], []
 	for ii,dat in enumerate(alldata):
@@ -1112,7 +1100,7 @@ def add_sfr_info(runname=None, outfolder=None):
 				      transform = ax[ii].transAxes,horizontalalignment='right')
 
 	plt.tight_layout()
-	plt.savefig(outname, dpi=300)
+	plt.savefig(outname, dpi=dpi)
 
 
 	print 1/0
@@ -1122,11 +1110,8 @@ def add_prosp_mag_info(runname=None):
 	if runname == None:
 		runname = 'brownseds'
 
-	output = outpickle+'/alldata.pickle'
 	outfolder = os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/magphys/sed_residuals/'
-
-	with open(output, "rb") as f:
-		alldata=pickle.load(f)
+	alldata = brown_io.load_alldata(runname=runname)
 
 	filebase, parm_basename, ancilname=threed_dutils.generate_basenames(runname)
 	for ii,dat in enumerate(alldata):
@@ -1135,7 +1120,8 @@ def add_prosp_mag_info(runname=None):
 		dat = update_model_info(dat, sample_results, magphys)
 		print str(ii)+' done'
 
-	pickle.dump(alldata,open(output, "wb"))
+	brown_io.save_alldata(alldata,runname=runname)
+
 
 
 

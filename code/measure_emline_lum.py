@@ -404,8 +404,11 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 	nline = len(emline)
 
 	#### now define sets of absorption lines to measure
-	abslines = np.array(['halpha_wide', 'hbeta', 'hdelta_wide'])
+	abslines = np.array(['halpha_wide', 'halpha_narrow', 'hbeta', 'hdelta_wide', 'hdelta_narrow'])
 	nabs = len(abslines)             
+
+	#### mapping between em_bbox and abslines!
+	mod_abs_mapping = [np.where(abslines == 'hbeta')[0][0],np.where(abslines == 'halpha_wide')[0][0]]
 
 	#### put all spectra in proper units (Lsun/AA, rest wavelength in Angstroms)
 	# first, get rest-frame Prospector spectrum w/o emission lines
@@ -539,8 +542,9 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 
 			#### here we have a bizarre, handmade mapping between
 			#### mod_abs_lamcont and the ordered em_bbox vector.
-			close_fit = np.abs(model_lams[jj]-mod_abs_lamcont[jj,-kk+1]).argmin()
-			norm_factor = gauss_fit[6](model_lams[jj][close_fit])/(mod_abs_flux[jj,-kk+1]/mod_abs_eqw[jj,-kk+1])
+			mod_abs_idx = mod_abs_mapping[kk]
+			close_fit = np.abs(model_lams[jj]-mod_abs_lamcont[jj,mod_abs_idx]).argmin()
+			norm_factor = gauss_fit[6](model_lams[jj][close_fit])/(mod_abs_flux[jj,mod_abs_idx]/mod_abs_eqw[jj,mod_abs_idx])
 			model_norm[m_idx] = model_fluxes[jj][m_idx]*norm_factor
 
 		#### adjust model wavelengths for the slight difference with published redshifts
@@ -619,7 +623,6 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 	# flux come out of bootstrap as (nlines,[median,errup,errdown])
 	tnoise = np.min(emline_noise)
 	bfit_mod_save = []
-	continuum_obs = np.zeros(shape=(3,2)) # (hdelta, OIII / Hbeta, NII / Halpha), (Prospector,magphys)
 
 	#### now measure emission line fluxes
 	for jj in xrange(nmodel):
@@ -627,20 +630,6 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 		bfit_mod, emline_flux_local = bootstrap(obslam[p_idx],residuals[jj],emmod,fitter,tnoise,em_wave)
 		bfit_mod_save.append(bfit_mod)
 		emline_flux.append(emline_flux_local)
-
-		#### measure fluxes, EQW
-		# estimate continuum
-		# do it from model continuum with fit offset from observations
-		low_idx = (obslam[p_idx] > 5030) & (obslam[p_idx] < 5100)
-		cont_low = np.mean(bfit_mod[6](obslam[p_idx][low_idx]) + smoothed_absflux[jj][low_idx])
-		continuum_obs[1,jj] = cont_low
-
-		high_idx = (obslam[p_idx] > 6400) & (obslam[p_idx] < 6500)
-		cont_high = np.mean(bfit_mod[6](obslam[p_idx][high_idx]) + smoothed_absflux[jj][high_idx])
-		continuum_obs[2,jj] = cont_high
-
-		eqw = np.concatenate((emline_flux_local[:,:3] / cont_low, emline_flux_local[:,3:] / cont_high),axis=1)
-		eqw_percs.append(eqw)
 
 		#############################
 		#### PLOT ALL THE THINGS ####
@@ -734,19 +723,26 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 
 	#### bootstrap
 	nboot = 100
-	obs_abs_flux,obs_abs_eqw = [np.zeros(shape=(nabs,nboot)) for i in xrange(2)]
+	tobs_abs_flux,tobs_abs_eqw = [np.zeros(shape=(nabs,nboot)) for i in xrange(2)]
+
 	for i in xrange(nboot):
 		randomDelta = np.random.normal(0.,1.,len(obsflux))
 		randomFlux = obsflux + randomDelta*tnoise
 		out = threed_dutils.measure_abslines(obslam/(1+zadj),randomFlux,plot=False)
 
-		for kk in xrange(nabs): obs_abs_flux[:,i] = out[abslines[kk]]['flux']
-		for kk in xrange(nabs): obs_abs_eqw[:,i] = out[abslines[kk]]['eqw']
+		for kk in xrange(nabs): tobs_abs_flux[kk,i] = out[abslines[kk]]['flux']
+		for kk in xrange(nabs): tobs_abs_eqw[kk,i] = out[abslines[kk]]['eqw']
 
-	# we want errors for flux and eqw
-	hd_idx = abslines == 'hdelta_wide'
-	absflux = np.array([np.percentile(obs_abs_flux[hd_idx,:], 50,axis=1),np.percentile(obs_abs_flux[hd_idx,:], 84,axis=1),np.percentile(obs_abs_flux[hd_idx,:], 16,axis=1)])
-	abseqw = np.array([np.percentile(obs_abs_eqw[hd_idx,:], 50,axis=1),np.percentile(obs_abs_eqw[hd_idx,:], 84,axis=1),np.percentile(obs_abs_eqw[hd_idx,:], 16,axis=1)])
+	### we want errors for flux and eqw
+	obs_abs_flux,obs_abs_eqw = [np.zeros(shape=(nabs,3)) for i in xrange(2)]
+
+	for kk in xrange(nabs): obs_abs_flux[kk,:] = np.array([np.percentile(tobs_abs_flux[kk,:],50),
+		                                                   np.percentile(tobs_abs_flux[kk,:],84),
+		                                                   np.percentile(tobs_abs_flux[kk,:],16)])
+
+	for kk in xrange(nabs): obs_abs_eqw[kk,:] =  np.array([np.percentile(tobs_abs_eqw[kk,:],50), 
+		                                                   np.percentile(tobs_abs_eqw[kk,:],84), 
+		                                                   np.percentile(tobs_abs_eqw[kk,:],16)])
 
 	# bestfit, for plotting purposes
 	out = threed_dutils.measure_abslines(obslam/(1+zadj),obsflux,plot=True)
@@ -770,7 +766,6 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 		temp['flux_errup'] = emline_flux[ii][1,:]  / dfactor / (1+magphys['metadata']['redshift'])
 		temp['flux_errdown'] = emline_flux[ii][2,:]  / dfactor / (1+magphys['metadata']['redshift'])
 
-		temp['eqw_rest'] = eqw_percs[ii]
 		temp['Dn4000'] = dn4000_mod[ii]
 
 		temp['balmer_lum'] = mod_abs_flux[ii,:]
@@ -778,22 +773,20 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 		temp['balmer_eqw_rest'] = mod_abs_eqw[ii,:]
 		temp['balmer_names'] = abslines
 
+		temp['continuum_mod'] = mod_abs_flux[ii,:] / mod_abs_eqw[ii,:]
+		temp['continuum_lam'] = mod_abs_lamcont[ii,:]
+
 		out[mod] = temp
 
 	obs = {}
 	obs['dn4000'] = dn4000_obs
-	obs['hdelta_eqw'] = abseqw[0]
-	obs['hdelta_eqw_errup'] = abseqw[1]
-	obs['hdelta_eqw_errdown'] = abseqw[2]
-	obs['hdelta_lum'] = absflux[0]
-	obs['hdelta_lum_errup'] = absflux[1]
-	obs['hdelta_lum_errdown'] = absflux[2]
-	obs['continuum_obs'] = absflux[:,0] / abseqw[:,0]
-	obs['continuum_lam'] = obs_lam_cont
+	obs['balmer_lum'] = obs_abs_flux
+	obs['balmer_eqw_rest'] = obs_abs_eqw
+	obs['balmer_flux'] = obs_abs_flux / dfactor / (1+magphys['metadata']['redshift'])
+	obs['balmer_names'] = abslines
 
-	obs['hdelta_flux'] = absflux[0] / dfactor / (1+magphys['metadata']['redshift'])
-	obs['hdelta_flux_errup'] = absflux[1]/ dfactor / (1+magphys['metadata']['redshift'])
-	obs['hdelta_flux_errdown'] = absflux[2]/ dfactor / (1+magphys['metadata']['redshift'])
+	obs['continuum_obs'] = obs_abs_flux[:,0] / obs_abs_eqw[:,0] 
+	obs['continuum_lam'] = obs_lam_cont
 
 	out['obs'] = obs 
 	out['em_name'] = emline

@@ -471,6 +471,20 @@ def generate_basenames(runname):
 			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+basename+'_'+ids[jj])
 			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
 
+	elif runname == 'brownseds_tightbc':
+
+		id_list = os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/namelist.txt'
+		ids = np.loadtxt(id_list, dtype='|S20',delimiter=',')
+		ngals = len(ids)
+
+		basename = runname
+		parm_basename = basename+"_params"
+		ancilname=None
+
+		for jj in xrange(ngals):
+			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+basename+'_'+ids[jj])
+			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
+
 
 	elif 'simha' in runname:
 
@@ -593,6 +607,38 @@ def load_moustakas_data(objnames = None):
 				outtable.append(table[match.data])
 	else:
 		outtable = table
+
+	return outtable
+
+def load_moustakas_newdat(objnames = None):
+
+	'''
+	access (new) Moustakas line fluxes, from email in Jan 2016
+
+	if we pass a list of object names, return a sorted, matched list
+	otherwise return everything
+
+	returns in units of 10^-15^erg/s/cm^2
+	'''
+
+	#### load data
+	from astropy.io import fits
+	filename = os.getenv('APPS')+'/threedhst_bsfh/data/Moustakas_new/atlas_specdata_solar_drift_v1.1.fits'
+	hdulist = fits.open(filename)
+
+	##### match
+	if objnames is not None:
+		outtable = []
+		objnames = np.core.defchararray.replace(objnames, ' ', '')  # strip spaces
+		for name in objnames:
+			match = hdulist[1].data['GALAXY'] == name
+			if np.sum(match.data) == 0:
+				outtable.append(None)
+				continue
+			else:
+				outtable.append(hdulist[1].data[match])
+	else:
+		outtable = hdulist.data
 
 	return outtable
 
