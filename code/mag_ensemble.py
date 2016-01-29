@@ -2392,7 +2392,7 @@ def plot_emline_comp(alldata,outfolder,hflag):
 	##### load moustakas+10 line flux information
 	objnames = np.array([f['objname'] for f in alldata])
 	dat = threed_dutils.load_moustakas_data(objnames = list(objnames))
-
+	print 1/0
 	##### load new moustakas line flux information (from email, january 2016)
 	newdat = threed_dutils.load_moustakas_newdat(objnames = list(objnames))
 

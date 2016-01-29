@@ -111,25 +111,31 @@ def plot_all_residuals(alldata,runname):
 	lw_major = 2.5
 
 	##### load and plot photometric residuals
-	chi_magphys, chi_prosp, chisq_magphys,chisq_prosp, lam_rest = np.array([]),np.array([]),np.array([]), np.array([]), np.array([])
+	chi_magphys, chi_prosp, chisq_magphys, chisq_prosp, lam_rest, frac_magphys,frac_prosp = np.array([]),np.array([]),np.array([]), np.array([]), np.array([]),np.array([]),np.array([])
 	for data in alldata:
 
 		if data:
+
+			#### save chi, fractional difference
 			chi_magphys = np.append(chi_magphys,data['residuals']['phot']['chi_magphys'])
 			chi_prosp = np.append(chi_prosp,data['residuals']['phot']['chi_prosp'])
+			frac_magphys = np.append(frac_magphys,data['residuals']['phot']['frac_magphys'])
+			frac_prosp = np.append(frac_prosp,data['residuals']['phot']['frac_prosp'])
+
+			#### save goodness of fit
 			chisq_magphys = np.append(chisq_magphys,data['residuals']['phot']['chisq_magphys'])
 			chisq_prosp = np.append(chisq_prosp,data['residuals']['phot']['chisq_prosp'])
 			lam_rest = np.append(lam_rest,data['residuals']['phot']['lam_obs']/(1+data['residuals']['phot']['z'])/1e4)
 
 			phot.plot(data['residuals']['phot']['lam_obs']/(1+data['residuals']['phot']['z'])/1e4, 
-				      data['residuals']['phot']['chi_magphys'],
+				      data['residuals']['phot']['frac_magphys'],
 				      alpha=alpha_minor,
 				      color=magphys_color,
 				      lw=lw_minor
 				      )
 
 			phot.plot(data['residuals']['phot']['lam_obs']/(1+data['residuals']['phot']['z'])/1e4, 
-				      data['residuals']['phot']['chi_prosp'],
+				      data['residuals']['phot']['frac_prosp'],
 				      alpha=alpha_minor,
 				      color=prosp_color,
 				      lw=lw_minor
@@ -137,8 +143,8 @@ def plot_all_residuals(alldata,runname):
 
 	##### calculate and plot running median
 	nfilters = 33 # calculate this more intelligently?
-	magbins, magmedian = median_by_band(lam_rest,chi_magphys)
-	probins, promedian = median_by_band(lam_rest,chi_prosp)
+	magbins, magmedian = median_by_band(lam_rest,frac_magphys)
+	probins, promedian = median_by_band(lam_rest,frac_prosp)
 
 	phot.plot(magbins, 
 		      magmedian,
@@ -159,10 +165,11 @@ def plot_all_residuals(alldata,runname):
 		      )
 	phot.plot(probins, 
 		      promedian,
-		      alpha=alpha_major,
 		      color=prosp_color,
 		      lw=lw_major
 		      )
+
+
 	phot.text(0.99,0.92, 'MAGPHYS',
 			  transform = phot.transAxes,horizontalalignment='right',
 			  color=magphys_color)
@@ -172,7 +179,7 @@ def plot_all_residuals(alldata,runname):
 	phot.text(0.99,0.05, 'photometry',
 			  transform = phot.transAxes,horizontalalignment='right')
 	phot.set_xlabel(r'$\lambda_{\mathrm{rest}}$ [$\mu$m]')
-	phot.set_ylabel(r'$\chi$')
+	phot.set_ylabel(r'(f$_{\mathrm{obs}}$ - f$_{\mathrm{model}}$) / f$_{\mathrm{obs}}$)')
 	phot.axhline(0, linestyle=':', color='grey')
 	phot.set_xscale('log',nonposx='clip',subsx=(2,4,7))
 	phot.xaxis.set_minor_formatter(minorFormatter)
@@ -208,6 +215,8 @@ def plot_all_residuals(alldata,runname):
 	##### load and plot spectroscopic residuals
 	label = ['Optical','Akari', 'Spitzer IRS']
 	nbins = [500,50,50]
+	pmax = 0.0
+	pmin = 0.0
 	for i, plot in enumerate(plots):
 		res_magphys, res_prosp, obs_restlam, rms_mag, rms_pro = np.array([]),np.array([]),np.array([]),np.array([]),np.array([])
 		for data in alldata:
@@ -217,15 +226,26 @@ def plot_all_residuals(alldata,runname):
 					res_prosp = np.append(res_prosp,data['residuals'][label[i]]['prospector_resid'])
 					obs_restlam = np.append(obs_restlam,data['residuals'][label[i]]['obs_restlam'])
 
-					plot.plot(data['residuals'][label[i]]['obs_restlam'], 
-						      data['residuals'][label[i]]['magphys_resid'],
+					xplot_mag = data['residuals'][label[i]]['obs_restlam']
+					xplot_prosp = data['residuals'][label[i]]['obs_restlam']
+
+					yplot_mag = data['residuals'][label[i]]['magphys_resid']
+					yplot_prosp = data['residuals'][label[i]]['prospector_resid']
+
+					# mask emission lines for MAGPHYS
+					if label[i] == 'Optical':
+							nolines = mask_emission_lines(xplot_mag,0.0)
+							yplot_mag[~nolines] = np.nan
+
+					plot.plot(xplot_mag, 
+						      yplot_mag,
 						      alpha=alpha_minor,
 						      color=magphys_color,
 						      lw=lw_minor
 						      )
 
-					plot.plot(data['residuals'][label[i]]['obs_restlam'], 
-						      data['residuals'][label[i]]['prospector_resid'],
+					plot.plot(xplot_prosp, 
+						      yplot_prosp,
 						      alpha=alpha_minor,
 						      color=prosp_color,
 						      lw=lw_minor
@@ -234,9 +254,17 @@ def plot_all_residuals(alldata,runname):
 					rms_mag = np.append(rms_mag,data['residuals'][label[i]]['magphys_rms'])
 					rms_pro = np.append(rms_pro,data['residuals'][label[i]]['prospector_rms'])
 
+					pmin = np.min((pmin,np.nanmin(yplot_mag),np.nanmin(yplot_prosp)))
+					pmax = np.max((pmax,np.nanmax(yplot_mag),np.nanmax(yplot_prosp)))
+
 		##### calculate and plot running median
 		magbins, magmedian = threed_dutils.running_median(obs_restlam,res_magphys,nbins=nbins[i])
 		probins, promedian = threed_dutils.running_median(obs_restlam,res_prosp,nbins=nbins[i])
+
+		# mask emission lines for MAGPHYS
+		if label[i] == 'Optical':
+				nolines = mask_emission_lines(magbins,0.0)
+				magmedian[~nolines] = np.nan
 
 		plot.plot(magbins, 
 			      magmedian,
@@ -253,7 +281,7 @@ def plot_all_residuals(alldata,runname):
 		plot.plot(probins, 
 			      promedian,
 			      color='black',
-			      lw=lw_major
+			      lw=lw_major*1.1
 			      )
 
 		plot.plot(probins, 
@@ -262,6 +290,8 @@ def plot_all_residuals(alldata,runname):
 			      lw=lw_major
 			      )
 
+		plt_lim = np.max((np.abs(pmin*0.8),np.abs(pmax*1.2)))
+		plot.set_ylim(-plt_lim,plt_lim)
 		plot.set_xscale('log',nonposx='clip',subsx=(1,2,3,4,5,6,7,8,9))
 		plot.xaxis.set_minor_formatter(minorFormatter)
 		plot.xaxis.set_major_formatter(majorFormatter)
@@ -362,13 +392,13 @@ def return_sedplot_vars(thetas, sample_results, sps, nufnu=True):
 	# here we want to return
 	# effective wavelength of photometric bands, observed maggies, observed uncertainty, model maggies, observed_maggies-model_maggies / uncertainties
 	# model maggies, observed_maggies-model_maggies/uncertainties
-	return wave_eff, obs_maggies, obs_maggies_unc, mu, (obs_maggies-mu)/obs_maggies_unc, spec, sps.wavelengths
+	return wave_eff, obs_maggies, obs_maggies_unc, mu, (obs_maggies-mu)/obs_maggies_unc, (obs_maggies-mu)/obs_maggies, spec, sps.wavelengths
 
 def mask_emission_lines(lam,z):
 
 	# OII, Hbeta, OIII, Halpha, NII, SII
 	lam_temp = lam*1e4
-	mask_lines = np.array([3727, 4861, 4959, 5007, 6563, 6583,6720])*(1.0+z)
+	mask_lines = np.array([3727, 4102, 4341, 4861, 4959, 5007, 6563, 6583,6720])*(1.0+z)
 	mask_size = 20 # Angstroms
 	mask = np.ones_like(lam,dtype=bool)
 
@@ -430,9 +460,11 @@ def plot_obs_spec(obs_spec, phot, spec_res, alpha,
 		                           bounds_error=False, fill_value=0)
 		magphys_resid = np.log10(obs_spec['flux'][mask]) - np.log10(mag_flux_interp(obslam))
 		nolines = mask_emission_lines(obslam,z)
+		temp_yplot = magphys_resid
+		temp_yplot[~nolines] = np.nan
 
-		spec_res.plot(obslam[nolines], 
-			          magphys_resid[nolines],
+		spec_res.plot(obslam, 
+			          temp_yplot,
 			          color=magphys_color,
 			          alpha=alpha,
 			          linestyle='-')
@@ -458,6 +490,10 @@ def plot_obs_spec(obs_spec, phot, spec_res, alpha,
 			spec_res.set_xlim(min(obslam)*0.98,max(obslam)*1.02)
 
 		#### axis scale
+		pmin = np.min((np.nanmin(temp_yplot),np.nanmin(prospector_resid)))*0.8
+		pmax = np.max((np.nanmax(temp_yplot),np.nanmax(prospector_resid)))*1.2
+		plt_lim = np.max((np.abs(pmin),np.abs(pmax)))
+		spec_res.set_ylim(-plt_lim,plt_lim)
 		spec_res.set_xscale('log',nonposx='clip', subsx=(1,2,3,4,5,6,7,8,9))
 		spec_res.xaxis.set_minor_formatter(minorFormatter)
 		spec_res.xaxis.set_major_formatter(majorFormatter)
@@ -539,7 +575,7 @@ def sed_comp_figure(sample_results, sps, model, magphys,
 	##### Prospector maximum probability model ######
 	# plot the spectrum, photometry, and chi values
 	try:
-		wave_eff, obsmags, obsmags_unc, modmags, chi, modspec, modlam = \
+		wave_eff, obsmags, obsmags_unc, modmags, chi, frac_prosp, modspec, modlam = \
 		return_sedplot_vars(sample_results['bfit']['maxprob_params'], 
 			                sample_results, sps)
 	except KeyError as e:
@@ -599,6 +635,7 @@ def sed_comp_figure(sample_results, sps, model, magphys,
 		return None
 	
 	chi_magphys = (magphys['obs']['flux'][m]-magphys['model']['flux'][m])/magphys['obs']['flux_unc'][m]
+	frac_magphys = (magphys['obs']['flux'][m]-magphys['model']['flux'][m])/magphys['obs']['flux'][m]
 	res.plot(wave_eff/1e4, 
 		     chi_magphys, 
 		     color=magphys_color, marker='o', linestyle=' ', label='MAGPHYS', 
@@ -746,9 +783,11 @@ def sed_comp_figure(sample_results, sps, model, magphys,
 		#os.system('open '+outname)
 		plt.close()
 
-	# save chi for photometry
+	# save chi+fractional difference for photometry
 	out = {'chi_magphys': chi_magphys,
+		   'frac_magphys': frac_magphys,
 	       'chi_prosp': chi,
+	       'frac_prosp': frac_prosp,
 	       'chisq_prosp': chisq,
 	       'chisq_magphys': chisq_magphys,
 	       'lam_obs': wave_eff,
@@ -849,10 +888,10 @@ def plt_all(runname=None,startup=True,**extras):
 			alldata_low=pickle.load(f)
 		mag_ensemble.time_res_incr_comp(alldata_low,alldata)
 
+	plot_all_residuals(alldata,runname)
 	mag_ensemble.prospector_comparison(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/pcomp/',hflag)
 	mag_ensemble.plot_emline_comp(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/magphys/emlines_comp/',hflag)
 	mag_ensemble.plot_relationships(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/magphys/')
-	plot_all_residuals(alldata,runname)
 	mag_ensemble.plot_comparison(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/magphys/')
 
 def perform_wavelength_cal(spec_dict, objname):
@@ -1034,8 +1073,6 @@ def add_sfr_info(runname=None, outfolder=None):
 	alldata = brown_io.load_alldata(runname=runname)
 	sps = threed_dutils.setup_sps(custom_filter_key=None)
 	outname = os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/pcomp/sfrcomp.png'
-
-
 
 	sfr_mips_z2, sfr_mips, sfr_uvir, sfr_prosp = [], [], [], []
 	for ii,dat in enumerate(alldata):

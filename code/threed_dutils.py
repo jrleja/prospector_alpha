@@ -618,7 +618,7 @@ def load_moustakas_newdat(objnames = None):
 	if we pass a list of object names, return a sorted, matched list
 	otherwise return everything
 
-	returns in units of 10^-15^erg/s/cm^2
+	returns in units of erg/s/cm^2
 	'''
 
 	#### load data
@@ -1012,6 +1012,11 @@ def integrate_mag(spec_lam,spectra,filter, z=None, alt_file='/Users/joel/code/py
 	return mag, luminosity
 
 def return_full_sfh(t, sfh_params):
+
+	'''
+	returns full SFH given a time vector [in Gyr] and a
+	set of SFH parameters
+	'''
 
 	deltat=0.0001
 
