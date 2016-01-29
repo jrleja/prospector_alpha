@@ -45,10 +45,8 @@ def translate_filters(bfilters, full_list = False):
     'UVM2': 'UVOT m2',
     'NUV': 'GALEX NUV',
     'UVW1': 'UVOT w1',
-    'Umag': np.nan,    # [11.9/15.7]? Swift/UVOT U AB band magnitude
     'umag': 'SDSS Camera u Response Function, airmass = 1.3 (June 2001)',
     'gmag': 'SDSS Camera g Response Function, airmass = 1.3 (June 2001)',
-    'Vmag': np.nan,    # [10.8/15.6]? Swift/UVOT V AB band magnitude
     'rmag': 'SDSS Camera r Response Function, airmass = 1.3 (June 2001)',
     'imag': 'SDSS Camera i Response Function, airmass = 1.3 (June 2001)',
     'zmag': 'SDSS Camera z Response Function, airmass = 1.3 (June 2001)',
@@ -62,10 +60,7 @@ def translate_filters(bfilters, full_list = False):
     '[5.8]': 'IRAC Channel 3',
     '[8.0]': 'IRAC CH4',
     'W3mag': 'WISE W3',
-    'PUIB': np.nan,    # [8.2/15.6]? Spitzer/IRS Blue Peak Up Imaging channel (13.3-18.7um) AB magnitude
-    'W4mag': np.nan,    # two WISE4 magnitudes, what is the correction?
     "W4'mag": 'WISE W4',
-    'PUIR': np.nan,    # Spitzer/IRS Red Peak Up Imaging channel (18.5-26.0um) AB magnitude
     '[24]': 'MIPS 24um',
     'pacs70': 'Herschel PACS 70um',
     'pacs100': 'Herschel PACS 100um',
@@ -83,10 +78,8 @@ def translate_filters(bfilters, full_list = False):
     'UVM2': 'UVOT_M2',
     'NUV': 'GALEX_NUV',
     'UVW1': 'UVOT_W1',
-    'Umag': np.nan,    # [11.9/15.7]? Swift/UVOT U AB band magnitude
     'umag': 'SDSS_u',
     'gmag': 'SDSS_g',
-    'Vmag': np.nan,    # [10.8/15.6]? Swift/UVOT V AB band magnitude
     'rmag': 'SDSS_r',
     'imag': 'SDSS_i',
     'zmag': 'SDSS_z',
@@ -100,10 +93,7 @@ def translate_filters(bfilters, full_list = False):
     '[5.8]': 'IRAC_3',
     '[8.0]': 'IRAC_4',
     'W3mag': 'WISE_W3',
-    'PUIB': np.nan,    # [8.2/15.6]? Spitzer/IRS Blue Peak Up Imaging channel (13.3-18.7um) AB magnitude
-    'W4mag': np.nan,    # two WISE4 magnitudes, what is the correction?
     "W4'mag": 'WISE_W4',
-    'PUIR': np.nan,    # Spitzer/IRS Red Peak Up Imaging channel (18.5-26.0um) AB magnitude
     '[24]': 'MIPS_24',
     'pacs70': 'PACS_70',
     'pacs100': 'PACS_100',
@@ -142,7 +132,7 @@ def load_obs_mock(filename, objnum):
 
     # define all outputs
     from translate_filter import calc_lameff_for_fsps
-    wave_effective = calc_lameff_for_fsps(translate_filters(filters))
+    wave_effective = calc_lameff_for_fsps(translate_filters(filters,full_list=True))
     phot_mask = np.logical_or(np.logical_or((flux != unc),(flux > 0)),flux != -99.0)
 
     # build output dictionary
@@ -157,7 +147,6 @@ def load_obs_mock(filename, objnum):
     return obs
 
 obs = load_obs_mock(run_params['photname'],run_params['objname'])
-
 
 #############
 # MODEL_PARAMS
@@ -185,10 +174,7 @@ def tie_gas_logz(logzsol=None, **extras):
 
 #### SET SFH PRIORS #####
 ###### REDSHIFT ######
-hdulist = fits.open(run_params['datname'])
-idx = hdulist[1].data['Name'] == run_params['objname']
-zred =  hdulist[1].data['cz'][idx][0] / 3e5
-hdulist.close()
+zred =  0.01
 
 #### TUNIV #####
 tuniv = WMAP9.age(zred).value
@@ -600,12 +586,8 @@ class BurstyModel(sedmodel.CSPModel):
                 start,end = self.theta_index['dust2']
                 dust2 = theta[start:end]
                 if dust1/2. > dust2:
-                    print dust1,dust2
-                    print 'dust failure'
                     return -np.inf
                 if dust1 < 0.5*dust2:
-                    print dust1,dust2
-                    print 'dust failure2'
                     return -np.inf
 
         for k, v in self.theta_index.iteritems():
