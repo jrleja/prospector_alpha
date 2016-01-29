@@ -401,7 +401,7 @@ def main(redraw_thetas=True,pass_guesses=False,redraw_lbol_thetas=False):
 	cb1.ax.yaxis.set_label_position('left')
 
 	#### First plot labels and scales
-	sedax[0].set_ylabel(r'log($\nu$ f$_{\nu}$) [arbitrary]')
+	sedax[0].set_ylabel(r'log($\nu$ f$_{\nu}$)')
 	sedax[0].set_xlabel(r'wavelength [microns]')
 	sedax[0].set_xlim(xlim_sed)
 	sedax[0].set_ylim(ylim_sed)
@@ -420,7 +420,7 @@ def main(redraw_thetas=True,pass_guesses=False,redraw_lbol_thetas=False):
 			       ha='right',fontsize=fontsize)
 
 	#### second plot labels and scales
-	#sedax[1].set_ylabel(r'log($\nu$ f$_{\nu}$) [arbitrary]')
+	#sedax[1].set_ylabel(r'log($\nu$ f$_{\nu}$)')
 	sedax[1].set_xlabel(r'wavelength [microns]')
 	sedax[1].set_xlim(xlim_sed)
 	sedax[1].set_ylim(ylim_sed)
