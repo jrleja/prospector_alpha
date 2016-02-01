@@ -269,7 +269,6 @@ def compare_moustakas_newfluxes(alldata,dat,eline_to_plot,objnames,outname='test
 	plt.tight_layout()
 	plt.savefig(outname,dpi=dpi)
 	plt.close()
-	print 1/0
 
 def compare_moustakas_fluxes(alldata,dat,emline_names,objnames,outname='test.png',outdec='bdec.png',model='Prospectr'):
 
@@ -1039,10 +1038,11 @@ def bpt_diagram(e_pinfo,hflag,outname=None):
 	plt.savefig(outname,dpi=dpi)
 	plt.close()
 
-def obs_vs_kennicutt_ha(e_pinfo,hflag,outname='test.png',outname_cloudy='test_cloudy.png',
+def obs_vs_kennicutt_ha(e_pinfo,hflag,outname_prosp='test.png',outname_mag='testmag.png',
+					    outname_cloudy='test_cloudy.png',
 						outname_ha_inpt='test_ha_inpt.png',
 						outname_sfr_margcomp='test_sfr_margcomp.png',
-	                    standardized_ha_axlim = True, eqw=False):
+	                    standardized_ha_axlim = False, eqw=False):
 	
 	#################
 	#### plot observed Halpha versus model Halpha from Kennicutt relationship
@@ -1107,7 +1107,8 @@ def obs_vs_kennicutt_ha(e_pinfo,hflag,outname='test.png',outname_cloudy='test_cl
 	# second plot: (kennicutt v CLOUDY), (kennicutt/cloudy v met)
 	# third plot: (mag SFR10 v Prosp SFR10), (mag ext(ha) v Prosp ext(ha)), (mag met v Prosp met)
 	# fourth plot: (mag SFR100 v Prosp SFR100), (mag SFR10 v Prosp SFR10)
-	fig1, ax1 = plt.subplots(1,2, figsize = (12.5,6))
+	fig1, ax1 = plt.subplots(1,1, figsize = (6,6))
+	figmag, axmag = plt.subplots(1,1, figsize = (6,6))
 	fig2, ax2 = plt.subplots(1,2, figsize = (12.5,6))
 	fig3, ax3 = plt.subplots(1,3, figsize = (18.75,6))
 	fig4, ax4 = plt.subplots(1,2, figsize = (12.5,6))
@@ -1131,9 +1132,9 @@ def obs_vs_kennicutt_ha(e_pinfo,hflag,outname='test.png',outname_cloudy='test_cl
 			msfr100_err = threed_dutils.asym_errors(msfr100_marginalized[plt_idx,1], msfr100_marginalized[plt_idx,0], msfr100_marginalized[plt_idx,2],log=False)
 
 
-			ax1[0].errorbar(pl_ha_obs[plt_idx,0], pl_ha_emp[plt_idx,0], xerr=obs_err, yerr=prosp_emp_err,
+			ax1.errorbar(pl_ha_obs[plt_idx,0], pl_ha_emp[plt_idx,0], xerr=obs_err, yerr=prosp_emp_err,
 				           linestyle=' ',**pdict)
-			ax1[1].errorbar(pl_ha_obs[plt_idx,0], pl_ha_mag[plt_idx], xerr=obs_err,
+			axmag.errorbar(pl_ha_obs[plt_idx,0], pl_ha_mag[plt_idx], xerr=obs_err,
 				           linestyle=' ',**pdict)
 			ax2[0].errorbar(pl_ha_cloudy[plt_idx,0], pl_ha_emp[plt_idx,0], xerr=prosp_emp_err, yerr=prosp_emp_err, 
 				           linestyle=' ',**pdict)
@@ -1152,30 +1153,33 @@ def obs_vs_kennicutt_ha(e_pinfo,hflag,outname='test.png',outname_cloudy='test_cl
 			ax4[1].errorbar(sfr100[plt_idx,0], msfr100_marginalized[plt_idx,1], xerr=sfr100_err, yerr=msfr100_err,
 	           linestyle=' ',**pdict)
 
-	ax1[0].text(0.04,0.87, r'S/N H$\alpha$ > {0}'.format(int(e_pinfo['obs']['sn_cut'])), transform = ax1[0].transAxes,horizontalalignment='left')
-	ax1[0].text(0.04,0.92, r'EQW H$\alpha$ > {0} $\AA$'.format(int(e_pinfo['obs']['eqw_cut'])), transform = ax1[0].transAxes,horizontalalignment='left')
-	ax1[0].text(0.04,0.82, r'N = '+str(int(np.sum(keep_idx))), transform = ax1[0].transAxes,horizontalalignment='left')
-	ax1[0].set_xlabel(xlab_ha[0])
-	ax1[0].set_ylabel(ylab_ha[0])
+	ax1.text(0.04,0.87, r'S/N H$\alpha$ > {0}'.format(int(e_pinfo['obs']['sn_cut'])), transform = ax1.transAxes,horizontalalignment='left')
+	ax1.text(0.04,0.92, r'EQW H$\alpha$ > {0} $\AA$'.format(int(e_pinfo['obs']['eqw_cut'])), transform = ax1.transAxes,horizontalalignment='left')
+	ax1.text(0.04,0.82, r'N = '+str(int(np.sum(keep_idx))), transform = ax1.transAxes,horizontalalignment='left')
+	ax1.set_xlabel(xlab_ha[0])
+	ax1.set_ylabel(ylab_ha[0])
 	if standardized_ha_axlim:
-		ax1[0].axis((ha_lim[0],ha_lim[1],ha_lim[0],ha_lim[1]))
-		ax1[0].plot(ha_lim,ha_lim,linestyle='--',color='0.1',alpha=0.8)
+		ax1.axis((ha_lim[0],ha_lim[1],ha_lim[0],ha_lim[1]))
+		ax1.plot(ha_lim,ha_lim,linestyle='--',color='0.1',alpha=0.8)
 	else:
-		ax1[0] = threed_dutils.equalize_axes(ax1[0], pl_ha_obs[:,0], pl_ha_emp[:,0])
+		ax1 = threed_dutils.equalize_axes(ax1, pl_ha_obs[:,0], pl_ha_emp[:,0])
 	off,scat = threed_dutils.offset_and_scatter(pl_ha_obs[:,0], pl_ha_emp[:,0], biweight=True)
-	ax1[0].text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat) +' dex', transform = ax1[0].transAxes,horizontalalignment='right')
-	ax1[0].text(0.96,0.1, 'mean offset='+"{:.2f}".format(off)+ ' dex', transform = ax1[0].transAxes,horizontalalignment='right')
+	ax1.text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat) +' dex', transform = ax1.transAxes,horizontalalignment='right')
+	ax1.text(0.96,0.1, 'mean offset='+"{:.2f}".format(off)+ ' dex', transform = ax1.transAxes,horizontalalignment='right')
 
-	ax1[1].set_xlabel(xlab_ha[1])
-	ax1[1].set_ylabel(ylab_ha[1])
+	axmag.text(0.04,0.87, r'S/N H$\alpha$ > {0}'.format(int(e_pinfo['obs']['sn_cut'])), transform = axmag.transAxes,horizontalalignment='left')
+	axmag.text(0.04,0.92, r'EQW H$\alpha$ > {0} $\AA$'.format(int(e_pinfo['obs']['eqw_cut'])), transform = axmag.transAxes,horizontalalignment='left')
+	axmag.text(0.04,0.82, r'N = '+str(int(np.sum(keep_idx))), transform = axmag.transAxes,horizontalalignment='left')
+	axmag.set_xlabel(xlab_ha[1])
+	axmag.set_ylabel(ylab_ha[1])
 	if standardized_ha_axlim:
-		ax1[1].axis((ha_lim[0],ha_lim[1],ha_lim[0],ha_lim[1]))
-		ax1[1].plot(ha_lim,ha_lim,linestyle='--',color='0.1',alpha=0.8)
+		axmag.axis((ha_lim[0],ha_lim[1],ha_lim[0],ha_lim[1]))
+		axmag.plot(ha_lim,ha_lim,linestyle='--',color='0.1',alpha=0.8)
 	else:
-		ax1[1] = threed_dutils.equalize_axes(ax1[1], pl_ha_obs[:,0], pl_ha_mag)
+		axmag = threed_dutils.equalize_axes(axmag, pl_ha_obs[:,0], pl_ha_mag)
 	off,scat = threed_dutils.offset_and_scatter(pl_ha_obs[:,0], pl_ha_mag, biweight=True)
-	ax1[1].text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat) +' dex', transform = ax1[1].transAxes,horizontalalignment='right')
-	ax1[1].text(0.96,0.1, 'mean offset='+"{:.2f}".format(off)+ ' dex', transform = ax1[1].transAxes,horizontalalignment='right')
+	axmag.text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat) +' dex', transform = axmag.transAxes,horizontalalignment='right')
+	axmag.text(0.96,0.1, 'mean offset='+"{:.2f}".format(off)+ ' dex', transform = axmag.transAxes,horizontalalignment='right')
 
 	ax2[0].text(0.04,0.87, r'S/N H$\alpha$ > {0}'.format(int(e_pinfo['obs']['sn_cut'])), transform = ax2[0].transAxes,horizontalalignment='left')
 	ax2[0].text(0.04,0.92, r'EQW H$\alpha$ > {0} $\AA$'.format(int(e_pinfo['obs']['eqw_cut'])), transform = ax2[0].transAxes,horizontalalignment='left')
@@ -1231,10 +1235,10 @@ def obs_vs_kennicutt_ha(e_pinfo,hflag,outname='test.png',outname_cloudy='test_cl
 	ax4[1].text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat) +' dex', transform = ax4[1].transAxes,horizontalalignment='right')
 	ax4[1].text(0.96,0.1, 'mean offset='+"{:.2f}".format(off)+ ' dex', transform = ax4[1].transAxes,horizontalalignment='right')
 
-
-
 	fig1.tight_layout()
-	fig1.savefig(outname,dpi=dpi)
+	fig1.savefig(outname_prosp,dpi=dpi)
+	figmag.tight_layout()
+	figmag.savefig(outname_mag,dpi=dpi)
 	fig2.tight_layout()
 	fig2.savefig(outname_cloudy,dpi=dpi)
 	fig3.tight_layout()
@@ -2392,7 +2396,7 @@ def plot_emline_comp(alldata,outfolder,hflag):
 	##### load moustakas+10 line flux information
 	objnames = np.array([f['objname'] for f in alldata])
 	dat = threed_dutils.load_moustakas_data(objnames = list(objnames))
-	print 1/0
+
 	##### load new moustakas line flux information (from email, january 2016)
 	newdat = threed_dutils.load_moustakas_newdat(objnames = list(objnames))
 
@@ -2442,13 +2446,15 @@ def plot_emline_comp(alldata,outfolder,hflag):
 
 	# model versus observations for Kennicutt Halphas
 	obs_vs_kennicutt_ha(e_pinfo,hflag, eqw=False,
-		                outname=outfolder+'empirical_halpha_comparison.png',
+		                outname_prosp=outfolder+'empirical_halpha_prosp.png',
+		                outname_mag=outfolder+'empirical_halpha_mag.png',
 		                outname_cloudy=outfolder+'empirical_halpha_versus_cloudy.png',
 		                outname_ha_inpt=outfolder+'kennicutt_ha_input.png',
 		                outname_sfr_margcomp=outfolder+'sfr_margcomp.png')
 
 	obs_vs_kennicutt_ha(e_pinfo,hflag, eqw=True,
-		                outname=outfolder+'empirical_halpha_comparison_eqw.png',
+		                outname_prosp=outfolder+'empirical_halpha_prosp.png',
+		                outname_mag=outfolder+'empirical_halpha_mag.png',
 		                outname_cloudy=outfolder+'empirical_halpha_versus_cloudy_eqw.png',
 		                outname_ha_inpt=outfolder+'kennicutt_ha_input.png',
 		                outname_sfr_margcomp=outfolder+'sfr_margcomp.png')
