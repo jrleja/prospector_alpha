@@ -6,6 +6,7 @@ from astropy import constants
 import magphys_plot_pref
 import copy
 from scipy.optimize import minimize
+import pickle
 
 #### set up colors and plot style
 prosp_color = '#e60000'
@@ -510,7 +511,7 @@ def fmt_emline_info(alldata,add_abs_err = True):
 	obslines['sn_cut'] = 3.0
 	obslines['eqw_cut'] = 3.0
 	obslines['hdelta_sn_cut'] = 3.0
-	obslines['hdelta_eqw_cut'] = 3.0
+	obslines['hdelta_eqw_cut'] = 1.0
 
 	'''
 	obslines['sn_cut'] = 1.0
@@ -1022,6 +1023,20 @@ def bpt_diagram(e_pinfo,hflag,outname=None):
 		ax.plot(x2,0.61 / (x2-0.47) + 1.19, linestyle='--',color='0.5')
 
 
+	#### determine BPT status based off my measurements
+	bpt_flag = np.empty(len(e_pinfo['obs']['f_ha'][:,0]),dtype='|S6')
+	bpt_flag_idx = np.empty(np.sum(keep_idx),dtype='|S6')
+	bpt_flag_idx[:] = 'SF'
+	sf_line1 = 0.61 / (np.log10(obs_nii_ha) - 0.05) + 1.3
+	sf_line2 = 0.61 / (np.log10(obs_nii_ha) - 0.47) + 1.19
+	composite = (np.log10(obs_oiii_hb) > sf_line1) & (np.log10(obs_oiii_hb) < sf_line2)
+	agn = np.log10(obs_oiii_hb) > sf_line2
+	bpt_flag_idx[composite] = 'SF/AGN'
+	bpt_flag_idx[agn] = 'AGN'
+	bpt_flag[:] = 'SF'
+	bpt_flag[keep_idx] = bpt_flag_idx
+	pickle.dump(bpt_flag,open(os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/joel_bpt.pickle', "wb"))
+
 	ax1[0].text(0.04,0.1, r'S/N (H$\alpha$,H$\beta$,[OIII],[NII]) > '+str(int(e_pinfo['obs']['sn_cut'])), transform = ax1[0].transAxes,horizontalalignment='left')
 	ax1[0].set_xlabel(r'log([NII 6583]/H$_{\alpha}$) [observed]')
 	ax1[0].set_ylabel(r'log([OIII 5007]/H$_{\beta}$) [observed]')
@@ -1177,6 +1192,7 @@ def obs_vs_kennicutt_ha(e_pinfo,hflag,outname_prosp='test.png',outname_mag='test
 		axmag.plot(ha_lim,ha_lim,linestyle='--',color='0.1',alpha=0.8)
 	else:
 		axmag = threed_dutils.equalize_axes(axmag, pl_ha_obs[:,0], pl_ha_mag)
+		axmag.axis((3,10,3,10))
 	off,scat = threed_dutils.offset_and_scatter(pl_ha_obs[:,0], pl_ha_mag, biweight=True)
 	axmag.text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat) +' dex', transform = axmag.transAxes,horizontalalignment='right')
 	axmag.text(0.96,0.1, 'mean offset='+"{:.2f}".format(off)+ ' dex', transform = axmag.transAxes,horizontalalignment='right')
@@ -1248,8 +1264,6 @@ def obs_vs_kennicutt_ha(e_pinfo,hflag,outname_prosp='test.png',outname_mag='test
 	plt.close()
 
 def fit_and_save(met,ha_ratio):
-
-	import pickle
 
 	### clean nans
 	good = np.isfinite(ha_ratio[:,0])
@@ -1638,8 +1652,8 @@ def obs_vs_model_hdelta(e_pinfo,hflag,outname=None,outname_dnplt=None,eqw=False)
 	hflag = [hflag[good_idx],~hflag[good_idx]]
 
 	### Hdelta plot
-	fig, ax = plt.subplots(2,2, figsize = (12,12))
-	ax = np.ravel(ax)
+	# fig, ax = plt.subplots(2,2, figsize = (12,12))
+	fig, ax = plt.subplots(1,1, figsize = (6,6))
 	norm_errs = []
 	norm_flag = []
 
@@ -1671,50 +1685,26 @@ def obs_vs_model_hdelta(e_pinfo,hflag,outname=None,outname_dnplt=None,eqw=False)
 				                             np.log10(pl_hdel_prosp),errs_pro))
 			norm_flag.append([labels[ii]]*np.sum(plt_idx))
 
-			ax[0].errorbar(np.log10(pl_hdel_obs), np.log10(pl_hdel_prosp_em), xerr=errs_obs, linestyle=' ',  **pdict)
-			ax[1].errorbar(np.log10(pl_hdel_obs), pl_hdel_prosp_bestfit, xerr=errs_obs, linestyle=' ', **pdict)
-			ax[2].errorbar(np.log10(pl_hdel_obs), np.log10(pl_hdel_prosp), xerr=errs_obs, yerr=errs_pro, linestyle=' ', **pdict)
-			ax[3].errorbar(np.log10(pl_hdel_obs), pl_hdel_mag, xerr=errs_obs, linestyle=' ', **pdict)
+			# ax[0].errorbar(np.log10(pl_hdel_obs), np.log10(pl_hdel_prosp_em), xerr=errs_obs, linestyle=' ',  **pdict)
+			# ax[1].errorbar(np.log10(pl_hdel_obs), pl_hdel_prosp_bestfit, xerr=errs_obs, linestyle=' ', **pdict)
+			ax.errorbar(np.log10(pl_hdel_obs), np.log10(pl_hdel_prosp), xerr=errs_obs, yerr=errs_pro, linestyle=' ', **pdict)
+			#ax[3].errorbar(np.log10(pl_hdel_obs), pl_hdel_mag, xerr=errs_obs, linestyle=' ', **pdict)
 
 			if eqw:
 				ax2[0].errorbar(np.log10(pl_hdel_obs), dn4000_obs[plt_idx], linestyle=' ',**pdict)
 				ax2[1].errorbar(np.log10(pl_hdel_prosp), dn4000_prosp[plt_idx], linestyle=' ',**pdict)
 				ax2[2].errorbar(pl_hdel_mag, dn4000_mag[plt_idx], linestyle=' ',**pdict)
 
-	ax[0].text(0.04,0.87, r'S/N H$\delta$ > {0}'.format(int(e_pinfo['obs']['hdelta_sn_cut'])), transform = ax[0].transAxes,horizontalalignment='left')
-	ax[0].text(0.04,0.92, r'EQW H$\delta$ < -{0} $\AA$'.format(int(e_pinfo['obs']['hdelta_eqw_cut'])), transform = ax[0].transAxes,horizontalalignment='left')
-	ax[0].text(0.04,0.82, r'N = '+str(int(np.sum(good_idx))), transform = ax[0].transAxes,horizontalalignment='left')
-	ax[0].set_xlabel(xtit[0])
-	ax[0].set_ylabel(ytit[0])
-	off,scat = threed_dutils.offset_and_scatter(np.log10(hdel_obs[:,0]), np.log10(hdel_prosp_em[:,0]),biweight=True)
-	ax[0].text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat) + ' dex', transform = ax[0].transAxes,horizontalalignment='right')
-	ax[0].text(0.96,0.1, 'mean offset='+"{:.2f}".format(off) + ' dex', transform = ax[0].transAxes,horizontalalignment='right')
-	ax[0].axis(plotlim)
-	ax[0].plot([min,max],[min,max],linestyle='--',color='0.1',alpha=0.8)
-
-	ax[1].set_xlabel(xtit[1])
-	ax[1].set_ylabel(ytit[1])
-	off,scat = threed_dutils.offset_and_scatter(np.log10(hdel_obs[:,0]), hdel_prosp,biweight=True)
-	ax[1].text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat) + ' dex', transform = ax[1].transAxes,horizontalalignment='right')
-	ax[1].text(0.96,0.1, 'mean offset='+"{:.2f}".format(off) + ' dex', transform = ax[1].transAxes,horizontalalignment='right')
-	ax[1].axis(plotlim)
-	ax[1].plot([min,max],[min,max],linestyle='--',color='0.1',alpha=0.8)
-
-	ax[2].set_xlabel(xtit[2])
-	ax[2].set_ylabel(ytit[2])
+	ax.text(0.04,0.87, r'S/N H$\delta$ > {0}'.format(int(e_pinfo['obs']['hdelta_sn_cut'])), transform = ax.transAxes,horizontalalignment='left')
+	ax.text(0.04,0.92, r'EQW H$\delta$ < -{0} $\AA$'.format(int(e_pinfo['obs']['hdelta_eqw_cut'])), transform = ax.transAxes,horizontalalignment='left')
+	ax.text(0.04,0.82, r'N = '+str(int(np.sum(good_idx))), transform = ax.transAxes,horizontalalignment='left')
+	ax.set_xlabel(xtit[2])
+	ax.set_ylabel(ytit[2])
 	off,scat = threed_dutils.offset_and_scatter(np.log10(hdel_obs[:,0]), np.log10(hdel_prosp_marg[:,0]),biweight=True)
-	ax[2].text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat) + ' dex', transform = ax[2].transAxes,horizontalalignment='right')
-	ax[2].text(0.96,0.1, 'mean offset='+"{:.2f}".format(off) + ' dex', transform = ax[2].transAxes,horizontalalignment='right')
-	ax[2].axis(plotlim)
-	ax[2].plot([min,max],[min,max],linestyle='--',color='0.1',alpha=0.8)
-
-	ax[3].set_xlabel(xtit[3])
-	ax[3].set_ylabel(ytit[3])
-	off,scat = threed_dutils.offset_and_scatter(np.log10(hdel_obs[:,0]), hdel_mag,biweight=True)
-	ax[3].text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat), transform = ax[3].transAxes,horizontalalignment='right')
-	ax[3].text(0.96,0.1, 'mean offset='+"{:.2f}".format(off), transform = ax[3].transAxes,horizontalalignment='right')
-	ax[3].axis(plotlim)
-	ax[3].plot([min,max],[min,max],linestyle='--',color='0.1',alpha=0.8)
+	ax.text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat) + ' dex', transform = ax.transAxes,horizontalalignment='right')
+	ax.text(0.96,0.1, 'mean offset='+"{:.2f}".format(off) + ' dex', transform = ax.transAxes,horizontalalignment='right')
+	ax.axis(plotlim)
+	ax.plot([min,max],[min,max],linestyle='--',color='0.1',alpha=0.8)
 
 	### dn4000 plot options
 	if eqw:
@@ -1759,7 +1749,7 @@ def obs_vs_model_dn(e_pinfo,hflag,outname=None):
 
 	### plot comparison
 	### Dn4000 first
-	fig, ax = plt.subplots(1,2, figsize = (12.5,6))
+	fig, ax = plt.subplots(1,1, figsize = (6,6))
 	norm_errs = []
 	norm_flag = []
 
@@ -1785,23 +1775,15 @@ def obs_vs_model_dn(e_pinfo,hflag,outname=None):
 				                             pl_dn4000_prosp,errs_pro))
 			norm_flag.append([labels[ii]]*np.sum(plt_idx))
 
-			ax[0].errorbar(pl_dn4000_obs, pl_dn4000_prosp, yerr=errs_pro, linestyle=' ', **pdict)
-			ax[1].errorbar(pl_dn4000_obs, pl_dn4000_mag, linestyle=' ', **pdict)
+			ax.errorbar(pl_dn4000_obs, pl_dn4000_prosp, yerr=errs_pro, linestyle=' ', **pdict)
 
-	ax[0].set_xlabel(r'observed D$_n$(4000)')
-	ax[0].set_ylabel(r'Prospector D$_n$(4000)')
-	ax[0] = threed_dutils.equalize_axes(ax[0], dn4000_obs, dn4000_prosp)
+	ax.set_xlabel(r'observed D$_n$(4000)')
+	ax.set_ylabel(r'Prospector D$_n$(4000)')
+	ax = threed_dutils.equalize_axes(ax, dn4000_obs, dn4000_prosp)
 	off,scat = threed_dutils.offset_and_scatter(dn4000_obs, dn4000_prosp,biweight=True)
-	ax[0].text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat), transform = ax[0].transAxes,horizontalalignment='right')
-	ax[0].text(0.96,0.1, 'mean offset='+"{:.2f}".format(off), transform = ax[0].transAxes,horizontalalignment='right')
-	ax[0].text(0.04,0.9, r'N = '+str(int(np.sum(dn_idx))), transform = ax[0].transAxes,horizontalalignment='left')
-
-	ax[1].set_xlabel(r'observed D$_n$(4000)')
-	ax[1].set_ylabel(r'MAGPHYS D$_n$(4000)')
-	ax[1] = threed_dutils.equalize_axes(ax[1], dn4000_obs, dn4000_mag)
-	off,scat = threed_dutils.offset_and_scatter(dn4000_obs, dn4000_mag,biweight=True)
-	ax[1].text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat), transform = ax[1].transAxes,horizontalalignment='right')
-	ax[1].text(0.96,0.1, 'mean offset='+"{:.2f}".format(off), transform = ax[1].transAxes,horizontalalignment='right')
+	ax.text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat), transform = ax.transAxes,horizontalalignment='right')
+	ax.text(0.96,0.1, 'mean offset='+"{:.2f}".format(off), transform = ax.transAxes,horizontalalignment='right')
+	ax.text(0.04,0.9, r'N = '+str(int(np.sum(dn_idx))), transform = ax.transAxes,horizontalalignment='left')
 
 	plt.tight_layout()
 	plt.savefig(outname, dpi=dpi)
@@ -1946,7 +1928,7 @@ def obs_vs_model_bdec(e_pinfo,hflag,outname1='test.png',outname2='test.png'):
 	hflag = [hflag[keep_idx],~hflag[keep_idx]]
 
 	#### create plots
-	fig1, ax1 = plt.subplots(1,2, figsize = (12.5,6))
+	fig1, ax1 = plt.subplots(1,1, figsize = (6,6))
 	fig2, ax2 = plt.subplots(1,3, figsize = (18.75,6))
 	axlims = (-0.1,1.7)
 	norm_errs = []
@@ -1974,10 +1956,8 @@ def obs_vs_model_bdec(e_pinfo,hflag,outname1='test.png',outname2='test.png'):
 			norm_errs.append(normalize_error(pl_bdec_measured[plt_idx],errs_obs,pl_bdec_cloudy_marg[plt_idx,0],errs_cloudy_marg))
 			norm_flag.append([labels[ii]]*np.sum(plt_idx))
 
-			ax1[0].errorbar(pl_bdec_measured[plt_idx], pl_bdec_cloudy_marg[plt_idx,0], xerr=errs_obs, yerr=errs_cloudy_marg,
-				           linestyle=' ',**pdict)
-			ax1[1].errorbar(pl_bdec_measured[plt_idx], pl_bdec_magphys[plt_idx], xerr=errs_obs,
-				           linestyle=' ',**pdict)
+			ax1.errorbar(pl_bdec_measured[plt_idx], pl_bdec_cloudy_marg[plt_idx,0], xerr=errs_obs, yerr=errs_cloudy_marg,
+				         linestyle=' ',**pdict)
 
 			ax2[0].errorbar(pl_bdec_measured[plt_idx], pl_bdec_calc_marg[plt_idx,0], xerr=errs_obs, yerr=errs_calc_marg,
 				           linestyle=' ',**pdict)
@@ -1994,22 +1974,15 @@ def obs_vs_model_bdec(e_pinfo,hflag,outname1='test.png',outname2='test.png'):
 	for s in sort: print e_pinfo['objnames'][keep_idx][s], agn_string[s], "{:.1f}".format(pl_bdec_measured[s]), "{:.1f}".format(pl_bdec_cloudy_marg[s,0]), "{:.1f}".format(sn_ha[keep_idx][s]), "{:.1f}".format(e_pinfo['obs']['eqw_ha'][keep_idx,0][s]), "{:.1f}".format(sn_hb[keep_idx][s]), "{:.1f}".format(e_pinfo['obs']['eqw_hb'][keep_idx,0][s])
 
 	#### MAIN FIGURE ERRATA
-	ax1[0].text(0.04,0.87, r'S/N (H$\alpha$,H$\beta$) > {0}'.format(int(e_pinfo['obs']['sn_cut'])), transform = ax1[0].transAxes,horizontalalignment='left')
-	ax1[0].text(0.04,0.92, r'EQW (H$\alpha$,H$\beta$) > {0} $\AA$'.format(int(e_pinfo['obs']['eqw_cut'])), transform = ax1[0].transAxes,horizontalalignment='left')
-	ax1[0].text(0.04,0.82, r'N = '+str(int(np.sum(keep_idx))), transform = ax1[0].transAxes,horizontalalignment='left')
-	ax1[0].set_xlabel(r'observed A$_{\mathrm{H}\beta}$ - A$_{\mathrm{H}\alpha}$')
-	ax1[0].set_ylabel(r'Prospector A$_{\mathrm{H}\beta}$ - A$_{\mathrm{H}\alpha}$')
-	ax1[0] = threed_dutils.equalize_axes(ax1[0], pl_bdec_measured,pl_bdec_cloudy_marg[:,0],axlims=axlims)
+	ax1.text(0.04,0.87, r'S/N (H$\alpha$,H$\beta$) > {0}'.format(int(e_pinfo['obs']['sn_cut'])), transform = ax1.transAxes,horizontalalignment='left')
+	ax1.text(0.04,0.92, r'EQW (H$\alpha$,H$\beta$) > {0} $\AA$'.format(int(e_pinfo['obs']['eqw_cut'])), transform = ax1.transAxes,horizontalalignment='left')
+	ax1.text(0.04,0.82, r'N = '+str(int(np.sum(keep_idx))), transform = ax1.transAxes,horizontalalignment='left')
+	ax1.set_xlabel(r'observed A$_{\mathrm{H}\beta}$ - A$_{\mathrm{H}\alpha}$')
+	ax1.set_ylabel(r'Prospector A$_{\mathrm{H}\beta}$ - A$_{\mathrm{H}\alpha}$')
+	ax1 = threed_dutils.equalize_axes(ax1, pl_bdec_measured,pl_bdec_cloudy_marg[:,0],axlims=axlims)
 	off,scat = threed_dutils.offset_and_scatter(pl_bdec_measured,pl_bdec_cloudy_marg[:,0],biweight=True)
-	ax1[0].text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat), transform = ax1[0].transAxes,horizontalalignment='right')
-	ax1[0].text(0.96,0.1, 'mean offset='+"{:.2f}".format(off), transform = ax1[0].transAxes,horizontalalignment='right')
-
-	ax1[1].set_xlabel(r'observed A$_{\mathrm{H}\beta}$ - A$_{\mathrm{H}\alpha}$')
-	ax1[1].set_ylabel(r'MAGPHYS A$_{\mathrm{H}\beta}$ - A$_{\mathrm{H}\alpha}$')
-	ax1[1] = threed_dutils.equalize_axes(ax1[1], pl_bdec_measured,pl_bdec_magphys,axlims=axlims)
-	off,scat = threed_dutils.offset_and_scatter(pl_bdec_measured,pl_bdec_magphys,biweight=True)
-	ax1[1].text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat), transform = ax1[1].transAxes,horizontalalignment='right')
-	ax1[1].text(0.96,0.1, 'mean offset='+"{:.2f}".format(off), transform = ax1[1].transAxes,horizontalalignment='right')
+	ax1.text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat), transform = ax1.transAxes,horizontalalignment='right')
+	ax1.text(0.96,0.1, 'mean offset='+"{:.2f}".format(off), transform = ax1.transAxes,horizontalalignment='right')
 
 	#### SECONDARY FIGURE ERRATA
 	ax2[0].set_xlabel(r'observed A$_{\mathrm{H}\beta}$ - A$_{\mathrm{H}\alpha}$')
@@ -2150,10 +2123,16 @@ def obs_vs_prosp_sfr(e_pinfo,hflag,outname='test.png'):
 
 def return_agn_str(idx, string=False):
 
+	'''
+	# OLD VERSION
 	from astropy.io import fits
 	hdulist = fits.open(os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/table1.fits')
 	agn_str = hdulist[1].data['Class']
 	hdulist.close()
+	'''
+	# NEW VERSION, WITH MY FLUXES
+	with open(os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/joel_bpt.pickle', "rb") as f:
+		agn_str=pickle.load(f)
 
 	agn_str = agn_str[idx]
 	sfing = (agn_str == 'SF') | (agn_str == '---')
@@ -2453,8 +2432,8 @@ def plot_emline_comp(alldata,outfolder,hflag):
 		                outname_sfr_margcomp=outfolder+'sfr_margcomp.png')
 
 	obs_vs_kennicutt_ha(e_pinfo,hflag, eqw=True,
-		                outname_prosp=outfolder+'empirical_halpha_prosp.png',
-		                outname_mag=outfolder+'empirical_halpha_mag.png',
+		                outname_prosp=outfolder+'empirical_halpha_prosp_eqw.png',
+		                outname_mag=outfolder+'empirical_halpha_mag_eqw.png',
 		                outname_cloudy=outfolder+'empirical_halpha_versus_cloudy_eqw.png',
 		                outname_ha_inpt=outfolder+'kennicutt_ha_input.png',
 		                outname_sfr_margcomp=outfolder+'sfr_margcomp.png')
