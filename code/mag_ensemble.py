@@ -365,15 +365,6 @@ def compare_moustakas_fluxes(alldata,dat,emline_names,objnames,outname='test.png
 			      transform = axes[ii].transAxes,horizontalalignment='right')
 		axes[ii].axhline(0, linestyle='--', color='0.1')
 
-
-		# print outliers
-		diff = np.log10(xp) - np.log10(yp)
-		outliers = np.abs(diff) > 3*scat
-		print emline_names_doubrem[ii] + ' outliers:'
-		for jj in xrange(len(outliers)):
-			if outliers[jj] == True:
-				print np.array(moust_objnames)[ok_idx][jj]+' ' + "{:.2f}".format(diff[jj]/scat)
-
 	plt.tight_layout()
 	plt.savefig(outname,dpi=dpi)
 	plt.close()
@@ -490,8 +481,9 @@ def fmt_emline_info(alldata,add_abs_err = True):
 	obslines['err_hd'] = (obslines['f_hd'][:,1] - obslines['f_hd'][:,2])/2.
 
 	obslines['f_nii'] = np.transpose([ret_inf(alldata,'lum',model='Prospectr',name='[NII] 6583'),
-		                             ret_inf(alldata,'lum_errup',model='Prospectr',name='[NII] 6583'),
-		                             ret_inf(alldata,'lum_errdown',model='Prospectr',name='[NII] 6583')]) / constants.L_sun.cgs.value
+		                              ret_inf(alldata,'lum_errup',model='Prospectr',name='[NII] 6583'),
+		                              ret_inf(alldata,'lum_errdown',model='Prospectr',name='[NII] 6583')]) / constants.L_sun.cgs.value
+
 	obslines['err_nii'] = (obslines['f_nii'][:,1] - obslines['f_nii'][:,2])/2.
 	obslines['eqw_nii'] = obslines['f_nii'] / obslines['ha_obs_cont'][:,None]
 	obslines['eqw_err_nii'] = obslines['err_nii'] / obslines['ha_obs_cont'][:,None]
@@ -694,6 +686,7 @@ def fmt_emline_info(alldata,add_abs_err = True):
 	##### NAME VARIABLES
 	# Prospector model variables
 	parnames = alldata[0]['pquantiles']['parnames']
+	mass_idx = parnames == 'mass'
 	dinx_idx = parnames == 'dust_index'
 	dust1_idx = parnames == 'dust1'
 	dust2_idx = parnames == 'dust2'
@@ -740,7 +733,7 @@ def fmt_emline_info(alldata,add_abs_err = True):
 	cloudy_nii, cloudy_oiii, ha_emp, pmet, ha_ratio, oiii_hb, \
 	nii_ha, dn4000, d1, d2, didx,sfr_10,sfr_100,ha_ext,sfr_100_mag_marginalized,\
 	cloudy_ha_eqw, cloudy_hb_eqw, cloudy_oiii_eqw, cloudy_nii_eqw, \
-	cloudy_hd_eqw, d1_d2 = [np.zeros(shape=(ngals,3)) for i in xrange(26)]
+	cloudy_hd_eqw, d1_d2,mass = [np.zeros(shape=(ngals,3)) for i in xrange(27)]
 	for ii,dat in enumerate(np.array(alldata)):
 
 		####### BALMER DECREMENTS
@@ -849,10 +842,14 @@ def fmt_emline_info(alldata,add_abs_err = True):
 		dn4000[ii,1] = dat['spec_info']['dn4000']['q84']
 		dn4000[ii,2] = dat['spec_info']['dn4000']['q16']
 
-		##### marginalized dust properties + SFR
+		##### marginalized dust properties + SFR + mass
 		d1[ii,0] = dat['pquantiles']['q50'][dust1_idx]
 		d1[ii,1] = dat['pquantiles']['q84'][dust1_idx]
 		d1[ii,2] = dat['pquantiles']['q16'][dust1_idx]
+
+		mass[ii,0] = dat['pquantiles']['q50'][mass_idx]
+		mass[ii,1] = dat['pquantiles']['q84'][mass_idx]
+		mass[ii,2] = dat['pquantiles']['q16'][mass_idx]
 
 		d2[ii,0] = dat['pquantiles']['q50'][dust2_idx]
 		d2[ii,1] = dat['pquantiles']['q84'][dust2_idx]
@@ -909,6 +906,7 @@ def fmt_emline_info(alldata,add_abs_err = True):
 	prosp['sfr_10'] = sfr_10
 	prosp['sfr_100'] = sfr_100
 	prosp['ha_ext'] = ha_ext
+	prosp['mass'] = mass
 
 	mag['bdec'] = bdec_magphys
 	mag['ha'] = ha_magphys
@@ -940,6 +938,114 @@ def fmt_emline_info(alldata,add_abs_err = True):
 	eline_info = {'obs': obslines, 'mag': mag, 'prosp': prosp, 'objnames':objnames}
 
 	return eline_info
+
+def atlas_3d_met(e_pinfo,hflag,outfolder=''):
+
+	#### load up atlas3d info
+	dtype={'names': ('name', 'hbeta_ang','hbeta_ang_err', 'fe5015_ang','fe5015_ang_err','mgb_ang','mgb_ang_err','fe5270_ang','fe5270_ang_err','age_ssp','age_ssp_err','z_h_ssp','z_h_ssp_err','a_fe_ssp','a_fe_ssp_err','quality'), \
+	       'formats': ('S16', 'f8', 'f8', 'f8', 'f8', 'f8', 'f8', 'f8', 'f8', 'f8', 'f8', 'f8', 'f8', 'f8', 'f8', 'f8', 'f8', 'i4')}
+	a3d = np.loadtxt('/Users/joel/code/python/threedhst_bsfh/data/brownseds_data/atlas_3d_abundances.dat',dtype=dtype,comments='#')
+
+	#### matching
+	objnames = e_pinfo['objnames']
+	a3d_met, a3d_alpha, prosp_met = [],[],[]
+	for i, obj in enumerate(objnames): 
+		match = a3d['name'] == obj.replace(' ','')
+		
+		# no match
+		if np.sum(match) == 0:
+			continue
+
+		# match, save metallicity
+		prosp_met.append(e_pinfo['prosp']['met'][i,0])
+		a3d_met.append(a3d['z_h_ssp'][match])
+		a3d_alpha.append(a3d['a_fe_ssp'][match])
+
+	prosp_met = np.array(prosp_met)
+	a3d_met = np.array(a3d_met)
+	a3d_alpha = np.array(a3d_alpha)
+
+	fig, ax = plt.subplots(1,1,figsize=(7,7))
+	fig.subplots_adjust(left=0.15,bottom=0.1,top=0.95,right=0.95)
+	ax.plot(a3d_met,prosp_met,'o', color='#1C86EE',alpha=0.9)
+	ax.set_xlabel('log(Z$_{\mathrm{ATLAS3D}}$/Z$_{\odot}$)')
+	ax.set_ylabel('log(Z$_{\mathrm{Prosp}}$/Z$_{\odot}$)')
+
+	ax = threed_dutils.equalize_axes(ax,a3d_met,prosp_met, dynrange=0.1, line_of_equality=True, log=False)
+
+	off,scat = threed_dutils.offset_and_scatter(a3d_met,prosp_met, biweight=True)
+	ax.text(0.03,0.95, r'N = '+str(prosp_met.shape[0]), transform = ax.transAxes,horizontalalignment='left')
+	ax.text(0.03,0.9, 'biweight scatter='+"{:.2f}".format(scat) +' dex', transform = ax.transAxes,horizontalalignment='left')
+	ax.text(0.03,0.85, 'mean offset='+"{:.2f}".format(off)+ ' dex', transform = ax.transAxes,horizontalalignment='left')
+
+	plt.savefig(outfolder+'atlas3d_starmet.png',dpi=150)
+	plt.close()
+
+def gas_phase_metallicity(e_pinfo, hflag, outfolder='',ssfr_cut=False):
+
+	#### cuts first
+	sn_ha = e_pinfo['obs']['f_ha'][:,0] / np.abs(e_pinfo['obs']['err_ha'])
+	sn_hb = e_pinfo['obs']['f_hb'][:,0] / np.abs(e_pinfo['obs']['err_hb'])
+	sn_oiii = e_pinfo['obs']['f_oiii'][:,0] / np.abs(e_pinfo['obs']['err_oiii'])
+	sn_nii = e_pinfo['obs']['f_nii'][:,0] / np.abs(e_pinfo['obs']['err_nii'])
+	ssfr = e_pinfo['prosp']['sfr_100'][:,0] / e_pinfo['prosp']['mass'][:,0]
+
+	eqw_ha = e_pinfo['obs']['eqw_ha'][:,0]
+
+	sn_cut = 3
+	if ssfr_cut:
+		keep_idx = np.squeeze((sn_ha > sn_cut) & (sn_hb > sn_cut) & (sn_oiii > sn_cut) & (sn_nii > sn_cut) & (ssfr > 3e-10))
+	else:
+		keep_idx = np.squeeze((sn_ha > sn_cut) & (sn_hb > sn_cut) & (sn_oiii > sn_cut) & (sn_nii > sn_cut))
+
+	#### get BPT status
+	sfing, composite, agn = return_agn_str(keep_idx)
+	keys = [sfing, composite, agn]
+
+	#### get gas-phase metallicity
+	nii_ha = e_pinfo['obs']['f_nii'][keep_idx,0] / e_pinfo['obs']['f_ha'][keep_idx,0]
+	oiii_hb = e_pinfo['obs']['f_oiii'][keep_idx,0] / e_pinfo['obs']['f_hb'][keep_idx,0]
+	logzgas = np.zeros_like(nii_ha)
+	for ii in xrange(len(logzgas)): logzgas[ii] = threed_dutils.gas_met(nii_ha[ii],oiii_hb[ii])
+
+	#### get stellar metallicity
+	logzsol = e_pinfo['prosp']['met'][keep_idx,0]
+
+	fig, ax = plt.subplots(1,1,figsize=(7,7))
+	fig.subplots_adjust(left=0.15,bottom=0.1,top=0.95,right=0.95)
+	for ii,key in enumerate(keys): ax.plot(logzgas[key],logzsol[key],'o',**bptdict[ii])
+	ax.set_xlabel('log(Z$_{\mathrm{gas}}$/Z$_{\odot}$)')
+	ax.set_ylabel('log(Z$_{*}$/Z$_{\odot}$)')
+
+	ax = threed_dutils.equalize_axes(ax, logzgas,logzsol, dynrange=0.1, line_of_equality=True, log=False)
+
+	ax.text(0.03,0.93, r'S/N (H$\alpha$,H$\beta$,[OIII],[NII]) > '+str(int(sn_cut)), transform = ax.transAxes,horizontalalignment='left')
+	ax.text(0.03,0.87, r'N = '+str(np.sum(keep_idx)), transform = ax.transAxes,horizontalalignment='left')
+
+	if ssfr_cut:
+		ax.text(0.03,0.81, 'sSFR > 3e-10', transform = ax.transAxes,horizontalalignment='left')
+		plt.savefig(outfolder+'gas_to_stellar_metallicity_highssfr.png',dpi=150)
+	else:
+		plt.savefig(outfolder+'gas_to_stellar_metallicity.png',dpi=150)
+
+	plt.close()
+
+	# rough and dirty new figure
+	# Halpha_predicted,prosp / Halpha_observed vs (Z_prospector/Z_elines)
+	# for star-forming only
+	ha_mod = e_pinfo['prosp']['cloudy_ha'][keep_idx,0]
+	ha_obs = e_pinfo['obs']['f_ha'][keep_idx,0]
+
+	fig, ax = plt.subplots(1,1,figsize=(7,7))
+	fig.subplots_adjust(left=0.15,bottom=0.1,top=0.95,right=0.95)
+	ax.plot(np.log10(ha_mod[sfing]/ha_obs[sfing]),logzsol[sfing]-logzgas[sfing],'o',**bptdict[0])
+	ax.set_xlabel(r'log(H$_{\alpha,\mathrm{model}}$/H$_{\alpha,\mathrm{obs}}$)')
+	ax.set_ylabel(r'log(Z$_{\mathrm{stars,model}}$/Z$_{\mathrm{gas,obs}}$)')
+
+	plt.show()
+	print 1/0
+
+
 
 def bpt_diagram(e_pinfo,hflag,outname=None):
 
@@ -1569,6 +1675,7 @@ def obs_vs_prosp_balmlines(e_pinfo,hflag,outname='test.png',outname_resid='test.
 			ax2.text(0.757, 0.12, 'normalization \n error',transform = ax2.transAxes,horizontalalignment='left',fontsize=10,multialignment='center',weight='semibold')
 			ax2.text(0.687, 0.12, 'reddening \n error',transform = ax2.transAxes,horizontalalignment='right',fontsize=10,multialignment='center',weight='semibold')
 
+			threed_dutils.return_n_outliers(np.log10(f_ha[:,0]),np.log10(model_ha[:,0]),e_pinfo['objnames'][keep_idx],10,cp_files='halpha')
 
 	fig1.tight_layout()
 	fig1.savefig(outname,dpi=dpi)
@@ -1602,9 +1709,10 @@ def obs_vs_model_hdelta(e_pinfo,hflag,outname=None,outname_dnplt=None,eqw=False)
 		#hdel_plot_errs = threed_dutils.asym_errors(e_pinfo['obs']['hdel_eqw'][good_idx,0], e_pinfo['obs']['hdel_eqw'][good_idx,1], e_pinfo['obs']['hdel_eqw'][good_idx,2], log=True)
 
 		hdel_prosp_marg = e_pinfo['prosp']['hdel_eqw_marg'][good_idx]
+		hdel_prosp_marg = e_pinfo['prosp']['hdel_eqw_marg'][good_idx] - e_pinfo['prosp']['cloudy_hd'][good_idx]/(e_pinfo['prosp']['hdel_abs_marg'][good_idx]/e_pinfo['prosp']['hdel_eqw_marg'][good_idx])
 		#hdel_prosp_marg_errs = threed_dutils.asym_errors(e_pinfo['prosp']['hdel_eqw_marg'][good_idx,0], e_pinfo['prosp']['hdel_eqw_marg'][good_idx,1], e_pinfo['prosp']['hdel_eqw_marg'][good_idx,2], log=True)
 
-		hdel_prosp_em = e_pinfo['prosp']['hdel_eqw_marg'][good_idx] - e_pinfo['prosp']['cloudy_hd_eqw'][good_idx]
+		hdel_prosp_em = e_pinfo['prosp']['hdel_eqw_marg'][good_idx] - e_pinfo['prosp']['cloudy_hd'][good_idx]
 
 		hdel_prosp = np.log10(e_pinfo['prosp']['hdel_eqw'][good_idx])
 		hdel_mag = np.log10(e_pinfo['mag']['hdel_eqw'][good_idx])
@@ -1724,6 +1832,9 @@ def obs_vs_model_hdelta(e_pinfo,hflag,outname=None,outname_dnplt=None,eqw=False)
 		fig2.tight_layout()
 		fig2.savefig(outname_dnplt, dpi=dpi)
 
+		threed_dutils.return_n_outliers(np.log10(hdel_obs[:,0]),np.log10(hdel_prosp_marg[:,0]),e_pinfo['objnames'][good_idx],10,cp_files='hdelta_abs')
+
+
 	fig.tight_layout()
 	fig.savefig(outname, dpi=dpi)
 	plt.close()
@@ -1785,6 +1896,7 @@ def obs_vs_model_dn(e_pinfo,hflag,outname=None):
 	ax.text(0.96,0.1, 'mean offset='+"{:.2f}".format(off), transform = ax.transAxes,horizontalalignment='right')
 	ax.text(0.04,0.9, r'N = '+str(int(np.sum(dn_idx))), transform = ax.transAxes,horizontalalignment='left')
 
+	threed_dutils.return_n_outliers(dn4000_obs,dn4000_prosp,e_pinfo['objnames'][dn_idx],3,cp_files='dn4000')
 	plt.tight_layout()
 	plt.savefig(outname, dpi=dpi)
 	plt.close()
@@ -1965,13 +2077,6 @@ def obs_vs_model_bdec(e_pinfo,hflag,outname1='test.png',outname2='test.png'):
 				           linestyle=' ',**pdict)
 			ax2[2].errorbar(pl_bdec_measured[plt_idx], pl_bdec_cloudy_bfit[plt_idx], xerr=errs_obs,
 				           linestyle=' ',**pdict)
-
-	#### PRINT OUTLIERS
-	# (galaxy, bdec obs, bdec mod, S/N + EQW (Ha), S/N + EQW (Hb)
-	resid = pl_bdec_measured - pl_bdec_cloudy_marg[:,0]
-	sort = np.argsort(np.abs(resid))
-	agn_string = return_agn_str(keep_idx,string=True)
-	for s in sort: print e_pinfo['objnames'][keep_idx][s], agn_string[s], "{:.1f}".format(pl_bdec_measured[s]), "{:.1f}".format(pl_bdec_cloudy_marg[s,0]), "{:.1f}".format(sn_ha[keep_idx][s]), "{:.1f}".format(e_pinfo['obs']['eqw_ha'][keep_idx,0][s]), "{:.1f}".format(sn_hb[keep_idx][s]), "{:.1f}".format(e_pinfo['obs']['eqw_hb'][keep_idx,0][s])
 
 	#### MAIN FIGURE ERRATA
 	ax1.text(0.04,0.87, r'S/N (H$\alpha$,H$\beta$) > {0}'.format(int(e_pinfo['obs']['sn_cut'])), transform = ax1.transAxes,horizontalalignment='left')
@@ -2319,6 +2424,7 @@ def residual_plots(e_pinfo,hflag,outfolder):
 
 	#### inclination
 	fig, ax = plt.subplots(2,3, figsize = (18.75,12))
+	fig.subplots_adjust(wspace=0.25,left=0.075,right=0.95,bottom=0.075,top=0.95)
 	ax = np.ravel(ax)
 
 	xplot = inclination
@@ -2356,7 +2462,7 @@ def residual_plots(e_pinfo,hflag,outfolder):
 	ax[5].set_ylabel(r'A$_{\mathrm{H}\beta}$ - A$_{\mathrm{H}\alpha}$ [model - measured]')
 	ax[5].set_ylim(-0.5,0.5)
 
-	plt.tight_layout()
+	#plt.tight_layout()
 	plt.savefig(fldr+'inclination.png', dpi=dpi)
 	plt.close()
 
@@ -2379,6 +2485,7 @@ def plot_emline_comp(alldata,outfolder,hflag):
 	##### load new moustakas line flux information (from email, january 2016)
 	newdat = threed_dutils.load_moustakas_newdat(objnames = list(objnames))
 
+	'''
 	##### plots, one by one
 	# observed line fluxes, with MAGPHYS / Prospector continuum
 	compare_model_flux(alldata,emline_names,outname = outfolder+'continuum_model_flux_comparison.png')
@@ -2391,9 +2498,13 @@ def plot_emline_comp(alldata,outfolder,hflag):
 	compare_moustakas_newfluxes(alldata,newdat,np.array(['[OIII] 5007','H$\\beta$','[NII] 6583','H$\\alpha$']),objnames,
 							    outname=outfolder+'moustakas_flux_newcomp.png',
 							    outdec=outfolder+'moustakas_bdec_comp.png')
-
+	'''
 	##### format emission line data for plotting
 	e_pinfo = fmt_emline_info(alldata)
+
+	# gas-phase versus stellar metallicity
+	atlas_3d_met(e_pinfo, hflag,outfolder=outfolder)
+	gas_phase_metallicity(e_pinfo, hflag, outfolder=outfolder)
 
 	# model versus observations, Balmer decrement
 	bdec_errs,bdec_flag = obs_vs_model_bdec(e_pinfo, hflag, outname1=outfolder+'bdec_comparison.png',outname2=outfolder+'prospector_bdec_comparison.png')
@@ -2710,6 +2821,7 @@ def plot_comparison(alldata,outfolder):
 	##### set up plots
 	fig = plt.figure(figsize=(18,12))
 	gs1 = mpl.gridspec.GridSpec(2, 3)
+	gs1.update(hspace=0.2,wspace=0.25,left=0.075,right=0.95,bottom=0.075,top=0.95)
 	mass = plt.Subplot(fig, gs1[0])
 	sfr = plt.Subplot(fig, gs1[1])
 	met = plt.Subplot(fig, gs1[2])
@@ -2724,7 +2836,8 @@ def plot_comparison(alldata,outfolder):
 	fig.add_subplot(ext_tot)
 	fig.add_subplot(ext_diff)
 
-
+	color = '0.6'
+	mew = 1.5
 	alpha = 0.6
 	fmt = 'o'
 
@@ -2763,7 +2876,8 @@ def plot_comparison(alldata,outfolder):
 	           magmass[:,2]-magmass[:,1]]
 	mass.errorbar(promass[:,1],magmass[:,1],
 		          fmt=fmt, alpha=alpha,
-			      xerr=proerrs, yerr=magerrs, color='0.4')
+			      xerr=proerrs, yerr=magerrs, color=color,
+			      mew=mew)
 
 	# labels
 	mass.set_xlabel(r'log(M$_*$) [Prospector]',labelpad=13)
@@ -2794,7 +2908,8 @@ def plot_comparison(alldata,outfolder):
 	           magsfr[:,2]-magsfr[:,1]]
 	sfr.errorbar(prosfr[:,1],magsfr[:,1],
 		          fmt=fmt, alpha=alpha,
-			      xerr=proerrs, yerr=magerrs, color='0.4')
+			      xerr=proerrs, yerr=magerrs, color=color,
+			      mew=mew)
 
 	# labels
 	sfr.set_xlabel(r'log(SFR) [Prospector]')
@@ -2823,7 +2938,8 @@ def plot_comparison(alldata,outfolder):
 	           promet[:,2]-promet[:,1]]
 	met.errorbar(promet[:,1],magmet,
 		          fmt=fmt, alpha=alpha,
-			      xerr=proerrs, color='0.4')
+			      xerr=proerrs, color=color,
+			      mew=mew)
 
 	# labels
 	met.set_xlabel(r'log(Z/Z$_{\odot}$) [Prospector]',labelpad=13)
@@ -2856,7 +2972,7 @@ def plot_comparison(alldata,outfolder):
 	bdec_prospector = np.array(bdec_prospector)
 
 	balm.errorbar(bdec_prospector,bdec_magphys,
-		          fmt=fmt, alpha=alpha, color='0.4')
+		          fmt=fmt, alpha=alpha, color=color,mew=mew)
 
 	# labels
 	balm.set_xlabel(r'Prospector H$_{\alpha}$/H$_{\beta}$',labelpad=13)
@@ -2893,7 +3009,7 @@ def plot_comparison(alldata,outfolder):
 	tautot_prospector = np.array(tautot_prospector)
 
 	ext_tot.errorbar(tautot_prospector,tautot_magphys,
-		          fmt=fmt, alpha=alpha, color='0.4')
+		          fmt=fmt, alpha=alpha, color=color,mew=mew)
 
 	# labels
 	ext_tot.set_xlabel(r'Prospector total $\tau_{5500}$',labelpad=13)
@@ -2908,7 +3024,8 @@ def plot_comparison(alldata,outfolder):
 		      transform = ext_tot.transAxes,horizontalalignment='right',)
 
 	ext_diff.errorbar(taudiff_prospector,taudiff_magphys,
-		          fmt=fmt, alpha=alpha, color='0.4')
+		          fmt=fmt, alpha=alpha, color='0.4',
+		          mew=mew)
 
 	# labels
 	ext_diff.set_xlabel(r'Prospector diffuse $\tau_{5500}$',labelpad=13)
@@ -2922,8 +3039,6 @@ def plot_comparison(alldata,outfolder):
 	ext_diff.text(0.96,0.1, 'mean offset='+"{:.2f}".format(off) + ' dex',
 		      transform = ext_diff.transAxes,horizontalalignment='right')
 
-
-	plt.tight_layout()
 	plt.savefig(outfolder+'basic_comparison.png',dpi=dpi)
 	plt.close()
 

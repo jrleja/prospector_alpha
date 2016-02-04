@@ -16,6 +16,7 @@ obs_color = '#545454'
 
 tiny_number = 1e-3
 big_number = 1e90
+dpi = 150
 
 def subtriangle(sample_results,  sps, model,
                 outname=None, showpars=None,
@@ -562,7 +563,7 @@ def show_chain(sample_results,outname=None,alpha=0.6,truths=None):
 
 
 	if outname is not None:
-		plt.savefig(outname, bbox_inches='tight',dpi=300)
+		plt.savefig(outname, bbox_inches='tight',dpi=dpi)
 		plt.close()
 
 def return_sedplot_vars(thetas, sample_results, sps, nufnu=True):
@@ -872,7 +873,7 @@ def sed_figure(sample_results, sps, model,
 	phot.set_xticklabels([])
     
 	if outname is not None:
-		fig.savefig(outname, bbox_inches='tight', dpi=300)
+		fig.savefig(outname, bbox_inches='tight', dpi=dpi)
 		plt.close()
 	#os.system('open '+outname)
 

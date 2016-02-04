@@ -9,7 +9,6 @@ from astropy import constants
 from matplotlib.ticker import MaxNLocator
 from scipy.integrate import simps
 
-
 c_kms = 2.99e5
 maxfev = 2000
 dpi=150
@@ -387,11 +386,10 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 	smooth       = [200,200]
 
 	#### output names
-	base = '/Users/joel/code/python/threedhst_bsfh/plots/brownseds/magphys/line_fits/'
+	base = '/Users/joel/code/python/threedhst_bsfh/plots/brownseds_tightbc/magphys/line_fits/'
 	out_em = [base+sample_results['run_params']['objname']+'_em_prosp.png',base+sample_results['run_params']['objname']+'_em_mag.png']
 	out_abs = [base+sample_results['run_params']['objname']+'_abs_prosp.png',base+sample_results['run_params']['objname']+'_abs_mag.png']
 	out_absobs = base+sample_results['run_params']['objname']+'_absobs.png'
-
 
     #### define emission lines to measure
     # we do this in sets of lines, which are unpacked at the end
@@ -423,8 +421,10 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 	sample_results['model'].params['add_neb_emission'] = np.array(2)
 	sample_results['model'].params['add_neb_continuum'] = np.array(True)
 	sample_results['model'].params['zred'] = z
+	prospflux_em,mags_em,sm = sample_results['model'].mean_model(sample_results['bfit']['maxprob_params'], sample_results['obs'], sps=sps)
 	factor = 3e18 / wav**2
 	prospflux *= factor
+	prospflux_em *= factor
 
 	# MAGPHYS spectra arrive in Lsun/AA
 	# and observed lambda

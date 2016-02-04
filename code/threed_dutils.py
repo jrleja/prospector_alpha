@@ -653,12 +653,104 @@ def asym_errors(center, up, down, log=False):
 
 	return errarray
 
+def return_n_outliers(x,y,objnames,noutliers,
+	                  outfolder='/Users/joel/code/python/threedhst_bsfh/plots/brownseds_tightbc/outliers',
+	                  cp_files=None):
+
+	'''
+	for observed parameter x versus predicted parameter y, will choose the top N_OUTLIERS (in an absolute sense)
+	puts all diagnostic plots for these outliers in a folder
+	and adds a text file with the x+y values and the object name
+	'''
+
+	residual = np.abs(x - y)
+	indices = np.argpartition(residual, -noutliers)[-noutliers:]
+	indices = indices[np.argsort(residual[indices])]
+
+	# create the destination folder
+	# and put diagnostic plots there
+	# also create a text file 
+	# x is observed, y is model
+	if cp_files is not None:
+		### create destinations if they don't exist
+		destination = outfolder+'/'+cp_files
+		if not os.path.isdir(outfolder):
+			os.makedirs(outfolder)
+		if not os.path.isdir(destination):
+			os.makedirs(destination)
+		### make sure they are empty
+		os.system('rm '+destination+'/*')
+
+		# move plots there
+		to_move = objnames[indices]
+		xout = x[indices]
+		yout = y[indices]
+		for obj in to_move:
+			# plots made by threedhst_diag
+			threedhst_diag_loc = "/".join(outfolder.split('/')[:-1])
+			os.system('cp '+threedhst_diag_loc+'/*'+obj.replace(' ','*')+'* '+destination)
+			# old magphys sed comparison
+			mag_sed_loc = threedhst_diag_loc + '/magphys/sed_residuals'
+			os.system('cp '+mag_sed_loc+'/*'+obj.replace(' ','*')+'* '+destination)
+			# emission line fits
+			mag_sed_loc = threedhst_diag_loc + '/magphys/line_fits'
+			os.system('cp '+mag_sed_loc+'/*'+obj.replace(' ','*')+'* '+destination)
+
+		with open(destination+'/list.txt', 'w') as f:
+			f.write('# name observed model \n')
+			for ii,obj in enumerate(to_move):
+				writeout=str(obj)+' '+"{:.2f}".format(xout[ii])+' '+"{:.2f}".format(yout[ii])
+				f.write(writeout)
+				f.write('\n')
+
+def gas_met(nii_ha,oiii_hb):
+	# return gas-phase metallicity based on NII / Halpha ratio
+	# 
+	# uses the following relationships from Maiolino et al. 2008:
+	# 		x = log (Z/Zsol) = 12 + log(O/H) - 8.69, Allende Priete et al. 2001
+	# 		c0: -0.7732 c1: 1.2357  c2: -0.2811 c3: -0.7201 c4:-0.3330  [NII/Halpha]
+	#		c0: 0.1549  c1: -1.5031 c2: -0.9790 c3: -0.0297 [OIII 5007 / Hbeta] 
+	# 		log R = c0 + c1 x + c2 x**2 + c3 x**3 + c4 x**4
+
+
+	#### find solutions
+	c1 = [-0.7732 - np.log10(nii_ha), 1.2357, -0.2811, -0.7201, -0.3330]
+	c2 = [0.1549 - np.log10(oiii_hb), -1.5031, -0.9790, -0.0297]
+	'''
+	solutions = np.polynomial.polynomial.polyroots(coeffs)
+
+	### only keep reasonable solutions
+	keep = (np.real(solutions) > -2.0) & (np.real(solutions) < 0.4)
+	answer = np.unique(np.real(solutions[keep]))
+	if np.unique(np.real(solutions[keep])).shape[0] != 1:
+		print 1/0 # we have an unreasonable solution, or multiple solutions
+	'''
+	#### dummy metallicity array, NII / Ha
+	# used to determine where to look with OIII + Hb
+	# since that is double-valued
+	z_solution = np.linspace(-3.0,0.5,500)
+	zeros_guess = c1[0] + c1[1]*z_solution + c1[2]*z_solution**2 + c1[3]*z_solution**3 + c1[4]*z_solution**4
+	closest_niiha = z_solution[np.abs(zeros_guess).argmin()]
+
+	#### dummy metallicity array, OIII / Hb
+	inflection_point = 7.9-8.69 # estimated from Fig 5 of Maiolino+08
+	if closest_niiha < inflection_point:
+		z_solution = np.linspace(-4.0,inflection_point,500)
+	else:
+		z_solution = np.linspace(inflection_point,0.7,500)
+
+	zeros_guess = c2[0] + c2[1]*z_solution + c2[2]*z_solution**2 + c2[3]*z_solution**3
+	closest = z_solution[np.abs(zeros_guess).argmin()]
+
+	return closest
+	#return (closest+closest_niiha)/2.
+
 def equalize_axes(ax, x,y, dynrange=0.1, line_of_equality=True, log=False, axlims=None):
 	
 	''' 
 	sets up an equal x and y range that encompasses all of the data
 	if line_of_equality, add a diagonal line of equality 
-	dynrange represents the % of the data range above and below which
+	dynrange represents the percent of the data range above and below which
 	the plot limits are set
 	'''
 
