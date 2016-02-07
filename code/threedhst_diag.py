@@ -575,8 +575,8 @@ def return_sedplot_vars(thetas, sample_results, sps, nufnu=True):
 	# observational information
 	# hack to reload obs for brownseds_logzsol run
 	if 'truename' in sample_results['run_params']:
-		from brownseds_logzsol_params import load_obs_mock
-		sample_results['obs'] = load_obs_mock(os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_logzsol.cat', 
+		from ha_80myr_params import load_obs_mock
+		sample_results['obs'] = load_obs_mock(os.getenv('APPS')+'/threedhst_bsfh/data/ha_80myr.cat', 
 			                                  sample_results['run_params']['objname'])
 
 	mask = sample_results['obs']['phot_mask']

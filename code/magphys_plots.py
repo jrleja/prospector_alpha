@@ -772,7 +772,7 @@ def plt_all(runname=None,startup=True,**extras):
 		filebase, parm_basename, ancilname=threed_dutils.generate_basenames(runname)
 		alldata = []
 
-		for jj in xrange(11,len(filebase)):
+		for jj in xrange(len(filebase)):
 			print 'iteration '+str(jj) 
 
 			#if filebase[jj].split('_')[-1] != 'NGC 7331':
@@ -782,7 +782,6 @@ def plt_all(runname=None,startup=True,**extras):
 			                           outfolder=outfolder,
 			                           **extras)
 			alldata.append(dictionary)
-			print 1/0
 		brown_io.save_alldata(alldata,runname=runname)
 	else:
 		alldata = brown_io.load_alldata(runname=runname)

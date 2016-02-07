@@ -102,7 +102,7 @@ def remove_doublets(x, names):
 
 	return x
 
-def ret_inf(alldata,field, model='Prospectr',name=None):
+def ret_inf(alldata,field, model='Prospector',name=None):
 
 	'''
 	returns information from alldata
@@ -165,7 +165,7 @@ def ret_cont(alldata,model='Prospector',name='Halpha'):
 
 	return continuum
 
-def compare_moustakas_newfluxes(alldata,dat,eline_to_plot,objnames,outname='test.png',outdec='bdec.png',model='Prospectr'):
+def compare_moustakas_newfluxes(alldata,dat,eline_to_plot,objnames,outname='test.png',outdec='bdec.png',model='Prospector'):
 
 	##########
 	#### extract info for objects with measurements in both catalogs
@@ -271,7 +271,7 @@ def compare_moustakas_newfluxes(alldata,dat,eline_to_plot,objnames,outname='test
 	plt.savefig(outname,dpi=dpi)
 	plt.close()
 
-def compare_moustakas_fluxes(alldata,dat,emline_names,objnames,outname='test.png',outdec='bdec.png',model='Prospectr'):
+def compare_moustakas_fluxes(alldata,dat,emline_names,objnames,outname='test.png',outdec='bdec.png',model='Prospector'):
 
 	##########
 	#### extract info for objects with measurements in both catalogs
@@ -413,10 +413,10 @@ def compare_model_flux(alldata, emline_names, outname = 'test.png'):
 	axes = np.ravel(axes)
 	for ii,emname in enumerate(emline_names):
 		magdat = np.log10(ret_inf(alldata,'lum',model='MAGPHYS',name=emname)) 
-		prodat = np.log10(ret_inf(alldata,'lum',model='Prospectr',name=emname)) 
+		prodat = np.log10(ret_inf(alldata,'lum',model='Prospector',name=emname)) 
 		yplot = prodat-magdat
 
-		xplot = np.log10(ret_inf(alldata,'eqw_rest',model='Prospectr',name=emname))
+		xplot = np.log10(ret_inf(alldata,'eqw_rest',model='Prospector',name=emname))
 		idx = np.isfinite(yplot)
 
 		axes[ii].errorbar(xplot[idx,0], yplot[idx],linestyle=' ',**nhargs)
@@ -465,33 +465,33 @@ def fmt_emline_info(alldata,add_abs_err = True):
 	obslines['hd_obs_cont'] = continuum[:,absline_names == 'hdelta_wide'][:,0]
 
 	##### emission line EQWs and fluxes
-	obslines['f_ha'] = np.transpose([ret_inf(alldata,'lum',model='Prospectr',name='H$\\alpha$'),
-		                             ret_inf(alldata,'lum_errup',model='Prospectr',name='H$\\alpha$'),
-		                             ret_inf(alldata,'lum_errdown',model='Prospectr',name='H$\\alpha$')]) / constants.L_sun.cgs.value
+	obslines['f_ha'] = np.transpose([ret_inf(alldata,'lum',model='Prospector',name='H$\\alpha$'),
+		                             ret_inf(alldata,'lum_errup',model='Prospector',name='H$\\alpha$'),
+		                             ret_inf(alldata,'lum_errdown',model='Prospector',name='H$\\alpha$')]) / constants.L_sun.cgs.value
 	obslines['err_ha'] = (obslines['f_ha'][:,1] - obslines['f_ha'][:,2])/2.
 
-	obslines['f_hb'] = np.transpose([ret_inf(alldata,'lum',model='Prospectr',name='H$\\beta$'),
-		                             ret_inf(alldata,'lum_errup',model='Prospectr',name='H$\\beta$'),
-		                             ret_inf(alldata,'lum_errdown',model='Prospectr',name='H$\\beta$')]) / constants.L_sun.cgs.value
+	obslines['f_hb'] = np.transpose([ret_inf(alldata,'lum',model='Prospector',name='H$\\beta$'),
+		                             ret_inf(alldata,'lum_errup',model='Prospector',name='H$\\beta$'),
+		                             ret_inf(alldata,'lum_errdown',model='Prospector',name='H$\\beta$')]) / constants.L_sun.cgs.value
 	obslines['err_hb'] = (obslines['f_hb'][:,1] - obslines['f_hb'][:,2])/2.
 
-	obslines['f_hd'] = np.transpose([ret_inf(alldata,'lum',model='Prospectr',name='H$\\delta$'),
-		                             ret_inf(alldata,'lum_errup',model='Prospectr',name='H$\\delta$'),
-		                             ret_inf(alldata,'lum_errdown',model='Prospectr',name='H$\\delta$')]) / constants.L_sun.cgs.value
+	obslines['f_hd'] = np.transpose([ret_inf(alldata,'lum',model='Prospector',name='H$\\delta$'),
+		                             ret_inf(alldata,'lum_errup',model='Prospector',name='H$\\delta$'),
+		                             ret_inf(alldata,'lum_errdown',model='Prospector',name='H$\\delta$')]) / constants.L_sun.cgs.value
 	obslines['err_hd'] = (obslines['f_hd'][:,1] - obslines['f_hd'][:,2])/2.
 
-	obslines['f_nii'] = np.transpose([ret_inf(alldata,'lum',model='Prospectr',name='[NII] 6583'),
-		                              ret_inf(alldata,'lum_errup',model='Prospectr',name='[NII] 6583'),
-		                              ret_inf(alldata,'lum_errdown',model='Prospectr',name='[NII] 6583')]) / constants.L_sun.cgs.value
+	obslines['f_nii'] = np.transpose([ret_inf(alldata,'lum',model='Prospector',name='[NII] 6583'),
+		                              ret_inf(alldata,'lum_errup',model='Prospector',name='[NII] 6583'),
+		                              ret_inf(alldata,'lum_errdown',model='Prospector',name='[NII] 6583')]) / constants.L_sun.cgs.value
 
 	obslines['err_nii'] = (obslines['f_nii'][:,1] - obslines['f_nii'][:,2])/2.
 	obslines['eqw_nii'] = obslines['f_nii'] / obslines['ha_obs_cont'][:,None]
 	obslines['eqw_err_nii'] = obslines['err_nii'] / obslines['ha_obs_cont'][:,None]
 
 	# sum [OIII] lines
-	obslines['f_oiii'] = np.transpose([ret_inf(alldata,'lum',model='Prospectr',name='[OIII] 5007'),
-		                             ret_inf(alldata,'lum_errup',model='Prospectr',name='[OIII] 5007'),
-		                             ret_inf(alldata,'lum_errdown',model='Prospectr',name='[OIII] 5007')])  / constants.L_sun.cgs.value
+	obslines['f_oiii'] = np.transpose([ret_inf(alldata,'lum',model='Prospector',name='[OIII] 5007'),
+		                             ret_inf(alldata,'lum_errup',model='Prospector',name='[OIII] 5007'),
+		                             ret_inf(alldata,'lum_errdown',model='Prospector',name='[OIII] 5007')])  / constants.L_sun.cgs.value
 	obslines['err_oiii'] = (obslines['f_oiii'][:,1] - obslines['f_oiii'][:,2])/2.
 	obslines['eqw_oiii'] = obslines['f_oiii'] / obslines['hb_obs_cont'][:,None]
 	obslines['eqw_err_oiii'] = obslines['err_oiii'] / obslines['hb_obs_cont'][:,None]
@@ -555,15 +555,15 @@ def fmt_emline_info(alldata,add_abs_err = True):
 			continue
 
 		#### best-fit
-		hb_ind = dat['residuals']['emlines']['Prospectr']['balmer_names'] == 'hbeta'
-		hb_lum_pro[kk] = dat['residuals']['emlines']['Prospectr']['balmer_lum'][hb_ind]
-		hb_eqw_pro[kk] = dat['residuals']['emlines']['Prospectr']['balmer_eqw_rest'][hb_ind]
+		hb_ind = dat['residuals']['emlines']['Prospector']['balmer_names'] == 'hbeta'
+		hb_lum_pro[kk] = dat['residuals']['emlines']['Prospector']['balmer_lum'][hb_ind]
+		hb_eqw_pro[kk] = dat['residuals']['emlines']['Prospector']['balmer_eqw_rest'][hb_ind]
 		hb_lum_mag[kk] = dat['residuals']['emlines']['MAGPHYS']['balmer_lum'][hb_ind]
 		hb_eqw_mag[kk] = dat['residuals']['emlines']['MAGPHYS']['balmer_eqw_rest'][hb_ind]
 
-		ha_ind = dat['residuals']['emlines']['Prospectr']['balmer_names'] == halph_ind
-		ha_lum_pro[kk] = dat['residuals']['emlines']['Prospectr']['balmer_lum'][ha_ind]
-		ha_eqw_pro[kk] = dat['residuals']['emlines']['Prospectr']['balmer_eqw_rest'][ha_ind]
+		ha_ind = dat['residuals']['emlines']['Prospector']['balmer_names'] == halph_ind
+		ha_lum_pro[kk] = dat['residuals']['emlines']['Prospector']['balmer_lum'][ha_ind]
+		ha_eqw_pro[kk] = dat['residuals']['emlines']['Prospector']['balmer_eqw_rest'][ha_ind]
 		ha_lum_mag[kk] = dat['residuals']['emlines']['MAGPHYS']['balmer_lum'][ha_ind]
 		ha_eqw_mag[kk] = dat['residuals']['emlines']['MAGPHYS']['balmer_eqw_rest'][ha_ind]
 
@@ -617,7 +617,7 @@ def fmt_emline_info(alldata,add_abs_err = True):
 	obslines['eqw_err_hb'] = obslines['err_hb'] / obslines['hb_obs_cont'][:,None]
 
 	####### hdelta absorption properties, for all
-	# Prospectr is marginalized PLUS best-fit, data is bootstrapped; MAGPHYS is best-fit
+	# Prospector is marginalized PLUS best-fit, data is bootstrapped; MAGPHYS is best-fit
 	# which index should we use; wide or narrow?
 	hd_lum_prosp_marg,hd_eqw_prosp_marg, \
 	hd_lum_obs, hd_eqw_obs = [np.zeros(shape=(ngals,3)) for i in xrange(4)]
@@ -646,9 +646,9 @@ def fmt_emline_info(alldata,add_abs_err = True):
 			continue
 
 		#### best-fit, MAGPHYS + Prospector
-		hd_ind = dat['residuals']['emlines']['Prospectr']['balmer_names'] == hdelta_ind
-		hd_lum_prosp[kk] = dat['residuals']['emlines']['Prospectr']['balmer_lum'][hd_ind]
-		hd_eqw_prosp[kk] = dat['residuals']['emlines']['Prospectr']['balmer_eqw_rest'][hd_ind]
+		hd_ind = dat['residuals']['emlines']['Prospector']['balmer_names'] == hdelta_ind
+		hd_lum_prosp[kk] = dat['residuals']['emlines']['Prospector']['balmer_lum'][hd_ind]
+		hd_eqw_prosp[kk] = dat['residuals']['emlines']['Prospector']['balmer_eqw_rest'][hd_ind]
 		hd_lum_mag[kk] = dat['residuals']['emlines']['MAGPHYS']['balmer_lum'][hd_ind]
 		hd_eqw_mag[kk] = dat['residuals']['emlines']['MAGPHYS']['balmer_eqw_rest'][hd_ind]
 
@@ -1033,16 +1033,21 @@ def gas_phase_metallicity(e_pinfo, hflag, outfolder='',ssfr_cut=False):
 	# rough and dirty new figure
 	# Halpha_predicted,prosp / Halpha_observed vs (Z_prospector/Z_elines)
 	# for star-forming only
-	ha_mod = e_pinfo['prosp']['cloudy_ha'][keep_idx,0]
-	ha_obs = e_pinfo['obs']['f_ha'][keep_idx,0]
+	ha_mod = e_pinfo['prosp']['cloudy_ha_eqw'][keep_idx,0]
+	ha_obs = e_pinfo['obs']['eqw_ha'][keep_idx,0]
 
 	fig, ax = plt.subplots(1,1,figsize=(7,7))
 	fig.subplots_adjust(left=0.15,bottom=0.1,top=0.95,right=0.95)
 	ax.plot(np.log10(ha_mod[sfing]/ha_obs[sfing]),logzsol[sfing]-logzgas[sfing],'o',**bptdict[0])
+	#ax.plot(np.log10(ha_mod/ha_obs),logzsol-logzgas,'o',**bptdict[0])
 	ax.set_xlabel(r'log(H$_{\alpha,\mathrm{model}}$/H$_{\alpha,\mathrm{obs}}$)')
 	ax.set_ylabel(r'log(Z$_{\mathrm{stars,model}}$/Z$_{\mathrm{gas,obs}}$)')
-
+	ax.set_xlim(-0.5,0.5)
+	ax.axhline(0, linestyle=':', color='grey')
+	ax.axvline(0, linestyle=':', color='grey')
 	plt.show()
+	plt.savefig('met_residuals_vs_halpha_residuals.png',dpi=150)
+	plt.close()	
 	print 1/0
 
 
@@ -1439,11 +1444,11 @@ def minimize_bdec_corr_eqn(x, hdel_eqw_obs, hdel_eqw_model, halpha_obs, hbeta_ob
 
 	return scat
 
-def bdec_correction(e_pinfo,hflag,outname='test.png',model='Prospectr',
+def bdec_correction(e_pinfo,hflag,outname='test.png',model='Prospector',
 	                additive=False):
 
 	#################
-	#### plot observed Halpha versus expected (PROSPECTR ONLY)
+	#### plot observed Halpha versus expected (Prospector ONLY)
 	#################
 	# SAME as obs_vs_prosp_balmlines
 	# PLUS hdelta_dn_comp
@@ -1547,7 +1552,7 @@ def bdec_correction(e_pinfo,hflag,outname='test.png',model='Prospectr',
 	plt.savefig(outname,dpi=dpi)
 	plt.close()
 
-def obs_vs_prosp_balmlines(e_pinfo,hflag,outname='test.png',outname_resid='test.png',model='Prospectr',
+def obs_vs_prosp_balmlines(e_pinfo,hflag,outname='test.png',outname_resid='test.png',model='Prospector',
 	                       standardized_ha_axlim = False):
 
 	#################
@@ -2635,7 +2640,7 @@ def plot_relationships(alldata,outfolder):
 	msfr.errorbar(promass[:,1],prosfr[:,1],
 		          fmt='o', alpha=alpha,
 		          color=prosp_color,
-		          label='Prospectr',
+		          label='Prospector',
 			      xerr=proerrs_mass, yerr=proerrs_sfr,
 			      ms=ms)
 	msfr.errorbar(magmass[:,1],magsfr[:,1],

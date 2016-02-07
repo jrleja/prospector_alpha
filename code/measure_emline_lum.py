@@ -28,8 +28,8 @@ class tLinear1D(core.Fittable1DModel):
 		"""One dimensional Line model function"""
 
 		out = np.zeros_like(x)
-		low = np.array(x) < 4300
-		mid = (np.array(x) > 4300) & (np.array(x) < 5600)
+		low = np.array(x) < 4000
+		mid = (np.array(x) > 4000) & (np.array(x) < 5600)
 		high = np.array(x) > 5600
 		out[low] = slope_low*x[low]+intercept_low
 		out[mid] = slope_mid*x[mid]+intercept_mid
@@ -41,8 +41,8 @@ class tLinear1D(core.Fittable1DModel):
 	def fit_deriv(x, slope_low, intercept_low, slope_mid, intercept_mid, slope_high, intercept_high):
 		"""One dimensional Line model derivative with respect to parameters"""
 
-		low = np.array(x) < 4300
-		mid = (np.array(x) > 4300) & (np.array(x) < 5600)
+		low = np.array(x) < 4000
+		mid = (np.array(x) > 4000) & (np.array(x) < 5600)
 		high = np.array(x) > 5600
 		
 		d_lslope = np.zeros_like(x)
@@ -246,6 +246,10 @@ def absobs_model(lams):
 
 	return model
 
+def tiedfunc_oii(g1):
+	amp = 0.35 * g1.amplitude_6
+	return amp
+
 def tiedfunc_oiii(g1):
 	amp = 2.98 * g1.amplitude_0
 	return amp
@@ -256,6 +260,14 @@ def tiedfunc_nii(g1):
 
 def tiedfunc_sig(g1):
 	return g1.stddev_0
+
+def loii_2(g1):
+	zadj = g1.mean_0 / 4958.92 - 1
+	return (1+zadj) *  3728.8
+
+def loii_1(g1):
+	zadj = g1.mean_0 / 4958.92 - 1
+	return (1+zadj) *  3726.1
 
 def loiii_2(g1):
 	zadj = g1.mean_0 / 4958.92 - 1
@@ -276,6 +288,9 @@ def lnii_2(g1):
 def lhalpha(g1):
 	zadj = g1.mean_0 / 4958.92 - 1
 	return (1+zadj) *  6562.80
+
+def soii(g1):
+	return g1.stddev_6
 
 def soiii(g1):
 	return g1.stddev_0
@@ -303,7 +318,7 @@ def umbrella_model(lams, amp_tied, lam_tied, sig_tied,continuum_6400):
 
 	#### EQW initial
 	# OIII 1, OIII 2, Hbeta, NII 1, NII 2, Halpha
-	eqw_init = np.array([3.,9.,4.,1.,3.,12.])*4	
+	eqw_init = np.array([3.,9.,4.,1.,3.,12.,3.,3.])*4	
 	stddev_init = 3.5
 
 	#### ADD ALL MODELS FIRST
@@ -315,7 +330,7 @@ def umbrella_model(lams, amp_tied, lam_tied, sig_tied,continuum_6400):
 			model += functional_models.Gaussian1D(amplitude=amp_init, mean=lams[ii], stddev=stddev_init)
 
 	# add slope + constant
-	model += bLinear1D(intercept_low=continuum_6400,intercept_high=continuum_6400)
+	model += tLinear1D(intercept_low=continuum_6400,intercept_mid=continuum_6400,intercept_high=continuum_6400)
 
 	#### NOW TIE THEM TOGETHER
 	for ii in xrange(len(lams)):
@@ -383,22 +398,23 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 		return None
 
 	#### smoothing (prospector, magphys) in km/s
-	smooth       = [200,200]
+	smooth       = 200
 
 	#### output names
+	objname_short = sample_results['run_params']['objname'].replace(' ','_')
 	base = '/Users/joel/code/python/threedhst_bsfh/plots/brownseds_tightbc/magphys/line_fits/'
-	out_em = [base+sample_results['run_params']['objname']+'_em_prosp.png',base+sample_results['run_params']['objname']+'_em_mag.png']
-	out_abs = [base+sample_results['run_params']['objname']+'_abs_prosp.png',base+sample_results['run_params']['objname']+'_abs_mag.png']
-	out_absobs = base+sample_results['run_params']['objname']+'_absobs.png'
+	out_em = base+objname_short+'_em_prosp.png'
+	out_abs = base+objname_short+'_abs_prosp.png'
+	out_absobs = base+objname_short+'_absobs.png'
 
     #### define emission lines to measure
     # we do this in sets of lines, which are unpacked at the end
-	emline = np.array(['[OIII] 4959','[OIII] 5007',r'H$\beta$','[NII] 6549', '[NII] 6583', r'H$\alpha$'])
-	em_wave = np.array([4958.92,5006.84,4861.33,6548.03,6583.41,6562.80,])
-	em_bbox = [(4700,5100),(6350,6680)]
-	amp_tied = [None, tiedfunc_oiii, None, None, tiedfunc_nii, None]
-	lam_tied = [None, loiii_2, lhbeta, lnii_1, lnii_2, lhalpha]
-	sig_tied = [None, soiii, None, None, snii, None]
+	emline = np.array(['[OIII] 4959','[OIII] 5007',r'H$\beta$','[NII] 6549', '[NII] 6583', r'H$\alpha$','[OII] 3726','[OII] 3728'])
+	em_wave = np.array([4958.92,5006.84,4861.33,6548.03,6583.41,6562.80,3726.1,3728.8])
+	em_bbox = [(4700,5100),(6350,6680),(3600,3800)]
+	amp_tied = [None, tiedfunc_oiii, None, None, tiedfunc_nii, None, None, tiedfunc_oii]
+	lam_tied = [None, loiii_2, lhbeta, lnii_1, lnii_2, lhalpha,loii_1, loii_2]
+	sig_tied = [None, soiii, None, None, snii, None, None, soii]
 	nline = len(emline)
 
 	#### now define sets of absorption lines to measure
@@ -414,6 +430,7 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 	# save redshift, restore at end
 	z = sample_results['model'].params.get('zred', np.array(0.0))
 	sample_results['model'].params['zred'] = np.array(0.0)
+	prospflux_em,mags_em,sm = sample_results['model'].mean_model(sample_results['bfit']['maxprob_params'], sample_results['obs'], sps=sps)
 	sample_results['model'].params['add_neb_emission'] = np.array(False)
 	sample_results['model'].params['add_neb_continuum'] = np.array(False)
 	prospflux,mags,sm = sample_results['model'].mean_model(sample_results['bfit']['maxprob_params'], sample_results['obs'], sps=sps)
@@ -421,15 +438,9 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 	sample_results['model'].params['add_neb_emission'] = np.array(2)
 	sample_results['model'].params['add_neb_continuum'] = np.array(True)
 	sample_results['model'].params['zred'] = z
-	prospflux_em,mags_em,sm = sample_results['model'].mean_model(sample_results['bfit']['maxprob_params'], sample_results['obs'], sps=sps)
 	factor = 3e18 / wav**2
 	prospflux *= factor
 	prospflux_em *= factor
-
-	# MAGPHYS spectra arrive in Lsun/AA
-	# and observed lambda
-	maglam = magphys['model']['lam']/(1+sample_results['model'].params.get('zred',0.0))
-	magflux = magphys['model']['speclum']
 
 	# observed spectra arrive in Lsun/cm^2/AA
 	# convert distance factor
@@ -440,10 +451,9 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 	obslam = obs_spec['rest_lam']
 
 	#### set up model iterables
-	model_fluxes = [prospflux,magflux]
-	model_lams   = [wav,maglam]
-	model_names  = ['Prospectr', 'MAGPHYS']
-	nmodel       = len(model_names)
+	model_flux   = prospflux
+	model_lam    = wav
+	model_name   = 'Prospector'
 
 	##### define fitter
 	fitter = fitting.LevMarLSQFitter()
@@ -456,43 +466,35 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 	# EQWs and fluxes are saved b/c we can 
 	# calculate continuum fluxes with these
 	absmods = []
-	mod_abs_flux = np.zeros(shape=(nmodel,nabs))
-	mod_abs_eqw = np.zeros(shape=(nmodel,nabs))
-	mod_abs_lamcont = np.zeros(shape=(nmodel,nabs))
+	mod_abs_flux = np.zeros(shape=(nabs,2))
+	mod_abs_eqw = np.zeros(shape=(nabs,2))
+	mod_abs_lamcont = np.zeros(shape=(nabs,2))
 
-	for jj in xrange(nmodel):
-		# smooth and measure absorption lines
-		flux_smooth = threed_dutils.smooth_spectrum(model_lams[jj],model_fluxes[jj],smooth[jj],minlam=3e3,maxlam=3e8)
-		out = threed_dutils.measure_abslines(model_lams[jj],flux_smooth,plot=True)
-		for kk in xrange(nabs): mod_abs_flux[jj,kk] = out[abslines[kk]]['flux']
-		for kk in xrange(nabs): mod_abs_eqw[jj,kk] = out[abslines[kk]]['eqw']
-		for kk in xrange(nabs): mod_abs_lamcont[jj,kk] = out[abslines[kk]]['lam']
+	#### smooth and measure absorption lines
+	flux_smooth = threed_dutils.smooth_spectrum(model_lam,model_flux,smooth,minlam=3e3,maxlam=3e8)
+	out = threed_dutils.measure_abslines(model_lam,flux_smooth,plot=True)
+	for kk in xrange(nabs): mod_abs_flux[kk,0] = out[abslines[kk]]['flux']
+	for kk in xrange(nabs): mod_abs_eqw[kk,0] = out[abslines[kk]]['eqw']
+	for kk in xrange(nabs): mod_abs_lamcont[kk,0] = out[abslines[kk]]['lam']
 
-		plt.tight_layout()
-		plt.savefig(out_abs[jj], dpi=dpi)
-		plt.close()
+	flux_smooth = threed_dutils.smooth_spectrum(model_lam,prospflux_em,smooth,minlam=3e3,maxlam=3e8)
+	out = threed_dutils.measure_abslines(model_lam,flux_smooth,plot=[out['fig'],out['ax']],alt_plot=True)
+	for kk in xrange(nabs): mod_abs_flux[kk,1] = out.get(abslines[kk],{}).get('flux',0.0)
+	for kk in xrange(nabs): mod_abs_eqw[kk,1] = out.get(abslines[kk],{}).get('eqw',0.0)
+	for kk in xrange(nabs): mod_abs_lamcont[kk,1] = out.get(abslines[kk],{}).get('lam',0.0)
 
 	#######################
 	##### Dn(4000) ########
 	#######################
-	dn4000_obs = threed_dutils.measure_Dn4000(obslam,obsflux)
-	dn4000_mod = []
-	for flux,lam in zip(model_fluxes,model_lams):
-		dn4000_mod.append(threed_dutils.measure_Dn4000(lam,flux))
-	dn4000_mod = np.array(dn4000_mod)
+	dn4000_mod = threed_dutils.measure_Dn4000(model_lam,flux_smooth,ax=out['ax'][5])
 
+	out['fig'].tight_layout()
+	out['fig'].savefig(out_abs, dpi=dpi)
+	plt.close()
 
 	#######################
 	##### NOISE ###########
 	#######################
-	# set up emission line outputs
-	# flux and resteqw are lists because we'll define these locally for each set
-	emline_noise = np.zeros(nmodel)
-	emline_flux = []
-	residuals   = []
-	eqw_percs = []
-	smoothed_absflux = []
-
 	#### define emission line model and fitting region
 	# use continuum_6400 to set up a good guess for starting positions
 	continuum_6400 = obsflux[(np.abs(obslam-6400)).argmin()]
@@ -510,9 +512,13 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 	# this assumes no scaling w/ wavelength, and that gas ~ stellar velocity dispersion
 	tmpflux = np.zeros(nline)
 	for j in xrange(nline):tmpflux[j] = getattr(gauss_fit, 'amplitude_'+str(j)).value*np.sqrt(2*np.pi*getattr(gauss_fit, 'stddev_'+str(j)).value**2)
-	mlow = em_wave < 5600
-	emnorm =  np.concatenate((gauss_fit.intercept_low_6+gauss_fit.slope_low_6*em_wave[mlow],
-							  gauss_fit.intercept_high_6+gauss_fit.slope_high_6*em_wave[~mlow]))
+	mlow = em_wave < 4000
+	mmid = (em_wave >= 4000) & (em_wave < 5600)
+	mhigh = em_wave >= 5600
+
+	emnorm =  np.concatenate((gauss_fit.intercept_low_8+gauss_fit.slope_low_8*em_wave[mlow],
+							  gauss_fit.intercept_mid_8+gauss_fit.slope_mid_8*em_wave[mmid],
+							  gauss_fit.intercept_high_8+gauss_fit.slope_high_8*em_wave[mhigh]))
 	tmpeqw = tmpflux / emnorm
 
 	# take two highest EQW lines
@@ -531,89 +537,90 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 	#### now interact with model
 	# normalize continuum model to observations
 	# subtract and fit Gaussian to residuals ---> constant noise
-	for jj in xrange(nmodel):
+	# calculate and apply normalization factor
+	# add a little padding for interpolation later
+	model_norm = model_flux
+	for kk in xrange(len(em_bbox)):
+		m_idx = (model_lam > em_bbox[kk][0]-30) & (model_lam < em_bbox[kk][1]+30)
 
-		model_norm = model_fluxes[jj]
-
-		# calculate and apply normalization factor
-		# add a little padding for interpolation later
-		for kk in xrange(len(em_bbox)):
-			m_idx = (model_lams[jj] > em_bbox[kk][0]-30) & (model_lams[jj] < em_bbox[kk][1]+30)
-
-			#### here we have a bizarre, handmade mapping between
-			#### mod_abs_lamcont and the ordered em_bbox vector.
+		#### here we have a bizarre, handmade mapping between
+		#### mod_abs_lamcont and the ordered em_bbox vector.
+		if kk == 2:
+			blue = (model_lam > 3652.) & (model_lam < 3802.)
+			norm_factor = np.mean(obsflux[blue])/np.mean(prospflux_em[blue])
+			model_norm[m_idx] = model_flux[m_idx]*norm_factor
+		else:
 			mod_abs_idx = mod_abs_mapping[kk]
-			close_fit = np.abs(model_lams[jj]-mod_abs_lamcont[jj,mod_abs_idx]).argmin()
-			norm_factor = gauss_fit[6](model_lams[jj][close_fit])/(mod_abs_flux[jj,mod_abs_idx]/mod_abs_eqw[jj,mod_abs_idx])
-			model_norm[m_idx] = model_fluxes[jj][m_idx]*norm_factor
+			close_fit = np.abs(model_lam-mod_abs_lamcont[mod_abs_idx,0]).argmin()
+			norm_factor = gauss_fit[8](model_lam[close_fit])/(mod_abs_flux[mod_abs_idx,0]/mod_abs_eqw[mod_abs_idx,0])
+			model_norm[m_idx] = model_flux[m_idx]*norm_factor
 
-		#### adjust model wavelengths for the slight difference with published redshifts
-		zadj = gauss_fit.mean_0 / 4958.92 - 1
-		model_newlam = (1+zadj)*model_lams[jj]
+	#### adjust model wavelengths for the slight difference with published redshifts
+	zadj = gauss_fit.mean_0 / 4958.92 - 1
+	model_newlam = (1+zadj)*model_lam
 
-		#### absorption model versus emission model
-		test_plot = False
-		if test_plot:
-			p_idx_mod = ((model_newlam > em_bbox[0][0]) & (model_newlam < em_bbox[0][1])) | ((model_newlam > em_bbox[1][0]) & (model_newlam < em_bbox[1][1]))
-			fig, ax = plt.subplots(1,1)
-			plt.plot(model_newlam[p_idx_mod], model_norm[p_idx_mod], color='black')
-			plt.plot(obslam[p_idx], gauss_fit(obslam[p_idx]), color='red')
-			plt.show()
+	#### absorption model versus emission model
+	test_plot = False
+	if test_plot:
+		p_idx_mod = ((model_newlam > em_bbox[0][0]) & (model_newlam < em_bbox[0][1])) | \
+		            ((model_newlam > em_bbox[1][0]) & (model_newlam < em_bbox[1][1])) | \
+		            ((model_newlam > em_bbox[2][0]) & (model_newlam < em_bbox[2][1]))
+		fig, ax = plt.subplots(1,1)
+		plt.plot(model_newlam[p_idx_mod], model_flux[p_idx_mod], color='black')
+		plt.plot(obslam[p_idx], gauss_fit(obslam[p_idx]), color='red')
+		plt.show()
+		print 1/0
 
-		#### interpolate model onto observations
-		flux_interp = interp1d(model_newlam, model_norm, bounds_error = False, fill_value = 0)
-		modflux = flux_interp(obslam[p_idx])
+	#### interpolate model onto observations
+	flux_interp = interp1d(model_newlam, model_norm, bounds_error = False, fill_value = 0)
+	modflux = flux_interp(obslam[p_idx])
 
-		#### smooth model to match observations
-		modflux = threed_dutils.smooth_spectrum(obslam[p_idx], modflux, sigma_spec)
+	#### smooth model to match observations
+	smoothed_absflux = threed_dutils.smooth_spectrum(obslam[p_idx], modflux, sigma_spec)
 
-		#### subtract model from observations
-		resid = obsflux[p_idx] - modflux
+	#### subtract model from observations
+	residuals = obsflux[p_idx] - modflux
 
-		smoothed_absflux.append(modflux)
-		residuals.append(resid)
+	#### mask emission lines
+	masklam = 30
+	mask = np.ones_like(obslam[p_idx],dtype=bool)
+	for lam in em_wave: mask[(obslam[p_idx] > lam-masklam) & (obslam[p_idx] < lam+masklam)] = 0
 
-		#### mask emission lines
-		masklam = 30
-		mask = np.ones_like(obslam[p_idx],dtype=bool)
-		for lam in em_wave: mask[(obslam[p_idx] > lam-masklam) & (obslam[p_idx] < lam+masklam)] = 0
+	#### fit Gaussian to histogram of (model-obs) (clear structure visible sometimes...)
+	hist, bin_edges = np.histogram(residuals[mask], density=True)
+	ngauss_init = functional_models.Gaussian1D(mean=0.0,stddev=1e5,amplitude=1e-6)
+	ngauss_init.mean.fixed = True
+	ngauss_init.stddev.max = np.max(np.abs(bin_edges))*0.6
+	noise_gauss,_ = bootstrap((bin_edges[1:]+bin_edges[:-1])/2., hist, ngauss_init, fitter, np.min(hist)*0.001, [1], 
+                  flux_flag=False, nboot=1)
 
-		#### fit Gaussian to histogram of (model-obs) (clear structure visible sometimes...)
-		hist, bin_edges = np.histogram(resid[mask], density=True)
-		ngauss_init = functional_models.Gaussian1D(mean=0.0,stddev=1e5,amplitude=1e-6)
-		ngauss_init.mean.fixed = True
-		ngauss_init.stddev.max = np.max(np.abs(bin_edges))*0.6
-		noise_gauss,_ = bootstrap((bin_edges[1:]+bin_edges[:-1])/2., hist, ngauss_init, fitter, np.min(hist)*0.001, [1], 
-                      flux_flag=False, nboot=1)
+	##### TEST PLOT
+	test_plot = False
+	# (obs , model)
+	if test_plot:
+		fig, ax = plt.subplots(1,1)
+		plt.plot(obslam[p_idx], obsflux[p_idx], color='black', drawstyle='steps-mid')
+		plt.plot(obslam[p_idx], flux_interp(obslam[p_idx]), color='red')
+		plt.show()
+	# (obs - model)
+	if test_plot:
+		fig, ax = plt.subplots(1,1)
+		plt.plot(obslam[p_idx], residuals, color='black', drawstyle='steps-mid')
+		plt.show()
 
-		##### TEST PLOT
-		test_plot = False
-		# (obs , model)
-		if test_plot:
-			fig, ax = plt.subplots(1,1)
-			plt.plot(obslam[p_idx], obsflux[p_idx], color='black', drawstyle='steps-mid')
-			plt.plot(obslam[p_idx], flux_interp(obslam[p_idx]), color='red')
-			plt.show()
-		# (obs - model)
-		if test_plot:
-			fig, ax = plt.subplots(1,1)
-			plt.plot(obslam[p_idx], resid, color='black', drawstyle='steps-mid')
-			plt.show()
+	# Gaussian fit to residuals in (obs - model)
+	if test_plot:
+		fig, ax = plt.subplots(1,1)
+		plt.plot((bin_edges[1:]+bin_edges[:-1])/2.,hist, color='black')
+		plt.plot((bin_edges[1:]+bin_edges[:-1])/2.,noise_gauss((bin_edges[1:]+bin_edges[:-1])/2.),color='red')
+		plt.show()
+		print 1/0
 
-		# Gaussian fit to residuals in (obs - model)
-		if test_plot:
-			fig, ax = plt.subplots(1,1)
-			plt.plot((bin_edges[1:]+bin_edges[:-1])/2.,hist, color='black')
-			plt.plot((bin_edges[1:]+bin_edges[:-1])/2.,noise_gauss((bin_edges[1:]+bin_edges[:-1])/2.),color='red')
-			plt.show()
-			print 1/0
+	#### measure noise!
+	continuum = gauss_fit[8](em_wave)
+	for ii, em in enumerate(emline): print 'measured '+em+' noise: '"{:.4f}".format(np.abs(noise_gauss.stddev.value)/continuum[ii])
 
-		#### measure noise!
-		mlow = em_wave < 5600
-		continuum = gauss_fit[6](em_wave)
-		for ii, em in enumerate(emline): print 'measured '+em+' noise: '"{:.4f}".format(np.abs(noise_gauss.stddev.value)/continuum[ii])
-
-		emline_noise[jj] = np.abs(noise_gauss.stddev.value)
+	emline_noise = np.abs(noise_gauss.stddev.value)
 
 	###############################################
 	##### MEASURE FLUXES FROM OBSERVATIONS ########
@@ -621,105 +628,98 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 	# get errors in parameters by bootstrapping
 	# use lower of two error estimates
 	# flux come out of bootstrap as (nlines,[median,errup,errdown])
-	tnoise = np.min(emline_noise)
-	bfit_mod_save = []
 
 	#### now measure emission line fluxes
-	for jj in xrange(nmodel):
+	bfit_mod, emline_flux = bootstrap(obslam[p_idx],residuals,emmod,fitter,emline_noise,em_wave)
 
-		bfit_mod, emline_flux_local = bootstrap(obslam[p_idx],residuals[jj],emmod,fitter,tnoise,em_wave)
-		bfit_mod_save.append(bfit_mod)
-		emline_flux.append(emline_flux_local)
+	#############################
+	#### PLOT ALL THE THINGS ####
+	#############################
+	# set up figure
+	# loop over models at some point? including above fit?
+	fig, axarr = plt.subplots(1, 3, figsize = (25,5))
+	for ii, bbox in enumerate(em_bbox):
 
-		#############################
-		#### PLOT ALL THE THINGS ####
-		#############################
-		# set up figure
-		# loop over models at some point? including above fit?
-		fig, axarr = plt.subplots(1, 2, figsize = (20,5))
-		for ii, bbox in enumerate(em_bbox):
+		p_idx_em = ((obslam[p_idx] > bbox[0]) & (obslam[p_idx] < bbox[1]))
 
-			p_idx_em = ((obslam[p_idx] > bbox[0]) & (obslam[p_idx] < bbox[1]))
+		# observations
+		axarr[ii].plot(obslam[p_idx][p_idx_em],obsflux[p_idx][p_idx_em],color='black',drawstyle='steps-mid')
+		# emission model + continuum model
+		axarr[ii].plot(obslam[p_idx][p_idx_em],bfit_mod(obslam[p_idx][p_idx_em])+smoothed_absflux[p_idx_em],color='red')
+		# continuum model + zeroth-order emission continuum
+		axarr[ii].plot(obslam[p_idx][p_idx_em],smoothed_absflux[p_idx_em]+bfit_mod[8](obslam[p_idx][p_idx_em]),color='#1E90FF')
 
-			# observations
-			axarr[ii].plot(obslam[p_idx][p_idx_em],obsflux[p_idx][p_idx_em],color='black',drawstyle='steps-mid')
-			# emission model + continuum model
-			axarr[ii].plot(obslam[p_idx][p_idx_em],bfit_mod(obslam[p_idx][p_idx_em])+smoothed_absflux[jj][p_idx_em],color='red')
-			# continuum model + zeroth-order emission continuum
-			axarr[ii].plot(obslam[p_idx][p_idx_em],smoothed_absflux[jj][p_idx_em]+bfit_mod[6](obslam[p_idx][p_idx_em]),color='#1E90FF')
+		axarr[ii].set_ylabel(r'flux [L$_{\odot}/\AA$]')
+		axarr[ii].set_xlabel(r'$\lambda$ [$\AA$]')
 
-			axarr[ii].set_ylabel(r'flux [L$_{\odot}/\AA$]')
-			axarr[ii].set_xlabel(r'$\lambda$ [$\AA$]')
+		axarr[ii].xaxis.set_major_locator(MaxNLocator(5))
+		axarr[ii].yaxis.get_major_formatter().set_powerlimits((0, 1))
 
-			axarr[ii].xaxis.set_major_locator(MaxNLocator(5))
-			axarr[ii].yaxis.get_major_formatter().set_powerlimits((0, 1))
+		e_idx = (em_wave > bbox[0]) & (em_wave < bbox[1])
+		nplot=0
+		for kk in xrange(len(emline)):
+			if e_idx[kk]:
+				fmt = "{{0:{0}}}".format(".2e").format
+				emline_str = r"${{{0}}}_{{-{1}}}^{{+{2}}}$"
+				emline_str = emline_str.format(fmt(emline_flux[0,kk]), 
+					                           fmt(emline_flux[1,kk]-emline_flux[0,kk]), 
+					                           fmt(emline_flux[0,kk]-emline_flux[2,kk])) + ' erg/s, '
+				axarr[ii].text(0.03, 0.93-0.085*nplot, 
+					           emline[kk]+': '+emline_str,
+					           fontsize=16, transform = axarr[ii].transAxes)
+				nplot+=1
 
-			e_idx = (em_wave > bbox[0]) & (em_wave < bbox[1])
-			nplot=0
-			for kk in xrange(len(emline)):
-				if e_idx[kk]:
-					fmt = "{{0:{0}}}".format(".2e").format
-					emline_str = r"${{{0}}}_{{-{1}}}^{{+{2}}}$"
-					emline_str = emline_str.format(fmt(emline_flux_local[0,kk]), 
-						                           fmt(emline_flux_local[1,kk]-emline_flux_local[0,kk]), 
-						                           fmt(emline_flux_local[0,kk]-emline_flux_local[2,kk])) + ' erg/s, '
-					axarr[ii].text(0.03, 0.93-0.085*nplot, 
-						           emline[kk]+': '+emline_str,
-						           fontsize=16, transform = axarr[ii].transAxes)
-					nplot+=1
+		axarr[ii].text(0.98, 0.93, 'em+abs model', fontsize=16, transform = axarr[ii].transAxes,ha='right',color='red')
+		axarr[ii].text(0.98, 0.845, 'abs model', fontsize=16, transform = axarr[ii].transAxes,ha='right',color='#1E90FF')
+		axarr[ii].text(0.98, 0.76, 'observations', fontsize=16, transform = axarr[ii].transAxes,ha='right')
 
-			axarr[ii].text(0.03, 0.93-0.085*nplot, model_names[jj], fontsize=16, transform = axarr[ii].transAxes)
-			axarr[ii].text(0.98, 0.93, 'em+abs model', fontsize=16, transform = axarr[ii].transAxes,ha='right',color='red')
-			axarr[ii].text(0.98, 0.845, 'abs model', fontsize=16, transform = axarr[ii].transAxes,ha='right',color='#1E90FF')
-			axarr[ii].text(0.98, 0.76, 'observations', fontsize=16, transform = axarr[ii].transAxes,ha='right')
+		'''
+		###############################
+		##### ARE HBETAS WRONG? #######
+		###############################
+		ha_idx = emline == r'H$\alpha$'
+		hb_idx = emline == r'H$\beta$'
 
-			###############################
-			##### ARE HBETAS WRONG? #######
-			###############################
-			ha_idx = emline == r'H$\alpha$'
-			hb_idx = emline == r'H$\beta$'
+		# Prospector values
+		ha_flux = emline_flux[0,ha_idx][0]
+		hb_flux = emline_flux[0,hb_idx][0]
 
-			# Prospector values
-			ha_flux = emline_flux[0][0,ha_idx][0]
-			hb_flux = emline_flux[0][0,hb_idx][0]
+		# only do this if observed ha and hb flux is non-negative, and we're in the Hbeta plot
+		if (ha_flux > 0) & (hb_flux > 0) and (ii == 0):
 
-			# only do this if observed ha and hb flux is non-negative, and we're in the Hbeta plot
-			if (ha_flux > 0) & (hb_flux > 0) and (ii == 0):
+			# determine model balmer decrement
+			bdec_idx = sample_results['extras']['parnames'] == 'bdec_cloudy'
+			mod_bdec = sample_results['extras']['q50'][bdec_idx][0]
 
-				# determine model balmer decrement
-				bdec_idx = sample_results['extras']['parnames'] == 'bdec_cloudy'
-				mod_bdec = sample_results['extras']['q50'][bdec_idx][0]
+			# adjust Hbeta flux
+			hb_flux_adj = (ha_flux / hb_flux) / mod_bdec
+			bfit_mod.amplitude_2.value *= hb_flux_adj
 
-				# adjust Hbeta flux
-				hb_flux_adj = (ha_flux / hb_flux) / mod_bdec
-				bfit_mod.amplitude_2.value *= hb_flux_adj
+			# replot
+			axarr[ii].plot(obslam[p_idx][p_idx_em],bfit_mod(obslam[p_idx][p_idx_em])+smoothed_absflux[p_idx_em],color='purple')
 
-				# replot
-				axarr[ii].plot(obslam[p_idx][p_idx_em],bfit_mod(obslam[p_idx][p_idx_em])+smoothed_absflux[jj][p_idx_em],color='purple')
+			# put Balmer decrements up
+			axarr[ii].text(0.03, 0.2, r'H$\beta$ adjust = '+"{:.2f}".format(hb_flux_adj),
+					       fontsize=16, transform = axarr[ii].transAxes, color='purple')				
+			axarr[ii].text(0.03, 0.115, 'model bdec = '+"{:.2f}".format(mod_bdec),
+					       fontsize=16, transform = axarr[ii].transAxes)
+			axarr[ii].text(0.03, 0.03, 'obs bdec = '+"{:.2f}".format(ha_flux / hb_flux),
+					       fontsize=16, transform = axarr[ii].transAxes)
+		'''
 
-				# put Balmer decrements up
-				axarr[ii].text(0.03, 0.2, r'H$\beta$ adjust = '+"{:.2f}".format(hb_flux_adj),
-						       fontsize=16, transform = axarr[ii].transAxes, color='purple')				
-				axarr[ii].text(0.03, 0.115, 'model bdec = '+"{:.2f}".format(mod_bdec),
-						       fontsize=16, transform = axarr[ii].transAxes)
-				axarr[ii].text(0.03, 0.03, 'obs bdec = '+"{:.2f}".format(ha_flux / hb_flux),
-						       fontsize=16, transform = axarr[ii].transAxes)
-				
-
-		plt.tight_layout()
-		plt.savefig(out_em[jj], dpi = 300)
-		plt.close()
+	plt.tight_layout()
+	plt.savefig(out_em, dpi = 300)
+	plt.close()
 
 	##############################################
 	##### MEASURE OBSERVED ABSORPTION LINES ######
 	##############################################
 	# use redshift from emission line fit
 	# currently, NO spectral smoothing; inspect to see if it's important for HDELTA ONLY
-	zadj = bfit_mod_save[0].mean_0.value / 4958.92 - 1
+	zadj = bfit_mod.mean_0.value / 4958.92 - 1
 
 	if sigma_spec < 175:
 		obsflux = threed_dutils.smooth_spectrum(obslam/(1+zadj),obsflux,200,minlam=3e3,maxlam=3e8)
-
 
 	#### bootstrap
 	nboot = 100
@@ -727,7 +727,7 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 
 	for i in xrange(nboot):
 		randomDelta = np.random.normal(0.,1.,len(obsflux))
-		randomFlux = obsflux + randomDelta*tnoise
+		randomFlux = obsflux + randomDelta*emline_noise
 		out = threed_dutils.measure_abslines(obslam/(1+zadj),randomFlux,plot=False)
 
 		for kk in xrange(nabs): tobs_abs_flux[kk,i] = out[abslines[kk]]['flux']
@@ -749,36 +749,24 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 	obs_lam_cont = np.zeros(nabs)
 	for kk in xrange(nabs): obs_lam_cont[kk] = out[abslines[kk]]['lam']
 
+	dn4000_obs = threed_dutils.measure_Dn4000(obslam,obsflux,ax=out['ax'][5])
+
 	plt.tight_layout()
 	plt.savefig(out_absobs, dpi=dpi)
 	plt.close()
 
 	out = {}
-	# save fluxes
-	for ii, mod in enumerate(model_names):
-		temp = {}
-
-		temp['lum'] = emline_flux[ii][0,:]
-		temp['lum_errup'] = emline_flux[ii][1,:]
-		temp['lum_errdown'] = emline_flux[ii][2,:]
-
-		temp['flux'] = emline_flux[ii][0,:]  / dfactor / (1+magphys['metadata']['redshift'])
-		temp['flux_errup'] = emline_flux[ii][1,:]  / dfactor / (1+magphys['metadata']['redshift'])
-		temp['flux_errdown'] = emline_flux[ii][2,:]  / dfactor / (1+magphys['metadata']['redshift'])
-
-		temp['Dn4000'] = dn4000_mod[ii]
-
-		temp['balmer_lum'] = mod_abs_flux[ii,:]
-		temp['balmer_flux'] = mod_abs_flux[ii,:] / dfactor / (1+magphys['metadata']['redshift'])
-		temp['balmer_eqw_rest'] = mod_abs_eqw[ii,:]
-		temp['balmer_names'] = abslines
-
-		temp['continuum_mod'] = mod_abs_flux[ii,:] / mod_abs_eqw[ii,:]
-		temp['continuum_lam'] = mod_abs_lamcont[ii,:]
-
-		out[mod] = temp
-
+	# SAVE OBSERVATIONS
 	obs = {}
+
+	obs['lum'] = emline_flux[0,:]
+	obs['lum_errup'] = emline_flux[1,:]
+	obs['lum_errdown'] = emline_flux[2,:]
+
+	obs['flux'] = emline_flux[0,:]  / dfactor / (1+magphys['metadata']['redshift'])
+	obs['flux_errup'] = emline_flux[1,:]  / dfactor / (1+magphys['metadata']['redshift'])
+	obs['flux_errdown'] = emline_flux[2,:]  / dfactor / (1+magphys['metadata']['redshift'])
+
 	obs['dn4000'] = dn4000_obs
 	obs['balmer_lum'] = obs_abs_flux
 	obs['balmer_eqw_rest'] = obs_abs_eqw
@@ -788,7 +776,27 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 	obs['continuum_obs'] = obs_abs_flux[:,0] / obs_abs_eqw[:,0] 
 	obs['continuum_lam'] = obs_lam_cont
 
-	out['obs'] = obs 
+	out['obs'] = obs
+
+	# SAVE MODEL
+	mod = {}
+
+	mod['balmer_lum'] = mod_abs_flux[:,0]
+	mod['balmer_flux'] = mod_abs_flux[:,0] / dfactor / (1+magphys['metadata']['redshift'])
+	mod['balmer_eqw_rest'] = mod_abs_eqw[:,0]
+	mod['balmer_names'] = abslines
+
+	mod['balmer_lum_addem'] = mod_abs_flux[:,1]
+	mod['balmer_flux_addem'] = mod_abs_flux[:,1] / dfactor / (1+magphys['metadata']['redshift'])
+	mod['balmer_eqw_rest_addem'] = mod_abs_eqw[:,1]
+
+	mod['continuum_mod'] = mod_abs_flux[ii,:] / mod_abs_eqw[ii,:]
+	mod['continuum_lam'] = mod_abs_lamcont[ii,:]
+
+	mod['Dn4000'] = dn4000_mod
+
+	out['mod'] = mod 
+
 	out['em_name'] = emline
 	out['em_lam'] = em_wave
 	out['sigsmooth'] = sigma_spec

@@ -695,6 +695,9 @@ def return_n_outliers(x,y,objnames,noutliers,
 			# emission line fits
 			mag_sed_loc = threedhst_diag_loc + '/magphys/line_fits'
 			os.system('cp '+mag_sed_loc+'/*'+obj.replace(' ','*')+'* '+destination)
+			# RGB
+			rgb_loc = '/Users/joel/code/python/threedhst_bsfh/data/brownseds_data/rgb'
+			os.system('cp '+rgb_loc+'/*'+obj.replace(' ','*')+'* '+destination)
 
 		with open(destination+'/list.txt', 'w') as f:
 			f.write('# name observed model \n')
@@ -1326,7 +1329,7 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None,
 	
 	return out
 
-def measure_Dn4000(lam,flux):
+def measure_Dn4000(lam,flux,ax=None):
 
 	# D4000, defined as average flux ratio between
 	# [4050,4250] and [3750,3950] (Bruzual 1983; Hamilton 1985)
@@ -1336,8 +1339,22 @@ def measure_Dn4000(lam,flux):
 
 	blue = (lam > 3850) & (lam < 3950)
 	red  = (lam > 4000) & (lam < 4100)
+	dn4000 = np.mean(flux[red])/np.mean(flux[blue])
 
-	return np.mean(flux[red])/np.mean(flux[blue])
+	if ax is not None:
+		ax.plot(lam,flux,color='black',drawstyle='steps-mid')
+		ax.plot(lam[blue],flux[blue],color='blue',drawstyle='steps-mid')
+		ax.plot(lam[red],flux[red],color='red',drawstyle='steps-mid')
+
+		ax.text(0.96,0.05, 'D$_{n}$(4000)='+"{:.2f}".format(dn4000), transform = ax.transAxes,horizontalalignment='right')
+
+		ax.set_xlim(3800,4150)
+		plt_lam_idx = (lam > 3800) & (lam < 4150)
+		minplot = np.min(flux[plt_lam_idx])*0.9
+		maxplot = np.max(flux[plt_lam_idx])*1.1
+		ax.set_ylim(minplot,maxplot)
+
+	return dn4000
 
 def measure_emlines(lam,flux_emline, flux_abs):
 
@@ -1433,7 +1450,7 @@ def measure_em(w,spec,spec_abs,wavelength,sideband,up, down, ax=None,savestr=Non
 
 	return emline_flux, emline_eqw
 
-def measure_abslines(lam,flux,plot=False):
+def measure_abslines(lam,flux,plot=False, alt_plot=False):
 
 	'''
 	Nelan et al. (2005)
@@ -1462,30 +1479,52 @@ def measure_abslines(lam,flux,plot=False):
 	up =    [(6590.,6610.),(6585.,6595.),(4894.625,4910.000),(4124.25,4151.00),(4113.75,4130.25)]
 	down =  [(6515.,6540.),(6515.,6540.),(4817.875,4835.875),(4041.6,4081.5),(4072.25,4094.50)]
 
-	if plot:
+	# if we want to plot but don't have fig + ax set up, set them up
+	# else if we have them, unpack them
+	if plot == True:
 		fig, ax = plt.subplots(2,3, figsize = (18.75,12))
 		ax = np.ravel(ax)
+	elif plot is not False:
+		fig, ax = plot[0],plot[1]
 
 	# measure the absorption flux
 	for ii in xrange(len(lines)):
 		dic = {}
+
+		#### only alt_plot for hdelta!
+		if alt_plot & (ii <=2):
+			continue
+
 		if plot: 
-			dic['flux'], dic['eqw'], dic['lam'] = measure_idx(lam,flux,index[ii],up[ii],down[ii],ax=ax[ii])
+			dic['flux'], dic['eqw'], dic['lam'] = measure_idx(lam,flux,index[ii],up[ii],down[ii],ax=ax[ii],alt_plot=alt_plot)
 		else: 
 			dic['flux'], dic['eqw'], dic['lam'] = measure_idx(lam,flux,index[ii],up[ii],down[ii],ax=None)
 		out[lines[ii]] = dic
 
-	if plot:
+	if plot is not False:
 		out['ax'] = ax
 		out['fig'] = fig
 
 	return out
 
-def measure_idx(lam,flux,index,up,down,ax=None):
+def measure_idx(lam,flux,index,up,down,ax=None,alt_plot=False):
 
 	'''
 	measures absorption depths
 	'''
+
+	continuum_line_color='red'
+	observed_flux_color = 'black'
+	line_index_color = 'blue'
+	continuum_index_color = 'cyan'
+	eqw_yloc = 0.05
+	alpha = 1.0
+
+	if alt_plot:
+		eqw_yloc = 0.1
+		line_index_color = 'green'
+		alpha = 0.5
+
 
 	##### identify average flux, average wavelength
 	low_cont = (lam > down[0]) & (lam < down[1])
@@ -1514,17 +1553,24 @@ def measure_idx(lam,flux,index,up,down,ax=None):
 
 	##### plot if necessary
 	if ax is not None:
-		ax.plot(lam,flux,color='black', drawstyle='steps-mid')
-		ax.plot(lam[abs_idx],yline,color='red')
-		ax.plot(lam[abs_idx],flux[abs_idx],color='blue')
-		ax.plot(lam[low_cont],flux[low_cont],color='cyan')
-		ax.plot(lam[high_cont],flux[high_cont],color='cyan')
+		ax.plot(lam,flux,color=observed_flux_color, drawstyle='steps-mid',alpha=alpha)
+		ax.plot(lam[abs_idx],yline,color=continuum_line_color,alpha=alpha)
+		ax.plot(lam[abs_idx],flux[abs_idx],color=line_index_color,alpha=alpha)
+		ax.plot(lam[low_cont],flux[low_cont],color=continuum_index_color,alpha=alpha)
+		ax.plot(lam[high_cont],flux[high_cont],color=continuum_index_color,alpha=alpha)
 
-		ax.text(0.96,0.05, 'EQW='+"{:.2f}".format(abseqw), transform = ax.transAxes,horizontalalignment='right')
+		ax.text(0.96,eqw_yloc, 'EQW='+"{:.2f}".format(abseqw), transform = ax.transAxes,horizontalalignment='right',color=line_index_color)
 		ax.set_xlim(np.min(down)-50,np.max(up)+50)
 
 		plt_lam_idx = (lam > down[0]) & (lam < up[1])
-		ax.set_ylim(np.min(flux[plt_lam_idx])*0.96,np.max(flux[plt_lam_idx])*1.04)
+		
+		if alt_plot:
+			minplot = np.min([ np.min(flux[plt_lam_idx])*0.9, ax.get_ylim()[0] ])
+			maxplot = np.max([ np.max(flux[plt_lam_idx])*1.1, ax.get_ylim()[1] ])
+		else:
+			minplot = np.min(flux[plt_lam_idx])*0.9
+			maxplot = np.max(flux[plt_lam_idx])*1.1
+		ax.set_ylim(minplot,maxplot)
 
 	return absflux, abseqw, lamcont
 
