@@ -637,7 +637,7 @@ def sed_figure(sample_results, sps, model,
 	res.plot(wave_eff, chi, 
 		     color=most_likely_color, marker='o', linestyle=' ', label='most likely', 
 		     ms=ms,alpha=alpha,markeredgewidth=0.7,**kwargs)
-	
+
 	nz = modspec > 0
 	phot.plot(modlam[nz], modspec[nz], linestyle='-',
               color=most_likely_color, alpha=0.9,**kwargs)
@@ -752,8 +752,8 @@ def sed_figure(sample_results, sps, model,
 	chisq=np.sum(chi**2)
 	chisq_median=np.sum(median_chi**2)
 	ndof = np.sum(sample_results['obs']['phot_mask']) - len(sample_results['model'].free_params)-1
-	reduced_chisq = chisq/(ndof-1)
-	reduced_chisq_median = chisq_median/(ndof-1)
+	reduced_chisq = chisq/(ndof)
+	reduced_chisq_median = chisq_median/(ndof)
 
 	# also calculate for truths if truths exist
 	if truths is not None:

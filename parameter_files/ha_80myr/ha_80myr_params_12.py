@@ -29,84 +29,73 @@ run_params = {'verbose':True,
 # OBS
 #############
 
-def translate_filters(bfilters, full_list = False):
-    '''
-    translate filter names to FSPS standard
-    this is ALREADY a mess, clean up soon!
-    suspect there are smarter routines to do this in python-fsps
-    '''
+def ret_joel_filts():
 
     # this is necessary for my code
     # to calculate effective wavelength
     # in threed_dutils
-    translate = {
-    'FUV': 'GALEX FUV',
-    'UVW2': 'UVOT w2',
-    'UVM2': 'UVOT m2',
-    'NUV': 'GALEX NUV',
-    'UVW1': 'UVOT w1',
-    'umag': 'SDSS Camera u Response Function, airmass = 1.3 (June 2001)',
-    'gmag': 'SDSS Camera g Response Function, airmass = 1.3 (June 2001)',
-    'rmag': 'SDSS Camera r Response Function, airmass = 1.3 (June 2001)',
-    'imag': 'SDSS Camera i Response Function, airmass = 1.3 (June 2001)',
-    'zmag': 'SDSS Camera z Response Function, airmass = 1.3 (June 2001)',
-    'Jmag': '2MASS J filter (total response w/atm)',
-    'Hmag': '2MASS H filter (total response w/atm)',
-    'Ksmag': '2MASS Ks filter (total response w/atm)',
-    'W1mag': 'WISE W1',
-    '[3.6]': 'IRAC Channel 1',
-    '[4.5]': 'IRAC Channel 2',
-    'W2mag': 'WISE W2',
-    '[5.8]': 'IRAC Channel 3',
-    '[8.0]': 'IRAC CH4',
-    'W3mag': 'WISE W3',
-    "W4'mag": 'WISE W4',
-    '[24]': 'MIPS 24um',
-    'pacs70': 'Herschel PACS 70um',
-    'pacs100': 'Herschel PACS 100um',
-    'pacs160': 'Herschel PACS 160um',
-    'spire250': 'Herschel SPIRE 250um',
-    'spire350': 'Herschel SPIRE 350um',
-    'spire500': 'Herschel SPIRE 500um'
-    }
+    JOEL_FILTNAMES = [
+    'GALEX FUV', 
+    'GALEX NUV', 
+    'SDSS Camera u Response Function, airmass = 1.3 (June 2001)',
+    'SDSS Camera g Response Function, airmass = 1.3 (June 2001)',
+    'SDSS Camera r Response Function, airmass = 1.3 (June 2001)',
+    'SDSS Camera i Response Function, airmass = 1.3 (June 2001)',
+    'SDSS Camera z Response Function, airmass = 1.3 (June 2001)',
+    '2MASS J filter (total response w/atm)',
+    '2MASS H filter (total response w/atm)',
+    '2MASS Ks filter (total response w/atm)',
+    'WISE W1',
+    'IRAC Channel 1',
+    'IRAC Channel 2',
+    'WISE W2',
+    'IRAC Channel 3',
+    'IRAC CH4',
+    'WISE W3',
+    'WISE W4',
+    'MIPS 24um',
+    'Herschel PACS 70um',
+    'Herschel PACS 100um',
+    'Herschel PACS 160um',
+    'Herschel SPIRE 250um',
+    'Herschel SPIRE 350um',
+    'Herschel SPIRE 500um'
+    ]
 
+    return JOEL_FILTNAMES
+
+def ret_fsps_filts():
     # this translates filter names
     # to names that FSPS recognizes
-    translate_pfsps = {
-    'FUV': 'GALEX_FUV',
-    'UVW2': 'UVOT_W2',
-    'UVM2': 'UVOT_M2',
-    'NUV': 'GALEX_NUV',
-    'UVW1': 'UVOT_W1',
-    'umag': 'SDSS_u',
-    'gmag': 'SDSS_g',
-    'rmag': 'SDSS_r',
-    'imag': 'SDSS_i',
-    'zmag': 'SDSS_z',
-    'Jmag': '2MASS_J',
-    'Hmag': '2MASS_H',
-    'Ksmag': '2MASS_Ks',
-    'W1mag': 'WISE_W1',
-    '[3.6]': 'IRAC_1',
-    '[4.5]': 'IRAC_2',
-    'W2mag': 'WISE_W2',
-    '[5.8]': 'IRAC_3',
-    '[8.0]': 'IRAC_4',
-    'W3mag': 'WISE_W3',
-    "W4'mag": 'WISE_W4',
-    '[24]': 'MIPS_24',
-    'pacs70': 'PACS_70',
-    'pacs100': 'PACS_100',
-    'pacs160': 'PACS_160',
-    'spire250': 'SPIRE_250',
-    'spire350': 'SPIRE_350',
-    'spire500': 'SPIRE_500'
-    }
+    FSPS_FILTNAMES = [
+    'GALEX_FUV',
+    'GALEX_NUV',
+    'SDSS_u',
+    'SDSS_g',
+    'SDSS_r',
+    'SDSS_i',
+    'SDSS_z',
+    '2MASS_J',
+    '2MASS_H',
+    '2MASS_Ks',
+    'WISE_W1',
+    'IRAC_1',
+    'IRAC_2',
+    'WISE_W2',
+    'IRAC_3',
+    'IRAC_4',
+    'WISE_W3',
+    'WISE_W4',
+    'MIPS_24',
+    'PACS_70',
+    'PACS_100',
+    'PACS_160',
+    'SPIRE_250',
+    'SPIRE_350',
+    'SPIRE_500'
+    ]
 
-    if full_list:
-        return translate.values()
-    else:
-        return np.array([translate[f] for f in bfilters]), np.array([translate_pfsps[f] for f in bfilters])
+    return FSPS_FILTNAMES
 
 
 def load_obs_mock(filename, objnum):
@@ -115,25 +104,31 @@ def load_obs_mock(filename, objnum):
     """
     obs ={}
 
-    with open(filename, 'r') as f:
-        hdr = f.readline().split()
-    dat = np.loadtxt(filename, comments = '#',
-                     dtype = np.dtype([(n, np.float) for n in hdr[1:]]))
-    obj_ind = np.where(dat['id'] == int(objnum))[0][0]
-    
-    # extract fluxes+uncertainties for all objects and all filters
-    flux_fields = [f for f in dat.dtype.names if f[0:2] == 'f_']
-    unc_fields = [f for f in dat.dtype.names if f[0:2] == 'e_']
-    filters = [f[2:] for f in flux_fields]
+    # if the photometric files exist
+    try:
+        with open(filename, 'r') as f:
+            hdr = f.readline().split()
+        dat = np.loadtxt(filename, comments = '#',
+                         dtype = np.dtype([(n, np.float) for n in hdr[1:]]))
+        obj_ind = np.where(dat['id'] == int(objnum))[0][0]
+        
+        # extract fluxes+uncertainties for all objects and all filters
+        flux_fields = [f for f in dat.dtype.names if f[0:2] == 'f_']
+        unc_fields = [f for f in dat.dtype.names if f[0:2] == 'e_']
+        filters = [f[2:] for f in flux_fields]
 
-    # extract fluxes for particular object, converting from record array to numpy array
-    flux = dat[flux_fields].view(float).reshape(len(dat),-1)[obj_ind]
-    unc  = dat[unc_fields].view(float).reshape(len(dat),-1)[obj_ind]
+        # extract fluxes for particular object, converting from record array to numpy array
+        flux = dat[flux_fields].view(float).reshape(len(dat),-1)[obj_ind]
+        unc  = dat[unc_fields].view(float).reshape(len(dat),-1)[obj_ind]
+    except:
+        filters = ret_fsps_filts()
+        flux = np.zeros(len(filters))
+        unc = np.zeros(len(filters))
 
     # define all outputs
     from translate_filter import calc_lameff_for_fsps
-    wave_effective = calc_lameff_for_fsps(translate_filters(filters,full_list=True))
-    phot_mask = np.logical_or(np.logical_or((flux != unc),(flux > 0)),flux != -99.0)
+    wave_effective = calc_lameff_for_fsps(ret_joel_filts())
+    phot_mask = np.ones_like(wave_effective,dtype=bool)
 
     # build output dictionary
     obs['wave_effective'] = wave_effective

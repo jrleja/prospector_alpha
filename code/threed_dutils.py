@@ -696,8 +696,8 @@ def return_n_outliers(x,y,objnames,noutliers,
 			mag_sed_loc = threedhst_diag_loc + '/magphys/line_fits'
 			os.system('cp '+mag_sed_loc+'/*'+obj.replace(' ','*')+'* '+destination)
 			# RGB
-			rgb_loc = '/Users/joel/code/python/threedhst_bsfh/data/brownseds_data/rgb'
-			os.system('cp '+rgb_loc+'/*'+obj.replace(' ','*')+'* '+destination)
+			#rgb_loc = '/Users/joel/code/python/threedhst_bsfh/data/brownseds_data/rgb'
+			#os.system('cp '+rgb_loc+'/*'+obj.replace(' ','*')+'* '+destination)
 
 		with open(destination+'/list.txt', 'w') as f:
 			f.write('# name observed model \n')

@@ -77,8 +77,7 @@ def ha_mocks(basename,outname=None,add_zp_err=False):
 	'''
 
 	#### output names ####
-	if outname == None:
-		outname = '/Users/joel/code/python/threedhst_bsfh/data/'+basename
+	outname = '/Users/joel/code/python/threedhst_bsfh/data/'+basename
 	parmfile='/Users/joel/code/python/threedhst_bsfh/parameter_files/'+basename+'/'+basename+'_params.py'
 
 	#### load test model, build sps  ####
@@ -87,32 +86,24 @@ def ha_mocks(basename,outname=None,add_zp_err=False):
 	sps = threed_dutils.setup_sps(custom_filter_key=None)
 
 	#### basic parameters ####
-	ngals_per_model     = 100
-	noise               = 0.01            # perturb fluxes
-	reported_noise      = 0.01            # reported noise
+	# hack to make it run 100x times in for-loop
+	# so i can calculate sfr each time
+	ngals_per_model     = 1
+	noise               = 0.02            # perturb fluxes
+	reported_noise      = 0.02            # reported noise
 	test_sfhs           = [1,2,3,4,5]     # which test sfhs to use?
-	test_sfhs           = [0]
+	test_sfhs           = np.zeros(100)
 	ntest               = len(test_sfhs)
 	ngals               = ntest*ngals_per_model
 	time_of_trunc       = 0.08 # in Gyr. this is 80 Myr currently
-	
-	#### band-specific noise ####
-	if 'gp_filter_amps' in model.free_params:
-		band_specific_noise = [0.0,0.15,0.25] # add band-specific noise?
-
-	#### outlier noise ####
-	if 'gp_outlier_locs' in model.free_params:
-		outliers_noise      = 0.5             # add outlier noise
-		outliers_bands      = [5,22,29]
-	else:
-		outliers_bands=[]
 
 	#### generate random model parameters ####
 	nparams = len(model.initial_theta)
 	testparms = np.zeros(shape=(ngals,nparams))
 	parnames = np.array(model.theta_labels())
 
-	for jj in xrange(ntest):
+	jj = 0
+	while jj < ntest:
 		for ii in xrange(nparams):
 			
 			#### random in logspace for mass
@@ -131,8 +122,9 @@ def ha_mocks(basename,outname=None,add_zp_err=False):
 
 			#### set delt_trunc so that SFH truncates a specific amount of time before observation
 			elif parnames[ii] == 'delt_trunc':
-				tage = np.squeeze(testparms[:,parnames == 'tage'])
-				testparms[jj*ngals_per_model:(jj+1)*ngals_per_model,ii] = (tage-time_of_trunc)/tage
+				for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): 
+					tage = np.squeeze(testparms[kk,parnames == 'tage'])
+					testparms[kk,ii] = (tage-time_of_trunc)/tage
 
 			#### choose reasonable amounts of dust ####
 			elif parnames[ii] == 'dust2':
@@ -157,8 +149,16 @@ def ha_mocks(basename,outname=None,add_zp_err=False):
 				min = model.theta_bounds()[ii][0]
 				max = model.theta_bounds()[ii][1]
 				for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): testparms[kk,ii] = random.random()*(max-min)+min
-			print parnames[ii]
-			print min,max
+			#print parnames[ii]
+			#print min,max
+
+		sfh_params = threed_dutils.find_sfh_params(model,testparms[jj,:],obs,sps)
+		ssfr_10 = threed_dutils.calculate_sfr(sfh_params, 0.01, minsfr=-np.inf, maxsfr=np.inf)/sfh_params['mformed']
+		if ssfr_10 > 1e-12:
+			print ssfr_10
+			jj += 1
+		else:
+			print 'fail, retry'
 
 	#### make sure priors are satisfied
 	for ii in xrange(ngals):
@@ -187,7 +187,7 @@ def ha_mocks(basename,outname=None,add_zp_err=False):
 	#### generate photometry, add noise ####
 	for ii in xrange(ngals):
 		model.initial_theta = testparms[ii,:]
-		_,maggiestemp,_ = model.mean_model(model.initial_theta, obs, sps=sps,norm_spec=False)
+		_,maggiestemp,_ = model.mean_model(model.initial_theta, obs, sps=sps)
 		maggies[ii,:] = maggiestemp
 
 		#### record noise ####
@@ -197,19 +197,8 @@ def ha_mocks(basename,outname=None,add_zp_err=False):
 		for kk in xrange(nfilters): 
 			
 			###### general noise
-			tnoise = noise
-			
-			##### linked filter noise
-			filtlist = model.params.get('gp_filter_locs',[])			
-			for mm in xrange(len(filtlist)):
-				if obs['filters'][kk].lower() in filtlist[mm]:
-					tnoise = (tnoise**2+band_specific_noise[mm]**2)**0.5
-
-			##### outlier noise
-			if kk in outliers_bands:
-				tnoise = (tnoise**2+outliers_noise**2)**0.5
-			add_noise = random.gauss(0, tnoise)
-			print obs['filters'][kk].lower()+': ' + "{:.2f}".format(add_noise)
+			add_noise = random.gauss(0, noise)
+			print obs['filters'][kk].lower()+': ' + "{:.3f}".format(add_noise)
 			maggies[ii,kk] += add_noise*maggies[ii,kk]
 
 	#### output ####
