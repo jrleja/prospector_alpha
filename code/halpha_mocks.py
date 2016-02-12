@@ -95,7 +95,7 @@ def ha_mocks(basename,outname=None,add_zp_err=False):
 	test_sfhs           = np.zeros(100)
 	ntest               = len(test_sfhs)
 	ngals               = ntest*ngals_per_model
-	time_of_trunc       = 0.08 # in Gyr. this is 80 Myr currently
+	time_of_trunc       = 0.02 # in Gyr. this is 20 Myr currently
 
 	#### generate random model parameters ####
 	nparams = len(model.initial_theta)
@@ -108,7 +108,7 @@ def ha_mocks(basename,outname=None,add_zp_err=False):
 			
 			#### random in logspace for mass
 			if parnames[ii] == 'mass':
-				min,max = np.log10(return_bounds(parnames[ii],model,ii,test_sfhs=test_sfhs[jj]))
+				min,max = 10,11
 				for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): testparms[kk,ii] = 10**(random.random()*(max-min)+min)
 
 			#### weight sampling in sf_tanslope towards the edges
@@ -116,9 +116,9 @@ def ha_mocks(basename,outname=None,add_zp_err=False):
 				min,max = return_bounds(parnames[ii],model,ii,test_sfhs=test_sfhs[jj])
 				for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): 
 					if random.random() > 0.5:
-						testparms[kk,ii] = random.triangular(0.0,max,0.8*max)
+						testparms[kk,ii] = np.random.power(8)*max
 					else:
-						testparms[kk,ii] = random.triangular(min,0.0,0.8*min)
+						testparms[kk,ii] = np.random.power(8)*min
 
 			#### set delt_trunc so that SFH truncates a specific amount of time before observation
 			elif parnames[ii] == 'delt_trunc':

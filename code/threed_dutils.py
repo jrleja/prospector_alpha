@@ -375,45 +375,46 @@ def load_truths(truthname,objname,sample_results, sps=None, calc_prob = True):
 	parnames = np.array(hdr)
 
 	#### define extra parameters ####
-	# mass      
 	mass = truths[np.array([True if 'mass' in x else False for x in parnames])]
-	totmass = np.log10(np.sum(mass))
 
 	# SFH parameters
 	if sample_results is not None:
 		sfh_params = find_sfh_params(sample_results['model'],truths,sample_results['obs'],sps)
 		deltat=0.1
+		sfr_10  = np.log10(calculate_sfr(sfh_params,0.01))
+		ssfr_10 = np.log10(10**sfr_10 / mass)
 		sfr_100  = np.log10(calculate_sfr(sfh_params,deltat))
-		ssfr_100 = np.log10(calculate_sfr(sfh_params,deltat) / 10**totmass)
+		ssfr_100 = np.log10(calculate_sfr(sfh_params,deltat) / mass)
 		halftime = halfmass_assembly_time(sfh_params,sfh_params['tage'])
 		if calc_prob == True:
 			lnprob   = test_likelihood(sps=sps,model=sample_results['model'], obs=sample_results['obs'],thetas=truths)
+
+		modelout = measure_emline_lum(sps, thetas = truths,
+	 								  model=sample_results['model'], obs = sample_results['obs'],
+									  saveplot=False,measure_ir=True)
+		emnames = np.array(modelout['emlines'].keys())
+		emflux = np.array([modelout['emlines'][line]['flux'] for line in emnames])
+		absnames = np.array(modelout['abslines'].keys())
+		abseqw = np.array([modelout['abslines'][line]['eqw'] for line in absnames])
+		dn4000 = modelout['dn4000']
+
 	else:
 		sfh_params = None
 		sfr_100 = None
 		ssfr_100 = None
 		halftime = None
 		lnprob   = None
-
-	# convert truths to plotting parameters
-	plot_truths = truths+0.0
-	for kk in xrange(len(parnames)):
-		# reset age
-		#if parnames[kk] == 'sf_start' or parnames[kk][:-2] == 'sf_start':
-		#	plot_truths[kk] = sample_results['model'].params['tage'][0]-plot_truths[kk]
-
-		# log parameters
-		if parnames[kk] == 'mass' or parnames[kk][:-2] == 'mass':
-
-			plot_truths[kk] = np.log10(plot_truths[kk])
-
     
 	truths_dict = {'parnames':parnames,
 				   'truths':truths,
-				   'plot_truths':plot_truths,
-				   'extra_parnames':np.array(['totmass','sfr_100','half_time','ssfr_100']),
-				   'extra_truths':np.array([totmass,sfr_100,halftime,ssfr_100]),
-				   'sfh_params': sfh_params}
+				   'extra_parnames':np.array(['sfr_10','ssfr_10','sfr_100','ssfr_100','half_time']),
+				   'extra_truths':np.array([sfr_10,ssfr_10,sfr_100,ssfr_100,halftime]),
+				   'sfh_params': sfh_params,
+				   'emnames':emnames,
+				   'emflux':emflux,
+				   'absnames':absnames,
+				   'abseqw':abseqw,
+				   'dn4000':dn4000}
 	
 	if calc_prob == True:
 		truths_dict['truthprob'] = lnprob
