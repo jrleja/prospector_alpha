@@ -1261,9 +1261,6 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None,
 	if we pass spec, then avoid the first model call
 
 	flux comes out in Lsun
-
-	if you ever add more emission lines to this, God help you... find all the places where you lazily indexed
-	halpha as 4 and hbeta as 1!
 	'''
 	out = {}
 
