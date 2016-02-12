@@ -75,7 +75,8 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 	deltat=[0.01,0.1,1.0] # for averaging SFR over, in Gyr
 
     ##### initialize output arrays for SFH + emission line posterior draws #####
-	half_time,sfr_10,sfr_100,sfr_1000,ssfr_100,totmass,emp_ha,mips_flux,lir,dust_mass,bdec_cloudy,bdec_calc,ext_5500,dn4000,bdec_nodust = [np.zeros(shape=(ncalc)) for i in range(15)]
+	half_time,sfr_10,sfr_100,sfr_1000,ssfr_100,totmass,emp_ha,mips_flux,lir,dust_mass,
+	bdec_cloudy,bdec_calc,ext_5500,dn4000,bdec_nodust,ssfr_10 = [np.zeros(shape=(ncalc)) for i in range(16)]
 	
 
 	##### information for empirical emission line calculation ######
@@ -136,6 +137,7 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 
 		##### calculate mass, sSFR
 		totmass[jj] = np.sum(sfh_params['mass'])
+		ssfr_10[jj] = sfr_10[jj] / totmass[jj]
 		ssfr_100[jj] = sfr_100[jj] / totmass[jj]
 
 		##### empirical halpha
@@ -197,7 +199,7 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 	for kk in xrange(ntheta): q_16[kk], q_50[kk], q_84[kk] = triangle.quantile(sample_results['flatchain'][:,kk], [0.16, 0.5, 0.84])
 	
 	##### CALCULATE Q16,Q50,Q84 FOR EXTRA PARAMETERS
-	extra_flatchain = np.dstack((half_time, sfr_10, sfr_100, sfr_1000, ssfr_100, totmass, emp_ha, dust_mass, bdec_cloudy,bdec_calc, bdec_nodust,ext_5500))[0]
+	extra_flatchain = np.dstack((half_time, sfr_10, sfr_100, sfr_1000, ssfr_10, ssfr_100, totmass, emp_ha, dust_mass, bdec_cloudy,bdec_calc, bdec_nodust,ext_5500))[0]
 	nextra = extra_flatchain.shape[1]
 	q_16e, q_50e, q_84e = (np.zeros(nextra)+np.nan for i in range(3))
 	for kk in xrange(nextra): q_16e[kk], q_50e[kk], q_84e[kk] = triangle.quantile(extra_flatchain[:,kk], [0.16, 0.5, 0.84])
@@ -242,7 +244,7 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 
 	#### EXTRA PARAMETER OUTPUTS 
 	extras = {'flatchain': extra_flatchain,
-			  'parnames': np.array(['half_time','sfr_10','sfr_100','sfr_1000','ssfr_100','totmass','emp_ha','dust_mass','bdec_cloudy','bdec_calc','bdec_nodust','total_ext5500']),
+			  'parnames': np.array(['half_time','sfr_10','sfr_100','sfr_1000','ssfr_10','ssfr_100','totmass','emp_ha','dust_mass','bdec_cloudy','bdec_calc','bdec_nodust','total_ext5500']),
 			  'q16': q_16e,
 			  'q50': q_50e,
 			  'q84': q_84e,
