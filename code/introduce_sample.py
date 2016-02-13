@@ -18,19 +18,25 @@ def make_plot(runname='brownseds_tightbc'):
 	scale = 1.4
 	figsize = (8.5*scale,11*scale)
 	fig = plt.figure(figsize = figsize)
-	fontsize=8
-	xcurr = -0.05
-	xmax = 0.9
+	fontsize=12
 
-	ycurr = 0.9
+	dy = 0.17
+	dx = 0.17
+
+	xcurr = -dx+0.01
+	xmax = 1.0-dx # farthest right you can place an image, after transition
+
+	ycurr = 0.85
 	ytrans = 0.6 # where we transition from half to full
+	xtrans = 0.45 # farthest right position to place an image above half-page
 
-	dy = 0.1
-	dx = 0.1
 
-	ysep = 0.06
+	ysep = 0.11
 
 	fig = add_mass_sfr_plot(alldata,fig)
+
+	### galaxies we want
+	in_list = ['NGC 4594', 'NGC 0660', 'NGC 4486', 'NGC 4579', 'NGC 3079', 'NGC 3198', 'NGC 5258', 'NGC 7331']
 
 	#### loop over alldata, add each galaxy png
 	xstart = xcurr + dx
@@ -38,12 +44,12 @@ def make_plot(runname='brownseds_tightbc'):
 
 		#### determine location of png
 		xcurr += dx
-		if (xcurr > xmax) or ((ycurr > ytrans) & (xcurr > 0.5)):
+		if (xcurr > xmax) or ((ycurr > ytrans) & (xcurr > xtrans)):
 			xcurr = xstart
 			ycurr = ycurr - ysep
 
 		#### if we're off the page, bail!
-		if ycurr < -ysep:
+		if ycurr < 0.01:
 			break
 
 		#### load png

@@ -75,7 +75,7 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 	deltat=[0.01,0.1,1.0] # for averaging SFR over, in Gyr
 
     ##### initialize output arrays for SFH + emission line posterior draws #####
-	half_time,sfr_10,sfr_100,sfr_1000,ssfr_100,totmass,emp_ha,mips_flux,lir,dust_mass,
+	half_time,sfr_10,sfr_100,sfr_1000,ssfr_100,totmass,emp_ha,mips_flux,lir,dust_mass, \
 	bdec_cloudy,bdec_calc,ext_5500,dn4000,bdec_nodust,ssfr_10 = [np.zeros(shape=(ncalc)) for i in range(16)]
 	
 
