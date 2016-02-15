@@ -808,16 +808,16 @@ def fmt_emline_info(alldata,add_abs_err = True):
 		met_mag[ii] = dat['model']['full_parameters'][mmet_idx]
 
 		##### CLOUDY Halpha / empirical halpha, chain calculation
-		if ii == 0: import triangle
+		if ii == 0: import corner
 		ratio = np.log10(dat['model_emline']['flux']['chain'][:,ha_em]*constants.L_sun.cgs.value / dat['pextras']['flatchain'][:,emp_ha_idx])
-		ha_ratio[ii,:] = triangle.quantile(ratio, [0.5, 0.84, 0.16])
+		ha_ratio[ii,:] = corner.quantile(ratio, [0.5, 0.84, 0.16])
 
 		##### BPT information
 		ratio = np.log10(dat['model_emline']['flux']['chain'][:,oiii_em] / dat['model_emline']['flux']['chain'][:,hb_em])
-		oiii_hb[ii,:] = triangle.quantile(ratio, [0.5, 0.84, 0.16])
+		oiii_hb[ii,:] = corner.quantile(ratio, [0.5, 0.84, 0.16])
 		try:
 			ratio = np.log10(dat['model_emline']['flux']['chain'][:,nii_em] / dat['model_emline']['flux']['chain'][:,ha_em])
-			nii_ha[ii,:] = triangle.quantile(ratio, [0.5, 0.84, 0.16])
+			nii_ha[ii,:] = corner.quantile(ratio, [0.5, 0.84, 0.16])
 		except ValueError as e:
 			pass
 
@@ -850,7 +850,7 @@ def fmt_emline_info(alldata,add_abs_err = True):
 
 		ratio = dat['pquantiles']['random_chain'][:,dust1_idx] / dat['pquantiles']['random_chain'][:,dust2_idx]
 		ratio[~np.isfinite(ratio)] = 2.0
-		d1_d2[ii,:] = triangle.quantile(ratio, [0.5, 0.84, 0.16])
+		d1_d2[ii,:] = corner.quantile(ratio, [0.5, 0.84, 0.16])
 
 		sfr_10[ii,0] = dat['pextras']['q50'][sfr_10_idx_p]
 		sfr_10[ii,1] = dat['pextras']['q84'][sfr_10_idx_p]
@@ -865,7 +865,7 @@ def fmt_emline_info(alldata,add_abs_err = True):
 		d2_chain = dat['pquantiles']['random_chain'][:,dust2_idx]
 		didx_chain = dat['pquantiles']['random_chain'][:,dinx_idx]
 		ha_ext_chain = threed_dutils.charlot_and_fall_extinction(6563.0,d1_chain,d2_chain,-1.0,didx_chain,kriek=False)
-		ha_ext[ii,:] = triangle.quantile(ha_ext_chain, [0.5, 0.84, 0.16])
+		ha_ext[ii,:] = corner.quantile(ha_ext_chain, [0.5, 0.84, 0.16])
 
 	prosp['bdec_cloudy_bfit'] = bdec_cloudy_bfit
 	prosp['bdec_calc_bfit'] = bdec_calc_bfit

@@ -1,5 +1,5 @@
 from bsfh import model_setup,read_results
-import os, threed_dutils, triangle, threedhst_diag, pickle, sys
+import os, threed_dutils, corner, threedhst_diag, pickle, sys
 import numpy as np
 import matplotlib.pyplot as plt
 from copy import copy
@@ -196,18 +196,18 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 	##### CALCULATE Q16,Q50,Q84 FOR VARIABLE PARAMETERS
 	ntheta = len(sample_results['initial_theta'])
 	q_16, q_50, q_84 = (np.zeros(ntheta)+np.nan for i in range(3))
-	for kk in xrange(ntheta): q_16[kk], q_50[kk], q_84[kk] = triangle.quantile(sample_results['flatchain'][:,kk], [0.16, 0.5, 0.84])
+	for kk in xrange(ntheta): q_16[kk], q_50[kk], q_84[kk] = corner.quantile(sample_results['flatchain'][:,kk], [0.16, 0.5, 0.84])
 	
 	##### CALCULATE Q16,Q50,Q84 FOR EXTRA PARAMETERS
 	extra_flatchain = np.dstack((half_time, sfr_10, sfr_100, sfr_1000, ssfr_10, ssfr_100, totmass, emp_ha, dust_mass, bdec_cloudy,bdec_calc, bdec_nodust,ext_5500))[0]
 	nextra = extra_flatchain.shape[1]
 	q_16e, q_50e, q_84e = (np.zeros(nextra)+np.nan for i in range(3))
-	for kk in xrange(nextra): q_16e[kk], q_50e[kk], q_84e[kk] = triangle.quantile(extra_flatchain[:,kk], [0.16, 0.5, 0.84])
+	for kk in xrange(nextra): q_16e[kk], q_50e[kk], q_84e[kk] = corner.quantile(extra_flatchain[:,kk], [0.16, 0.5, 0.84])
 
 	##### FORMAT EMLINE OUTPUT 
 	q_16flux, q_50flux, q_84flux, q_16eqw, q_50eqw, q_84eqw = (np.zeros(nline)+np.nan for i in range(6))
-	for kk in xrange(nline): q_16flux[kk], q_50flux[kk], q_84flux[kk] = triangle.quantile(emflux[:,kk], [0.16, 0.5, 0.84])
-	for kk in xrange(nline): q_16eqw[kk], q_50eqw[kk], q_84eqw[kk] = triangle.quantile(emeqw[:,kk], [0.16, 0.5, 0.84])
+	for kk in xrange(nline): q_16flux[kk], q_50flux[kk], q_84flux[kk] = corner.quantile(emflux[:,kk], [0.16, 0.5, 0.84])
+	for kk in xrange(nline): q_16eqw[kk], q_50eqw[kk], q_84eqw[kk] = corner.quantile(emeqw[:,kk], [0.16, 0.5, 0.84])
 	emline_info = {}
 	emline_info['eqw'] = {'chain':emeqw,
 						'q16':q_16eqw,
@@ -222,9 +222,9 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 
 	##### SPECTRAL QUANTITIES
 	q_16flux, q_50flux, q_84flux, q_16eqw, q_50eqw, q_84eqw = (np.zeros(nabs)+np.nan for i in range(6))
-	for kk in xrange(nabs): q_16flux[kk], q_50flux[kk], q_84flux[kk] = triangle.quantile(absflux[:,kk], [0.16, 0.5, 0.84])
-	for kk in xrange(nabs): q_16eqw[kk], q_50eqw[kk], q_84eqw[kk] = triangle.quantile(abseqw[:,kk], [0.16, 0.5, 0.84])
-	q_16dn, q_50dn, q_84dn = triangle.quantile(dn4000, [0.16, 0.5, 0.84])
+	for kk in xrange(nabs): q_16flux[kk], q_50flux[kk], q_84flux[kk] = corner.quantile(absflux[:,kk], [0.16, 0.5, 0.84])
+	for kk in xrange(nabs): q_16eqw[kk], q_50eqw[kk], q_84eqw[kk] = corner.quantile(abseqw[:,kk], [0.16, 0.5, 0.84])
+	q_16dn, q_50dn, q_84dn = corner.quantile(dn4000, [0.16, 0.5, 0.84])
 	
 	spec_info = {}
 	spec_info['dn4000'] = {'chain':dn4000,

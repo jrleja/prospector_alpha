@@ -190,7 +190,7 @@ def load_obs_brown(photname, extinctname, herschname, objname):
 
     # phot mask
     phot_mask_brown = mag != 0
-    phot_mask_hersch = np.zeros_like(hflux)
+    phot_mask_hersch = np.zeros_like(hflux,dtype=bool)
     phot_mask = np.concatenate((phot_mask_brown,phot_mask_hersch))
 
     # map brown filters to FSPS filters

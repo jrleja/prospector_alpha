@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import triangle, os, math, copy, threed_dutils
+import corner, os, math, copy, threed_dutils
 from bsfh import read_results
 import matplotlib.image as mpimg
 from astropy.cosmology import WMAP9
@@ -18,17 +18,17 @@ tiny_number = 1e-3
 big_number = 1e90
 dpi = 150
 
-def subtriangle(sample_results,  sps, model,
+def subcorner(sample_results,  sps, model,
                 outname=None, showpars=None,
                 start=0, thin=1, truths=None,
                 powell_results=None, 
                 **kwargs):
     """
-    Make a triangle plot of the (thinned, latter) samples of the posterior
+    Make a corner plot of the (thinned, latter) samples of the posterior
     parameter space.  Optionally make the plot only for a supplied subset
     of the parameters.
     """
-    import triangle
+
     # pull out the parameter names and flatten the thinned chains
     parnames = np.array(sample_results['model'].theta_labels())
     plotflatchain = threed_dutils.chop_chain(sample_results['plotchain'])
@@ -48,14 +48,14 @@ def subtriangle(sample_results,  sps, model,
     else:
         ptruths = None
 
-    fig = triangle.corner(plotflatchain, labels = sample_results['plotnames'],
+    fig = corner.corner(plotflatchain, labels = sample_results['plotnames'],
                           quantiles=[0.16, 0.5, 0.84], verbose=False,
-                          truths = ptruths, extents=sample_results['extents'],truth_color='red',**kwargs)
-    
+                          truths = ptruths, range=sample_results['extents'],truth_color='red',**kwargs)
+
     fig = add_to_corner(fig, sample_results, sps, model, truths=truths, powell_results=powell_results)
 
     if outname is not None:
-        fig.savefig('{0}.triangle.png'.format(outname))
+        fig.savefig('{0}.corner.png'.format(outname))
         plt.close(fig)
     else:
         return fig
@@ -67,7 +67,7 @@ def add_to_corner(fig, sample_results, sps, model,truths=None,maxprob=True,powel
     if we have truths, list them as text
     '''
 
-	# pull information from triangle to replicate plots
+	# pull information from corner to replicate plots
 	# will want to put them in axes[6-8] or something
     axes = fig.get_axes()
 	
@@ -442,7 +442,7 @@ def create_plotquant(sample_results, logplot = ['mass'], truths=None):
 def return_extent(sample_results):    
     
 	'''
-	sets plot range for chain plot and triangle plot for each parameter
+	sets plot range for chain plot and corner plot for each parameter
 	'''
     
 	# set range
@@ -881,7 +881,7 @@ def make_all_plots(filebase=None,
 				   outfolder=os.getenv('APPS')+'/threedhst_bsfh/plots/',
 				   sample_results=None,
 				   sps=None,plt_chain=True,
-				   plt_triangle=True,
+				   plt_corner=True,
 				   plt_sed=True):
 
 	'''
@@ -924,12 +924,12 @@ def make_all_plots(filebase=None,
 	               outname=outfolder+objname+'.chain.png',
 			       alpha=0.3,truths=truths)
 
-	# triangle plot
-	if plt_triangle: 
-		print 'MAKING TRIANGLE PLOT'
+	# corner plot
+	if plt_corner: 
+		print 'MAKING CORNER PLOT'
 		chopped_sample_results = copy.deepcopy(sample_results)
 
-		subtriangle(sample_results, sps, copy.deepcopy(sample_results['model']),
+		subcorner(sample_results, sps, copy.deepcopy(sample_results['model']),
 							 outname=outfolder+objname,
 							 showpars=None,start=0,
 							 show_titles=True, truths=truths, powell_results=powell_results)

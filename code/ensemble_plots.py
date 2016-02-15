@@ -1,4 +1,4 @@
-import os, threed_dutils, pickle, extra_output, triangle, pylab
+import os, threed_dutils, pickle, extra_output, corner, pylab
 from bsfh import read_results
 import numpy as np
 import matplotlib.pyplot as plt

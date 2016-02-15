@@ -405,8 +405,16 @@ def load_truths(truthname,objname,sample_results, sps=None, calc_prob = True):
 		halftime = None
 		lnprob   = None
     
+
+	#### parameter conversions for plotting
+	plot_truths = truths+0.0
+	for kk in xrange(len(parnames)):
+		if parnames[kk] == 'mass':
+			plot_truths[kk] = np.log10(plot_truths[kk])
+
 	truths_dict = {'parnames':parnames,
 				   'truths':truths,
+				   'plot_truths':plot_truths,
 				   'extra_parnames':np.array(['sfr_10','ssfr_10','sfr_100','ssfr_100','half_time']),
 				   'extra_truths':np.array([sfr_10,ssfr_10,sfr_100,ssfr_100,halftime]),
 				   'sfh_params': sfh_params,

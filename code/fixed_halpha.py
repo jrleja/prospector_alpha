@@ -7,7 +7,7 @@ import random
 import pickle
 import matplotlib.pyplot as plt
 import math
-import triangle
+import corner
 import magphys_plot_pref
 from astropy import constants
 random.seed(69)
@@ -296,7 +296,7 @@ def main(redraw_thetas=True,pass_guesses=False,redraw_lbol_thetas=False):
 		#### percentile of spectra
 		spec_perc = np.zeros(shape=(sps.wavelengths.shape[0],3))
 		for kk in xrange(spec_perc.shape[0]):
-			spec_perc[kk,:] = triangle.quantile(thetas[name]['spec'][kk,:], [0.5, 0.84, 0.16])*to_fnu[kk]
+			spec_perc[kk,:] = corner.quantile(thetas[name]['spec'][kk,:], [0.5, 0.84, 0.16])*to_fnu[kk]
 
 		#### smooth and log spectra
 		for nn in xrange(3): spec_perc[:,nn] = np.log10(threed_dutils.smooth_spectrum(sps.wavelengths,spec_perc[:,nn],smoothing))
