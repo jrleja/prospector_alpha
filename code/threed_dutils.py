@@ -452,21 +452,7 @@ def generate_basenames(runname):
 	parm=[]
 	ancilname='COSMOS_testsamp.dat'
 
-	if runname == 'testsed_nonoise':
-
-		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/testsed_nonoise.ids"
-		ids = np.loadtxt(id_list, dtype='|S20')
-		ngals = len(ids)
-
-		basename = "testsed_nonoise"
-		parm_basename = "testsed_nonoise_params"
-		ancilname=None
-
-		for jj in xrange(ngals):
-			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+basename+'_'+ids[jj])
-			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
-
-	elif runname == 'brownseds':
+	if runname == 'brownseds':
 
 		id_list = os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/namelist.txt'
 		ids = np.loadtxt(id_list, dtype='|S20',delimiter=',')
@@ -494,7 +480,6 @@ def generate_basenames(runname):
 			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+basename+'_'+ids[jj])
 			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
 
-
 	elif 'simha' in runname:
 
 		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/testsed_simha.ids"
@@ -521,6 +506,20 @@ def generate_basenames(runname):
 			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+runname+'_'+ids[jj])
 			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
 
+	elif runname == 'brownseds_nohersch':
+
+		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/herschel_names.txt"
+		ids = np.loadtxt(id_list, dtype='|S20')
+		ngals = len(ids)
+
+		parm_basename = runname+"_params"
+		ancilname=None
+
+		for jj in xrange(ngals):
+			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+runname+'_'+' '.join(ids[jj]))
+			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
+
+		return filebase,parm,ancilname
 
 	else:
 
@@ -1312,6 +1311,7 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None,
 		out['abslines'] = measure_abslines(w,smooth_spec) # comes out in Lsun and rest-frame EQW
 
 	##### measure emission lines
+	# smooth_spec is only used to identify continuum
 	out['emlines'] = measure_emlines(w,spec,smooth_spec)
 
 	if measure_ir:
@@ -1321,7 +1321,7 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None,
 		if np.sum(mips_index) == 0:
 			mips_index = [i for i, s in enumerate(obs['filters']) if 'MIPS' in s]
 
-		lir = return_lir(w,spec, z=None, alt_file=None) # comes out in ergs/s
+		lir = return_lir(w,spec_nebon, z=None, alt_file=None) # comes out in ergs/s
 		lir /= 3.846e33 #  convert to Lsun
 
 		# if no MIPS flux...
@@ -1332,7 +1332,6 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None,
 
 		out['lir'] = lir
 		out['mips'] = mips
-	
 	return out
 
 def measure_Dn4000(lam,flux,ax=None):

@@ -1321,8 +1321,8 @@ def obs_vs_kennicutt_ha(e_pinfo,hflag,outname_prosp='test.png',outname_mag='test
 	ax3[0].text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat) +' dex', transform = ax3[0].transAxes,horizontalalignment='right')
 	ax3[0].text(0.96,0.1, 'mean offset='+"{:.2f}".format(off)+ ' dex', transform = ax3[0].transAxes,horizontalalignment='right')
 
-	ax3[1].set_xlabel(r'log(F$_{emit}$/F$_{obs}$) (6563 $\AA$) [marginalized, Prospector]')
-	ax3[1].set_ylabel(r'log(F$_{emit}$/F$_{obs}$) (6563 $\AA$) [best-fit, MAGPHYS]')
+	ax3[1].set_xlabel(r'log(F$_{\mathrm{emit}}$/F$_{\mathrm{obs}}$) (6563 $\AA$) [marginalized, Prospector]')
+	ax3[1].set_ylabel(r'log(F$_{\mathrm{emit}}$/F$_{\mathrm{obs}}$) (6563 $\AA$) [best-fit, MAGPHYS]')
 	ax3[1] = threed_dutils.equalize_axes(ax3[1], ha_ext[:,0], mha_ext)
 	off,scat = threed_dutils.offset_and_scatter(ha_ext[:,0], mha_ext, biweight=True)
 	ax3[1].text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat), transform = ax3[1].transAxes,horizontalalignment='right')
