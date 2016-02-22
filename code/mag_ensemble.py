@@ -2622,6 +2622,8 @@ def prospector_comparison(alldata,outfolder,hflag):
 	didx_idx = parnames == 'dust_index'
 	d1_idx = parnames == 'dust1'
 	d2_idx = parnames == 'dust2'
+	qpah_idx = parnames == 'duste_qpah'
+	met_idx = parnames == 'logzsol'
 
 	#### agn flags
 	sfing, composite, agn = return_agn_str(np.ones_like(hflag,dtype=bool))
@@ -2692,8 +2694,31 @@ def prospector_comparison(alldata,outfolder,hflag):
 	ax[1,2].text(0.96,0.1, 'mean offset='+"{:.2f}".format(off),
 			      transform = ax[1,2].transAxes,horizontalalignment='right')
 
+
+
 	plt.savefig(outfolder+'bestfit_param_comparison.png', dpi=dpi)
 	plt.close()
+
+	#### qpah plots
+	fig, ax = plt.subplots(1,2, figsize = (12,6))
+
+	mass = np.array([x['pquantiles']['q50'][idx_mass][0] for x in alldata])
+	logzsol = np.array([x['pquantiles']['q50'][met_idx][0] for x in alldata])
+	qpah = np.array([x['pquantiles']['q50'][qpah_idx][0] for x in alldata])
+
+	ax[0].errorbar(logzsol, qpah, alpha=0.6, fmt='o', color='#1C86EE')
+	ax[1].errorbar(np.log10(mass),qpah, alpha=0.6, fmt='o', color='#1C86EE')
+
+	ax[0].set_xlabel(r'log(Z/Z$_{\odot}$)')
+	ax[0].set_ylabel(r'Q$_{\mathrm{PAH}}$')
+	ax[1].set_xlabel(r'log(M/M$_{\odot}$)')
+	ax[1].set_ylabel(r'Q$_{\mathrm{PAH}}$')
+	ax[0].set_ylim(-0.5,10)
+	ax[1].set_ylim(-0.5,10)
+
+	plt.savefig(outfolder+'qpah_comp.png', dpi=dpi)
+	plt.close()
+
 
 def plot_comparison(alldata,outfolder):
 

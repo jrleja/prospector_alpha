@@ -1292,7 +1292,7 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None,
 		# subtract, switch to flam
 		factor = 3e18 / w**2
 		spec = (spec_nebon-spec_neboff) *factor
-		spec_nebon *= factor
+		spec_nebon_flam = factor * spec_nebon
 		spec_neboff *= factor
 
 		model.params['zred'] = z
@@ -1305,7 +1305,7 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None,
 
 
 	##### measure absorption lines and Dn4000
-	out['dn4000'] = measure_Dn4000(w,spec_nebon)
+	out['dn4000'] = measure_Dn4000(w,spec_nebon_flam)
 	if abslines:
 		smooth_spec = smooth_spectrum(w,spec_neboff,200.0,minlam=3e3,maxlam=8e3)
 		out['abslines'] = measure_abslines(w,smooth_spec) # comes out in Lsun and rest-frame EQW
