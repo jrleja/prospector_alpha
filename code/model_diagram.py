@@ -575,7 +575,7 @@ def main_plot():
 	idx = labels.index('logzsol')
 	par = [-1.8,0.1]
 	a2 = plt.subplot(gs2[1])
-	add_label(a2,r'log(Z$_{\odot}$)',par=par,par_idx=idx, txtlabel=r'log(Z/Z$_{\odot}$)', fmt="{:.2f}")
+	add_label(a2,'stellar \n metallicity',par=par,par_idx=idx, txtlabel=r'log(Z/Z$_{\odot}$)', fmt="{:.2f}")
 	met_xplot(a2,par,idx)
 	plot_sed(plt.subplot(gs1[1,0]),plt.subplot(gs1[1,1]),idx,
 						 par=[-1.8,0.1])

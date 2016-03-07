@@ -22,3 +22,7 @@ data/FAST/master_catalogs/cosmos_3dhst.v4.1.test.cat
 *mcmc
 
 *model
+*.pickle
+plots/
+remote/
+results/

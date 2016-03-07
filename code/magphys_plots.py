@@ -76,7 +76,13 @@ def plot_all_residuals(alldata,runname):
 
 	'''
 	show all residuals for spectra + photometry, magphys + prospector
+	split into star-forming and quiescent
+	by an arbitrary sSFR cut
 	'''
+	qucolor = '#FF3D0D' #red
+	sfcolor = '#1C86EE' #blue
+	ssfr_limit = 1e-11
+
 
 	##### set up plots
 	fig = plt.figure(figsize=(15,12.5))
@@ -110,51 +116,84 @@ def plot_all_residuals(alldata,runname):
 	lw_major = 2.5
 
 	##### load and plot photometric residuals
-	chi_magphys, chi_prosp, chisq_magphys, chisq_prosp, lam_rest, frac_magphys,frac_prosp = np.array([]),np.array([]),np.array([]), np.array([]), np.array([]),np.array([]),np.array([])
+	chi_magphys, chi_prosp, chisq_magphys, chisq_prosp, lam_rest, frac_magphys,frac_prosp, \
+	ssfr_100,lam_rest_sf,lam_rest_qu,frac_prosp_sf,frac_prosp_qu,chisq_prosp_sf, \
+	chisq_prosp_qu = [np.array([]) for i in range(14)]
 	for data in alldata:
 
 		if data:
 
-			#### save chi, fractional difference
+			#### save chi
 			chi_magphys = np.append(chi_magphys,data['residuals']['phot']['chi_magphys'])
 			chi_prosp = np.append(chi_prosp,data['residuals']['phot']['chi_prosp'])
+
+			#### save fractional difference
 			frac_magphys = np.append(frac_magphys,data['residuals']['phot']['frac_magphys'])
-			frac_prosp = np.append(frac_prosp,data['residuals']['phot']['frac_prosp'])
 
 			#### save goodness of fit
 			chisq_magphys = np.append(chisq_magphys,data['residuals']['phot']['chisq_magphys'])
 			chisq_prosp = np.append(chisq_prosp,data['residuals']['phot']['chisq_prosp'])
 			lam_rest = np.append(lam_rest,data['residuals']['phot']['lam_obs']/(1+data['residuals']['phot']['z'])/1e4)
 
+			#### star-forming or quiescent?
+			idx = data['pextras']['parnames'] == 'ssfr_100'
+			ssfr_100 = np.append(ssfr_100,data['pextras']['q50'][idx][0])
+			if ssfr_100[-1] > ssfr_limit:
+				pcolor = sfcolor
+				lam_rest_sf = np.append(lam_rest_sf,data['residuals']['phot']['lam_obs']/(1+data['residuals']['phot']['z'])/1e4)
+				frac_prosp_sf = np.append(frac_prosp_sf,data['residuals']['phot']['frac_prosp'])
+				chisq_prosp_sf = np.append(chisq_prosp_sf,data['residuals']['phot']['chisq_prosp'])
+			else:
+				pcolor = qucolor
+				lam_rest_qu = np.append(lam_rest_qu,data['residuals']['phot']['lam_obs']/(1+data['residuals']['phot']['z'])/1e4)
+				frac_prosp_qu = np.append(frac_prosp_qu,data['residuals']['phot']['frac_prosp'])
+				chisq_prosp_qu = np.append(chisq_prosp_qu,data['residuals']['phot']['chisq_prosp'])
+
+
+			#### plot
 			phot.plot(data['residuals']['phot']['lam_obs']/(1+data['residuals']['phot']['z'])/1e4, 
 				      data['residuals']['phot']['frac_prosp'],
 				      alpha=alpha_minor,
-				      color='black',
+				      color=pcolor,
 				      lw=lw_minor
 				      )
+
+	sfflag = ssfr_100 > ssfr_limit
 
 	##### calculate and plot running median
 	nfilters = 33 # calculate this more intelligently?
 	magbins, magmedian = median_by_band(lam_rest,frac_magphys)
-	probins, promedian = median_by_band(lam_rest,frac_prosp)
+	pro_sf_bins, pro_sf_median = median_by_band(lam_rest_sf,frac_prosp_sf)
+	pro_qu_bins, pro_qu_median = median_by_band(lam_rest_qu,frac_prosp_qu)
 
-	phot.plot(probins, 
-		      promedian,
+	phot.plot(pro_qu_bins, 
+		      pro_qu_median,
 		      color='black',
 		      lw=lw_major*1.1
 		      )
-	phot.plot(probins, 
-		      promedian,
-		      color=prosp_color,
+	phot.plot(pro_qu_bins, 
+		      pro_qu_median,
+		      color=qucolor,
 		      lw=lw_major
 		      )
 
-	phot.text(0.98,0.85, 'median',
+	phot.plot(pro_sf_bins, 
+		      pro_sf_median,
+		      color='black',
+		      lw=lw_major*1.1
+		      )
+	phot.plot(pro_sf_bins, 
+		      pro_sf_median,
+		      color=sfcolor,
+		      lw=lw_major
+		      )
+
+	phot.text(0.98,0.85, 'star-forming',
 			  transform = phot.transAxes,horizontalalignment='right',
-			  color=prosp_color)
-	phot.text(0.98,0.75, 'all fits',
+			  color=sfcolor)
+	phot.text(0.98,0.75, 'quiescent',
 			  transform = phot.transAxes,horizontalalignment='right',
-			  color='black')
+			  color=qucolor)
 	phot.text(0.98,0.05, 'photometry',
 			  transform = phot.transAxes,horizontalalignment='right')
 	phot.set_xlabel(r'$\lambda_{\mathrm{rest}}$ [$\mu$m]')
@@ -167,22 +206,26 @@ def plot_all_residuals(alldata,runname):
 
 	##### histogram of chisq values
 	nbins = 10
-	alpha_hist = 0.3
+	alpha_hist = 0.6
 	# first call is color-less, to get bins
 	# suitable for both data sets
 	histmax = np.log10(100.0)
-	chisq_prosp = np.log10(chisq_prosp)
-	okmag = chisq_magphys < histmax
-	okpro = chisq_prosp < histmax
-	n, b, p = phot_hist.hist(chisq_prosp[okpro],
-		                 nbins, histtype='bar',
-		                 color=prosp_color,
-		                 alpha=0.0,lw=2)
-	n, b, p = phot_hist.hist(chisq_prosp[okpro],
-		                 bins=b, histtype='bar',
-		                 color=prosp_color,
-		                 alpha=alpha_hist,lw=2)
+	chisq_prosp_sf = np.log10(chisq_prosp_sf)
+	chisq_prosp_qu = np.log10(chisq_prosp_qu)
 
+	okqu = chisq_prosp_qu < histmax
+	oksf = chisq_prosp_sf < histmax
+	n, b, p = phot_hist.hist([chisq_prosp_qu[okqu],chisq_prosp_sf[oksf]],
+		                 nbins, histtype='bar',
+		                 alpha=0.0,lw=2)
+	n, b, p = phot_hist.hist(chisq_prosp_sf[oksf],
+		                 bins=b, histtype='bar',
+		                 color=sfcolor,
+		                 alpha=alpha_hist,lw=2)
+	n, b, p = phot_hist.hist(chisq_prosp_qu[okqu],
+		                 bins=b, histtype='bar',
+		                 color=qucolor,
+		                 alpha=alpha_hist,lw=2)
 	phot_hist.set_ylabel('N')
 	phot_hist.xaxis.set_major_locator(MaxNLocator(4))
 
@@ -190,66 +233,81 @@ def plot_all_residuals(alldata,runname):
 
 	##### load and plot spectroscopic residuals
 	label = ['Optical','Akari', 'Spitzer IRS']
-	nbins = [500,500,500]
+	nbins = [50,50,50]
 	pmax = 0.0
 	pmin = 0.0
 	for i, plot in enumerate(plots):
-		res_magphys, res_prosp, obs_restlam, rms_mag, rms_pro = np.array([]),np.array([]),np.array([]),np.array([]),np.array([])
-		for data in alldata:
+		res_prosp_qu, rms_pro_qu, obs_restlam_qu, \
+		res_prosp_sf, rms_pro_sf, obs_restlam_sf = [np.array([]) for nn in range(6)]
+		for kk,data in enumerate(alldata):
 			if data:
 				if data['residuals'][label[i]]:
-					res_magphys = np.append(res_magphys,data['residuals'][label[i]]['magphys_resid'])
-					res_prosp = np.append(res_prosp,data['residuals'][label[i]]['prospector_resid'])
-					obs_restlam = np.append(obs_restlam,data['residuals'][label[i]]['obs_restlam'])
 
-					xplot_mag = data['residuals'][label[i]]['obs_restlam']
 					xplot_prosp = data['residuals'][label[i]]['obs_restlam']
-
-					yplot_mag = data['residuals'][label[i]]['magphys_resid']
 					yplot_prosp = data['residuals'][label[i]]['prospector_resid']
 
-					# mask emission lines for MAGPHYS
-					if label[i] == 'Optical':
-							nolines = mask_emission_lines(xplot_mag,0.0)
-							yplot_mag[~nolines] = np.nan
+					# color?
+					if sfflag[kk]:
+						pcolor=sfcolor
+						res_prosp_sf = np.append(res_prosp_sf,data['residuals'][label[i]]['prospector_resid'])
+						obs_restlam_sf = np.append(obs_restlam_sf,data['residuals'][label[i]]['obs_restlam'])
+						rms_pro_sf = np.append(rms_pro_sf,data['residuals'][label[i]]['prospector_rms'])
+					else:
+						pcolor=qucolor
+						res_prosp_qu = np.append(res_prosp_qu,data['residuals'][label[i]]['prospector_resid'])
+						obs_restlam_qu = np.append(obs_restlam_qu,data['residuals'][label[i]]['obs_restlam'])
+						rms_pro_qu = np.append(rms_pro_qu,data['residuals'][label[i]]['prospector_rms'])
 
 					plot.plot(xplot_prosp, 
 						      yplot_prosp,
 						      alpha=alpha_minor,
-						      color='black',
+						      color=pcolor,
 						      lw=lw_minor
 						      )
 
-					rms_mag = np.append(rms_mag,data['residuals'][label[i]]['magphys_rms'])
-					rms_pro = np.append(rms_pro,data['residuals'][label[i]]['prospector_rms'])
-
-					pmin = np.min((pmin,np.nanmin(yplot_mag),np.nanmin(yplot_prosp)))
-					pmax = np.max((pmax,np.nanmax(yplot_mag),np.nanmax(yplot_prosp)))
+					pmin = np.min((pmin,np.nanmin(yplot_prosp)))
+					pmax = np.max((pmax,np.nanmax(yplot_prosp)))
 
 		##### calculate and plot running median
-		magbins, magmedian = threed_dutils.running_median(obs_restlam,res_magphys,nbins=nbins[i])
-		probins, promedian = threed_dutils.running_median(obs_restlam,res_prosp,nbins=nbins[i])
+		# wrap quiescent galaxies in try-except clause
+		# as there are no Akari spectra for these
+		try:
+			probins_qu, promedian_qu = threed_dutils.running_median(obs_restlam_qu,res_prosp_qu,nbins=nbins[i])
+			plot.plot(probins_qu, 
+				      promedian_qu,
+				      color='black',
+				      lw=lw_major*1.1
+				      )
+			plot.plot(probins_qu, 
+				      promedian_qu,
+				      color=qucolor,
+				      lw=lw_major
+				      )
+		except ValueError:
+			pass
 
-		# mask emission lines for MAGPHYS
-		if label[i] == 'Optical':
-				nolines = mask_emission_lines(magbins,0.0)
-				magmedian[~nolines] = np.nan
-
-		plot.plot(probins, 
-			      promedian,
+		probins_sf, promedian_sf = threed_dutils.running_median(obs_restlam_sf,res_prosp_sf,nbins=nbins[i])
+		plot.plot(probins_sf, 
+			      promedian_sf,
 			      color='black',
 			      lw=lw_major*1.1
 			      )
-
-		plot.plot(probins, 
-			      promedian,
-			      color=prosp_color,
+		plot.plot(probins_sf, 
+			      promedian_sf,
+			      color=sfcolor,
 			      lw=lw_major
 			      )
 
-		plt_lim = np.max((np.abs(pmin*0.8),np.abs(pmax*1.2)))
-		plot.set_ylim(-plt_lim,plt_lim)
-		plot.set_xscale('log',nonposx='clip',subsx=(1,2,3,4,5,6,7,8,9))
+		plt_ylim = np.max((np.abs(pmin*0.8),np.abs(pmax*1.2)))
+		plt_xlim_lo = np.min(np.concatenate((obs_restlam_sf,obs_restlam_qu)))*0.99
+		plt_xlim_up = np.max(np.concatenate((obs_restlam_sf,obs_restlam_qu)))*1.01
+
+		plot.set_ylim(-plt_ylim,plt_ylim)
+		plot.set_xlim(plt_xlim_lo,plt_xlim_up)
+		if i == 2:
+			plot.set_xscale('log',nonposx='clip',subsx=(1,2,3,4,5,6,7,8,9))
+		else:
+			plot.set_xscale('log',nonposx='clip',subsx=(1,1.5,2,2.5,3,3.5,4,4.5,5,5.5,6,6.5,7,8,9))
 		plot.xaxis.set_minor_formatter(minorFormatter)
 		plot.xaxis.set_major_formatter(majorFormatter)
 		plot.set_xlabel(r'$\lambda_{\mathrm{rest}}$ [$\mu$m]')
@@ -260,28 +318,28 @@ def plot_all_residuals(alldata,runname):
 
 		##### histogram of mean offsets
 		nbins_hist = 10
-		alpha_hist = 0.3
+		alpha_hist = 0.6
 		# first histogram is transparent, to get bins
 		# suitable for both data sets
 		histmax = 2
-		okmag = rms_mag < histmax
-		okpro = rms_pro < histmax
-		n, b, p = plots_hist[i].hist(rms_pro[okpro],
+		okproqu = rms_pro_qu < histmax
+		okprosf = rms_pro_sf < histmax
+
+		n, b, p = plots_hist[i].hist([rms_pro_sf[okprosf],rms_pro_qu[okproqu]],
 			                 nbins_hist, histtype='bar',
-			                 color=prosp_color,
 			                 alpha=0.0,lw=2)
-		n, b, p = plots_hist[i].hist(rms_pro[okpro],
+		n, b, p = plots_hist[i].hist(rms_pro_sf[okprosf],
 			                 bins=b, histtype='bar',
-			                 color=prosp_color,
+			                 color=sfcolor,
+			                 alpha=alpha_hist,lw=2)
+		n, b, p = plots_hist[i].hist(rms_pro_qu[okproqu],
+			                 bins=b, histtype='bar',
+			                 color=qucolor,
 			                 alpha=alpha_hist,lw=2)
 
 		plots_hist[i].set_ylabel('N')
 		plots_hist[i].set_xlabel(r'RMS [dex]')
 		plots_hist[i].xaxis.set_major_locator(MaxNLocator(4))
-
-		plot.set_ylim(-1.2,1.2)
-		dynx = (np.max(magbins) - np.min(magbins))*0.05
-		plot.set_xlim(np.min(magbins)-dynx,np.max(magbins)+dynx)
 
 	outfolder = os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/magphys/'
 	
@@ -434,10 +492,8 @@ def plot_obs_spec(obs_spec, phot, spec_res, alpha,
 			spec_res.set_xlim(min(obslam)*0.98,max(obslam)*1.02)
 
 		#### axis scale
-		pmin = np.min(np.nanmin(prospector_resid))*0.8
-		pmax = np.max(np.nanmax(prospector_resid))*1.2
-		plt_lim = np.max((np.abs(pmin),np.abs(pmax)))
-		spec_res.set_ylim(-plt_lim,plt_lim)
+		plt_lim = np.nanmax(np.abs(prospector_resid))
+		spec_res.set_ylim(-1.1*plt_lim,1.1*plt_lim)
 		spec_res.set_xscale('log',nonposx='clip', subsx=(1,2,3,4,5,6,7,8,9))
 		spec_res.xaxis.set_minor_formatter(minorFormatter)
 		spec_res.xaxis.set_major_formatter(majorFormatter)
@@ -588,7 +644,12 @@ def sed_comp_figure(sample_results, sps, model, magphys,
 					                         magphys['metadata']['redshift'], sample_results['run_params']['objname'],
 		                                     ii+1, color=obs_color, label=label[ii],sigsmooth=sigsmooth[ii])
 
-
+	#### set all residual y-limits to be the same
+	pltlim = 0.0
+	for plot in resplots: 
+		if plot.axis() != (0.0, 1.0, 0.0, 1.0): # if the axis is not turned off...
+			pltlim = np.max((pltlim,np.abs(plot.get_ylim())[0],np.abs(plot.get_ylim())[1]))
+	for plot in resplots: plot.set_ylim(-pltlim,pltlim)
 
 	# diagnostic text
 	textx = 0.98
@@ -964,8 +1025,6 @@ def compute_specmags(runname=None, outfolder=None):
 	out = {'obs_phot':obsphot,'spec_phot':optphot}
 	brown_io.save_spec_cal(out,runname=runname)
 
-	print 1/0
-
 
 def add_sfr_info(runname=None, outfolder=None):
 
@@ -1047,8 +1106,6 @@ def add_sfr_info(runname=None, outfolder=None):
 	plt.tight_layout()
 	plt.savefig(outname, dpi=dpi)
 
-
-	print 1/0
 
 def add_prosp_mag_info(runname=None):
 	

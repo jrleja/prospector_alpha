@@ -277,6 +277,18 @@ def synthetic_halpha(sfr,dust1,dust2,dust1_index,dust2_index,kriek=False):
 	# comes out in ergs/s
 	return flux
 
+def chev_extinction(tau, lam):
+	'''
+	return optical depth based on Eqn 8 + 10 in Chevallard et al. 2013
+	lambda must be in angstroms
+	'''
+
+	exponent = -2.8 / (1. + 3.*np.sqrt(tau))
+	tau_return = tau * (lam/5500.)**exponent
+
+	return tau_return
+
+
 def charlot_and_fall_extinction(lam,dust1,dust2,dust1_index,dust2_index, kriek=False, nobc=False, nodiff=False):
 
 	dust1_ext = np.exp(-dust1*(lam/5500.)**dust1_index)
