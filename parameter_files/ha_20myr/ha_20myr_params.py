@@ -359,10 +359,10 @@ model_params.append({'name': 'dust2', 'N': 1,
 
 model_params.append({'name': 'dust_index', 'N': 1,
                         'isfree': True,
-                        'init': -0.7,
+                        'init': 0.0,
                         'units': '',
-                        'prior_function': priors.normal_clipped,
-                        'prior_args': {'mini':-3.0, 'maxi': -0.4,'mean':-0.7,'sigma':0.5}})
+                        'prior_function': tophat,
+                        'prior_args': {'mini':-2.2, 'maxi': 0.4}})
 
 model_params.append({'name': 'dust1_index', 'N': 1,
                         'isfree': False,
