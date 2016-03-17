@@ -11,7 +11,7 @@ plt.ioff() # don't pop up a window for each plot
 
 median_err_color = '0.75'
 median_main_color = 'black'
-most_likely_color = '#e60000'
+most_likely_color = '#1974D2'
 obs_color = '#545454'
 
 tiny_number = 1e-3
