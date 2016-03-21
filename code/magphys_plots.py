@@ -14,9 +14,9 @@ c = 3e18   # angstroms per second
 dpi = 150
 
 #### set up colors and plot style
-prosp_color = '#e60000'
-obs_color = '#95918C'
-magphys_color = '#1974D2'
+prosp_color = '#1974D2'
+obs_color = '#63605c'
+magphys_color = '#e60000'
 
 class jLogFormatter(mpl.ticker.LogFormatter):
 	'''
@@ -233,7 +233,7 @@ def plot_all_residuals(alldata,runname):
 
 	##### load and plot spectroscopic residuals
 	label = ['Optical','Akari', 'Spitzer IRS']
-	nbins = [50,50,50]
+	nbins = [100,100,100]
 	pmax = 0.0
 	pmin = 0.0
 	for i, plot in enumerate(plots):
@@ -462,7 +462,7 @@ def plot_obs_spec(obs_spec, phot, spec_res, alpha,
 		prospector_resid = np.log10(obs_spec['flux'][mask]) - np.log10(pro_flux_interp(obslam))
 		spec_res.plot(obslam, 
 			          prospector_resid,
-			          color=prosp_color,
+			          color=obs_color,
 			          alpha=alpha,
 			          linestyle='-')
 
@@ -482,7 +482,7 @@ def plot_obs_spec(obs_spec, phot, spec_res, alpha,
 		#### write text, add lines
 		spec_res.text(0.98,0.05, 'RMS='+"{:.2f}".format(prospector_rms)+' dex',
 			          transform = spec_res.transAxes,ha='right',
-			          color=prosp_color,fontsize=14)
+			          color=obs_color,fontsize=14)
 		spec_res.text(0.015,0.05, label,
 			          transform = spec_res.transAxes)
 		spec_res.axhline(0, linestyle=':', color='grey')
@@ -605,7 +605,7 @@ def sed_comp_figure(sample_results, sps, model, magphys,
 
 	# plot limits
 	phot.set_xlim(min(xplot)*0.4,max(xplot)*1.5)
-	phot.set_ylim(min(yplot[np.isfinite(yplot)])*0.4,max(yplot[np.isfinite(yplot)])*2.3)
+	phot.set_ylim(min(yplot[np.isfinite(yplot)])*0.2,max(yplot[np.isfinite(yplot)])*2.3)
 	res.set_xlim(min(xplot)*0.4,max(xplot)*1.5)
 	res.axhline(0, linestyle=':', color='grey')
 

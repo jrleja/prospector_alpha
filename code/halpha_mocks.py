@@ -95,7 +95,7 @@ def ha_mocks(basename,outname=None,add_zp_err=False):
 	test_sfhs           = np.zeros(100)
 	ntest               = len(test_sfhs)
 	ngals               = ntest*ngals_per_model
-	time_of_trunc       = 0.02 # in Gyr. this is 20 Myr currently
+	time_of_trunc       = 0.01 # in Gyr. this is 20 Myr currently
 
 	#### generate random model parameters ####
 	nparams = len(model.initial_theta)
@@ -116,9 +116,9 @@ def ha_mocks(basename,outname=None,add_zp_err=False):
 				min,max = return_bounds(parnames[ii],model,ii,test_sfhs=test_sfhs[jj])
 				for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): 
 					if random.random() > 0.5:
-						testparms[kk,ii] = np.random.power(8)*max
+						testparms[kk,ii] = np.random.power(15)*max
 					else:
-						testparms[kk,ii] = np.random.power(8)*min
+						testparms[kk,ii] = np.random.power(15)*min
 
 			#### set delt_trunc so that SFH truncates a specific amount of time before observation
 			elif parnames[ii] == 'delt_trunc':
@@ -143,7 +143,7 @@ def ha_mocks(basename,outname=None,add_zp_err=False):
 			elif parnames[ii] == 'dust_index':
 				min = -1.4
 				max = model.theta_bounds()[ii][1]
-				for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): testparms[kk,ii] = np.clip(random.gauss(-0.7, 0.5),min,max)
+				for kk in xrange(jj*ngals_per_model,(jj+1)*ngals_per_model): testparms[kk,ii] = np.clip(random.gauss(0.0, 0.5),min,max)
 			
 			else:
 				min = model.theta_bounds()[ii][0]
