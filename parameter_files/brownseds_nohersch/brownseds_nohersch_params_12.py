@@ -681,9 +681,7 @@ class BurstyModel(sedmodel.CSPModel):
                 dust1 = theta[start:end]
                 start,end = self.theta_index['dust2']
                 dust2 = theta[start:end]
-                if dust1/2. > dust2:
-                    return -np.inf
-                if dust1 < 0.5*dust2:
+                if dust1/1.5 > dust2:
                     return -np.inf
 
         for k, v in self.theta_index.iteritems():

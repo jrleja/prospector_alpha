@@ -252,7 +252,6 @@ def plot_lir(alldata,outfolder=None):
 
 	plt.savefig(outfolder+'lir_comparison.png',dpi=150)
 	plt.close()
-	print 1/0
 
 def plot_halpha(alldata,outfolder=None):
 
@@ -391,7 +390,6 @@ def plot_bdec(alldata,outfolder=None):
 
 	plt.savefig(outfolder+'herschel_bdec.png',dpi=150)
 	plt.close()
-	print 1/0
 
 def plot_dustpars(alldata,outfolder=None):
 

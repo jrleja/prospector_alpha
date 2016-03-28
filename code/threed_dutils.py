@@ -277,16 +277,31 @@ def synthetic_halpha(sfr,dust1,dust2,dust1_index,dust2_index,kriek=False):
 	# comes out in ergs/s
 	return flux
 
-def chev_extinction(tau, lam):
+def chev_extinction(tau_v, lam, ebars=False):
 	'''
-	return optical depth based on Eqn 8 + 10 in Chevallard et al. 2013
+	return optical depth based on Eqn 7+9,10 in Chevallard et al. 2013
 	lambda must be in angstroms
+	if ebars==True, also return the +/- 1 sigma
+	this only works perfectly at lambda = 5500!
+	must include error in b_tauv if you do it elsewhere!
+
+	returns (center, up, down)
 	'''
 
-	exponent = -2.8 / (1. + 3.*np.sqrt(tau))
-	tau_return = tau * (lam/5500.)**exponent
+	n_v = 2.8 / (1. + 3.*np.sqrt(tau_v))
+	b_tauv = 0.3-0.05*tau_v
+	n_lam = n_v + b_tauv*(lam/1e4-0.55)
+	tau_return = tau_v * (lam/5500.)**(-n_lam)
 
-	return tau_return
+	if ebars:
+		n_v_up = n_v*1.25
+		n_v_do = n_v*0.75
+		n_lam_up = n_v_up + b_tauv*(lam/1e4-0.55)
+		n_lam_do = n_v_do + b_tauv*(lam/1e4-0.55)
+
+		return np.array([tau_return, tau_v*(lam/5500.)**(-n_lam_up),tau_v*(lam/5500.)**(-n_lam_do)])
+	else:
+		return tau_return
 
 
 def charlot_and_fall_extinction(lam,dust1,dust2,dust1_index,dust2_index, kriek=False, nobc=False, nodiff=False):
