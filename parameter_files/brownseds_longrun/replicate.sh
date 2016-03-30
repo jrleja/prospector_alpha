@@ -3,8 +3,8 @@
 # for multiple galaxy IDs
 # set location of ID file, base parameter file
 IDFILE=$APPS"/threedhst_bsfh/data/brownseds_data/photometry/namelist.txt"
-PARAMFOLDER=$APPS"/threedhst_bsfh/parameter_files/brownseds_tightbc/"
-PARAMBASE="brownseds_tightbc_params"
+PARAMFOLDER=$APPS"/threedhst_bsfh/parameter_files/brownseds_longrun/"
+PARAMBASE="brownseds_longrun_params"
 PARAMEXT=".py"
 
 echo 'ID file:'$IDFILE
