@@ -118,7 +118,7 @@ def smooth_spectrum(lam,spec,sigma,
 def offset_and_scatter(x,y,biweight=True):
 
 	n = len(x)
-	mean_offset = np.nanmean(x-y)
+	mean_offset = np.nanmean(y-x)
 
 	if biweight:
 		diff = y-x

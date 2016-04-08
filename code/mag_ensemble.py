@@ -3087,6 +3087,7 @@ def prospector_comparison(alldata,outfolder,hflag):
 
 	#### qpah plots
 	fig, ax = plt.subplots(1,2, figsize = (12.5,6))
+	qpah_low = 0.001 # lower plot limit for qpah, must clip errors for presentation purposes
 
 	mass = np.array([x['pquantiles']['q50'][idx_mass][0] for x in alldata])
 	m_errup = np.array([x['pquantiles']['q84'][idx_mass][0] for x in alldata])
@@ -3097,7 +3098,7 @@ def prospector_comparison(alldata,outfolder,hflag):
 	qpah = np.array([x['pquantiles']['q50'][qpah_idx][0] for x in alldata])
 	qpah_errup = np.array([x['pquantiles']['q84'][qpah_idx][0] for x in alldata])
 	qpah_errdo = np.array([x['pquantiles']['q16'][qpah_idx][0] for x in alldata])
-	qpah_err = threed_dutils.asym_errors(qpah,qpah_errup,qpah_errdo,log=False)
+	qpah_err = threed_dutils.asym_errors(qpah,qpah_errup,np.clip(qpah_errdo,qpah_low,np.inf),log=True)
 
 	lir, lir_up, lir_do = [],[],[]
 	for dat in alldata:
@@ -3116,16 +3117,18 @@ def prospector_comparison(alldata,outfolder,hflag):
 	ax[0].set_ylim(-0.5,10)
 	'''
 
-	ax[0].errorbar(np.log10(mass),qpah,xerr=mass_err,yerr=qpah_err, alpha=0.6, fmt='o', color='#1C86EE')
+	ax[0].errorbar(np.log10(mass),np.log10(qpah),xerr=mass_err,yerr=qpah_err, alpha=0.6, fmt='o', color='#1C86EE')
 	ax[0].set_xlabel(r'log(M/M$_{\odot}$)')
-	ax[0].set_ylabel(r'Q$_{\mathrm{PAH}}$')
-	ax[0].set_ylim(-0.5,10)
+	ax[0].set_ylabel(r'log(Q$_{\mathrm{PAH}}$)')
+	ax[0].set_ylim(np.log10(qpah_low),np.log10(11.0))
 
-	ax[1].errorbar(lir,qpah,xerr=lir_err,yerr=qpah_err, alpha=0.6, fmt='o', color='#1C86EE')
+	ax[1].errorbar(lir,np.log10(qpah),xerr=lir_err,yerr=qpah_err, alpha=0.6, fmt='o', color='#1C86EE')
 	ax[1].set_xlabel(r'log(L$_{\mathrm{IR}}$)')
-	ax[1].set_ylabel(r'Q$_{\mathrm{PAH}}$')
-	ax[1].set_ylim(-0.5,10)
+	ax[1].set_ylabel(r'log(Q$_{\mathrm{PAH}}$)')
+	ax[1].set_ylim(np.log10(0.001),np.log10(11.0))
+	ax[1].set_xlim(6.5,12.5)
 
+	plt.tight_layout()
 	plt.savefig(outfolder+'qpah_comp.png', dpi=dpi)
 	plt.close()
 

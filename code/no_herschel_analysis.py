@@ -181,16 +181,6 @@ def plot_lir(alldata,outfolder=None):
 	nohersch_lir_err = threed_dutils.asym_errors(nohersch_lir,nohersch_lir_up,nohersch_lir_do,log=False)
 
 	##### SFRs
-	nh_sfr10 = np.log10(np.clip(np.squeeze([dat['nohersch']['sfr10_q50'] for dat in alldata]),minsfr,np.inf))
-	nh_sfr10_up = np.log10(np.clip(np.squeeze([dat['nohersch']['sfr10_q84'] for dat in alldata]),minsfr,np.inf))
-	nh_sfr10_do = np.log10(np.clip(np.squeeze([dat['nohersch']['sfr10_q16'] for dat in alldata]),minsfr,np.inf))
-	nh_sfr10_err = threed_dutils.asym_errors(nh_sfr10,nh_sfr10_up,nh_sfr10_do,log=False)
-
-	h_sfr10 = np.log10(np.clip(np.squeeze([dat['hersch']['sfr10_q50'] for dat in alldata]),minsfr,np.inf))
-	h_sfr10_up = np.log10(np.clip(np.squeeze([dat['hersch']['sfr10_q84'] for dat in alldata]),minsfr,np.inf))
-	h_sfr10_do = np.log10(np.clip(np.squeeze([dat['hersch']['sfr10_q16'] for dat in alldata]),minsfr,np.inf))
-	h_sfr10_err = threed_dutils.asym_errors(h_sfr10,h_sfr10_up,h_sfr10_do,log=False)
-
 	nh_sfr100 = np.log10(np.clip(np.squeeze([dat['nohersch']['sfr100_q50'] for dat in alldata]),minsfr,np.inf))
 	nh_sfr100_up = np.log10(np.clip(np.squeeze([dat['nohersch']['sfr100_q84'] for dat in alldata]),minsfr,np.inf))
 	nh_sfr100_do = np.log10(np.clip(np.squeeze([dat['nohersch']['sfr100_q16'] for dat in alldata]),minsfr,np.inf))
@@ -202,7 +192,7 @@ def plot_lir(alldata,outfolder=None):
 	h_sfr100_err = threed_dutils.asym_errors(h_sfr100,h_sfr100_up,h_sfr100_do,log=False)
 
 	##### PLOTS
-	fig, axes = plt.subplots(1, 3, figsize = (21,6))
+	fig, axes = plt.subplots(1, 2, figsize = (12.5,6))
 	ax = np.ravel(axes)
 
 	### LIR
@@ -221,35 +211,21 @@ def plot_lir(alldata,outfolder=None):
 	ax[0] = threed_dutils.equalize_axes(ax[0], hersch_lir,nohersch_lir)
 
 	### SFR10
-	ax[1].errorbar(h_sfr10,nh_sfr10,xerr=h_sfr10_err,yerr=nh_sfr10_err,fmt='o',alpha=0.8,color='#1C86EE')
-	ax[1].set_xlabel('log(SFR$_{10 \mathrm{Myr}}$) [Herschel]')
-	ax[1].set_ylabel('log(SFR$_{10 \mathrm{Myr}}$)  [no Herschel]')
+	ax[1].errorbar(h_sfr100,nh_sfr100,xerr=h_sfr100_err,yerr=nh_sfr100_err,fmt='o',alpha=0.8,color='#1C86EE')
+	ax[1].set_xlabel('log(SFR$_{100 \mathrm{Myr}}$) [Herschel]')
+	ax[1].set_ylabel('log(SFR$_{100 \mathrm{Myr}}$)  [no Herschel]')
 
 	ax[1].xaxis.set_major_locator(MaxNLocator(5))
 	ax[1].yaxis.set_major_locator(MaxNLocator(5))
 
-	off,scat = threed_dutils.offset_and_scatter(h_sfr10,nh_sfr10,biweight=True)
+	off,scat = threed_dutils.offset_and_scatter(h_sfr100,nh_sfr100,biweight=True)
 	ax[1].text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat)+ ' dex',
 			  transform = ax[1].transAxes,horizontalalignment='right')
 	ax[1].text(0.96,0.10, 'mean offset='+"{:.2f}".format(off) + ' dex',
 			      transform = ax[1].transAxes,horizontalalignment='right')
-	ax[1] = threed_dutils.equalize_axes(ax[1], h_sfr10,nh_sfr10)
-	
-	### SFR10
-	ax[2].errorbar(h_sfr100,nh_sfr100,xerr=h_sfr100_err,yerr=nh_sfr100_err,fmt='o',alpha=0.8,color='#1C86EE')
-	ax[2].set_xlabel('log(SFR$_{100 \mathrm{Myr}}$) [Herschel]')
-	ax[2].set_ylabel('log(SFR$_{100 \mathrm{Myr}}$)  [no Herschel]')
+	ax[1] = threed_dutils.equalize_axes(ax[1], h_sfr100,nh_sfr100)
 
-	ax[2].xaxis.set_major_locator(MaxNLocator(5))
-	ax[2].yaxis.set_major_locator(MaxNLocator(5))
-
-	off,scat = threed_dutils.offset_and_scatter(h_sfr100,nh_sfr100,biweight=True)
-	ax[2].text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat)+ ' dex',
-			  transform = ax[2].transAxes,horizontalalignment='right')
-	ax[2].text(0.96,0.10, 'mean offset='+"{:.2f}".format(off) + ' dex',
-			      transform = ax[2].transAxes,horizontalalignment='right')
-	ax[2] = threed_dutils.equalize_axes(ax[2], h_sfr100,nh_sfr100)
-
+	plt.tight_layout()
 	plt.savefig(outfolder+'lir_comparison.png',dpi=150)
 	plt.close()
 
@@ -362,7 +338,7 @@ def plot_bdec(alldata,outfolder=None):
 	bdec_h = hersch_bdec[idx]
 
 	### plot!
-	fig, ax = plt.subplots(1, 1, figsize = (8,8))
+	fig, ax = plt.subplots(1, 1, figsize = (7,7))
 
 	ax.errorbar(bdec_obs,bdec_h,xerr=bdec_obs_err,yerr=bdec_h_err,fmt='o',alpha=0.8,color=hcolor)
 	ax.errorbar(bdec_obs,bdec_nh,xerr=bdec_obs_err,yerr=bdec_nh_err,fmt='o',alpha=0.8,color=nhcolor)
@@ -396,6 +372,7 @@ def plot_dustpars(alldata,outfolder=None):
 	#### REGULAR PARAMETERS
 	pars = np.array(alldata[0]['nohersch']['parnames'])
 	to_plot = ['dust1','dust2','dust_index']
+	parname = ['birth-cloud dust', 'diffuse dust', 'diffuse dust index']
 	fig, axes = plt.subplots(2, 2, figsize = (12,12))
 	plt.subplots_adjust(wspace=0.3,hspace=0.3)
 	ax = np.ravel(axes)
@@ -416,8 +393,8 @@ def plot_dustpars(alldata,outfolder=None):
 		xerr = threed_dutils.asym_errors(x,xup,xdown,log=False)
 
 		ax[ii].errorbar(x,y,yerr=yerr,xerr=xerr,fmt='o',alpha=0.8,color='#1C86EE')
-		ax[ii].set_xlabel(par+' [no Herschel]')
-		ax[ii].set_ylabel(par+' [with Herschel]')
+		ax[ii].set_xlabel(parname[ii]+' [no Herschel]')
+		ax[ii].set_ylabel(parname[ii]+' [with Herschel]')
 
 		ax[ii] = threed_dutils.equalize_axes(ax[ii], x,y)
 		mean_offset,scat = threed_dutils.offset_and_scatter(x,y)
@@ -428,19 +405,19 @@ def plot_dustpars(alldata,outfolder=None):
 		ax[ii].yaxis.set_major_locator(MaxNLocator(5))
 
 	### halpha extinction!
-	ha_ext_h, ha_ext_up_h, ha_ext_do_h = np.array([dat['hersch']['ha_ext_q50'] for dat in alldata]), \
-										 np.array([dat['hersch']['ha_ext_q84'] for dat in alldata]), \
-										 np.array([dat['hersch']['ha_ext_q16'] for dat in alldata])
+	ha_ext_h, ha_ext_up_h, ha_ext_do_h = 1./np.array([dat['hersch']['ha_ext_q50'] for dat in alldata]), \
+										 1./np.array([dat['hersch']['ha_ext_q84'] for dat in alldata]), \
+										 1./np.array([dat['hersch']['ha_ext_q16'] for dat in alldata])
 	ha_ext_h_errs = threed_dutils.asym_errors(ha_ext_h,ha_ext_up_h,ha_ext_do_h,log=False)
 
-	ha_ext_nh, ha_ext_up_nh, ha_ext_do_nh = np.array([dat['nohersch']['ha_ext_q50'] for dat in alldata]), \
-										    np.array([dat['nohersch']['ha_ext_q84'] for dat in alldata]), \
-										    np.array([dat['nohersch']['ha_ext_q16'] for dat in alldata])
+	ha_ext_nh, ha_ext_up_nh, ha_ext_do_nh = 1./np.array([dat['nohersch']['ha_ext_q50'] for dat in alldata]), \
+										    1./np.array([dat['nohersch']['ha_ext_q84'] for dat in alldata]), \
+										    1./np.array([dat['nohersch']['ha_ext_q16'] for dat in alldata])
 	ha_ext_nh_errs = threed_dutils.asym_errors(ha_ext_nh,ha_ext_up_nh,ha_ext_do_nh,log=False)
 
 	ax[ii+1].errorbar(ha_ext_nh,ha_ext_h,xerr=ha_ext_nh_errs,yerr=ha_ext_h_errs,fmt='o',alpha=0.8,color='#1C86EE')
-	ax[ii+1].set_xlabel(r'attenuation [6563 $\AA$, no Herschel]')
-	ax[ii+1].set_ylabel(r'attenuation [6563 $\AA$, with Herschel]')
+	ax[ii+1].set_xlabel(r'total dust attenuation [6563 $\AA$, no Herschel]')
+	ax[ii+1].set_ylabel(r'total dust attenuation [6563 $\AA$, with Herschel]')
 
 	ax[ii+1] = threed_dutils.equalize_axes(ax[ii+1], ha_ext_nh,ha_ext_h)
 	mean_offset,scat = threed_dutils.offset_and_scatter(ha_ext_nh,ha_ext_h)

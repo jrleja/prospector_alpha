@@ -18,31 +18,36 @@ def make_plot(runname='brownseds_tightbc'):
 	scale = 1.4
 	figsize = (8.5*scale,11*scale)
 	fig = plt.figure(figsize = figsize)
-	fontsize=12
+	fontsize=18.5
 
-	dy = 0.16
-	dx = 0.16
+	dy = 0.249
+	dx = 0.249
 
-	xcurr = -dx+0.02
+	xcurr = -dx+0.001
 	xmax = 1.0-dx # farthest right you can place an image, after transition
 
-	ycurr = 0.87
+	ycurr = 0.8
 	ytrans = 0.6 # where we transition from half to full
-	xtrans = 0.45 # farthest right position to place an image above half-page
+	xtrans = 0.4 # farthest right position to place an image above half-page
 
-	ysep = 0.0985
+	ysep = 0.16 # distance between images
 
 	fig = add_mass_sfr_plot(alldata,fig)
 
 	### galaxies we want
 	# limit 51
-	in_list = ['NGC 0337', 'NGC 0474', 'NGC 0660', 'NGC 1068', 'NGC 1275', 'NGC 2403', 'NGC 2623', 'NGC 2798', \
+	# NEW LIMIT 20
+	in_list = ['NGC 0337', 'NGC 0474', 'NGC 0660', 'NGC 4594', 'NGC 1275', 'NGC 2403', 'NGC 2623', 'NGC 2798', \
 	           'NGC 3079', 'NGC 3198', 'NGC 3190', 'NGC 3310', 'NGC 3351', 'NGC 3379', 'NGC 3521', 'NGC 3627', \
 	           'NGC 3938', 'NGC 4088', 'NGC 4168', 'NGC 4254', 'NGC 4321', 'NGC 4365', 'NGC 4450', 'NGC 4486', \
 	           'NGC 4559', 'NGC 4569', 'NGC 4579', 'NGC 4594', 'NGC 4631', 'NGC 4676 A', 'NGC 4725', 'NGC 4826',\
 	           'NGC 5033', 'NGC 5194', 'NGC 5195', 'NGC 5258', 'NGC 5866', 'NGC 7331', 'NGC 7585', 'NGC 7714',\
 	           'UGCA 219', 'UGC 06850', 'UGC 09618 N', 'UGC 12150', 'Arp 118', 'Arp 256 N', 'Arp 256 S', 'IC 0691',\
 	           'II Zw 096', 'Mrk 0930', 'IRAS 17208-0014', 'Mrk 0331']
+
+	in_list = ['NGC 0337', 'NGC 0474', 'NGC 0660', 'NGC 7331', 'NGC 1275', 'NGC 2403', 'UGC 06850', 'NGC 2798', \
+	           'NGC 3079', 'NGC 3198', 'NGC 3190', 'NGC 3310', 'NGC 3351', 'Arp 256 N', 'NGC 3521', 'NGC 3627', \
+	           'NGC 3938', 'NGC 4594', 'NGC 4168', 'NGC 4254']
 
 	#### loop over alldata, add each galaxy png
 	xstart = xcurr + dx
@@ -63,9 +68,9 @@ def make_plot(runname='brownseds_tightbc'):
 		img=mpimg.imread(imgname)
 
 		#### background
-		size = 0.019
+		size = 0.04
 		ax_bg = fig.add_axes([xcurr+0.0007,ycurr+0.021,dx-0.0007,size])
-		ax_bg.set_axis_bgcolor('0.83')
+		ax_bg.set_axis_bgcolor('0.87')
 		ax_bg.get_xaxis().set_visible(False)
 		ax_bg.get_yaxis().set_visible(False)
 
@@ -75,7 +80,7 @@ def make_plot(runname='brownseds_tightbc'):
 		ax.set_axis_off()
 
 		#### text
-		ax.text(0.5,-0.15,name,fontsize=fontsize,ha='center',transform=ax.transAxes)
+		ax.text(0.5,-0.18,name,fontsize=fontsize,ha='center',transform=ax.transAxes,weight='semibold')
 
 	plt.savefig('/Users/joel/my_papers/prospector_brown/figures/introduce_sample.png',dpi=dpi)
 	plt.close()
@@ -94,7 +99,7 @@ def add_mass_sfr_plot(alldata,fig):
 	sfr = np.zeros(shape=(len(alldata),3))
 
 	##### add axis
-	ax = fig.add_axes([0.575,0.73,0.36,0.26])
+	ax = fig.add_axes([0.58,0.71,0.37,0.28])
 
 	for ii,dat in enumerate(alldata):
 		mass[ii,0] = np.log10(dat['pquantiles']['q50'][idx_mass])
