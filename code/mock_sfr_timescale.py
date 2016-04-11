@@ -10,6 +10,31 @@ from corner import quantile
 minsfr = 1e-1
 minssfr = 1e-12
 
+def norm_resid(fit,truth):
+	
+	# define output
+	out = np.zeros_like(truth)
+	
+	# define errors
+	edown_fit = fit[:,0] - fit[:,2]
+	eup_fit = fit[:,1] - fit[:,0]
+
+	# find out which side of error bar to use
+	undershot = truth > fit[:,0]
+	
+	# create output
+	out[undershot] = (truth[undershot] - fit[undershot,0]) / eup_fit[undershot]
+	out[~undershot] = (truth[~undershot] - fit[~undershot,0]) / edown_fit[~undershot]
+
+	return out
+
+def gaussian(x, mu, sig):
+	'''
+	can't believe there's not a package for this
+	x is x-values, mu is mean, sig is sigma
+	'''
+	return np.exp(-np.power(x - mu, 2.) / (2 * np.power(sig, 2.)))
+
 def make_plots(runname='ha_80myr', recollate_data = False):
 
 	outpickle = '/Users/joel/code/python/threedhst_bsfh/data/'+runname+'_extradat.pickle'
@@ -34,6 +59,24 @@ def make_plots(runname='ha_80myr', recollate_data = False):
 	# max fit likelihood divided by truth likelihood
 	# hdelta, halpha, hbeta absorption: what about wide / narrow indexes?
 	# SFR_10 (truth) versus SFR_100 (truth) [there better be differences, goddamnit]
+
+
+def calc_onesig(fit_pars,true_pars):
+
+	'''
+	(1) calculate normalized residual distribution
+	(2) calculate 16th, 50th, and 84th percentiles of this distribution
+	(3) return average(84th-50th, 50th-16th) as 1 sigma, and 50th as mean
+	'''
+
+	residual_distribution = norm_resid(fit_pars,true_pars)
+	residual_percentiles = quantile(residual_distribution,[0.16,0.5,0.84])
+
+	mean = residual_percentiles[1]
+	onesig = (residual_percentiles[2] - residual_percentiles[0])/2.
+
+	return residual_distribution, onesig, mean
+
 
 def collate_data(runname='ha_80myr',outpickle=None):
 
@@ -112,6 +155,13 @@ def plot_fit_parameters(alldata,outfolder=None):
 	fig, axes = plt.subplots(3, 4, figsize = (20,14))
 	plt.subplots_adjust(wspace=0.3,hspace=0.3)
 	ax = np.ravel(axes)
+
+	### DISTRIBUTION OF ERRORS
+	fig_err, axes_err = plt.subplots(3, 4, figsize = (20,14))
+	plt.subplots_adjust(wspace=0.3,hspace=0.3)
+	ax_err = np.ravel(axes_err)
+
+
 	for ii,par in enumerate(pars):
 
 		#### fit parameter
@@ -126,6 +176,8 @@ def plot_fit_parameters(alldata,outfolder=None):
 		if par == 'mass':
 			yerr = threed_dutils.asym_errors(y,yup,ydown,log=True)
 			y = np.log10(y)
+			yup = np.log10(yup)
+			ydown = np.log10(ydown)
 			x = np.log10(x)
 		else:
 			yerr = threed_dutils.asym_errors(y,yup,ydown,log=False)
@@ -142,7 +194,43 @@ def plot_fit_parameters(alldata,outfolder=None):
 		ax[ii].xaxis.set_major_locator(MaxNLocator(5))
 		ax[ii].yaxis.set_major_locator(MaxNLocator(5))
 
-	plt.savefig(outfolder+'fit_parameter_recovery.png',dpi=150)
+		##### distribution of errors
+		fit_pars = np.transpose(np.vstack((y,yup,ydown)))
+		residual_distribution, onesig, median = calc_onesig(fit_pars,x)
+
+		# plot histogram, overplot gaussian 1sig, write onesig and mean
+		nbins_hist = 25
+		histcolor = '#0000CD'
+		gausscolor = '#FF0000'
+
+		if np.max(np.abs(residual_distribution)) > 20:
+			range = (-20,20)
+		else:
+			range = None
+
+		n, bins, patches = ax_err[ii].hist(residual_distribution,
+	                 			           nbins_hist, histtype='bar',
+	                 			           alpha=0.9,lw=2,color=histcolor,
+	                 			           range=range)
+
+		### Need to multiply with Gaussian amplitude A such that AREA = NPOINTS
+		# AREA = AMPLITUDE * SIGMA * (2*pi)**0.5
+		gnorm = residual_distribution.shape[0]/(onesig*np.sqrt(2*np.pi))*(bins[1]-bins[0])
+		xplot = np.linspace(np.min(bins),np.max(bins),1e4)
+		plot_gauss = gaussian(xplot,median,onesig)*gnorm
+
+		ax_err[ii].plot(xplot,plot_gauss,color=gausscolor,lw=3)
+
+		ax_err[ii].text(0.95,0.9,'median='+"{:.2f}".format(median),transform=ax_err[ii].transAxes,color=gausscolor,ha='right')
+		ax_err[ii].text(0.95,0.8,r'1$\sigma$='+"{:.2f}".format(onesig),transform=ax_err[ii].transAxes,color=gausscolor,ha='right')
+
+		ax_err[ii].set_xlabel(r'(true-fit)/1$\sigma$ error')
+		ax_err[ii].set_ylabel('N')
+		ax_err[ii].set_title(par)
+
+
+	fig.savefig(outfolder+'fit_parameter_recovery.png',dpi=150)
+	fig_err.savefig(outfolder+'residual_fitpars.png',dpi=150)
 	plt.close()
 
 def plot_derived_parameters(alldata,outfolder=None):
@@ -156,7 +244,12 @@ def plot_derived_parameters(alldata,outfolder=None):
 	fig, axes = plt.subplots(1, 3, figsize = (15,5))
 	plt.subplots_adjust(wspace=0.33,bottom=0.15,top=0.85,left=0.05,right=0.93)
 
+	### DISTRIBUTION OF ERRORS
+	fig_err, axes_err = plt.subplots(1, 3, figsize = (15,5))
+	plt.subplots_adjust(wspace=0.33,bottom=0.15,top=0.85,left=0.05,right=0.93)
+
 	ax = np.ravel(axes)
+	ax_err = np.ravel(axes_err)
 	for ii,par in enumerate(pars_to_plot):
 
 		#### derived parameter
@@ -180,6 +273,8 @@ def plot_derived_parameters(alldata,outfolder=None):
 
 		### log all parameters
 		yerr = threed_dutils.asym_errors(y,yup,ydown,log=True)
+		yup = np.log10(yup)
+		ydown = np.log10(ydown)
 		y = np.log10(y)
 
 		if par == 'half_time':
@@ -198,7 +293,43 @@ def plot_derived_parameters(alldata,outfolder=None):
 		ax[ii].xaxis.set_major_locator(MaxNLocator(5))
 		ax[ii].yaxis.set_major_locator(MaxNLocator(5))
 
-	plt.savefig(outfolder+'derived_parameter_recovery.png',dpi=150)
+		##### distribution of errors
+		fit_pars = np.transpose(np.vstack((y,yup,ydown)))
+		residual_distribution, onesig, median = calc_onesig(fit_pars,x)
+
+		# plot histogram, overplot gaussian 1sig, write onesig and mean
+		nbins_hist = 25
+		histcolor = '#0000CD'
+		gausscolor = '#FF0000'
+
+		if np.max(np.abs(residual_distribution)) > 20:
+			range = (-20,20)
+		else:
+			range = None
+
+		n, bins, patches = ax_err[ii].hist(residual_distribution,
+	                 			           nbins_hist, histtype='bar',
+	                 			           alpha=0.9,lw=2,color=histcolor,
+	                 			           range=range)
+
+		### Need to multiply with Gaussian amplitude A such that AREA = NPOINTS
+		# AREA = AMPLITUDE * SIGMA * (2*pi)**0.5
+		gnorm = residual_distribution.shape[0]/(onesig*np.sqrt(2*np.pi))*(bins[1]-bins[0])
+		xplot = np.linspace(np.min(bins),np.max(bins),1e4)
+		plot_gauss = gaussian(xplot,median,onesig)*gnorm
+
+		ax_err[ii].plot(xplot,plot_gauss,color=gausscolor,lw=3)
+
+		ax_err[ii].text(0.95,0.9,'median='+"{:.2f}".format(median),transform=ax_err[ii].transAxes,color=gausscolor,ha='right')
+		ax_err[ii].text(0.95,0.8,r'1$\sigma$='+"{:.2f}".format(onesig),transform=ax_err[ii].transAxes,color=gausscolor,ha='right')
+
+		ax_err[ii].set_xlabel(r'(true-fit)/1$\sigma$ error')
+		ax_err[ii].set_ylabel('N')
+		ax_err[ii].set_title(parlabels[ii])
+
+	fig.savefig(outfolder+'derived_parameter_recovery.png',dpi=150)
+	fig_err.savefig(outfolder+'residual_derivedpars.png',dpi=150)
+
 	plt.close()
 
 def plot_spectral_parameters(alldata,outfolder=None):

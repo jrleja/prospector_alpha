@@ -15,6 +15,7 @@ dpi = 150
 
 #### set up colors and plot style
 prosp_color = '#1974D2'
+median_err_color = '0.75'
 obs_color = '#63605c'
 magphys_color = '#e60000'
 
@@ -596,6 +597,19 @@ def sed_comp_figure(sample_results, sps, model, magphys,
 	nz = modspec > 0
 	phot.plot(modlam[nz]/1e4, modspec[nz], linestyle='-',
               color=prosp_color, alpha=0.6,**kwargs)
+
+	###### spectra for q50 + 5th, 95th percentile
+	w = sample_results['observables']['lam_obs']
+	spec_pdf = np.zeros(shape=(len(w),3))
+	for jj in xrange(len(w)): spec_pdf[jj,:] = np.percentile(sample_results['observables']['spec'][jj,:],[5.0,50.0,95.0])
+	sfactor = 3e18/w 	# must convert to nu fnu
+
+	nz = spec_pdf[:,1] > 0
+	phot.fill_between(w/1e4, spec_pdf[:,0]*sfactor, 
+		                 spec_pdf[:,2]*sfactor,
+		                 color=median_err_color,
+		                 zorder=-48)
+
 
 	##### photometric observations, errors ######
 	xplot = wave_eff/1e4

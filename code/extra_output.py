@@ -153,8 +153,8 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 		##### and magnitudes (L_IR, MIPS)
 		modelout = threed_dutils.measure_emline_lum(sps, thetas = thetas,
 			 										model=sample_results['model'], obs = sample_results['obs'],
-											        savestr=sample_results['run_params']['objname'], 
-											        saveplot=False,measure_ir=True)
+											        #savestr=sample_results['run_params']['objname'], 
+											        measure_ir=True)
 
 		##### no dust, to get the intrinsic balmer decrement
 		nd_thetas = copy(thetas)

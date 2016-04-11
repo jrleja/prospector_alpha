@@ -1946,26 +1946,6 @@ def obs_vs_model_dn(e_pinfo,hflag,outname=None):
 def bdec_to_ext(bdec):
 	return 2.5*np.log10(bdec/2.86)
 
-def normalize_error_asym(obs,mod):
-	
-	# define output
-	out = np.zeros_like(obs[:,0])
-	
-	# define errors
-	edown_mod = mod[:,0] - mod[:,2]
-	eup_mod = mod[:,1] - mod[:,0]
-	edown_obs = obs[:,0] - obs[:,2]
-	eup_obs = obs[:,1] - obs[:,0]
-
-	# find out which side of error bar to use
-	undershot = obs[:,0] > mod[:,0]
-	
-	# create output
-	out[undershot] = (obs[undershot,0] - mod[undershot,0]) / np.sqrt(eup_mod[undershot]**2+edown_obs[undershot]**2)
-	out[~undershot] = (obs[~undershot,0] - mod[~undershot,0]) / np.sqrt(edown_mod[~undershot]**2+eup_obs[~undershot]**2)
-
-	return out
-
 def normalize_error(obs,obserr,mod,moderr):
 	
 	# define output
@@ -2123,12 +2103,12 @@ def eline_errs(e_pinfo,hflag,outname='test.png'):
 		bdec_err = bdec * np.sqrt((err_ha/f_ha[:,0])**2+(err_hb/f_hb[:,0])**2)
 
 		##### calculate normalized residuals
-		# mock up asymmetric errors to use normalize_error_asym
+		# mock up asymmetric errors to use threed_dutils.normalize_error_asym
 		bdec_obs_fake = np.transpose(np.vstack((bdec,bdec+bdec_err,bdec-bdec_err)))
 
-		ha_sig_distr = normalize_error_asym(f_ha[keep_idx,:],e_pinfo['prosp']['cloudy_ha'][keep_idx,:])
-		hb_sig_distr = normalize_error_asym(f_hb[keep_idx,:],e_pinfo['prosp']['cloudy_hb'][keep_idx,:])
-		bdec_sig_distr = normalize_error_asym(bdec_obs_fake[keep_idx,:],e_pinfo['prosp']['bdec_cloudy_marg'][keep_idx,:])
+		ha_sig_distr = threed_dutils.normalize_error_asym(f_ha[keep_idx,:],e_pinfo['prosp']['cloudy_ha'][keep_idx,:])
+		hb_sig_distr = threed_dutils.normalize_error_asym(f_hb[keep_idx,:],e_pinfo['prosp']['cloudy_hb'][keep_idx,:])
+		bdec_sig_distr = threed_dutils.normalize_error_asym(bdec_obs_fake[keep_idx,:],e_pinfo['prosp']['bdec_cloudy_marg'][keep_idx,:])
 		
 		##### calculate average (over +/- 1 sigma) distance from observations at 1 sigma
 		# could also fit a Gaussian

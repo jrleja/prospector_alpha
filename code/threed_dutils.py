@@ -115,6 +115,26 @@ def smooth_spectrum(lam,spec,sigma,
 
 	return spec_out
 
+def normalize_error_asym(obs,mod):
+	
+	# define output
+	out = np.zeros_like(obs[:,0])
+	
+	# define errors
+	edown_mod = mod[:,0] - mod[:,2]
+	eup_mod = mod[:,1] - mod[:,0]
+	edown_obs = obs[:,0] - obs[:,2]
+	eup_obs = obs[:,1] - obs[:,0]
+
+	# find out which side of error bar to use
+	undershot = obs[:,0] > mod[:,0]
+	
+	# create output
+	out[undershot] = (obs[undershot,0] - mod[undershot,0]) / np.sqrt(eup_mod[undershot]**2+edown_obs[undershot]**2)
+	out[~undershot] = (obs[~undershot,0] - mod[~undershot,0]) / np.sqrt(edown_mod[~undershot]**2+eup_obs[~undershot]**2)
+
+	return out
+
 def offset_and_scatter(x,y,biweight=True):
 
 	n = len(x)
@@ -493,7 +513,22 @@ def generate_basenames(runname):
 			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+basename+'_'+ids[jj])
 			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
 
-	elif runname == 'brownseds_tightbc':
+	elif runname == 'brownseds_nohersch':
+
+		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/herschel_names.txt"
+		ids = np.loadtxt(id_list, dtype='|S20')
+		ngals = len(ids)
+
+		parm_basename = runname+"_params"
+		ancilname=None
+
+		for jj in xrange(ngals):
+			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+runname+'_'+' '.join(ids[jj]))
+			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
+
+		return filebase,parm,ancilname
+
+	elif 'brownseds' in runname:
 
 		id_list = os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/namelist.txt'
 		ids = np.loadtxt(id_list, dtype='|S20',delimiter=',')
@@ -533,20 +568,6 @@ def generate_basenames(runname):
 			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+runname+'_'+ids[jj])
 			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
 
-	elif runname == 'brownseds_nohersch':
-
-		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/herschel_names.txt"
-		ids = np.loadtxt(id_list, dtype='|S20')
-		ngals = len(ids)
-
-		parm_basename = runname+"_params"
-		ancilname=None
-
-		for jj in xrange(ngals):
-			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+runname+'_'+' '.join(ids[jj]))
-			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
-
-		return filebase,parm,ancilname
 
 	else:
 
@@ -1284,7 +1305,7 @@ def integrate_sfh(t1,t2,sfh_params):
 	return tot_sfr
 
 def measure_emline_lum(sps, model = None, obs = None, thetas = None, 
-	                   measure_ir = False, savestr = False, saveplot=True,
+	                   measure_ir = False, measure_luv = False, savestr = None,
 	                   spec=None, abslines=True):
 	
 	'''
@@ -1339,14 +1360,17 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None,
 
 	##### measure emission lines
 	# smooth_spec is only used to identify continuum
-	out['emlines'] = measure_emlines(w,spec,smooth_spec)
+	out['emlines'] = measure_emlines(w,spec,smooth_spec,savestr=savestr)
 
 	if measure_ir:
 
 		# set up filters
-		mips_index = [i for i, s in enumerate(obs['filters']) if 'mips' in s]
-		if np.sum(mips_index) == 0:
-			mips_index = [i for i, s in enumerate(obs['filters']) if 'MIPS' in s]
+		try:
+			mips_index = [i for i, s in enumerate(obs['filters']) if 'mips' in s]
+			if np.sum(mips_index) == 0:
+				mips_index = [i for i, s in enumerate(obs['filters']) if 'MIPS' in s]
+		except TypeError as e: # if obs['filters'] is None.... 
+			mips_index = -99999
 
 		lir = return_lir(w,spec_nebon, z=None, alt_file=None) # comes out in ergs/s
 		lir /= 3.846e33 #  convert to Lsun
@@ -1359,6 +1383,10 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None,
 
 		out['lir'] = lir
 		out['mips'] = mips
+	if measure_luv:
+		luv = return_luv(w,spec_nebon, z=None, alt_file=None)/3.846e33 # comes out in ergs/s
+		out['luv'] = luv
+	out['spec'] = spec_nebon
 	return out
 
 def measure_Dn4000(lam,flux,ax=None):
@@ -1388,7 +1416,7 @@ def measure_Dn4000(lam,flux,ax=None):
 
 	return dn4000
 
-def measure_emlines(lam,flux_emline, flux_abs):
+def measure_emlines(lam, flux_emline, flux_abs, savestr=None):
 
 	'''
 	Nelan et al. (2005)
@@ -1415,24 +1443,26 @@ def measure_emlines(lam,flux_emline, flux_abs):
 	up   = [(3742.,3750.),(4124.25,4151.00),(4894.625,4910.000),(4970.,4979.),(5025.,5035.),(6590.,6610.),(6590.,6610.),(6730.,6740.)]
 	down = [(3713.,3720.),(4041.6,4081.5),(4817.875,4835.875),(4946.,4955.),(4985.,4995.),(6515.,6540.),(6515.,6540.),(6700.,6710.)]
 
-	#fig, ax = plt.subplots(2,4, figsize = (25,12))
-	#ax = np.ravel(ax)
+	if savestr is not None:
+		fig, ax = plt.subplots(2,4, figsize = (25,12))
+		ax = np.ravel(ax)
+	else:
+		ax = np.full(8,False)
 
 	##### measure emission line flux + EQW
 	for jj in xrange(len(lines)):
 		dic = {}
-		dic['flux'], dic['eqw'] = measure_em(lam,flux_emline,flux_abs,wavelength[jj],sideband[jj],up[jj],down[jj],ax=None)
+		dic['flux'], dic['eqw'] = measure_em(lam,flux_emline,flux_abs,wavelength[jj],sideband[jj],up[jj],down[jj],ax=ax[jj],savestr=savestr)
 		out[lines[jj]] = dic
 
-	#plt.savefig('test.png',dpi=150)
-	#os.system('open test.png')
-	#plt.savefig(os.getenv('APPS')+'/threedhst_bsfh/plots/testem/'+savestr+'.png',dpi=150)
-	#plt.close()
+	if savestr is not None:
+		plt.savefig(os.getenv('APPS')+'/threedhst_bsfh/plots/testem/'+savestr+'.png',dpi=150)
+		plt.close()
 
 	return out
 
 
-def measure_em(w,spec,spec_abs,wavelength,sideband,up, down, ax=None,savestr=None):
+def measure_em(w,spec,spec_abs,wavelength,sideband,up, down, ax=None, savestr=None, plot_emission=True,plot_absorption=False):
 
 	#### emission line flux
 	integrate_lam = (w > sideband[0]) & (w < sideband[1])
@@ -1440,7 +1470,7 @@ def measure_em(w,spec,spec_abs,wavelength,sideband,up, down, ax=None,savestr=Non
 	emline_flux = np.trapz(spec[integrate_lam]-baseline, w[integrate_lam])
 
 	# plot emission lines
-	if False:
+	if ax and plot_emission:
 		ax.plot(w,spec,'ro',linestyle='-')
 		ax.plot(w[integrate_lam], spec[integrate_lam], 'bo',linestyle=' ')
 
@@ -1471,7 +1501,7 @@ def measure_em(w,spec,spec_abs,wavelength,sideband,up, down, ax=None,savestr=Non
 	emline_eqw = emline_flux / contflux
 
 	##### plot if necessary
-	if ax is not None:
+	if ax and plot_absorption:
 		ax.plot(w,spec_abs,color='black', drawstyle='steps-mid')
 		ax.plot([low_lam,high_lam],[contflux,contflux],color='red')
 

@@ -53,12 +53,12 @@ def subcorner(sample_results,  sps, model,
                           truths = ptruths, range=sample_results['extents'],truth_color='red',**kwargs)
 
     fig = add_to_corner(fig, sample_results, sps, model, truths=truths, powell_results=powell_results)
-
     if outname is not None:
         fig.savefig('{0}.corner.png'.format(outname))
         plt.close(fig)
     else:
         return fig
+
 
 def add_to_corner(fig, sample_results, sps, model,truths=None,maxprob=True,powell_results=None):
 
@@ -86,15 +86,32 @@ def add_to_corner(fig, sample_results, sps, model,truths=None,maxprob=True,powel
     
     if truths is not None:
         parnames = np.append(truths['parnames'],'lnprob')
-        parnames = np.append(parnames, truths['extra_parnames'])
         tvals    = np.append(truths['plot_truths'],truths['truthprob'])
-        tvals    = np.append(tvals, truths['extra_truths'])
 
         plt.figtext(0.73, ttop, 'truths',weight='bold',
                        horizontalalignment='right',fontsize=fs)
         for kk in xrange(len(tvals)):
             plt.figtext(0.73, ttop-0.02*(kk+1), parnames[kk]+'='+"{:.2f}".format(tvals[kk]),
                        horizontalalignment='right',fontsize=fs)
+
+        # add in extras
+        etruths = truths['extra_truths']
+        eparnames = truths['extra_parnames']
+        txtcounter = 1
+        for nn in xrange(len(eparnames)):
+            if eparnames[nn] in to_show:
+                fmt = "{:.2f}"
+                if 'sfr' in eparnames[nn]:
+                    etruths[nn] = 10**etruths[nn]
+                if 'ssfr' in eparnames[nn]:
+                    fmt = '{0:.1e}'
+
+                plt.figtext(0.73, ttop-0.02*(kk+txtcounter+1), eparnames[nn]+'='+fmt.format(etruths[nn][0]),
+                           horizontalalignment='right',fontsize=fs)
+                txtcounter+=1
+
+        tvals    = np.append(tvals, etruths)
+        parnames = np.append(parnames, eparnames)
 
     # show maximum probability
     if maxprob:
@@ -575,8 +592,8 @@ def return_sedplot_vars(thetas, sample_results, sps, nufnu=True):
 	# observational information
 	# hack to reload obs for brownseds_logzsol run
 	if 'truename' in sample_results['run_params']:
-		from ha_80myr_params import load_obs_mock
-		sample_results['obs'] = load_obs_mock(os.getenv('APPS')+'/threedhst_bsfh/data/ha_80myr.cat', 
+		from ha_20myr_params import load_obs_mock
+		sample_results['obs'] = load_obs_mock(os.getenv('APPS')+'/threed'+sample_results['run_params']['photname'].split('threed')[1], 
 			                                  sample_results['run_params']['objname'])
 
 	mask = sample_results['obs']['phot_mask']
@@ -585,8 +602,10 @@ def return_sedplot_vars(thetas, sample_results, sps, nufnu=True):
 	obs_maggies_unc = sample_results['obs']['maggies_unc'][mask]
 
 	# model information
-	spec, mu ,_ = sample_results['model'].mean_model(thetas, sample_results['obs'], sps=sps)
-	mu = mu[mask]
+	spec = sample_results['bfit']['spec']
+	mu = sample_results['bfit']['mags'][mask]
+	#spec, mu ,_ = sample_results['model'].mean_model(thetas, sample_results['obs'], sps=sps)
+	#mu = mu[mask]
 
 	# output units
 	if nufnu == True:
@@ -654,7 +673,7 @@ def sed_figure(sample_results, sps, model,
 	# define observations for later use
 	xplot = wave_eff
 	yplot = obsmags
-	yerr=obsmags_unc
+	yerr = obsmags_unc
 
 	# set up plot limits
 	phot.set_xlim(min(xplot)*0.4,max(xplot)*1.5)
@@ -875,6 +894,7 @@ def sed_figure(sample_results, sps, model,
 	if outname is not None:
 		fig.savefig(outname, bbox_inches='tight', dpi=dpi)
 		plt.close()
+
 	#os.system('open '+outname)
 
 def make_all_plots(filebase=None,

@@ -23,6 +23,11 @@ obs['filters'] = None # don't generate photometry, for speed
 sps = threed_dutils.setup_sps()
 parnames = np.array(model.theta_labels())
 
+# don't cache emission line strength
+if model.params['add_neb_emission'] == 2:
+	model.params['add_neb_emission'] = np.array(True)
+	model.params['add_neb_continuum'] = np.array(True)
+
 #### load relationship between CLOUDY/empirical Halpha and metallicity
 outloc = '/Users/joel/code/python/threedhst_bsfh/data/pickles/ha_ratio.pickle'
 with open(outloc, "rb") as f:
@@ -121,6 +126,7 @@ def halpha_draw(theta0, delta, ndraw, thetas_start=None, fixed_lbol=None, ha_lum
 		# draw random dust, SFH, metallicity properties
 		theta = random_theta_draw(theta0)
 
+		'''
 		#### if we have them, use previous guesses
 		if thetas_start is not None:
 			if thetas_start['pars'].shape[1] != 0:
@@ -142,28 +148,44 @@ def halpha_draw(theta0, delta, ndraw, thetas_start=None, fixed_lbol=None, ha_lum
 		# calculate LIR, LUV
 		luv = threed_dutils.return_luv(sps.wavelengths,spec) / 3.846e33
 		lir = threed_dutils.return_lir(sps.wavelengths,spec) / 3.846e33
-
-		# check Halpha and, if necessary, LIR to see if it's within tolerance
-		# if so, add parameters to the pile
+		'''
+		#### SPEED TEST
+		# just assume we have 90% of recycled mass
+		# must have sSFR > 1e-10
 		if ha_lum_fixed is not None:
-			ratio = np.abs(ha_lum_adj/ha_lum_fixed - 1)
-			if ratio < delta:
-				
-				out_pars = np.concatenate((out_pars,theta[:,None]),axis=1)
-				out_spec = np.concatenate((out_spec,spec[:,None]),axis=1)
-				out_lir = np.concatenate((out_lir,np.atleast_1d(lir)))
-				out_luv = np.concatenate((out_luv,np.atleast_1d(luv)))
-				out_ha = np.concatenate((out_ha,np.atleast_1d(ha_lum_adj)))
-				print out_pars.shape[1]
+			sfh_params = threed_dutils.find_sfh_params(model,theta,obs,sps,sm=0.9)
+			sfr_10     = threed_dutils.calculate_sfr(sfh_params, 0.01, minsfr=-np.inf, maxsfr=np.inf)
+			if sfr_10/theta[0] > 1e-12:
+				match = False
+				# play with sf_slope until we have the right SFR
+				while match==False:
+					out = threed_dutils.measure_emline_lum(sps, thetas=theta, model=model, obs=obs,measure_ir=True, measure_luv=True)
+					ratio = np.abs(out['emlines']['Halpha']['eqw']/ha_lum_fixed - 1)
+					print ratio,out_pars.shape[1]
+					if ratio < delta:
+						out_pars = np.concatenate((out_pars,theta[:,None]),axis=1)
+						out_spec = np.concatenate((out_spec,out['spec'][:,None]),axis=1)
+						out_lir = np.concatenate((out_lir,np.atleast_1d(out['lir'])))
+						out_luv = np.concatenate((out_luv,np.atleast_1d(out['luv'])))
+						out_ha = np.concatenate((out_ha,np.atleast_1d(out['emlines']['Halpha']['eqw'])))
+						match = True
+						print out_pars.shape[1]
+					else:
+						if ratio > delta*20:
+							theta[5] = theta[5] * ratio**-0.05
+						else:
+							theta[5] = theta[5] * ratio**-0.005
+
 		elif fixed_lbol is not None:
-			lbol = luv + lir
+			out = threed_dutils.measure_emline_lum(sps, thetas=theta, model=model,obs=obs, savestr='test',measure_ir=True, measure_luv=True)
+			lbol = out['luv'] + out['lir']
 			lbol_ratio = np.abs(lbol/fixed_lbol - 1)
 			if (lbol_ratio < delta) & (sfr_10 > 0.0):
 				out_pars = np.concatenate((out_pars,theta[:,None]),axis=1)
-				out_spec = np.concatenate((out_spec,spec[:,None]),axis=1)
-				out_lir = np.concatenate((out_lir,np.atleast_1d(lir)))
-				out_luv = np.concatenate((out_luv,np.atleast_1d(luv)))
-				out_ha = np.concatenate((out_ha,np.atleast_1d(ha_lum_adj)))
+				out_spec = np.concatenate((out_spec,out['spec'][:,None]),axis=1)
+				out_lir = np.concatenate((out_lir,np.atleast_1d(out['lir'])))
+				out_luv = np.concatenate((out_luv,np.atleast_1d(out['luv'])))
+				out_ha = np.concatenate((out_ha,np.atleast_1d(out['emlines']['Halpha']['eqw'])))
 				print out_pars.shape[1]
 
 		ntest+=1
@@ -200,7 +222,7 @@ def label_sed(sedax,ylim):
 
 	return sedax
 
-def main(redraw_thetas=True,pass_guesses=False,redraw_lbol_thetas=False):
+def main(redraw_thetas=True,pass_guesses=False,redraw_lbol_thetas=True):
 	'''
 	main driver, to create plot
 		redraw_thetas: if true, will redraw parameters based on draw parameters defined in the IF statement
@@ -211,6 +233,7 @@ def main(redraw_thetas=True,pass_guesses=False,redraw_lbol_thetas=False):
 	#### name draws
 	colors = ['red','green','blue']
 	names = ['5e6','5e7','5e8'] # 3e7 is SFR = 1 Msun / yr, dust1 = 0.3, dust2 = 0.15
+	names = ['1','10','100']
 	smoothing = 10000 # km/s smooth
 	lw = 2
 
@@ -436,8 +459,8 @@ def main(redraw_thetas=True,pass_guesses=False,redraw_lbol_thetas=False):
 	relax.set_xlabel(r'log(F$_{\mathrm{extincted}}$/F$_{\mathrm{intrinsic}}$) (6563 $\AA$)')
 	relax.set_xlim(xlim_rel)
 
-	sedfig.savefig('/Users/joel/my_papers/prospector_brown/figures/fixed_ha.png',dpi=150)
-	relfig.savefig('/Users/joel/my_papers/prospector_brown/figures/fixed_ha_relationship.png',dpi=150)
+	sedfig.savefig('/Users/joel/my_papers/prospector_brown/figures/maybes/fixed_ha.png',dpi=150)
+	relfig.savefig('/Users/joel/my_papers/prospector_brown/figures/maybes/fixed_ha_relationship.png',dpi=150)
 	plt.close()
 
 	print 1/0
