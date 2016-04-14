@@ -76,6 +76,21 @@ def calc_lameff_for_fsps(fsps_filter_list):
 
 	return lameff
 
+def translate_fsps_to_sedpy(fsps_filtname,sedpy_filtname,
+					        outfolder='/Users/joel/code/python/sedpy/sedpy/data/filters'):
+
+	'''
+	used to translate FSPS filter curves into sedpy-style filter files
+	INPUT: FSPS filter name
+	OUTPUT: sedpy-style filter definition file at outfolder/sedpy_filtname.par
+	'''
+	lam,res = load_filter_response(fsps_filtname, alt_file=None)
+
+	outfile=outfolder+'/'+sedpy_filtname+'.par'
+	with open(outfile, 'w') as f:
+		for l,r in zip(lam,res): f.write("{:.6e}".format(l)+'  '+"{:.6e}".format(r)+'\n')
+
+	print 'created '+outfile
 
 def main(field=False):
 
