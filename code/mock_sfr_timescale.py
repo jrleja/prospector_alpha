@@ -7,8 +7,8 @@ import pickle
 from matplotlib.ticker import MaxNLocator
 from corner import quantile
 
-minsfr = 1e-1
-minssfr = 1e-12
+minsfr = 1e-4
+minssfr = 1e-15
 
 def norm_resid(fit,truth):
 	
@@ -238,8 +238,8 @@ def plot_derived_parameters(alldata,outfolder=None):
 	##### EXTRA PARAMETERS
 	epars = alldata[0]['eparnames']
 	epars_truth = alldata[0]['truths']['extra_parnames']
-	pars_to_plot = ['sfr_10','sfr_100', 'half_time']#,'ssfr_10','ssfr_100','half_time']
-	parlabels = ['log(SFR) [10 Myr]','log(SFR) [100 Myr]', r"log(t$_{\mathrm{half-mass}}$)"]
+	pars_to_plot = ['sfr_100','ssfr_100', 'half_time']#,'ssfr_10','ssfr_100','half_time']
+	parlabels = ['log(SFR) [100 Myr]','log(sSFR) [100 Myr]', r"log(t$_{\mathrm{half-mass}}$)"]
 
 	fig, axes = plt.subplots(1, 3, figsize = (15,5))
 	plt.subplots_adjust(wspace=0.33,bottom=0.15,top=0.85,left=0.05,right=0.93)

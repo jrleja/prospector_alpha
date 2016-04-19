@@ -162,8 +162,7 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 		nd_thetas[dust2_index] = 0.0
 		modelout_nodust = threed_dutils.measure_emline_lum(sps, thetas = nd_thetas,
 			 										       model=sample_results['model'], obs = sample_results['obs'],
-											               savestr=None, 
-											               saveplot=False,measure_ir=False)
+											               measure_ir=False)
 
 		##### Balmer decrements
 		bdec_cloudy[jj] = modelout['emlines']['Halpha']['flux'] / modelout['emlines']['Hbeta']['flux']

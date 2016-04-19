@@ -438,7 +438,7 @@ def load_truths(truthname,objname,sample_results, sps=None, calc_prob = True):
 
 		modelout = measure_emline_lum(sps, thetas = truths,
 	 								  model=sample_results['model'], obs = sample_results['obs'],
-									  saveplot=False,measure_ir=True)
+									  measure_ir=True)
 		emnames = np.array(modelout['emlines'].keys())
 		emflux = np.array([modelout['emlines'][line]['flux'] for line in emnames])
 		absnames = np.array(modelout['abslines'].keys())
