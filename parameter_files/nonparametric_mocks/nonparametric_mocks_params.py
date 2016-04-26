@@ -1,7 +1,7 @@
 import numpy as np
 import os
 from prospect.models import priors, sedmodel
-from prospect.sources import CSPBasis
+from prospect.sources import StepSFHBasis
 from sedpy import observate
 from astropy.cosmology import WMAP9
 from astropy.io import fits
@@ -27,6 +27,8 @@ run_params = {'verbose':True,
               'zcontinuous': 2,
               'compute_vega_mags': False,
               'initial_disp':0.1,
+              'interp_type': 'logarithmic',
+              'agelims': [6.0,7.0,8.0,8.5,9.0,9.5,10.0],
               # Data info
               'datname':os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/table1.fits',
               'photname':os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/table3.fits',
@@ -234,7 +236,6 @@ def load_obs(photname='', extinctname='', herschname='', objname='', **extras):
     obs['maggies_unc'] =  unc
     obs['wavelength'] = None
     obs['spectrum'] = None
-    obs['logify_spectrum'] = False
 
     if objname is None:
         obs['hnames'] = herschel[1].data['Name']
@@ -247,6 +248,121 @@ def load_obs(photname='', extinctname='', herschname='', objname='', **extras):
 
     return obs
 
+def expsfh(agelims, tau=3.0, power=1, **extras):
+    """
+    Calculate the mass in a set of step functions that is equivalent to an
+    exponential SFH.  That is, \int_amin^amax \, dt \, e^(-t/\tau) where
+    amin,amax are the age limits of the bins making up the step function.
+    """
+    from scipy.special import gamma, gammainc
+    tage = 10**np.max(agelims) / 1e9
+    t = tage - 10**np.array(agelims)/1e9
+    nb = len(t)
+    mformed = np.zeros(nb-1)
+    t = np.insert(t, 0, tage)
+    for i in range(nb-1):
+        t1, t2 = t[i+1], t[i]
+        normalized_times = (np.array([t1, t2, tage])[:, None]) / tau
+        mass = gammainc(power, normalized_times)
+        intsfr = (mass[1,...] - mass[0,...]) / mass[2,...]
+        mformed[i] = intsfr
+    return mformed * 1e3
+        
+
+#################
+# NEW SPS BASIS #
+#################
+class NPBasis(StepSFHBasis):
+
+    @property
+    def all_ssp_weights(self):
+        ages = self.ssp.params['agebins']
+        fractions = self.ssp.params['sfh_frac']
+        mass = self.ssp.params['mass']
+        w = np.zeros(len(self.logage))
+        # Loop over age bins
+        # Should cache the bin weights when agebins not changing.  But this is
+        # not very time consuming for few enough bins.
+        for (t1, t2), frac in zip(ages, fractions):
+            params = {'tage': t2, 'sf_trunc': t2 - t1}
+            #w += mass * self.ssp_weights(self.func, regular_limits, params)
+            w += frac * mass * self.bin_weights(t1, t2)[1:]
+        return w
+
+    def bin_weights(self, amin, amax):
+        """Compute normalizations required to get a piecewise constant SFH
+        within an age bin.  This is super complicated and obscured.  The output
+        weights are such that one solar mass will have formed during the bin
+        (i.e. SFR = 1/(amax-amin))
+
+        This computes weights using \int_tmin^tmax dt (\log t_i - \log t) /
+        (\log t_{i+1} - \log t_i) but see sfh.tex for the detailed calculation
+        and the linear time interpolation case.
+        """
+        if self.interp_type == 'linear':
+            sspages = np.insert(10**self.logage, 0, 0)
+            func = constant_linear
+            mass = amax - amin
+        elif self.interp_type == 'logarithmic':
+            sspages = np.insert(self.logage, 0, 0)
+            func = constant_logarithmic
+            mass = 10**amax - 10**amin
+
+        assert amin >= sspages[1]
+        assert amax <= sspages.max()
+
+        # below could be done by using two separate dt vectors instead of two
+        # age vectors
+        ages = np.array([sspages[:-1], sspages[1:]])
+        dt = np.diff(ages, axis=0)
+        tmin, tmax = np.clip(ages, amin, amax)
+
+        # get contributions from SSP sub-bin to the left and from SSP sub-bin
+        # to the right
+        left, right = (func(ages, tmax) - func(ages, tmin)) / dt
+        # put into full array
+        ww = np.zeros(len(sspages))
+        ww[:-1] += right  # last element has no sub-bin to the right
+        ww[1:] += -left  # need to flip sign
+
+        # normalize to 1 solar mass formed and return
+        return ww / mass
+
+    def get_spectrum(self, outwave=None, filters=None, **params):
+        """
+        :returns spec:
+            Spectrum in erg/s/AA/cm^2
+
+        :returns phot:
+            Photometry in maggies
+
+        :returns x:
+            A generic blob. can be used to return e.g. present day masses,
+            total masses, etc.
+        """
+        wave, spec = self.get_galaxy_spectrum(**params)
+        mags = getSED(w , lightspeed/w**2 * spec * to_cgs, filters)
+        mags = np.atleast_1d(10**(-0.4 * mags))
+
+        if outwave is not None:
+            w = self.csp.wavelengths
+            spec = np.interp(outwave, w, spec)
+
+        # Modern FSPS does the distance modulus for us in get_mags,
+        # !but python-FSPS does not!
+        if self.params['zred'] == 0:
+            # Use 10pc for the luminosity distance (or a number
+            # provided in the dist key in units of Mpc)
+            dfactor = (self.params.get('dist', 1e-5) * 1e5)**2
+            # spectrum stays in L_sun/Hz
+            dfactor_spec = 1.0
+        else:
+            dfactor = ((cosmo.luminosity_distance(self.csp.params['zred']).value *
+                        1e5)**2 / (1 + self.params['zred']))
+            # convert to maggies
+            dfactor_spec = to_cgs / 1e3 / dfactor / (3631*jansky_mks)
+        return (spec * dfactor_spec, maggies / dfactor, extra)
+
 ######################
 # GENERATING FUNCTIONS
 ######################
@@ -255,24 +371,12 @@ def load_gp(**extras):
 
 def load_sps(**extras):
 
-    sps = CSPBasis(**extras)
+    sps = NPBasis(**extras)
     return sps
-
-def transform_sftanslope_to_sfslope(sf_slope=None,sf_tanslope=None,**extras):
-
-    return np.tan(sf_tanslope)
-
-def transform_delt_to_sftrunc(tage=None, delt_trunc=None, **extras):
-
-    return tage*delt_trunc
 
 def transform_logmass_to_mass(mass=None, logmass=None, **extras):
 
     return 10**logmass
-
-def transform_logtau_to_tau(tau=None, logtau=None, **extras):
-
-    return 10**logtau
 
 def add_dust1(dust2=None, **extras):
 
@@ -344,104 +448,24 @@ model_params.append({'name': 'logzsol', 'N': 1,
                         'prior_args': {'mini':-1.98, 'maxi':0.19}})
                         
 ###### SFH   ########
-model_params.append({'name': 'sfh', 'N': 1,
+model_params.append({'name': 'sfh', 'N':1,
                         'isfree': False,
-                        'init': 5,
-                        'units': 'type',
-                        'prior_function_name': None,
-                        'prior_args': None})
+                        'init': 0,
+                        'units': None})
 
-model_params.append({'name': 'logtau', 'N': 1,
+model_params.append({'name': 'sfh_frac', 'N': 1,
                         'isfree': True,
-                        'init': 0.0,
-                        'init_disp': 0.3,
-                        'disp_floor': 0.25,
-                        'units': 'log(Gyr)',
-                        'prior_function': tophat,
-                        'prior_args': {'mini':-1.0,
-                                       'maxi':2.0}})
+                        'init': [],
+                        'units': 'log(yr)',
+                        'prior_function': priors.tophat,
+                        'prior_args':{'mini':0.0, 'maxi':1.0}})
 
-model_params.append({'name': 'tau', 'N': 1,
+model_params.append({'name': 'agebins', 'N': 1,
                         'isfree': False,
-                        'init': 1.0,
-                        'depends_on': transform_logtau_to_tau,
-                        'units': 'Gyr',
-                        'prior_function': tophat,
-                        'prior_args': {'mini':0.1,
-                                       'maxi':100}})
-
-model_params.append({'name': 'tage', 'N': 1,
-                        'isfree': True,
-                        'init': 1.1,
-                        'init_disp': 0.25,
-                        'disp_floor': 0.1,
-                        'units': 'Gyr',
-                        'prior_function': tophat,
-                        'prior_args': {'mini':0.11, 'maxi':13.7}})
-
-model_params.append({'name': 'tburst', 'N': 1,
-                        'isfree': False,
-                        'init': 0.0,
-                        'init_disp': 1.0,
-                        'units': '',
-                        'prior_function': tophat,
-                        'prior_args': {'mini':0.0, 'maxi':10.0}})
-
-model_params.append({'name': 'fburst', 'N': 1,
-                        'isfree': False,
-                        'init': 0.0,
-                        'init_disp': 0.5,
-                        'units': '',
-                        'prior_function': tophat,
-                        'prior_args': {'mini':0.0, 'maxi':0.2}})
-
-model_params.append({'name': 'fconst', 'N': 1,
-                        'isfree': False,
-                        'init': 0.0,
-                        'units': '',
-                        'prior_function': tophat,
-                        'prior_args': {'mini':0.0, 'maxi':1.0}})
-
-model_params.append({'name': 'sf_start', 'N': 1,
-                        'isfree': False,
-                        'init': 0.0,
-                        'units': 'Gyr',
-                        'prior_function': tophat,
-                        'prior_args': {'mini':0.0,'maxi':14.0}})
-
-model_params.append({'name': 'delt_trunc', 'N': 1,
-                        'isfree': True,
-                        'init': 1.0,
-                        'init_disp': 0.1,
-                        'disp_floor': 0.1,
-                        'units': '',
-                        'prior_function': tophat,
-                        'prior_args': {'mini':0.0, 'maxi': 1.0}})
-
-model_params.append({'name': 'sf_trunc', 'N': 1,
-                        'isfree': False,
-                        'init': 1.0,
-                        'units': '',
-                        'depends_on': transform_delt_to_sftrunc,
-                        'prior_function': tophat,
-                        'prior_args': {'mini':0, 'maxi':16}})
-
-model_params.append({'name': 'sf_tanslope', 'N': 1,
-                        'isfree': True,
-                        'init': 0.0,
-                        'init_disp': 0.4,
-                        'disp_floor': 0.3,
-                        'units': '',
-                        'prior_function': tophat,
-                        'prior_args': {'mini':-np.pi/2., 'maxi': np.pi/2}})
-
-model_params.append({'name': 'sf_slope', 'N': 1,
-                        'isfree': False,
-                        'init': -1.0,
-                        'units': '',
-                        'depends_on': transform_sftanslope_to_sfslope,
-                        'prior_function': tophat,
-                        'prior_args': {'mini':-np.inf,'maxi':5.0}})
+                        'init': [],
+                        'units': 'log(yr)',
+                        'prior_function': priors.tophat,
+                        'prior_args':{'mini':0.1, 'maxi':15.0}})
 
 ########    IMF  ##############
 model_params.append({'name': 'imf_type', 'N': 1,
@@ -579,7 +603,7 @@ model_params.append({'name': 'phot_jitter', 'N': 1,
 #### resort list of parameters 
 #### so that major ones are fit first
 parnames = [m['name'] for m in model_params]
-fit_order = ['logmass', 'tage', 'logtau', 'dust2', 'logzsol', 'dust_index', 'delt_trunc', 'sf_tanslope', 'dust1', 'duste_qpah', 'duste_gamma', 'duste_umin']
+fit_order = ['logmass', 'dust2', 'logzsol', 'dust_index', 'dust1', 'duste_qpah', 'duste_gamma', 'duste_umin']
 tparams = [model_params[parnames.index(i)] for i in fit_order]
 for param in model_params: 
     if param['name'] not in fit_order:
@@ -637,28 +661,35 @@ class BurstyModel(sedmodel.SedModel):
             lnp_prior += this_prior
         return lnp_prior
 
-def load_model(datname='', objname='', **extras):
+def load_model(objname='', agelims=[], **extras):
 
-    ###### REDSHIFT ######
-    hdulist = fits.open(datname)
-    idx = hdulist[1].data['Name'] == objname
-    zred =  hdulist[1].data['cz'][idx][0] / 3e5
-    hdulist.close()
+    ###### LOAD REDSHIFT ######
+    zred=0.0
 
-    #### TUNIV #####
+    #### CALCULATE TUNIV #####
     tuniv = WMAP9.age(zred).value
 
-    #### TAGE #####
-    tage_init = 1.1
-    tage_mini  = 0.11      # FSPS standard
-    tage_maxi = tuniv
+    #### NONPARAMETRIC SFH ######
+    agelims[-1] = np.log10(tuniv*1e9)
+    agebins = np.array([agelims[:-1], agelims[1:]])
+    ncomp = len(agelims) - 1
+    mass_init =  expsfh(agelims, **extras)
+    frac_init = mass_init / np.sum(mass_init)
 
-    #### INSERT MAXIMUM AGE AND REDSHIFT INTO MODEL PARAMETER DICTIONARY ####
-    pnames = [m['name'] for m in model_params]
-    zind = pnames.index('zred')
+    #### ADJUST MODEL PARAMETERS #####
+    n = [p['name'] for p in model_params]
+    model_params[n.index('sfh_frac')]['N'] = ncomp
+    model_params[n.index('sfh_frac')]['init'] = frac_init
+    model_params[n.index('sfh_frac')]['prior_args'] = {'maxi':1.0, 'mini':0.0}
+    model_params[n.index('sfh_frac')]['init_disp'] = 0.2
+    model_params[n.index('agebins')]['N'] = ncomp
+    model_params[n.index('agebins')]['init'] = agebins.T
+
+    #### INSERT REDSHIFT INTO MODEL PARAMETER DICTIONARY ####
+    zind = n.index('zred')
     model_params[zind]['init'] = zred
-    tind = pnames.index('tage')
-    model_params[tind]['prior_args']['maxi'] = tuniv
+
+    #### CREATE AND RETURN MODEL
     model = BurstyModel(model_params)
 
     return model

@@ -611,7 +611,7 @@ def return_sedplot_vars(thetas, sample_results, sps, nufnu=True):
 	if nufnu == True:
 		c = 3e8
 		factor = c*1e10
-		mu *= factor/wave_eff
+		mu *= factor/wave_eff**2
 		spec *= factor/sps.wavelengths
 		obs_maggies *= factor/wave_eff
 		obs_maggies_unc *= factor/wave_eff
