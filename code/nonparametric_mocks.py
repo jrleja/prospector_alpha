@@ -1,4 +1,4 @@
-import read_sextractor, read_data, random, os, threed_dutils
+import read_sextractor, read_data, random, os
 import numpy as np
 from astropy.table import Table, vstack
 from astropy.io import ascii
