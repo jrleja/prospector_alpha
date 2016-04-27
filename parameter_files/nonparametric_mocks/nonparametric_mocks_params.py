@@ -18,12 +18,15 @@ run_params = {'verbose':True,
               'nofork': True,
               # Optimizer params
               'ftol':0.5e-5, 
-              'maxfev':5000,
+              'maxfev':50,
+              #'maxfev':5000,
               # MCMC params
-              'nwalkers':507,
+              #'nwalkers':507,
+              'nwalkers':38,
               #'nburn':[32,32,64], 
               'nburn':[3,3],
-              'niter': 1000,
+              'niter': 10,
+              #'niter': 1000,
               # Model info
               'zcontinuous': 2,
               'compute_vega_mags': False,
