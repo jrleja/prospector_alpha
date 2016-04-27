@@ -4,10 +4,10 @@
 #PBS -q workq
 
 ### Requested number of nodes
-#PBS -l nodes=1:ppn=5
+#PBS -l nodes=1:ppn=20
 
 ### Requested computing time
-#PBS -l walltime=10:00:00
+#PBS -l walltime=1:00:00
 
 ### Account
 #PBS -A TG-AST150015
@@ -21,9 +21,9 @@
 
 cd $PBS_O_WORKDIR
 
-mpirun -np 5 -machinefile $PBS_NODEFILE \
+mpirun -np 20 -machinefile $PBS_NODEFILE \
 python $APPS/prospector/scripts/prospector.py \
---nwalkers=36 \
+--nwalkers=38 \
 --niter=20 \ 
 --maxfev=50 \
 --param_file=$APPS/threedhst_bsfh/parameter_files/nonparametric_mocks/nonparametric_mocks_params.py
