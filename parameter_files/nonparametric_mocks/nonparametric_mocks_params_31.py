@@ -32,7 +32,7 @@ run_params = {'verbose':True,
               # Data info
               'photname':os.getenv('APPS')+'/threedhst_bsfh/data/nonparametric_mocks.cat',
               'truename':os.getenv('APPS')+'/threedhst_bsfh/data/nonparametric_mocks.dat',
-              'objname':'1'
+              'objname':'31'
               }
 run_params['outfile'] = run_params['outfile']+'_'+run_params['objname']
 
