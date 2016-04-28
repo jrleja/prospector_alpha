@@ -5,6 +5,6 @@ NARRAY=$1
 
 for ((  i = 1 ;  i <= $NARRAY;  i++  ))
 do
-  cmd='sbatch suball_'$i'.sh'
+  cmd='qsub suball_'$i'.sh'
   $cmd
 done
