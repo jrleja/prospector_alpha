@@ -437,9 +437,6 @@ for param in model_params:
         tparams.append(param)
 model_params = tparams
 
-# name outfile
-run_params['outfile'] = run_params['outfile']+'_'+run_params['objname']
-
 ###### REDEFINE MODEL FOR MY OWN NEFARIOUS PURPOSES ######
 class BurstyModel(sedmodel.SedModel):
 
@@ -506,8 +503,8 @@ def load_model(objname='', agelims=[], **extras):
     n = [p['name'] for p in model_params]
     model_params[n.index('sfh_logmass')]['N'] = ncomp
     model_params[n.index('sfh_logmass')]['init'] = np.log10(mass_init)
-    model_params[n.index('sfh_logmass')]['prior_args'] = {'maxi':14, 'mini':0}
-    model_params[n.index('sfh_logmass')]['init_disp'] = 0.2
+    model_params[n.index('sfh_logmass')]['prior_args'] = {'maxi':np.full(ncomp,14.0), 'mini':np.full(ncomp,0.0)}
+    model_params[n.index('sfh_logmass')]['init_disp'] = 0.3
     model_params[n.index('agebins')]['N'] = ncomp
     model_params[n.index('agebins')]['init'] = agebins.T
 
