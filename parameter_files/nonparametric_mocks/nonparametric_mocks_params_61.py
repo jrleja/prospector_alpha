@@ -20,7 +20,7 @@ run_params = {'verbose':True,
               'ftol':0.5e-5, 
               'maxfev':5000,
               # MCMC params
-              'nwalkers':507,
+              'nwalkers':546,
               'nburn':[150,200], 
               'niter': 5000,
               # Model info
