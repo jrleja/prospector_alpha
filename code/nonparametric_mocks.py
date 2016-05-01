@@ -54,7 +54,7 @@ def construct_mocks(basename,outname=None,add_zp_err=False, plot_mock=False):
 	# expectation value is constant SFH
 	# get this by using Dirichlet distribution, with expectation = (size of time bins) / total time
 	# do it in LOG SPACE, so that we don't have most of the SFH in oldest bin...
-	nbins = model.params['sfh_logmass'].shape[0]
+	nbins = model.params['mass'].shape[0]
 	bin_weight = np.zeros(nbins)
 	exp = 1.7 # this controls the mean fractional mass in each age bin
 	for i in xrange(nbins): bin_weight[i] = exp**model.params['agebins'][i,1]-exp**model.params['agebins'][i,0]
@@ -73,7 +73,7 @@ def construct_mocks(basename,outname=None,add_zp_err=False, plot_mock=False):
 	for ii in xrange(nparams):
 		
 		#### nonparametric bins, using Dirichlet distribution
-		if 'sfh_logmass' in parnames[ii]:
+		if 'logmass' in parnames[ii]:
 			component = int(parnames[ii][-1])-1
 			testparms[:,ii] = np.log10(sfh_distribution[:,component]*total_mass)
 			bad = testparms[:,ii] < model.theta_bounds()[ii][0]
@@ -142,7 +142,7 @@ def construct_mocks(basename,outname=None,add_zp_err=False, plot_mock=False):
 			factor = 3e18 / sps.wavelengths[good]
 			ax[ii].plot(np.log10(sps.wavelengths[good]),np.log10(spec[good]*factor))
 			for nn in xrange(nparams):
-				if 'sfh_logmass' in parnames[nn]:
+				if 'logmass' in parnames[nn]:
 					ax[ii].text(0.05,0.95-nn*0.05,"{:.2f}".format(model.initial_theta[nn]),fontsize=8,transform = ax[ii].transAxes)
 			if ii < ntest-10:
 				ax[ii].xaxis.get_major_ticks()[0].label1On = False

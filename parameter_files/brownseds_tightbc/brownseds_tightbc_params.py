@@ -317,7 +317,7 @@ model_params.append({'name': 'logmass', 'N': 1,
                         'disp_floor': 0.1,
                         'units': r'M_\odot',
                         'prior_function': tophat,
-                        'prior_args': {'mini':5,'maxi':14}})
+                        'prior_args': {'mini':2,'maxi':14}})
 
 model_params.append({'name': 'mass', 'N': 1,
                         'isfree': False,
@@ -325,7 +325,7 @@ model_params.append({'name': 'mass', 'N': 1,
                         'depends_on': transform_logmass_to_mass,
                         'units': r'M_\odot',
                         'prior_function': tophat,
-                        'prior_args': {'mini':1e5,'maxi':1e14}})
+                        'prior_args': {'mini':1e2,'maxi':1e14}})
 
 model_params.append({'name': 'pmetals', 'N': 1,
                         'isfree': False,
@@ -585,9 +585,6 @@ for param in model_params:
     if param['name'] not in fit_order:
         tparams.append(param)
 model_params = tparams
-
-# name outfile
-run_params['outfile'] = run_params['outfile']+'_'+run_params['objname']
 
 ###### REDEFINE MODEL FOR MY OWN NEFARIOUS PURPOSES ######
 class BurstyModel(sedmodel.SedModel):

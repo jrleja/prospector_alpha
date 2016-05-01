@@ -1,11 +1,11 @@
 import numpy as np
 import os, fsps
 import matplotlib.pyplot as plt
-from bsfh import model_setup
+from prospect.models import model_setup
 from scipy.interpolate import interp1d
 from scipy.integrate import simps
 from calc_ml import load_filter_response
-from bsfh.likelihood import LikelihoodFunction
+from prospect.likelihood import LikelihoodFunction
 from astropy.cosmology import WMAP9
 import copy
 
@@ -169,40 +169,43 @@ def offset_and_scatter(x,y,biweight=True):
 
 def find_sfh_params(model,theta,obs,sps,sm=None):
 
-	str_sfh_parms = ['sfh','mass','tau','sf_start','tage','sf_trunc','sf_slope']
+	str_sfh_parms = ['sfh','mass','tau','sf_start','tage','sf_trunc','sf_slope','agebins']
 	parnames = model.theta_labels()
 	sfh_out = []
 
-	# set parameters, in case of dependencies
+	# pass theta to model
 	model.set_parameters(theta)
 
 	for string in str_sfh_parms:
 		
-		# find SFH parameters that are variables in the chain
-		index = np.char.find(parnames,string) > -1
-
-		# if not found, look in fixed parameters
-		if np.sum(index) == 0:
-			sfh_out.append(np.atleast_1d(model.params.get(string,0.0)))
+		# find SFH parameters
+		if string in model.params:
+			sfh_out.append(np.atleast_1d(model.params[string]))
+		# if not defined, give it an empty numpy array
 		else:
-			sfh_out.append(theta[index])
+			sfh_out.append(np.array([]))
 
 	iterable = [(str_sfh_parms[ii],sfh_out[ii]) for ii in xrange(len(sfh_out))]
 	out = {key: value for (key, value) in iterable}
 
-	# Need this because mass is 
-	# current mass, not total mass formed!
+	### total mass if we're using a nonparametric SFH
+	# need to edit this AND add total mass!
+	if 'sfh_logmass' in out:
+		out['mass']=np.atleast_1d(np.sum(10**out['sfh_logmass']))
 	
 	# if we pass sm from a prior model call,
 	# we don't have to calculate it here
 	if sm is None:
 		_,_,_=model.sed(theta, obs, sps=sps)
-		sm = sps.stellar_mass
+		sm = sps.csp.stellar_mass
+	
+	# Need this because mass is 
+	# current mass, not total mass formed!
 	out['mformed'] = out['mass'] / sm
 
 	return out
 
-def test_likelihood(param_file=None, sps=None, model=None, obs=None, thetas=None, verbose=False):
+def test_likelihood(sps,model,obs,thetas,param_file):
 
 	'''
 	skeleton:
@@ -211,28 +214,22 @@ def test_likelihood(param_file=None, sps=None, model=None, obs=None, thetas=None
 	can be run in different environments as a test
 	'''
 
-	if param_file is None:
-		param_file = os.getenv('APPS')+'/threedhst_bsfh/parameter_files/testsed_simha/testsed_simha_params.py'
+	run_params = model_setup.get_run_params(param_file=param_file)
 
 	if sps is None:
-		# load stellar population, set up custom filters
-		sps = fsps.StellarPopulation(zcontinuous=2, compute_vega_mags=False)
-		custom_filter_keys = os.getenv('APPS')+'/threedhst_bsfh/filters/filter_keys_threedhst.txt'
-		fsps.filters.FILTERS = model_setup.custom_filter_dict(custom_filter_keys)
+		sps = model_setup.load_sps(param_file=param_file,**run_params)
 
 	if model is None:
-		model = model_setup.load_model(param_file)
-	
+		model = model_setup.load_model(param_file=param_file,**run_params)
+
 	if obs is None:
-		run_params = model_setup.get_run_params(param_file=param_file)
-		obs = model_setup.load_obs(**run_params)
+		obs = model_setup.load_obs(param_file=param_file,**run_params)
 
 	if thetas is None:
 		thetas = np.array(model.initial_theta)
 
 	# setup gp
-	from bsfh import gp
-	gp_phot = gp.PhotOutlier()
+	gp_spec, gp_phot = model_setup.load_gp(**run_params)
 	try:
 		s, a, l = model.phot_gp_params(obs=obs)
 		print 'phot gp parameters'
@@ -246,12 +243,6 @@ def test_likelihood(param_file=None, sps=None, model=None, obs=None, thetas=None
 	mu, phot, x = model.mean_model(thetas, obs, sps = sps)
 	lnp_phot = likefn.lnlike_phot(phot, obs=obs, gp=gp_phot)
 	lnp_prior = model.prior_product(thetas)
-
-	if verbose:
-		print 'photometry:'
-		print phot
-		print 'phot likelihood, prior likelihood'
-		print lnp_phot,lnp_prior
 
 	return lnp_phot + lnp_prior
 
@@ -881,7 +872,7 @@ def create_prosp_filename(filebase):
 
 def load_prospector_data(filebase):
 
-	from bsfh import read_results
+	from prospect.io import read_results
 
 	mcmc_filename, model_filename = create_prosp_filename(filebase)
 	sample_results, powell_results, model = read_results.read_pickles(mcmc_filename, model_file=model_filename,inmod=None)
@@ -1174,7 +1165,10 @@ def return_full_sfh(t, sfh_params):
 	# calculate new time vector such that
 	# the spacing from tage back to zero
 	# is identical for each SFH model
-	tcalc = t-sfh_params['tage']
+	try:
+		tcalc = t-sfh_params['tage']
+	except ValueError:
+		tcalc = t-np.max(10**sfh_params['agebins'])/1e9
 	tcalc = tcalc[tcalc < 0]*-1
 
 	intsfr = np.zeros(len(t))
@@ -1212,6 +1206,8 @@ def calculate_sfr(sfh_params, timescale, tcalc = None,
 	if maxsfr is None:
 		maxsfr = np.inf
 
+	if sfr.shape[0] == 0:
+		print 1/0
 	sfr = np.clip(sfr, minsfr, maxsfr)
 
 	return sfr
@@ -1245,63 +1241,119 @@ def integrate_sfh(t1,t2,sfh_params):
 	sfh = dictionary of SFH parameters
 	'''
 
-	# copy over so we don't overwrite values
-	# put tau into linear units
+	# copy so we don't overwrite values
 	sfh = sfh_params.copy()
-	sfh['tau'] = 10**sfh['tau']
 
-	# here is our coordinate transformation to match fsps
-	t1 = t1-sfh['sf_start']
-	t2 = t2-sfh['sf_start']
+	# if we're using a parameterized SFH
+	if sfh_params['sfh'] > 0:
 
-	# match dimensions, if two-tau model
-	ndim = len(np.atleast_1d(sfh['mass']))
-	if len(np.atleast_1d(t2)) != ndim:
-		t2 = np.zeros(ndim)+t2
-	if len(np.atleast_1d(t1)) != ndim:
-		t1 = np.zeros(ndim)+t1
+		# here is our coordinate transformation to match fsps
+		t1 = t1-sfh['sf_start']
+		t2 = t2-sfh['sf_start']
 
-	# redefine sf_trunc, if not being used for sfh=5 purposes
-	if sfh['sf_trunc'] == 0.0:
-		sfh['sf_trunc'] = sfh['tage']
+		# match dimensions, if two-tau model
+		ndim = len(np.atleast_1d(sfh['mass']))
+		if len(np.atleast_1d(t2)) != ndim:
+			t2 = np.zeros(ndim)+t2
+		if len(np.atleast_1d(t1)) != ndim:
+			t1 = np.zeros(ndim)+t1
 
-	# if we're outside of the time boundaries, clip to boundary values
-	# this only affects integrals which would have been questionable in the first place
-	t1 = np.clip(t1,0,sfh['tage']-sfh['sf_start'])
-	t2 = np.clip(t2,0,sfh['tage']-sfh['sf_start'])
+		# redefine sf_trunc, if not being used for sfh=5 purposes
+		if sfh['sf_trunc'] == 0.0:
+			sfh['sf_trunc'] = sfh['tage']
 
-  	# if we're using delayed tau
-  	if (sfh['sfh'] == 1) or (sfh['sfh'] == 4):
+		# if we're outside of the time boundaries, clip to boundary values
+		# this only affects integrals which would have been questionable in the first place
+		t1 = np.clip(t1,0,sfh['tage']-sfh['sf_start'])
+		t2 = np.clip(t2,0,sfh['tage']-sfh['sf_start'])
 
-  			# add tau model
-			intsfr =  integrate_delayed_tau(t1,t2,sfh)
-			norm =    1.0- np.exp(-(sfh['sf_trunc']-sfh['sf_start'])/sfh['tau'])*(1+(sfh['sf_trunc']-sfh['sf_start'])/sfh['tau'])
-			intsfr = intsfr/(norm*sfh['tau']**2)
+	  	# if we're using delayed tau
+	  	if (sfh['sfh'] == 1) or (sfh['sfh'] == 4):
 
-	# else, add lin-ramp
-	elif (sfh['sfh'] == 5):
+	  			# add tau model
+				intsfr =  integrate_delayed_tau(t1,t2,sfh)
+				norm =    1.0- np.exp(-(sfh['sf_trunc']-sfh['sf_start'])/sfh['tau'])*(1+(sfh['sf_trunc']-sfh['sf_start'])/sfh['tau'])
+				intsfr = intsfr/(norm*sfh['tau']**2)
 
-		# by-hand calculation
-		norm1 = integrate_delayed_tau(0,sfh['sf_trunc']-sfh['sf_start'],sfh)
-		norm2 = integrate_linramp(sfh['sf_trunc']-sfh['sf_start'],sfh['tage']-sfh['sf_start'],sfh)
+		# else, add lin-ramp
+		elif (sfh['sfh'] == 5):
 
-		if (t1 < sfh['sf_trunc']-sfh['sf_start']) and \
-		   (t2 < sfh['sf_trunc']-sfh['sf_start']):
-			intsfr = integrate_delayed_tau(t1,t2,sfh) / (norm1+norm2)
-		elif (t1 > sfh['sf_trunc']-sfh['sf_start']) and \
-		     (t2 > sfh['sf_trunc']-sfh['sf_start']):
-			intsfr = integrate_linramp(t1,t2,sfh) / (norm1+norm2)
+			# by-hand calculation
+			norm1 = integrate_delayed_tau(0,sfh['sf_trunc']-sfh['sf_start'],sfh)
+			norm2 = integrate_linramp(sfh['sf_trunc']-sfh['sf_start'],sfh['tage']-sfh['sf_start'],sfh)
+
+			if (t1 < sfh['sf_trunc']-sfh['sf_start']) and \
+			   (t2 < sfh['sf_trunc']-sfh['sf_start']):
+				intsfr = integrate_delayed_tau(t1,t2,sfh) / (norm1+norm2)
+			elif (t1 > sfh['sf_trunc']-sfh['sf_start']) and \
+			     (t2 > sfh['sf_trunc']-sfh['sf_start']):
+				intsfr = integrate_linramp(t1,t2,sfh) / (norm1+norm2)
+			else:
+				intsfr = (integrate_delayed_tau(t1,sfh['sf_trunc']-sfh['sf_start'],sfh) + \
+					      integrate_linramp(sfh['sf_trunc']-sfh['sf_start'],t2,sfh)) / \
+	                      (norm1+norm2)
+
 		else:
-			intsfr = (integrate_delayed_tau(t1,sfh['sf_trunc']-sfh['sf_start'],sfh) + \
-				      integrate_linramp(sfh['sf_trunc']-sfh['sf_start'],t2,sfh)) / \
-                      (norm1+norm2)
+			print 'no such SFH implemented'
+			print 1/0
 
+		# return sum of SFR components
+		tot_sfr = np.sum(intsfr*sfh['mass'])/np.sum(sfh['mass'])
+	
+	#### nonparametric SFH
 	else:
-		print 'no such SFH implemented'
-		print 1/0
 
-	# return sum of SFR components
-	tot_sfr = np.sum(intsfr*sfh['mass'])/np.sum(sfh['mass'])
+		### make sure we got what we need
+		if ('agebins' not in sfh_params):
+			print 'missing parameters!'
+			print 1/0
+
+		### put bins in proper units
+		to_linear_bins = 10**sfh_params['agebins']/1e9
+		time_per_bin = to_linear_bins[:,1] - to_linear_bins[:,0]
+		time_bins = np.max(to_linear_bins) - to_linear_bins
+
+		### if it's outside the SFH bins, dump it
+		t1 = np.clip(t1,np.min(time_bins),np.max(time_bins))
+		t2 = np.clip(t2,np.min(time_bins),np.max(time_bins))
+
+		# annoying edge case
+		if t1 == t2:
+			return 0.0
+
+		### mformed in each bin
+		# this is CURRENTLY WRONG
+		mformed = sfh_params['mass']
+
+		### which bins to integrate?
+		in_range = (time_bins >= t1) & (time_bins <= t2)
+		bin_ids = in_range.sum(axis=1)
+
+		### weights
+		weights = np.zeros(mformed.shape)
+		# if we're all in one bin
+		if np.sum(bin_ids) == 1:
+			weights[bin_ids == 1] = t2-t1
+		# else do the whole thing
+		else:
+			for i in xrange(bin_ids.shape[0]):
+				if bin_ids[i] == 2: # bins that are entirely in t1,t2.
+					weights[i] = time_per_bin[i]
+				if bin_ids[i] == 1: # edge cases
+					if t2 < time_bins[i,0]: # this is the most recent edge
+						weights[i] = t2 - time_bins[i,0]
+					else: # this is the oldest edge
+						weights[i] = time_bins[i,1]-t1
+				if bin_ids[i] == 0: # no contribution
+					continue
+
+		### bug catch
+		try:
+			np.testing.assert_approx_equal(np.sum(weights),t2-t1,significant=5)
+		except AssertionError:
+			print 1/0
+		tot_sfr = np.sum(weights*(mformed/time_per_bin)) / (t2-t1)
+
 	return tot_sfr
 
 def measure_emline_lum(sps, model = None, obs = None, thetas = None, 

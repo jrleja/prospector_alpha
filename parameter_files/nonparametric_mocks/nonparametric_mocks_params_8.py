@@ -184,38 +184,19 @@ def expsfh(agelims, tau=1e5, power=1, **extras):
         mformed[i] = intsfr
     return mformed * 1e3
         
-
-#################
-# NEW SPS BASIS #
-#################
-class NPBasis(StepSFHBasis):
-
-    @property
-    def all_ssp_weights(self):
-        ages = self.params['agebins']
-        masses = self.params['sfh_logmass']
-
-        w = np.zeros(len(self.logage)+1)
-        # Loop over age bins
-        # Should cache the bin weights when agebins not changing.  But this is
-        # not very time consuming for few enough bins.
-        for (t1, t2), mass in zip(ages, masses):
-            w += 10**mass * self.bin_weights(t1, t2)
-
-        # convert to surviving stellar mass
-        weight = w/np.insert(self.ssp.stellar_mass, 0, 1.0)
-        return weight
-
-
 ######################
 # GENERATING FUNCTIONS
 ######################
+def transform_logmass_to_mass(mass=None, logmass=None, **extras):
+
+    return 10**logmass
+
 def load_gp(**extras):
     return None, None
 
 def load_sps(**extras):
 
-    sps = NPBasis(**extras)
+    sps = StepSFHBasis(**extras)
     return sps
 
 def add_dust1(dust2=None, **extras):
@@ -276,9 +257,17 @@ model_params.append({'name': 'sfh', 'N':1,
                         'init': 0,
                         'units': None})
 
-model_params.append({'name': 'sfh_logmass', 'N': 1,
+model_params.append({'name': 'logmass', 'N': 1,
                         'isfree': True,
                         'init': [],
+                        'units': 'Msun',
+                        'prior_function': priors.tophat,
+                        'prior_args':{'mini':0.0, 'maxi':1.0}})
+
+model_params.append({'name': 'mass', 'N': 1,
+                        'isfree': False,
+                        'init': [],
+                        'depends_on': transform_logmass_to_mass,
                         'units': 'Msun',
                         'prior_function': priors.tophat,
                         'prior_args':{'mini':0.0, 'maxi':1.0}})
@@ -426,7 +415,7 @@ model_params.append({'name': 'phot_jitter', 'N': 1,
 #### resort list of parameters 
 #### so that major ones are fit first
 parnames = [m['name'] for m in model_params]
-fit_order = ['sfh_logmass','dust2', 'logzsol', 'dust_index', 'dust1', 'duste_qpah', 'duste_gamma', 'duste_umin']
+fit_order = ['logmass','dust2', 'logzsol', 'dust_index', 'dust1', 'duste_qpah', 'duste_gamma', 'duste_umin']
 tparams = [model_params[parnames.index(i)] for i in fit_order]
 for param in model_params: 
     if param['name'] not in fit_order:
@@ -493,14 +482,20 @@ def load_model(objname='', agelims=[], **extras):
     agelims[-1] = np.log10(tuniv*1e9)
     agebins = np.array([agelims[:-1], agelims[1:]])
     ncomp = len(agelims) - 1
-    mass_init =  expsfh(agelims, **extras)
+    mass_init =  expsfh(agelims, **extras)*1e5
 
     #### ADJUST MODEL PARAMETERS #####
     n = [p['name'] for p in model_params]
-    model_params[n.index('sfh_logmass')]['N'] = ncomp
-    model_params[n.index('sfh_logmass')]['init'] = np.log10(mass_init)
-    model_params[n.index('sfh_logmass')]['prior_args'] = {'maxi':np.full(ncomp,14.0), 'mini':np.full(ncomp,0.0)}
-    model_params[n.index('sfh_logmass')]['init_disp'] = 0.3
+
+    model_params[n.index('logmass')]['N'] = ncomp
+    model_params[n.index('logmass')]['init'] = np.log10(mass_init)
+    model_params[n.index('logmass')]['prior_args'] = {'maxi':np.full(ncomp,14.0), 'mini':np.full(ncomp,1.0)}
+    model_params[n.index('logmass')]['init_disp'] = 0.3
+
+    model_params[n.index('mass')]['N'] = ncomp
+    model_params[n.index('mass')]['init'] = mass_init
+    model_params[n.index('mass')]['prior_args'] = {'maxi':np.full(ncomp,10**14.0), 'mini':np.full(ncomp,10**1.0)}
+
     model_params[n.index('agebins')]['N'] = ncomp
     model_params[n.index('agebins')]['init'] = agebins.T
 

@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import corner, os, math, copy, threed_dutils
-from bsfh import read_results
+from prospect.io import read_results
 import matplotlib.image as mpimg
 from astropy.cosmology import WMAP9
 import fsps

@@ -1,4 +1,5 @@
-from bsfh import model_setup,read_results
+from prospect.models import model_setup
+from prospect.io import read_results
 import os, threed_dutils, corner, threedhst_diag, pickle, sys
 import numpy as np
 import matplotlib.pyplot as plt
@@ -32,7 +33,7 @@ def maxprob_model(sample_results,sps):
 		thetas = thetas[0]
 
 	# ensure that maxprob stored is the same as calculated now
-	current_maxprob = threed_dutils.test_likelihood(sps=sps, model=sample_results['model'], obs=sample_results['obs'], thetas=thetas)
+	current_maxprob = threed_dutils.test_likelihood(sps,sample_results['model'],sample_results['obs'],thetas,sample_results['run_params']['param_file'])
 	print current_maxprob
 	print maxprob
 	#np.testing.assert_array_almost_equal(current_maxprob,maxprob,decimal=4)
@@ -56,15 +57,7 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 		sample_results['model'].params['add_neb_emission'] = np.array(True)
 
 	##### initialize sps
-	# check to see if we want zcontinuous=2 (i.e., the MDF)
-	if np.sum([1 for x in sample_results['model'].config_list if x['name'] == 'pmetals']) > 0:
-		sps = threed_dutils.setup_sps(zcontinuous=2,
-			                          custom_filter_key=sample_results['run_params'].get('custom_filter_key',None))
-		print 'zcontinuous=2'
-	else:
-		sps = threed_dutils.setup_sps(zcontinuous=1,
-			                          custom_filter_key=sample_results['run_params'].get('custom_filter_key',None))
-		print 'zcontinuous=1'
+	sps = model_setup.load_sps(**sample_results['run_params'])
 
 	##### maxprob
 	# also confirm probability calculations are consistent with fit
@@ -75,8 +68,8 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 	deltat=[0.01,0.1,1.0] # for averaging SFR over, in Gyr
 
     ##### initialize output arrays for SFH + emission line posterior draws #####
-	half_time,sfr_10,sfr_100,sfr_1000,ssfr_100,totmass,emp_ha,mips_flux,lir,dust_mass, \
-	bdec_cloudy,bdec_calc,ext_5500,dn4000,bdec_nodust,ssfr_10 = [np.zeros(shape=(ncalc)) for i in range(16)]
+	half_time,sfr_10,sfr_100,sfr_1000,ssfr_100,totmass,emp_ha,mips_flux,lir, \
+	bdec_cloudy,bdec_calc,ext_5500,dn4000,bdec_nodust,ssfr_10 = [np.zeros(shape=(ncalc)) for i in range(15)]
 	
 
 	##### information for empirical emission line calculation ######
@@ -98,11 +91,21 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 	flatchain[0,:] = maxthetas
 
 	##### set up time vector for full SFHs
-	nt = 100
-	idx = np.array(sample_results['model'].theta_labels()) == 'tage'
-	maxtime = np.max(flatchain[:ncalc,idx])
-	t = np.linspace(0,maxtime,num=nt)
-	intsfr = np.zeros(shape=(nt,ncalc))
+	# if parameterized, calculate linearly in 100 steps from t=0 to t=tage
+	# if nonparameterized, calculate at bin edges.
+	if 'tage' in sample_results['model'].theta_labels():
+		nt = 100
+		idx = np.array(sample_results['model'].theta_labels()) == 'tage'
+		maxtime = np.max(flatchain[:ncalc,idx])
+		t = np.linspace(0,maxtime,num=nt)
+	elif 'agebins' in sample_results['model'].params:
+		in_years = 10**sample_results['model'].params['agebins']/1e9
+		t = np.concatenate((np.ravel(in_years)*0.9999, np.ravel(in_years)*1.001))
+		t.sort()
+	else:
+		print 'not sure how to set up the time array here...'
+		print 1/0
+	intsfr = np.zeros(shape=(t.shape[0],ncalc))
 
 	##### set up model flux vectors
 	mags = np.zeros(shape=(len(sample_results['obs']['filters']),ncalc))
@@ -120,7 +123,6 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 		# pass stellar mass to avoid extra model call
 		sfh_params = threed_dutils.find_sfh_params(sample_results['model'],flatchain[jj,:],
 			                                       sample_results['obs'],sps,sm=sm)
-		dust_mass[jj] = sps.dust_mass * sfh_params['mformed']
 
 		##### calculate SFH
 		intsfr[:,jj] = threed_dutils.return_full_sfh(t, sfh_params)
@@ -190,6 +192,7 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 		mips_flux[jj]  = modelout['mips']
 		lir[jj]        = modelout['lir']
 		dn4000[jj] = modelout['dn4000']
+		print 1/0
 
 
 	##### CALCULATE Q16,Q50,Q84 FOR VARIABLE PARAMETERS
@@ -198,7 +201,7 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 	for kk in xrange(ntheta): q_16[kk], q_50[kk], q_84[kk] = corner.quantile(sample_results['flatchain'][:,kk], [0.16, 0.5, 0.84])
 	
 	##### CALCULATE Q16,Q50,Q84 FOR EXTRA PARAMETERS
-	extra_flatchain = np.dstack((half_time, sfr_10, sfr_100, sfr_1000, ssfr_10, ssfr_100, totmass, emp_ha, dust_mass, bdec_cloudy,bdec_calc, bdec_nodust,ext_5500))[0]
+	extra_flatchain = np.dstack((half_time, sfr_10, sfr_100, sfr_1000, ssfr_10, ssfr_100, totmass, emp_ha, bdec_cloudy,bdec_calc, bdec_nodust,ext_5500))[0]
 	nextra = extra_flatchain.shape[1]
 	q_16e, q_50e, q_84e = (np.zeros(nextra)+np.nan for i in range(3))
 	for kk in xrange(nextra): q_16e[kk], q_50e[kk], q_84e[kk] = corner.quantile(extra_flatchain[:,kk], [0.16, 0.5, 0.84])
@@ -243,7 +246,7 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 
 	#### EXTRA PARAMETER OUTPUTS 
 	extras = {'flatchain': extra_flatchain,
-			  'parnames': np.array(['half_time','sfr_10','sfr_100','sfr_1000','ssfr_10','ssfr_100','totmass','emp_ha','dust_mass','bdec_cloudy','bdec_calc','bdec_nodust','total_ext5500']),
+			  'parnames': np.array(['half_time','sfr_10','sfr_100','sfr_1000','ssfr_10','ssfr_100','totmass','emp_ha','bdec_cloudy','bdec_calc','bdec_nodust','total_ext5500']),
 			  'q16': q_16e,
 			  'q50': q_50e,
 			  'q84': q_84e,
@@ -276,7 +279,6 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 	             'sfr_1000':sfr_1000[0],
 	             'lir':lir[0],
 	             'mips_flux':mips_flux[0],
-	             'dust_mass': dust_mass[0],
 	             'halpha_flux':emflux[0,emnames == 'Halpha'],
 	             'hbeta_flux':emflux[0,emnames == 'Hbeta'],
 	             'hdelta_flux':emflux[0,emnames == 'Hdelta'],
@@ -350,7 +352,6 @@ def write_kinney_txt():
 		sample_results, powell_results, model = threed_dutils.load_prospector_data(filebase[jj])
 		
 		if jj == 0:
-			dmass_ind = sample_results['extras']['parnames'] == 'dust_mass'
 			sfr10_ind = sample_results['extras']['parnames'] == 'sfr_10'
 			sfr100_ind = sample_results['extras']['parnames'] == 'sfr_100'
 			mass_ind = sample_results['quantiles']['parnames'] == 'mass'

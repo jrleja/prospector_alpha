@@ -1,6 +1,8 @@
 import numpy as np
 import os
-from bsfh import priors, sedmodel
+from prospect.models import priors, sedmodel
+from prospect.sources import CSPBasis
+from sedpy import observate
 from astropy.cosmology import WMAP9
 from astropy.io import fits
 tophat = priors.tophat
@@ -11,22 +13,28 @@ logarithmic = priors.logarithmic
 #############
 
 run_params = {'verbose':True,
+              'debug': False,
               'outfile':os.getenv('APPS')+'/threedhst_bsfh/results/brownseds_tightbc/brownseds_tightbc',
+              'nofork': True,
+              # Optimizer params
               'ftol':0.5e-5, 
               'maxfev':5000,
+              # MCMC params
               'nwalkers':496,
               'nburn':[32,32,64], 
               'niter': 1000,
+              # Model info
+              'zcontinuous': 2,
+              'compute_vega_mags': False,
               'initial_disp':0.1,
-              'debug': False,
-              'spec': False, 
-              'phot':True,
+              # Data info
               'datname':os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/table1.fits',
               'photname':os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/table3.fits',
               'extinctname':os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/table4.fits',
               'herschname':os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/kingfish.brownapertures.flux.fits',
               'objname':'NGC 5992',
               }
+run_params['outfile'] = run_params['outfile']+'_'+run_params['objname']
 
 ############
 # OBS
@@ -81,39 +89,39 @@ def translate_filters(bfilters, full_list = False):
     # this translates filter names
     # to names that FSPS recognizes
     translate_pfsps = {
-    'FUV': 'GALEX_FUV',
-    'UVW2': 'UVOT_W2',
-    'UVM2': 'UVOT_M2',
-    'NUV': 'GALEX_NUV',
-    'UVW1': 'UVOT_W1',
+    'FUV': 'galex_FUV',
+    'UVW2': 'uvot_w2',
+    'UVM2': 'uvot_m2',
+    'NUV': 'galex_NUV',
+    'UVW1': 'uvot_w1',
     'Umag': np.nan,    # [11.9/15.7]? Swift/UVOT U AB band magnitude
-    'umag': 'SDSS_u',
-    'gmag': 'SDSS_g',
+    'umag': 'sdss_u0',
+    'gmag': 'sdss_g0',
     'Vmag': np.nan,    # [10.8/15.6]? Swift/UVOT V AB band magnitude
-    'rmag': 'SDSS_r',
-    'imag': 'SDSS_i',
-    'zmag': 'SDSS_z',
-    'Jmag': '2MASS_J',
-    'Hmag': '2MASS_H',
-    'Ksmag': '2MASS_Ks',
-    'W1mag': 'WISE_W1',
-    '[3.6]': 'IRAC_1',
-    '[4.5]': 'IRAC_2',
+    'rmag': 'sdss_r0',
+    'imag': 'sdss_i0',
+    'zmag': 'sdss_z0',
+    'Jmag': 'twomass_J',
+    'Hmag': 'twomass_H',
+    'Ksmag': 'twomass_Ks',
+    'W1mag': 'wise_w1',
+    '[3.6]': 'spitzer_irac_ch1',
+    '[4.5]': 'spitzer_irac_ch2',
     'W2mag': 'WISE_W2',
-    '[5.8]': 'IRAC_3',
-    '[8.0]': 'IRAC_4',
+    '[5.8]': 'spitzer_irac_ch3',
+    '[8.0]': 'spitzer_irac_ch4',
     'W3mag': 'WISE_W3',
     'PUIB': np.nan,    # [8.2/15.6]? Spitzer/IRS Blue Peak Up Imaging channel (13.3-18.7um) AB magnitude
-    'W4mag': np.nan,    # two WISE4 magnitudes, what is the correction?
+    'W4mag': np.nan,    # two WISE4 magnitudes, this one is "native" and must be corrected
     "W4'mag": 'WISE_W4',
     'PUIR': np.nan,    # Spitzer/IRS Red Peak Up Imaging channel (18.5-26.0um) AB magnitude
-    '[24]': 'MIPS_24',
-    'pacs70': 'PACS_70',
-    'pacs100': 'PACS_100',
-    'pacs160': 'PACS_160',
-    'spire250': 'SPIRE_250',
-    'spire350': 'SPIRE_350',
-    'spire500': 'SPIRE_500'
+    '[24]': 'spitzer_mips_24',
+    'pacs70': 'herschel_pacs_70',
+    'pacs100': 'herschel_pacs_100',
+    'pacs160': 'herschel_pacs_160',
+    'spire250': 'herschel_spire_250',
+    'spire350': 'herschel_spire_350',
+    'spire500': 'herschel_spire_500'
     }
 
     if full_list:
@@ -122,7 +130,7 @@ def translate_filters(bfilters, full_list = False):
         return np.array([translate[f] for f in bfilters]), np.array([translate_pfsps[f] for f in bfilters])
 
 
-def load_obs_brown(photname, extinctname, herschname, objname):
+def load_obs(photname='', extinctname='', herschname='', objname='', **extras):
     """
     let's do this
     """
@@ -220,12 +228,13 @@ def load_obs_brown(photname, extinctname, herschname, objname):
 
     # build output dictionary
     obs['wave_effective'] = wave_effective
-    obs['filters'] = fsps_filters
+    obs['filters'] = observate.load_filters(fsps_filters)
     obs['phot_mask'] = phot_mask
     obs['maggies'] = flux
     obs['maggies_unc'] =  unc
     obs['wavelength'] = None
     obs['spectrum'] = None
+    obs['logify_spectrum'] = False
 
     if objname is None:
         obs['hnames'] = herschel[1].data['Name']
@@ -238,12 +247,16 @@ def load_obs_brown(photname, extinctname, herschname, objname):
 
     return obs
 
-obs = load_obs_brown(run_params['photname'], run_params['extinctname'], 
-                     run_params['herschname'],run_params['objname'])
+######################
+# GENERATING FUNCTIONS
+######################
+def load_gp(**extras):
+    return None, None
 
-#############
-# MODEL_PARAMS
-#############
+def load_sps(**extras):
+
+    sps = CSPBasis(**extras)
+    return sps
 
 def transform_sftanslope_to_sfslope(sf_slope=None,sf_tanslope=None,**extras):
 
@@ -252,6 +265,10 @@ def transform_sftanslope_to_sfslope(sf_slope=None,sf_tanslope=None,**extras):
 def transform_delt_to_sftrunc(tage=None, delt_trunc=None, **extras):
 
     return tage*delt_trunc
+
+def transform_logmass_to_mass(mass=None, logmass=None, **extras):
+
+    return 10**logmass
 
 def transform_logtau_to_tau(tau=None, logtau=None, **extras):
 
@@ -265,32 +282,16 @@ def tie_gas_logz(logzsol=None, **extras):
 
     return logzsol
 
-#### SET SFH PRIORS #####
-###### REDSHIFT ######
-hdulist = fits.open(run_params['datname'])
-idx = hdulist[1].data['Name'] == run_params['objname']
-zred =  hdulist[1].data['cz'][idx][0] / 3e5
-hdulist.close()
-
-#### TUNIV #####
-tuniv = WMAP9.age(zred).value
-run_params['tuniv']       = tuniv
-
-#### TAGE #####
-tage_maxi = tuniv
-tage_init = 1.1
-tage_mini  = 0.11      # FSPS standard
+#############
+# MODEL_PARAMS
+#############
 
 model_params = []
-
-param_template = {'name':'', 'N':1, 'isfree': False,
-                  'init':0.0, 'units':'', 'label':'',
-                  'prior_function_name': None, 'prior_args': None}
 
 ###### BASIC PARAMETERS ##########
 model_params.append({'name': 'zred', 'N': 1,
                         'isfree': False,
-                        'init': zred,
+                        'init': 0.0,
                         'units': '',
                         'prior_function': tophat,
                         'prior_args': {'mini':0.0, 'maxi':4.0}})
@@ -308,11 +309,20 @@ model_params.append({'name': 'add_agb_dust_model', 'N': 1,
                         'units': None,
                         'prior_function': None,
                         'prior_args': None})
-                        
-model_params.append({'name': 'mass', 'N': 1,
+              
+model_params.append({'name': 'logmass', 'N': 1,
                         'isfree': True,
-                        'init': 1e10,
+                        'init': 10.0,
                         'init_disp': 0.25,
+                        'disp_floor': 0.1,
+                        'units': r'M_\odot',
+                        'prior_function': tophat,
+                        'prior_args': {'mini':5,'maxi':14}})
+
+model_params.append({'name': 'mass', 'N': 1,
+                        'isfree': False,
+                        'init': 1e10,
+                        'depends_on': transform_logmass_to_mass,
                         'units': r'M_\odot',
                         'prior_function': tophat,
                         'prior_args': {'mini':1e5,'maxi':1e14}})
@@ -327,7 +337,8 @@ model_params.append({'name': 'pmetals', 'N': 1,
 model_params.append({'name': 'logzsol', 'N': 1,
                         'isfree': True,
                         'init': -0.5,
-                        'init_disp': 0.15,
+                        'init_disp': 0.25,
+                        'disp_floor': 0.2,
                         'units': r'$\log (Z/Z_\odot)$',
                         'prior_function': tophat,
                         'prior_args': {'mini':-1.98, 'maxi':0.19}})
@@ -343,7 +354,8 @@ model_params.append({'name': 'sfh', 'N': 1,
 model_params.append({'name': 'logtau', 'N': 1,
                         'isfree': True,
                         'init': 0.0,
-                        'init_disp': 0.25,
+                        'init_disp': 0.3,
+                        'disp_floor': 0.25,
                         'units': 'log(Gyr)',
                         'prior_function': tophat,
                         'prior_args': {'mini':-1.0,
@@ -360,11 +372,12 @@ model_params.append({'name': 'tau', 'N': 1,
 
 model_params.append({'name': 'tage', 'N': 1,
                         'isfree': True,
-                        'init': tage_init,
+                        'init': 1.1,
                         'init_disp': 0.25,
+                        'disp_floor': 0.1,
                         'units': 'Gyr',
                         'prior_function': tophat,
-                        'prior_args': {'mini':tage_mini, 'maxi':tage_maxi}})
+                        'prior_args': {'mini':0.11, 'maxi':13.7}})
 
 model_params.append({'name': 'tburst', 'N': 1,
                         'isfree': False,
@@ -400,6 +413,7 @@ model_params.append({'name': 'delt_trunc', 'N': 1,
                         'isfree': True,
                         'init': 1.0,
                         'init_disp': 0.1,
+                        'disp_floor': 0.1,
                         'units': '',
                         'prior_function': tophat,
                         'prior_args': {'mini':0.0, 'maxi': 1.0}})
@@ -415,7 +429,8 @@ model_params.append({'name': 'sf_trunc', 'N': 1,
 model_params.append({'name': 'sf_tanslope', 'N': 1,
                         'isfree': True,
                         'init': 0.0,
-                        'init_disp': 0.25,
+                        'init_disp': 0.4,
+                        'disp_floor': 0.3,
                         'units': '',
                         'prior_function': tophat,
                         'prior_args': {'mini':-np.pi/2., 'maxi': np.pi/2}})
@@ -448,6 +463,7 @@ model_params.append({'name': 'dust1', 'N': 1,
                         'isfree': True,
                         'init': 1.0,
                         'init_disp': 0.8,
+                        'disp_floor': 0.5,
                         'units': '',
                         'prior_function': tophat,
                         'prior_args': {'mini':0.0, 'maxi':4.0}})
@@ -455,6 +471,8 @@ model_params.append({'name': 'dust1', 'N': 1,
 model_params.append({'name': 'dust2', 'N': 1,
                         'isfree': True,
                         'init': 1.0,
+                        'init_disp': 0.25,
+                        'disp_floor': 0.15,
                         'units': '',
                         'prior_function': tophat,
                         'prior_args': {'mini':0.0,'maxi':4.0}})
@@ -462,6 +480,8 @@ model_params.append({'name': 'dust2', 'N': 1,
 model_params.append({'name': 'dust_index', 'N': 1,
                         'isfree': True,
                         'init': 0.0,
+                        'init_disp': 0.25,
+                        'disp_floor': 0.15,
                         'units': '',
                         'prior_function': tophat,
                         'prior_args': {'mini':-2.2, 'maxi': 0.4}})
@@ -492,6 +512,7 @@ model_params.append({'name': 'duste_gamma', 'N': 1,
                         'isfree': True,
                         'init': 0.01,
                         'init_disp': 0.2,
+                        'disp_floor': 0.15,
                         'units': None,
                         'prior_function': tophat,
                         'prior_args': {'mini':0.0, 'maxi':1.0}})
@@ -500,6 +521,7 @@ model_params.append({'name': 'duste_umin', 'N': 1,
                         'isfree': True,
                         'init': 1.0,
                         'init_disp': 5.0,
+                        'disp_floor': 4.5,
                         'units': None,
                         'prior_function': tophat,
                         'prior_args': {'mini':0.1, 'maxi':25.0}})
@@ -508,6 +530,7 @@ model_params.append({'name': 'duste_qpah', 'N': 1,
                         'isfree': True,
                         'init': 3.0,
                         'init_disp': 3.0,
+                        'disp_floor': 3.0,
                         'units': 'percent',
                         'prior_function': tophat,
                         'prior_args': {'mini':0.0, 'maxi':10.0}})
@@ -552,106 +575,19 @@ model_params.append({'name': 'phot_jitter', 'N': 1,
                         'prior_function':tophat,
                         'prior_args': {'mini':0.0, 'maxi':0.5}})
 
+
 #### resort list of parameters 
 #### so that major ones are fit first
 parnames = [m['name'] for m in model_params]
-fit_order = ['mass', 'tage', 'logtau', 'dust2', 'delt_trunc', 'sf_tanslope', 'duste_gamma', 'logzsol', 'dust1', 'dust_index','duste_umin', 'duste_qpah']
+fit_order = ['logmass', 'tage', 'logtau', 'dust2', 'logzsol', 'dust_index', 'delt_trunc', 'sf_tanslope', 'dust1', 'duste_qpah', 'duste_gamma', 'duste_umin']
 tparams = [model_params[parnames.index(i)] for i in fit_order]
 for param in model_params: 
     if param['name'] not in fit_order:
         tparams.append(param)
 model_params = tparams
 
-# name outfile
-run_params['outfile'] = run_params['outfile']+'_'+run_params['objname']
-
-
 ###### REDEFINE MODEL FOR MY OWN NEFARIOUS PURPOSES ######
-class BurstyModel(sedmodel.CSPModel):
-
-    def theta_disps(self, thetas, initial_disp=0.1):
-        """Get a vector of dispersions for each parameter to use in
-        generating sampler balls for emcee's Ensemble sampler.
-
-        :param initial_disp: (default: 0.1)
-            The default dispersion to use in case the `init_disp` key
-            is not provided in the parameter configuration.  This is
-            in units of the parameter, so e.g. 0.1 will result in a
-            smpler ball with a dispersion that is 10% of the central
-            parameter value.
-        """
-        disp = np.zeros(self.ndim) + initial_disp
-        for par, inds in self.theta_index.iteritems():
-            
-            # fractional dispersion
-            if par == 'mass' or \
-               par == 'tage':
-                disp[inds[0]:inds[1]] = self._config_dict[par].get('init_disp', initial_disp) * thetas[inds[0]:inds[1]]
-
-            # constant (log) dispersion
-            if par == 'logtau' or \
-               par == 'metallicity' or \
-               par == 'sf_tanslope' or \
-               par == 'delt_trunc' or \
-               par == 'duste_umin' or \
-               par == 'duste_qpah' or \
-               par == 'duste_gamma':
-                disp[inds[0]:inds[1]] = self._config_dict[par].get('init_disp', initial_disp)
-
-            # fractional dispersion with artificial floor
-            if par == 'dust2' or \
-               par == 'dust1' or \
-               par == 'dust_index':
-                disp[inds[0]:inds[1]] = (self._config_dict[par].get('init_disp', initial_disp) * thetas[inds[0]:inds[1]]**2 + \
-                                         0.1**2)**0.5
-            
-        return disp
-
-    def theta_disp_floor(self, thetas):
-        """Get a vector of dispersions for each parameter to use as
-        a floor for the walker-calculated dispersions.
-        """
-        disp = np.zeros(self.ndim)
-        for par, inds in self.theta_index.iteritems():
-            
-            # constant 5% floor
-            if par == 'mass':
-                disp[inds[0]:inds[1]] = 0.05 * thetas[inds[0]:inds[1]]
-
-            # constant 0.05 floor (log space, sf_slope, dust_index)
-            if par == 'logzsol':
-                disp[inds[0]:inds[1]] = 0.2
-
-            if par == 'logtau':
-                disp[inds[0]:inds[1]] = 0.25
-
-            if par == 'sf_tanslope':
-                disp[inds[0]:inds[1]] = 0.3
-
-            if par == 'dust2' or \
-               par == 'dust_index':
-                disp[inds[0]:inds[1]] = 0.15
-
-            if par == 'dust1':
-                disp[inds[0]:inds[1]] = 0.4
-
-            if par == 'duste_umin':
-                disp[inds[0]:inds[1]] = 4.5
-
-            if par == 'duste_qpah':
-                disp[inds[0]:inds[1]] = 3.0
-
-            if par == 'duste_gamma':
-                disp[inds[0]:inds[1]] = 0.15
-
-            # 20% floor
-            if par == 'tage':
-                disp[inds[0]:inds[1]] = 0.2 * thetas[inds[0]:inds[1]]
-
-            if par == 'delt_trunc':
-                disp[inds[0]:inds[1]] = 0.1
-            
-        return disp
+class BurstyModel(sedmodel.SedModel):
 
     def prior_product(self, theta):
         """
@@ -690,9 +626,39 @@ class BurstyModel(sedmodel.CSPModel):
 
         for k, v in self.theta_index.iteritems():
             start, end = v
-            lnp_prior += np.sum(self._config_dict[k]['prior_function']
+            this_prior = np.sum(self._config_dict[k]['prior_function']
                                 (theta[start:end], **self._config_dict[k]['prior_args']))
+
+            if (not np.isfinite(this_prior)):
+                print('WARNING: ' + k + ' is out of bounds')
+            lnp_prior += this_prior
         return lnp_prior
+
+def load_model(datname='', objname='', **extras):
+
+    ###### REDSHIFT ######
+    hdulist = fits.open(datname)
+    idx = hdulist[1].data['Name'] == objname
+    zred =  hdulist[1].data['cz'][idx][0] / 3e5
+    hdulist.close()
+
+    #### TUNIV #####
+    tuniv = WMAP9.age(zred).value
+
+    #### TAGE #####
+    tage_init = 1.1
+    tage_mini  = 0.11      # FSPS standard
+    tage_maxi = tuniv
+
+    #### INSERT MAXIMUM AGE AND REDSHIFT INTO MODEL PARAMETER DICTIONARY ####
+    pnames = [m['name'] for m in model_params]
+    zind = pnames.index('zred')
+    model_params[zind]['init'] = zred
+    tind = pnames.index('tage')
+    model_params[tind]['prior_args']['maxi'] = tuniv
+    model = BurstyModel(model_params)
+
+    return model
 
 model_type = BurstyModel
 
