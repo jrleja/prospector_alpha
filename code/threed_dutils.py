@@ -188,16 +188,13 @@ def find_sfh_params(model,theta,obs,sps,sm=None):
 	iterable = [(str_sfh_parms[ii],sfh_out[ii]) for ii in xrange(len(sfh_out))]
 	out = {key: value for (key, value) in iterable}
 
-	### total mass if we're using a nonparametric SFH
-	# need to edit this AND add total mass!
-	if 'sfh_logmass' in out:
-		out['mass']=np.atleast_1d(np.sum(10**out['sfh_logmass']))
-	
 	# if we pass sm from a prior model call,
 	# we don't have to calculate it here
-	if sm is None:
+	if sm is None and out['mass'].shape[0] > 1:
 		_,_,_=model.sed(theta, obs, sps=sps)
 		sm = sps.csp.stellar_mass
+	else: # sps.stellar_mass in bins!
+		sm = sps.bin_mass_fraction
 	
 	# Need this because mass is 
 	# current mass, not total mass formed!
@@ -217,13 +214,13 @@ def test_likelihood(sps,model,obs,thetas,param_file):
 	run_params = model_setup.get_run_params(param_file=param_file)
 
 	if sps is None:
-		sps = model_setup.load_sps(param_file=param_file,**run_params)
+		sps = model_setup.load_sps(**run_params)
 
 	if model is None:
-		model = model_setup.load_model(param_file=param_file,**run_params)
+		model = model_setup.load_model(**run_params)
 
 	if obs is None:
-		obs = model_setup.load_obs(param_file=param_file,**run_params)
+		obs = model_setup.load_obs(**run_params)
 
 	if thetas is None:
 		thetas = np.array(model.initial_theta)
@@ -232,14 +229,12 @@ def test_likelihood(sps,model,obs,thetas,param_file):
 	gp_spec, gp_phot = model_setup.load_gp(**run_params)
 	try:
 		s, a, l = model.phot_gp_params(obs=obs)
-		print 'phot gp parameters'
-		print s, a, l
 		gp_phot.kernel = np.array( list(a) + list(l) + [s])
 	except(AttributeError):
-		#There was no phot_gp_params method
+		# There was no phot_gp_params method
 		pass
 
-	likefn = LikelihoodFunction(obs=obs, model=model)
+	likefn = LikelihoodFunction()
 	mu, phot, x = model.mean_model(thetas, obs, sps = sps)
 	lnp_phot = likefn.lnlike_phot(phot, obs=obs, gp=gp_phot)
 	lnp_prior = model.prior_product(thetas)
@@ -1193,21 +1188,23 @@ def calculate_sfr(sfh_params, timescale, tcalc = None,
 
 	'''
 
-	if tcalc is None:
-		tcalc = sfh_params['tage']
+	if sfh_params['tage'].shape[0] > 0:
+		tage = sfh_params['tage']
+	else:
+		tage = np.max(10**sfh_params['agebins']/1e9)
 
-	sfr=integrate_sfh(tcalc-timescale,
-		              tcalc,
-		              sfh_params)*np.sum(sfh_params['mformed'])/(timescale*1e9)
+	if tcalc is None:
+		tcalc = tage
+	print 1/0
+	sfr=integrate_sfh(tcalc-timescale, tcalc, sfh_params) * \
+	                  sfh_params['mformed'].sum()/(timescale*1e9)
 
 	if minsfr is None:
-		minsfr = np.sum(sfh_params['mformed']) / (sfh_params['tage']*1e9*10000)
+		minsfr = sfh_params['mformed'].sum() / (tage*1e9*10000)
 
 	if maxsfr is None:
 		maxsfr = np.inf
 
-	if sfr.shape[0] == 0:
-		print 1/0
 	sfr = np.clip(sfr, minsfr, maxsfr)
 
 	return sfr
@@ -1313,24 +1310,23 @@ def integrate_sfh(t1,t2,sfh_params):
 		time_per_bin = to_linear_bins[:,1] - to_linear_bins[:,0]
 		time_bins = np.max(to_linear_bins) - to_linear_bins
 
-		### if it's outside the SFH bins, dump it
+		### if it's outside the SFH bins, clip it
 		t1 = np.clip(t1,np.min(time_bins),np.max(time_bins))
 		t2 = np.clip(t2,np.min(time_bins),np.max(time_bins))
 
-		# annoying edge case
+		# annoying edge cases
 		if t1 == t2:
 			return 0.0
-
-		### mformed in each bin
-		# this is CURRENTLY WRONG
-		mformed = sfh_params['mass']
+		if (t2 < time_bins[0,0]) & (t1 < time_bins[0,0]): 
+			print 'SFR is undefined in this time region, outside youngest bin!'
+			print 1/0
 
 		### which bins to integrate?
 		in_range = (time_bins >= t1) & (time_bins <= t2)
 		bin_ids = in_range.sum(axis=1)
 
 		### weights
-		weights = np.zeros(mformed.shape)
+		weights = np.zeros(sfh_params['mformed'].shape)
 		# if we're all in one bin
 		if np.sum(bin_ids) == 1:
 			weights[bin_ids == 1] = t2-t1
@@ -1352,8 +1348,7 @@ def integrate_sfh(t1,t2,sfh_params):
 			np.testing.assert_approx_equal(np.sum(weights),t2-t1,significant=5)
 		except AssertionError:
 			print 1/0
-		tot_sfr = np.sum(weights*(mformed/time_per_bin)) / (t2-t1)
-
+		tot_sfr = np.sum(weights*(sfh_params['mformed']/time_per_bin/1e9)) / (t2-t1)
 	return tot_sfr
 
 def measure_emline_lum(sps, model = None, obs = None, thetas = None, 

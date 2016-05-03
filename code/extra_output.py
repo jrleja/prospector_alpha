@@ -102,6 +102,7 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 		in_years = 10**sample_results['model'].params['agebins']/1e9
 		t = np.concatenate((np.ravel(in_years)*0.9999, np.ravel(in_years)*1.001))
 		t.sort()
+		t = t[1:-1] # remove older than oldest bin, younger than youngest bin
 	else:
 		print 'not sure how to set up the time array here...'
 		print 1/0
@@ -138,7 +139,7 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 		sfr_1000[jj] = threed_dutils.calculate_sfr(sfh_params, 1.0,  minsfr=-np.inf, maxsfr=np.inf)
 
 		##### calculate mass, sSFR
-		totmass[jj] = np.sum(sfh_params['mass'])
+		totmass[jj] = sfh_params['mass'].sum()
 		ssfr_10[jj] = sfr_10[jj] / totmass[jj]
 		ssfr_100[jj] = sfr_100[jj] / totmass[jj]
 
