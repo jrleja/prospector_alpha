@@ -5,9 +5,9 @@ from prospect.models import model_setup
 from scipy.interpolate import interp1d
 from scipy.integrate import simps
 from calc_ml import load_filter_response
-from prospect.likelihood import LikelihoodFunction
 from astropy.cosmology import WMAP9
 import copy
+from astropy import constants
 
 def return_lir(lam,spec,z=None,alt_file=None):
 
@@ -190,7 +190,7 @@ def find_sfh_params(model,theta,obs,sps,sm=None):
 
 	# if we pass sm from a prior model call,
 	# we don't have to calculate it here
-	if sm is None and out['mass'].shape[0] > 1:
+	if sm is None and out['mass'].shape[0] == 1:
 		_,_,_=model.sed(theta, obs, sps=sps)
 		sm = sps.csp.stellar_mass
 	else: # sps.stellar_mass in bins!
@@ -210,6 +210,8 @@ def test_likelihood(sps,model,obs,thetas,param_file):
 	generate spectrum, compare to observations, assess likelihood
 	can be run in different environments as a test
 	'''
+
+	from prospect.likelihood import LikelihoodFunction
 
 	run_params = model_setup.get_run_params(param_file=param_file)
 
@@ -366,10 +368,14 @@ def sfh_half_time(x,sfh_params,c):
 	'''
 	wrapper for use with halfmass assembly time
 	'''
+	# check for nonparametric
+	if sfh_params['sf_start'].shape[0] == 0:
+		sf_start = 0.0
+	else:
+		sf_start = sfh_params['sf_start']
+	return integrate_sfh(sf_start,x,sfh_params)-c
 
-	return integrate_sfh(sfh_params['sf_start'],x,sfh_params)-c
-
-def halfmass_assembly_time(sfh_params,tuniv):
+def halfmass_assembly_time(sfh_params):
 
 	from scipy.optimize import brentq
 
@@ -389,60 +395,65 @@ def halfmass_assembly_time(sfh_params,tuniv):
 		warnings.warn("You've passed SFH parameters that don't allow t_half to be calculated. Check for bugs.", UserWarning)
 		half_time = np.nan
 
-	return tuniv-half_time
+	# define age of galaxy
+	tgal = sfh_params['tage']
+	if tgal.shape[0] == 0:
+		tgal = np.max(10**sfh_params['agebins']/1e9)
 
-def load_truths(truthname,objname,sample_results, sps=None, calc_prob = True):
+	return tgal-half_time
+
+def load_truths(param_file,model=None,sps=None,obs=None, calc_prob = True):
 
 	'''
-	loads truths
-	generates plotvalues
+	loads truths, generates useful information
+	will load sps, model, obs, etc if not passed!
 	'''
+
+	from prospect.likelihood import LikelihoodFunction
+
+	# load necessary machinery
+	run_params = model_setup.get_run_params(param_file=param_file)
+	if sps is None:
+		sps = model_setup.load_sps(**run_params)
+	if model is None:
+		model = model_setup.load_model(**run_params)
+	if obs is None:
+		obs = model_setup.load_obs(**run_params)
 
 	# load truths
-	with open(truthname, 'r') as f:
+	with open(run_params['truename'], 'r') as f:
 		hdr = f.readline().split()[1:]
-	truth = np.loadtxt(truthname, comments = '#',
+	truth = np.loadtxt(run_params['truename'], comments = '#',
 					   dtype = np.dtype([(n, np.float) for n in hdr]))
 
-	truths = np.array([x for x in truth[int(objname)-1]])
+	truths = np.array([x for x in truth[int(run_params['objname'])-1]])
 	parnames = np.array(hdr)
 
-	#### define extra parameters ####
-	mass = truths[np.array([True if 'mass' in x else False for x in parnames])]
-
 	# SFH parameters
-	if sample_results is not None:
-		sfh_params = find_sfh_params(sample_results['model'],truths,sample_results['obs'],sps)
-		deltat=0.1
-		sfr_10  = np.log10(calculate_sfr(sfh_params,0.01))
-		ssfr_10 = np.log10(10**sfr_10 / mass)
-		sfr_100  = np.log10(calculate_sfr(sfh_params,deltat))
-		ssfr_100 = np.log10(calculate_sfr(sfh_params,deltat) / mass)
-		halftime = halfmass_assembly_time(sfh_params,sfh_params['tage'])
-		if calc_prob == True:
-			lnprob   = test_likelihood(sps=sps,model=sample_results['model'], obs=sample_results['obs'],thetas=truths)
+	sfh_params = find_sfh_params(model,truths,obs,sps)
+	deltat=0.1
+	sfr_10  = np.log10(calculate_sfr(sfh_params,0.01))
+	ssfr_10 = np.log10(10**sfr_10 / sfh_params['mformed'].sum())
+	sfr_100  = np.log10(calculate_sfr(sfh_params,deltat))
+	ssfr_100 = np.log10(calculate_sfr(sfh_params,deltat) / sfh_params['mformed'].sum())
+	halftime = halfmass_assembly_time(sfh_params)
+	if calc_prob == True:
+		lnprob   = test_likelihood(sps,model,obs,truths,param_file)
 
-		modelout = measure_emline_lum(sps, thetas = truths,
-	 								  model=sample_results['model'], obs = sample_results['obs'],
-									  measure_ir=True)
-		emnames = np.array(modelout['emlines'].keys())
-		emflux = np.array([modelout['emlines'][line]['flux'] for line in emnames])
-		absnames = np.array(modelout['abslines'].keys())
-		abseqw = np.array([modelout['abslines'][line]['eqw'] for line in absnames])
-		dn4000 = modelout['dn4000']
-
-	else:
-		sfh_params = None
-		sfr_100 = None
-		ssfr_100 = None
-		halftime = None
-		lnprob   = None
+	modelout = measure_emline_lum(sps, thetas = truths,
+ 								  model=model, obs = obs,
+								  measure_ir=True)
+	emnames = np.array(modelout['emlines'].keys())
+	emflux = np.array([modelout['emlines'][line]['flux'] for line in emnames])
+	absnames = np.array(modelout['abslines'].keys())
+	abseqw = np.array([modelout['abslines'][line]['eqw'] for line in absnames])
+	dn4000 = modelout['dn4000']
+	lir = modelout['lir']
     
-
 	#### parameter conversions for plotting
 	plot_truths = truths+0.0
 	for kk in xrange(len(parnames)):
-		if parnames[kk] == 'mass':
+		if 'mass' in parnames[kk] and 'log' not in parnames[kk]:
 			plot_truths[kk] = np.log10(plot_truths[kk])
 
 	truths_dict = {'parnames':parnames,
@@ -455,8 +466,9 @@ def load_truths(truthname,objname,sample_results, sps=None, calc_prob = True):
 				   'emflux':emflux,
 				   'absnames':absnames,
 				   'abseqw':abseqw,
-				   'dn4000':dn4000}
-	
+				   'dn4000':dn4000,
+				   'lir':lir}
+	print 1/0
 	if calc_prob == True:
 		truths_dict['truthprob'] = lnprob
 
@@ -1188,16 +1200,25 @@ def calculate_sfr(sfh_params, timescale, tcalc = None,
 
 	'''
 
-	if sfh_params['tage'].shape[0] > 0:
+	if sfh_params['sfh'] > 0:
 		tage = sfh_params['tage']
 	else:
 		tage = np.max(10**sfh_params['agebins']/1e9)
 
 	if tcalc is None:
 		tcalc = tage
-	print 1/0
+
+	# calculate timescale used in integration
+	# different than input because for nonparametric SFH, SFR is undefined below smallest time bin!
+	calc_timescale = timescale
+	if sfh_params['sfh'] == 0:
+		min_t = np.min(10**sfh_params['agebins']/1e9)
+		tdefined = tage - min_t
+		if tdefined > tcalc-timescale:
+			calc_timescale = timescale-(tcalc-tdefined)
+
 	sfr=integrate_sfh(tcalc-timescale, tcalc, sfh_params) * \
-	                  sfh_params['mformed'].sum()/(timescale*1e9)
+	                  sfh_params['mformed'].sum()/(calc_timescale*1e9)
 
 	if minsfr is None:
 		minsfr = sfh_params['mformed'].sum() / (tage*1e9*10000)
@@ -1236,6 +1257,7 @@ def integrate_sfh(t1,t2,sfh_params):
 	'''
 	integrate a delayed tau SFH from t1 to t2
 	sfh = dictionary of SFH parameters
+	returns FRACTION OF TOTAL MASS FORMED in given time inteval
 	'''
 
 	# copy so we don't overwrite values
@@ -1295,7 +1317,7 @@ def integrate_sfh(t1,t2,sfh_params):
 			print 1/0
 
 		# return sum of SFR components
-		tot_sfr = np.sum(intsfr*sfh['mass'])/np.sum(sfh['mass'])
+		tot_mformed = np.sum(intsfr*sfh['mass'])/np.sum(sfh['mass'])
 	
 	#### nonparametric SFH
 	else:
@@ -1317,13 +1339,17 @@ def integrate_sfh(t1,t2,sfh_params):
 		# annoying edge cases
 		if t1 == t2:
 			return 0.0
-		if (t2 < time_bins[0,0]) & (t1 < time_bins[0,0]): 
+		if (t2 > time_bins[0,0]) & (t1 > time_bins[0,0]): 
 			print 'SFR is undefined in this time region, outside youngest bin!'
 			print 1/0
 
 		### which bins to integrate?
 		in_range = (time_bins >= t1) & (time_bins <= t2)
 		bin_ids = in_range.sum(axis=1)
+
+		### this doesn't work if we're fully inside a single bin...
+		if in_range.sum() == 0:
+			bin_ids = (time_bins[:,1] <= t1) & (time_bins[:,0] >= t2)
 
 		### weights
 		weights = np.zeros(sfh_params['mformed'].shape)
@@ -1337,9 +1363,9 @@ def integrate_sfh(t1,t2,sfh_params):
 					weights[i] = time_per_bin[i]
 				if bin_ids[i] == 1: # edge cases
 					if t2 < time_bins[i,0]: # this is the most recent edge
-						weights[i] = t2 - time_bins[i,0]
+						weights[i] = t2 - time_bins[i,1]
 					else: # this is the oldest edge
-						weights[i] = time_bins[i,1]-t1
+						weights[i] = time_bins[i,0]-t1
 				if bin_ids[i] == 0: # no contribution
 					continue
 
@@ -1348,8 +1374,11 @@ def integrate_sfh(t1,t2,sfh_params):
 			np.testing.assert_approx_equal(np.sum(weights),t2-t1,significant=5)
 		except AssertionError:
 			print 1/0
-		tot_sfr = np.sum(weights*(sfh_params['mformed']/time_per_bin/1e9)) / (t2-t1)
-	return tot_sfr
+
+		fractional_mass = sfh_params['mformed']/sfh_params['mformed'].sum()
+		tot_mformed = np.sum((weights/time_per_bin)*fractional_mass)
+
+	return tot_mformed
 
 def measure_emline_lum(sps, model = None, obs = None, thetas = None, 
 	                   measure_ir = False, measure_luv = False, savestr = None,
@@ -1366,6 +1395,10 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None,
 	'''
 	out = {}
 
+	# remove distance factor from FSPS spectra
+	pc = 3.085677581467192e18  # in cm
+	dfactor_10pc = 4*np.pi*pc**2
+
 	# get spectrum
 	if model:
 
@@ -1373,22 +1406,28 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None,
 		z      = model.params.get('zred', np.array(0.0))
 		model.params['zred'] = np.array(0.0)
 
-		# nebon
-		spec_nebon,mags_nebon,sm = model.mean_model(thetas, obs, sps=sps)
+		# nebon, comes out in erg/s/cm^2/AA at 10pc
+		spec_nebon_flam,mags_nebon,sm = model.mean_model(thetas, obs, sps=sps,peraa=True)
 
 		# neboff
 		model.params['add_neb_emission'] = np.array(False)
 		model.params['add_neb_continuum'] = np.array(False)
-		spec_neboff,mags_neboff,sm = model.mean_model(thetas, obs, sps=sps)
+		spec_neboff_flam,mags_neboff,sm = model.mean_model(thetas, obs, sps=sps,peraa=True)
 		w = sps.wavelengths
 		model.params['add_neb_emission'] = np.array(True)
 		model.params['add_neb_continuum'] = np.array(True)
 
-		# subtract, switch to flam
-		factor = 3e18 / w**2
-		spec = (spec_nebon-spec_neboff) *factor
-		spec_nebon_flam = factor * spec_nebon
-		spec_neboff *= factor
+		# fix distance, convert to Lsun
+		spec_neboff_flam *= dfactor_10pc / constants.L_sun.cgs.value
+		spec_nebon_flam *= dfactor_10pc / constants.L_sun.cgs.value
+
+		# subtract
+		spec = (spec_nebon_flam-spec_neboff_flam)
+
+		# calculate in fnu for absorption lines
+		to_fnu = w**2 / 3e18
+		spec_nebon_fnu = spec_nebon_flam * to_fnu
+		spec_neboff_fnu = spec_neboff_flam * to_fnu
 
 		model.params['zred'] = z
 
@@ -1402,7 +1441,7 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None,
 	##### measure absorption lines and Dn4000
 	out['dn4000'] = measure_Dn4000(w,spec_nebon_flam)
 	if abslines:
-		smooth_spec = smooth_spectrum(w,spec_neboff,200.0,minlam=3e3,maxlam=8e3)
+		smooth_spec = smooth_spectrum(w,spec_neboff_fnu,200.0,minlam=3e3,maxlam=8e3)
 		out['abslines'] = measure_abslines(w,smooth_spec) # comes out in Lsun and rest-frame EQW
 
 	##### measure emission lines
@@ -1419,8 +1458,7 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None,
 		except TypeError as e: # if obs['filters'] is None.... 
 			mips_index = -99999
 
-		lir = return_lir(w,spec_nebon, z=None, alt_file=None) # comes out in ergs/s
-		lir /= 3.846e33 #  convert to Lsun
+		lir = return_lir(w,spec_nebon_fnu, z=None, alt_file=None)/constants.L_sun.cgs.value # comes out in ergs/s, convert to Lsun
 
 		# if no MIPS flux...
 		try:
@@ -1431,9 +1469,9 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None,
 		out['lir'] = lir
 		out['mips'] = mips
 	if measure_luv:
-		luv = return_luv(w,spec_nebon, z=None, alt_file=None)/3.846e33 # comes out in ergs/s
+		luv = return_luv(w,spec_nebon_fnu, z=None, alt_file=None)/constants.L_sun.cgs.value # comes out in ergs/s, convert to Lsun
 		out['luv'] = luv
-	out['spec'] = spec_nebon
+	out['spec'] = spec_nebon_fnu
 	return out
 
 def measure_Dn4000(lam,flux,ax=None):

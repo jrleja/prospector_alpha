@@ -34,8 +34,11 @@ def maxprob_model(sample_results,sps):
 
 	# ensure that maxprob stored is the same as calculated now
 	current_maxprob = threed_dutils.test_likelihood(sps,sample_results['model'],sample_results['obs'],thetas,sample_results['run_params']['param_file'])
+	#current_maxprob = threed_dutils.test_likelihood(None,None,None,thetas,sample_results['run_params']['param_file'])
+
 	print current_maxprob
 	print maxprob
+
 	#np.testing.assert_array_almost_equal(current_maxprob,maxprob,decimal=4)
 
 	return thetas, maxprob
@@ -69,7 +72,7 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 
     ##### initialize output arrays for SFH + emission line posterior draws #####
 	half_time,sfr_10,sfr_100,sfr_1000,ssfr_100,totmass,emp_ha,mips_flux,lir, \
-	bdec_cloudy,bdec_calc,ext_5500,dn4000,bdec_nodust,ssfr_10 = [np.zeros(shape=(ncalc)) for i in range(15)]
+	bdec_cloudy,bdec_calc,ext_5500,dn4000,ssfr_10 = [np.zeros(shape=(ncalc)) for i in range(14)]
 	
 
 	##### information for empirical emission line calculation ######
@@ -131,7 +134,7 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 		##### solve for half-mass assembly time
 		# this is half-time in the sense of integral of SFR, i.e.
 		# mass loss is NOT taken into account.
-		half_time[jj] = threed_dutils.halfmass_assembly_time(sfh_params,sfh_params['tage'])
+		half_time[jj] = threed_dutils.halfmass_assembly_time(sfh_params)
 
 		##### calculate time-averaged SFR
 		sfr_10[jj]   = threed_dutils.calculate_sfr(sfh_params, 0.01, minsfr=-np.inf, maxsfr=np.inf)
@@ -163,16 +166,12 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 		nd_thetas = copy(thetas)
 		nd_thetas[dust1_index] = 0.0
 		nd_thetas[dust2_index] = 0.0
-		modelout_nodust = threed_dutils.measure_emline_lum(sps, thetas = nd_thetas,
-			 										       model=sample_results['model'], obs = sample_results['obs'],
-											               measure_ir=False)
 
 		##### Balmer decrements
 		bdec_cloudy[jj] = modelout['emlines']['Halpha']['flux'] / modelout['emlines']['Hbeta']['flux']
 		bdec_calc[jj] = threed_dutils.calc_balmer_dec(flatchain[jj,dust1_index], flatchain[jj,dust2_index], -1.0, 
 			                                          flatchain[jj,dust_index_index],
 			                                          kriek = (sample_results['model'].params['dust_type'] == 4)[0])
-		bdec_nodust[jj] = modelout_nodust['emlines']['Halpha']['flux']  / modelout_nodust['emlines']['Hbeta']['flux']
 		
 		if jj == 0:
 			emnames = np.array(modelout['emlines'].keys())

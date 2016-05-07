@@ -3,16 +3,18 @@ import numpy as np
 from astropy.table import Table, vstack
 from astropy.io import ascii
 from astropy import units as u
-import nonparametric_mocks_params as nparams
+import nonparametric_mocks_params as nonparam
+import threed_dutils
 
 #### NONPARAMETRIC GLOBALS
-sps = nparams.load_sps(**nparams.run_params)
-model = nparams.load_model(**nparams.run_params)
-obs = nparams.load_obs(**nparams.run_params)
+sps = nonparam.load_sps(**nonparam.run_params)
+model = nonparam.load_model(**nonparam.run_params)
+obs = nonparam.load_obs(**nonparam.run_params)
 sps.update(**model.params)
 
 #### RANDOM SEED
 random.seed(25001)
+np.random.seed(50)
 
 def return_bounds(parname,model,i):
 
@@ -53,31 +55,43 @@ def construct_mocks(basename,outname=None,add_zp_err=False, plot_mock=False):
 	#### generate nonparametric SFH distribution
 	# expectation value is constant SFH
 	# get this by using Dirichlet distribution, with expectation = (size of time bins) / total time
-	# do it in LOG SPACE, so that we don't have most of the SFH in oldest bin...
-	nbins = model.params['mass'].shape[0]
-	bin_weight = np.zeros(nbins)
-	exp = 1.7 # this controls the mean fractional mass in each age bin
-	for i in xrange(nbins): bin_weight[i] = exp**model.params['agebins'][i,1]-exp**model.params['agebins'][i,0]
-	norm_bin_weight = bin_weight / 1e2 # this numeric factor controls the dispersion of the Dirichlet distribution (see docs)
+	# TAKE MAX/MIN IN EACH BIN TO BE +/-3 DEX FROM CONSTANT SFH
+
+	dexdiff = 3 # allowed orders of magnitude lower than constant SFR
+	disp = 1e1 # this numeric factor controls the dispersion of the Dirichlet distribution (see docs) (+ is lower, - is higher)
+
+	# calculate bin distribution for constant star formation rate
+	agelims = np.concatenate((np.atleast_1d(model.params['agebins'][0,0]),model.params['agebins'][:,1])) # rebuild agelims with modified tuniv
+	bin_weight = nonparam.expsfh(agelims)
+	bin_weight /= np.sum(bin_weight)
+	
+	# renormalize so that there's an equal probability in last three bins (for variety of mass-weighted ages!)
+	bin_weight[3:] = (1-np.sum(bin_weight[:3]))/3.
+	
+	# convert this into weighting for dirichlet distribution
+	norm_bin_weight = bin_weight / np.sum(bin_weight)*disp
 	norm_bin_tuple = tuple(bin for bin in norm_bin_weight)
 
-	sfh_distribution = np.random.dirichlet(norm_bin_tuple, ntest)
+	# iterative generation of dirichlet distribution
+	nbins = model.params['mass'].shape[0]
+	min_sfr = norm_bin_weight*total_mass/(10**dexdiff)
+	sfh_distribution = np.zeros(shape=(ntest,nbins))
+	n = 0
+	while n < ntest:
+		testdistr = np.random.dirichlet(norm_bin_tuple, 1)*total_mass
 
-	'''
-	print 'MEAN'
-	for i in xrange(nbins): print np.mean(sfh_distribution[:,i])
-	print 'STANDARD DEVIATION'
-	for i in xrange(nbins): print np.std(sfh_distribution[:,i])/np.mean(sfh_distribution[:,i])
-	'''
+		#### CHECK THAT IT's +/- 3 DEX FROM CONSTANT SFH
+		check = np.sum(testdistr > min_sfr) == nbins
+		if check:
+			sfh_distribution[n,:] = testdistr
+			n+=1
 
 	for ii in xrange(nparams):
 		
 		#### nonparametric bins, using Dirichlet distribution
 		if 'logmass' in parnames[ii]:
 			component = int(parnames[ii][-1])-1
-			testparms[:,ii] = np.log10(sfh_distribution[:,component]*total_mass)
-			bad = testparms[:,ii] < model.theta_bounds()[ii][0]
-			testparms[bad,ii] = model.theta_bounds()[ii][0]
+			testparms[:,ii] = np.log10(sfh_distribution[:,component])
 
 		#### choose reasonable amounts of dust ####
 		elif parnames[ii] == 'dust2':
@@ -129,8 +143,7 @@ def construct_mocks(basename,outname=None,add_zp_err=False, plot_mock=False):
 
 	#### generate photometry, add noise ####
 	for ii in xrange(ntest):
-		model.initial_theta = testparms[ii,:]
-		spec,maggiestemp,_ = model.mean_model(model.initial_theta, obs, sps=sps)
+		spec,maggiestemp,sm = model.mean_model(testparms[ii,:], obs, sps=sps)
 
 		if plot_mock:
 			if ii == 0:
@@ -141,9 +154,20 @@ def construct_mocks(basename,outname=None,add_zp_err=False, plot_mock=False):
 			good = (sps.wavelengths > 1e3) & (sps.wavelengths < 1e6)
 			factor = 3e18 / sps.wavelengths[good]
 			ax[ii].plot(np.log10(sps.wavelengths[good]),np.log10(spec[good]*factor))
+
+			## write mass in each bin
 			for nn in xrange(nparams):
 				if 'logmass' in parnames[nn]:
-					ax[ii].text(0.05,0.95-nn*0.05,"{:.2f}".format(model.initial_theta[nn]),fontsize=8,transform = ax[ii].transAxes)
+					ax[ii].text(0.05,0.95-nn*0.05,"{:.2f}".format(testparms[ii,nn]),fontsize=8,transform = ax[ii].transAxes)
+
+			## write sSFR(10 Myr, 100 Myr, 1 Gyr)
+			sfh_params = threed_dutils.find_sfh_params(model,testparms[ii,:],obs,sps,sm=sm)
+			ssfr = np.array([threed_dutils.calculate_sfr(sfh_params, 0.01, minsfr=-np.inf, maxsfr=np.inf),\
+			                 threed_dutils.calculate_sfr(sfh_params, 0.1,  minsfr=-np.inf, maxsfr=np.inf),\
+			                 threed_dutils.calculate_sfr(sfh_params, 1.0,  minsfr=-np.inf, maxsfr=np.inf)])/total_mass
+			ssfr_label = ['10 Myr','100 Myr','1 Gyr']
+			for nn in xrange(ssfr.shape[0]): ax[ii].text(0.05,0.2-nn*0.05,"{:.2e}".format(ssfr[nn])+' '+ssfr_label[nn],fontsize=8,transform = ax[ii].transAxes)
+
 			if ii < ntest-10:
 				ax[ii].xaxis.get_major_ticks()[0].label1On = False
 			else:

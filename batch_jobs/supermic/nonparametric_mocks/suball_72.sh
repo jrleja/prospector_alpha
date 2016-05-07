@@ -7,7 +7,7 @@
 #PBS -l nodes=2:ppn=20
 
 ### Requested computing time
-#PBS -l walltime=10:00:00
+#PBS -l walltime=6:00:00
 
 ### Account
 #PBS -A TG-AST150015

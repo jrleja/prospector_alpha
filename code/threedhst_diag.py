@@ -928,9 +928,8 @@ def make_all_plots(filebase=None,
 	# do we know the truths?
 	objname = sample_results['run_params']['objname']
 	try:
-		truths = threed_dutils.load_truths(os.getenv('APPS')+'/threed'+sample_results['run_params']['truename'].split('/threed')[1],
-			                              objname,
-			                              sample_results, sps=sps)
+		truths = threed_dutils.load_truths(os.getenv('APPS')+'/threed'+sample_results['run_params']['param_file'].split('/threed')[1],
+			                               model=sample_results['model'],obs=sample_results['obs'], sps=sps)
 	except KeyError:
 		truths=None
 

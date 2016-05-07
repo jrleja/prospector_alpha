@@ -374,7 +374,7 @@ model_params.append({'name': 'duste_qpah', 'N': 1,
 ###### Nebular Emission ###########
 model_params.append({'name': 'add_neb_emission', 'N': 1,
                         'isfree': False,
-                        'init': 2,
+                        'init': 1,
                         'units': r'log Z/Z_\odot',
                         'prior_function_name': None,
                         'prior_args': None})
@@ -503,7 +503,7 @@ def load_model(objname='', agelims=[], **extras):
     zind = n.index('zred')
     model_params[zind]['init'] = zred
 
-    #### CREATE AND RETURN MODEL
+    #### CREATE MODEL
     model = BurstyModel(model_params)
 
     return model
