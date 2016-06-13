@@ -42,8 +42,8 @@ def construct_mocks(basename,outname=None,add_zp_err=False, plot_mock=False):
 	#### basic parameters ####
 	# hack to make it run 100x times in for-loop
 	# so i can calculate sfr each time
-	noise               = 0.02            # perturb fluxes
-	reported_noise      = 0.02            # reported noise
+	noise               = 0.05            # perturb fluxes
+	reported_noise      = 0.05            # reported noise
 	ntest               = 100             # number of mock galaxies to generate
 	total_mass          = 1e10            # total mass of galaxy
 

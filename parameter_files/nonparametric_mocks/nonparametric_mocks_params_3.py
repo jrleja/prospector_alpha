@@ -490,7 +490,7 @@ def load_model(objname='', agelims=[], **extras):
     model_params[n.index('logmass')]['N'] = ncomp
     model_params[n.index('logmass')]['init'] = np.log10(mass_init)
     model_params[n.index('logmass')]['prior_args'] = {'maxi':np.full(ncomp,14.0), 'mini':np.full(ncomp,1.0)}
-    model_params[n.index('logmass')]['init_disp'] = 0.3
+    model_params[n.index('logmass')]['init_disp'] = 0.6
 
     model_params[n.index('mass')]['N'] = ncomp
     model_params[n.index('mass')]['init'] = mass_init

@@ -517,6 +517,7 @@ def plot_sed(ax,ax_res,par_idx,par=None,txtlabel=None,fmt="{:.2e}"):
 	spec_sav = []
 	for ii,p in enumerate(par):
 		theta[par_idx] = p
+		print 1/0
 		spec,mags,_ = model.mean_model(theta, obs, sps=sps,norm_spec=False)
 		spec *= c/sps.wavelengths
 

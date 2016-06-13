@@ -6,6 +6,7 @@ import matplotlib.image as mpimg
 from astropy.cosmology import WMAP9
 import fsps
 from matplotlib.ticker import MaxNLocator
+from prospect.models import model_setup
 
 plt.ioff() # don't pop up a window for each plot
 
@@ -72,12 +73,15 @@ def add_to_corner(fig, sample_results, sps, model,truths=None,maxprob=True,powel
     axes = fig.get_axes()
 	
     plotquant = sample_results['extras'].get('flatchain',None)
-    plottit   = sample_results['extras'].get('parnames',None)
+    plotname   = sample_results['extras'].get('parnames',None)
 
     to_show = ['half_time','ssfr_100','sfr_100']
+    ptitle = [r't$_{\mathrm{half}}$ [Gyr]',r'sSFR(100 Myr) [yr$^{-1}$]',r'SFR(100 Myr) [yr$^{-1}$]']
     if sample_results['ncomp'] > 1:
-        toshow = ['half_time','ssfr_100','sfr_100','totmass']
-    showing = np.array([x in to_show for x in plottit])
+        to_show.append('totmass')
+        ptitle.append(r'stellar mass [M$_{\odot}$]')
+
+    showing = np.array([x in to_show for x in plotname])
 
     # extra text
     scale    = len(sample_results['model'].theta_labels())
@@ -103,10 +107,10 @@ def add_to_corner(fig, sample_results, sps, model,truths=None,maxprob=True,powel
                 fmt = "{:.2f}"
                 if 'sfr' in eparnames[nn]:
                     etruths[nn] = 10**etruths[nn]
-                if 'ssfr' in eparnames[nn]:
+                if 'ssfr' in eparnames[nn] or 'totmass' in eparnames[nn]:
                     fmt = '{0:.1e}'
 
-                plt.figtext(0.73, ttop-0.02*(kk+txtcounter+1), eparnames[nn]+'='+fmt.format(etruths[nn][0]),
+                plt.figtext(0.73, ttop-0.02*(kk+txtcounter+1), eparnames[nn]+'='+fmt.format(etruths[nn]),
                            horizontalalignment='right',fontsize=fs)
                 txtcounter+=1
 
@@ -170,7 +174,7 @@ def add_to_corner(fig, sample_results, sps, model,truths=None,maxprob=True,powel
 
 
     plotloc   = 2
-    for jj in xrange(len(plottit)):
+    for jj in xrange(len(plotname)):
 
 		if showing[jj] == 0:
 		    continue
@@ -206,14 +210,14 @@ def add_to_corner(fig, sample_results, sps, model,truths=None,maxprob=True,powel
 		q_p = qvalues[2]-qvalues[1]
 
 		# format quantile display
-		if plottit[jj] == 'ssfr_100':
+		if plotname[jj] == 'ssfr_100' or plotname[jj] == 'totmass':
 			fmt = "{{0:{0}}}".format(".1e").format
 		else:
 			fmt = "{{0:{0}}}".format(".2f").format
 		title = r"${{{0}}}_{{-{1}}}^{{+{2}}}$"
 		title = title.format(fmt(qvalues[1]), fmt(q_m), fmt(q_p))
-		title = "{0}={1}".format(plottit[jj],title)
 		axes[plotloc].set_title(title)
+		axes[plotloc].set_xlabel(ptitle[to_show.index(plotname[jj])])
 
 		# axes
 		# set min/max
@@ -225,8 +229,8 @@ def add_to_corner(fig, sample_results, sps, model,truths=None,maxprob=True,powel
 	
 		# truths
 		if truths is not None:
-		    if plottit[jj] in parnames:
-		        plottruth = tvals[parnames == plottit[jj]]
+		    if plotname[jj] in parnames:
+		        plottruth = tvals[parnames == plotname[jj]]
 		        axes[plotloc].axvline(x=plottruth,color='r')
 
     return fig
@@ -262,9 +266,10 @@ def add_sfh_plot(sample_results,fig,ax_loc,sps,
 		ax_inset = ax_loc
 	
 	# convert to log
-	parnames = np.array(sample_results['model'].theta_labels())
-	minsfr = sample_results['quantiles']['q50'][parnames=='mass'] / \
-	         (sample_results['quantiles']['q50'][parnames=='tage']*1e9*10000)
+	# set minimum to be 1/10,000th of the average SFR over 10 Gyr
+	extra_parnames = sample_results['extras']['parnames']
+	minsfr = sample_results['extras']['q50'][extra_parnames=='totmass'] / 1e10 / 1e5
+
 	perc = np.log10(np.clip(perc,minsfr,np.inf))
 	most_likely= np.log10(np.clip(most_likely,minsfr,np.inf))
 
@@ -310,23 +315,22 @@ def add_sfh_plot(sample_results,fig,ax_loc,sps,
 		ax_inset.fill_between(t, perc[:,0], perc[:,2], color='0.75')
 
 		parnames = sample_results['model'].theta_labels()
-		tt,pt = plot_sfh_single(truths,truths['parnames'],ncomp=sample_results['ncomp'])
+		tt,pt = plot_sfh_single(truths,truths['parnames'])
 		pt = np.log10(pt)
-		#tcolors=['steelblue','maroon']
-		#for aa in xrange(sample_results.get('ncomp',2)):
-		#	ax_inset.plot(tt, pt[:,aa+1],'-',color=tcolors[aa],alpha=0.5,linewidth=0.75)
-		ax_inset.plot(tt, pt[:,0],'-',color='blue')
+
+		ax_inset.plot(tt, pt,'-',color='blue')
 		ax_inset.text(0.92,0.32, 'truth',transform = ax_inset.transAxes,color='blue',fontsize=axfontsize*1.4,ha='right')
 
 		# set up plotting range
-		plotmax_y = np.maximum(np.max(perc[:,1]),np.max(pt[:,0]))
-		plotmin_y = np.maximum(np.min(perc[:,1]),np.min(pt[:,0]))
+		plotmax_y = np.maximum(np.max(perc[:,1]),np.max(pt))
+		plotmin_y = np.maximum(np.min(perc[:,1]),np.min(pt))
 
 	# the minimum time for which the upper percentile is equal to the minimum SFR
 	# exclude any times before the 50th percentile of tage, since those are 
 	# probably after quenching
 	plotmax_x = t[perc[:,2] == np.min(perc[:,2])]
-	plotmax_x = np.min(plotmax_x[plotmax_x > sample_results['quantiles']['q50'][np.array(sample_results['model'].theta_labels()) == 'tage']])
+	if 'tage' in sample_results['model'].theta_labels():
+		plotmax_x = np.min(plotmax_x[plotmax_x > sample_results['quantiles']['q50'][np.array(sample_results['model'].theta_labels()) == 'tage']])
 	if truths is not None:
 		plotmax_x = np.max(np.append(plotmax_x,truths['sfh_params']['tage']))
 
@@ -366,22 +370,31 @@ def plot_sfh_fast(tau,tage,mass,tuniv=None):
 
 	return t,sfr
 
-def plot_sfh_single(truths,parnames,ncomp=1):
+def plot_sfh_single(truths,parnames):
 
 	parnames = np.array(parnames)
 
-	# initialize output variables
-	nt = 50
-	intsfr = np.zeros(shape=(nt,ncomp+1))
+	### setup time array in reasonable fashion
+	# different for nonparametric versus parametric
+	if truths['sfh_params']['tage'].shape[0] != 0:
+		nt = 50
+		t = np.linspace(0,truths['sfh_params']['tage'][0],num=nt)
+	elif truths['sfh_params']['agebins'].shape[0] != 0:
+		in_years = 10**truths['sfh_params']['agebins']/1e9
+		t = np.concatenate((np.ravel(in_years)*0.9999, np.ravel(in_years)*1.001))
+		t.sort()
+		t = t[1:-1] # remove older than oldest bin, younger than youngest bin
+	else:
+		print 'not sure how to set up the time array here...'
+		print 1/0
+
+	# prepare outputs
+	nt = t.shape[0]
+	intsfr = np.zeros(shape=(nt))
 	deltat=0.0001
-	t=np.linspace(0,np.max(truths['sfh_params']['tage']),num=50)
 
-	for jj in xrange(nt): intsfr[jj,0] = threed_dutils.calculate_sfr(truths['sfh_params'], deltat, tcalc = t[jj])
-
-	for kk in xrange(ncomp):
-		iterable = [(key,value[kk]) for key, value in truths['sfh_params'].iteritems()]
-		newdict = {key: value for (key, value) in iterable}
-		for jj in xrange(nt): intsfr[jj,kk+1] = threed_dutils.calculate_sfr(newdict, deltat, tcalc = t[jj])
+	# calculate
+	for jj in xrange(nt): intsfr[jj] = threed_dutils.calculate_sfr(truths['sfh_params'], deltat, tcalc = t[jj])
 
 	return t[::-1], intsfr
 
@@ -591,11 +604,12 @@ def return_sedplot_vars(thetas, sample_results, sps, nufnu=True):
 
 	# observational information
 	# hack to reload obs for brownseds_logzsol run
+	'''
 	if 'truename' in sample_results['run_params']:
-		from ha_20myr_params import load_obs_mock
-		sample_results['obs'] = load_obs_mock(os.getenv('APPS')+'/threed'+sample_results['run_params']['photname'].split('threed')[1], 
-			                                  sample_results['run_params']['objname'])
-
+		from nonparametric_mocks_params import load_obs
+		sample_results['obs'] = load_obs(os.getenv('APPS')+'/threed'+sample_results['run_params']['photname'].split('threed')[1], 
+			                             sample_results['run_params']['objname'])
+	'''
 	mask = sample_results['obs']['phot_mask']
 	wave_eff = sample_results['obs']['wave_effective'][mask]
 	obs_maggies = sample_results['obs']['maggies'][mask]
@@ -900,7 +914,8 @@ def sed_figure(sample_results, sps, model,
 def make_all_plots(filebase=None,
 				   outfolder=os.getenv('APPS')+'/threedhst_bsfh/plots/',
 				   sample_results=None,
-				   sps=None,plt_chain=True,
+				   param_name=None,
+				   plt_chain=True,
 				   plt_corner=True,
 				   plt_sed=True):
 
@@ -914,13 +929,8 @@ def make_all_plots(filebase=None,
 
 	sample_results, powell_results, model = threed_dutils.load_prospector_data(filebase)
 
-	if not sps:
-		# load stellar population, set up custom filters
-		if np.sum([1 for x in sample_results['model'].config_list if x['name'] == 'pmetals']) > 0:
-			sps = threed_dutils.setup_sps(custom_filter_key=sample_results['run_params'].get('custom_filter_key',None))
-		else:
-			sps = threed_dutils.setup_sps(zcontinuous=1,
-										  custom_filter_key=sample_results['run_params'].get('custom_filter_key',None))
+	run_params = model_setup.get_run_params(param_file=param_name)
+	sps = model_setup.load_sps(**run_params)
 
 	# BEGIN PLOT ROUTINE
 	print 'MAKING PLOTS FOR ' + filebase.split('/')[-1] + ' in ' + outfolder
@@ -982,5 +992,6 @@ def plot_all_driver(runname=None,**extras):
 		print 'iteration '+str(jj) 
 		make_all_plots(filebase=filebase[jj],\
 		               outfolder=os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/',
+		               param_name=parm_basename[jj],
 		               **extras)
 	

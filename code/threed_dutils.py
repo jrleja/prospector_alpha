@@ -436,6 +436,7 @@ def load_truths(param_file,model=None,sps=None,obs=None, calc_prob = True):
 	ssfr_10 = np.log10(10**sfr_10 / sfh_params['mformed'].sum())
 	sfr_100  = np.log10(calculate_sfr(sfh_params,deltat))
 	ssfr_100 = np.log10(calculate_sfr(sfh_params,deltat) / sfh_params['mformed'].sum())
+	totmass = sfh_params['mass'].sum()
 	halftime = halfmass_assembly_time(sfh_params)
 	if calc_prob == True:
 		lnprob   = test_likelihood(sps,model,obs,truths,param_file)
@@ -459,8 +460,8 @@ def load_truths(param_file,model=None,sps=None,obs=None, calc_prob = True):
 	truths_dict = {'parnames':parnames,
 				   'truths':truths,
 				   'plot_truths':plot_truths,
-				   'extra_parnames':np.array(['sfr_10','ssfr_10','sfr_100','ssfr_100','half_time']),
-				   'extra_truths':np.array([sfr_10,ssfr_10,sfr_100,ssfr_100,halftime]),
+				   'extra_parnames':np.array(['sfr_10','ssfr_10','sfr_100','ssfr_100','half_time','totmass']),
+				   'extra_truths':np.array([sfr_10,ssfr_10,sfr_100,ssfr_100,halftime,totmass]),
 				   'sfh_params': sfh_params,
 				   'emnames':emnames,
 				   'emflux':emflux,
@@ -468,7 +469,7 @@ def load_truths(param_file,model=None,sps=None,obs=None, calc_prob = True):
 				   'abseqw':abseqw,
 				   'dn4000':dn4000,
 				   'lir':lir}
-	print 1/0
+
 	if calc_prob == True:
 		truths_dict['truthprob'] = lnprob
 
@@ -1382,7 +1383,7 @@ def integrate_sfh(t1,t2,sfh_params):
 
 def measure_emline_lum(sps, model = None, obs = None, thetas = None, 
 	                   measure_ir = False, measure_luv = False, savestr = None,
-	                   spec=None, abslines=True):
+	                   abslines=True):
 	
 	'''
 	takes spec(on)-spec(off) to measure emission line luminosity
@@ -1397,56 +1398,46 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None,
 
 	# remove distance factor from FSPS spectra
 	pc = 3.085677581467192e18  # in cm
-	dfactor_10pc = 4*np.pi*pc**2
+	dfactor_10pc = 4*np.pi*(10*pc)**2
 
-	# get spectrum
-	if model:
+	# save redshift
+	z      = model.params.get('zred', np.array(0.0))
+	model.params['zred'] = np.array(0.0)
 
-		# save redshift
-		z      = model.params.get('zred', np.array(0.0))
-		model.params['zred'] = np.array(0.0)
+	# nebon, comes out in erg/s/cm^2/AA at 10pc
+	spec_nebon_flam,mags_nebon,sm = model.mean_model(thetas, obs, sps=sps, peraa=True)
 
-		# nebon, comes out in erg/s/cm^2/AA at 10pc
-		spec_nebon_flam,mags_nebon,sm = model.mean_model(thetas, obs, sps=sps,peraa=True)
+	# neboff
+	model.params['add_neb_emission'] = np.array(False)
+	model.params['add_neb_continuum'] = np.array(False)
+	spec_neboff_flam,mags_neboff,sm = model.mean_model(thetas, obs, sps=sps, peraa=True)
+	w = sps.wavelengths
+	model.params['add_neb_emission'] = np.array(True)
+	model.params['add_neb_continuum'] = np.array(True)
 
-		# neboff
-		model.params['add_neb_emission'] = np.array(False)
-		model.params['add_neb_continuum'] = np.array(False)
-		spec_neboff_flam,mags_neboff,sm = model.mean_model(thetas, obs, sps=sps,peraa=True)
-		w = sps.wavelengths
-		model.params['add_neb_emission'] = np.array(True)
-		model.params['add_neb_continuum'] = np.array(True)
+	# fix distance, convert to Lsun
+	spec_neboff_flam *= dfactor_10pc / constants.L_sun.cgs.value
+	spec_nebon_flam *= dfactor_10pc / constants.L_sun.cgs.value
 
-		# fix distance, convert to Lsun
-		spec_neboff_flam *= dfactor_10pc / constants.L_sun.cgs.value
-		spec_nebon_flam *= dfactor_10pc / constants.L_sun.cgs.value
+	# subtract
+	spec_nebonly_flam = (spec_nebon_flam-spec_neboff_flam)
 
-		# subtract
-		spec = (spec_nebon_flam-spec_neboff_flam)
+	# calculate in fnu for absorption lines
+	to_fnu = w**2 / 3e18
+	spec_nebon_fnu = spec_nebon_flam * to_fnu
+	spec_neboff_fnu = spec_neboff_flam * to_fnu
 
-		# calculate in fnu for absorption lines
-		to_fnu = w**2 / 3e18
-		spec_nebon_fnu = spec_nebon_flam * to_fnu
-		spec_neboff_fnu = spec_neboff_flam * to_fnu
-
-		model.params['zred'] = z
-
-	else:
-		if spec is None:
-			print 'okay, you need to give me something here'
-			print 1/0
-		w = sps.wavelengths
-
+	model.params['zred'] = z
 
 	##### measure absorption lines and Dn4000
 	out['dn4000'] = measure_Dn4000(w,spec_nebon_flam)
 	if abslines:
-		smooth_spec = smooth_spectrum(w,spec_neboff_fnu,200.0,minlam=3e3,maxlam=8e3)
+		smooth_spec = smooth_spectrum(w,spec_neboff_flam,200.0,minlam=3e3,maxlam=8e3)
 		out['abslines'] = measure_abslines(w,smooth_spec) # comes out in Lsun and rest-frame EQW
 
 	##### measure emission lines
 	# smooth_spec is only used to identify continuum
-	out['emlines'] = measure_emlines(w,spec,smooth_spec,savestr=savestr)
+	out['emlines'] = measure_emlines(w,spec_nebonly_flam,smooth_spec,savestr=savestr)
 
 	if measure_ir:
 

@@ -35,7 +35,7 @@ def maxprob_model(sample_results,sps):
 	# ensure that maxprob stored is the same as calculated now
 	current_maxprob = threed_dutils.test_likelihood(sps,sample_results['model'],sample_results['obs'],thetas,sample_results['run_params']['param_file'])
 	#current_maxprob = threed_dutils.test_likelihood(None,None,None,thetas,sample_results['run_params']['param_file'])
-
+	print 1/0
 	print current_maxprob
 	print maxprob
 
@@ -159,7 +159,6 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 		##### and magnitudes (L_IR, MIPS)
 		modelout = threed_dutils.measure_emline_lum(sps, thetas = thetas,
 			 										model=sample_results['model'], obs = sample_results['obs'],
-											        #savestr=sample_results['run_params']['objname'], 
 											        measure_ir=True)
 
 		##### no dust, to get the intrinsic balmer decrement
@@ -192,7 +191,6 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 		mips_flux[jj]  = modelout['mips']
 		lir[jj]        = modelout['lir']
 		dn4000[jj] = modelout['dn4000']
-		print 1/0
 
 
 	##### CALCULATE Q16,Q50,Q84 FOR VARIABLE PARAMETERS
@@ -201,7 +199,7 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 	for kk in xrange(ntheta): q_16[kk], q_50[kk], q_84[kk] = corner.quantile(sample_results['flatchain'][:,kk], [0.16, 0.5, 0.84])
 	
 	##### CALCULATE Q16,Q50,Q84 FOR EXTRA PARAMETERS
-	extra_flatchain = np.dstack((half_time, sfr_10, sfr_100, sfr_1000, ssfr_10, ssfr_100, totmass, emp_ha, bdec_cloudy,bdec_calc, bdec_nodust,ext_5500))[0]
+	extra_flatchain = np.dstack((half_time, sfr_10, sfr_100, sfr_1000, ssfr_10, ssfr_100, totmass, emp_ha, bdec_cloudy,bdec_calc, ext_5500))[0]
 	nextra = extra_flatchain.shape[1]
 	q_16e, q_50e, q_84e = (np.zeros(nextra)+np.nan for i in range(3))
 	for kk in xrange(nextra): q_16e[kk], q_50e[kk], q_84e[kk] = corner.quantile(extra_flatchain[:,kk], [0.16, 0.5, 0.84])
@@ -246,7 +244,7 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 
 	#### EXTRA PARAMETER OUTPUTS 
 	extras = {'flatchain': extra_flatchain,
-			  'parnames': np.array(['half_time','sfr_10','sfr_100','sfr_1000','ssfr_10','ssfr_100','totmass','emp_ha','bdec_cloudy','bdec_calc','bdec_nodust','total_ext5500']),
+			  'parnames': np.array(['half_time','sfr_10','sfr_100','sfr_1000','ssfr_10','ssfr_100','totmass','emp_ha','bdec_cloudy','bdec_calc','total_ext5500']),
 			  'q16': q_16e,
 			  'q50': q_50e,
 			  'q84': q_84e,
@@ -287,7 +285,6 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 	             'hdelta_abs':absflux[0,absnames == 'hdelta_wide'],	             
 	             'bdec_cloudy':bdec_cloudy[0],
 	             'bdec_calc':bdec_calc[0],
-	             'bdec_nodust':bdec_nodust[0],
 	             'dn4000':dn4000[0],
 	             'spec':spec[:,0],
 	             'mags':mags[:,0]}
@@ -337,7 +334,7 @@ def post_processing(param_name, add_extra=True, **extras):
 		pickle.dump(sample_results,open(mcmc_filename, "wb"))
 
 	### PLOT HERE
-	threedhst_diag.make_all_plots(sample_results=sample_results,filebase=outname,outfolder=outfolder)
+	threedhst_diag.make_all_plots(sample_results=sample_results,filebase=outname,outfolder=outfolder,param_name=param_name)
 
 if __name__ == "__main__":
 	post_processing(sys.argv[1])
