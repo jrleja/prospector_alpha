@@ -52,6 +52,7 @@ def construct_mocks(basename,outname=None,add_zp_err=False, plot_mock=False):
 	testparms = np.zeros(shape=(ntest,nparams))
 	parnames = np.array(model.theta_labels())
 
+	'''
 	#### generate nonparametric SFH distribution
 	# expectation value is constant SFH
 	# get this by using Dirichlet distribution, with expectation = (size of time bins) / total time
@@ -85,13 +86,18 @@ def construct_mocks(basename,outname=None,add_zp_err=False, plot_mock=False):
 		if check:
 			sfh_distribution[n,:] = testdistr
 			n+=1
+	'''
+
+	nbins = model.params['sfr_fraction'].shape[0]+1
+	sfh_distribution = np.random.dirichlet(tuple(1.0 for x in xrange(nbins)),ntest)
+	for ii in xrange(ntest): sfh_distribution[ii,:] /= np.sum(sfh_distribution[ii,:])
 
 	for ii in xrange(nparams):
 		
 		#### nonparametric bins, using Dirichlet distribution
-		if 'logmass' in parnames[ii]:
+		if 'sfr_fraction' in parnames[ii]:
 			component = int(parnames[ii][-1])-1
-			testparms[:,ii] = np.log10(sfh_distribution[:,component])
+			testparms[:,ii] = sfh_distribution[:,component]
 
 		#### choose reasonable amounts of dust ####
 		elif parnames[ii] == 'dust2':
@@ -157,11 +163,15 @@ def construct_mocks(basename,outname=None,add_zp_err=False, plot_mock=False):
 
 			## write mass in each bin
 			for nn in xrange(nparams):
-				if 'logmass' in parnames[nn]:
-					ax[ii].text(0.05,0.95-nn*0.05,"{:.2f}".format(testparms[ii,nn]),fontsize=8,transform = ax[ii].transAxes)
+				if 'sfr_fraction' in parnames[nn]:
+					ax[ii].text(0.98,0.95-nn*0.05,"{:.2f}".format(testparms[ii,nn]),fontsize=8,transform = ax[ii].transAxes,ha='right')
+			ax[ii].text(0.98,0.95-(nbins-1)*0.05,"{:.2f}".format(1-testparms[ii,:nbins-1].sum()),fontsize=8,transform = ax[ii].transAxes,ha='right')
 
 			## write sSFR(10 Myr, 100 Myr, 1 Gyr)
 			sfh_params = threed_dutils.find_sfh_params(model,testparms[ii,:],obs,sps,sm=sm)
+
+			if ii == 0:
+				print sfh_params.keys()
 			ssfr = np.array([threed_dutils.calculate_sfr(sfh_params, 0.01, minsfr=-np.inf, maxsfr=np.inf),\
 			                 threed_dutils.calculate_sfr(sfh_params, 0.1,  minsfr=-np.inf, maxsfr=np.inf),\
 			                 threed_dutils.calculate_sfr(sfh_params, 1.0,  minsfr=-np.inf, maxsfr=np.inf)])/total_mass

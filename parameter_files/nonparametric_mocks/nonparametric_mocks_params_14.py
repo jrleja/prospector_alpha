@@ -28,7 +28,7 @@ run_params = {'verbose':True,
               'compute_vega_mags': False,
               'initial_disp':0.1,
               'interp_type': 'logarithmic',
-              'agelims': [6.0,7.0,8.0,8.5,9.0,9.5,10.0],
+              'agelims': [0.0,7.0,8.0,8.5,9.0,9.5,10.0],
               # Data info
               'photname':os.getenv('APPS')+'/threedhst_bsfh/data/nonparametric_mocks.cat',
               'truename':os.getenv('APPS')+'/threedhst_bsfh/data/nonparametric_mocks.dat',
@@ -194,11 +194,6 @@ def transform_logmass_to_mass(mass=None, logmass=None, **extras):
 def load_gp(**extras):
     return None, None
 
-def load_sps(**extras):
-
-    sps = StepSFHBasis(**extras)
-    return sps
-
 def add_dust1(dust2=None, **extras):
 
     return 0.86*dust2
@@ -259,18 +254,18 @@ model_params.append({'name': 'sfh', 'N':1,
 
 model_params.append({'name': 'logmass', 'N': 1,
                         'isfree': True,
-                        'init': [],
+                        'init': 10.0,
                         'units': 'Msun',
                         'prior_function': priors.tophat,
-                        'prior_args':{'mini':0.0, 'maxi':1.0}})
+                        'prior_args':{'mini':1.0, 'maxi':14.0}})
 
 model_params.append({'name': 'mass', 'N': 1,
                         'isfree': False,
-                        'init': [],
+                        'init': 1e10,
                         'depends_on': transform_logmass_to_mass,
                         'units': 'Msun',
                         'prior_function': priors.tophat,
-                        'prior_args':{'mini':0.0, 'maxi':1.0}})
+                        'prior_args':{'mini':1e1, 'maxi':1e14}})
 
 model_params.append({'name': 'agebins', 'N': 1,
                         'isfree': False,
@@ -278,6 +273,13 @@ model_params.append({'name': 'agebins', 'N': 1,
                         'units': 'log(yr)',
                         'prior_function': priors.tophat,
                         'prior_args':{'mini':0.1, 'maxi':15.0}})
+
+model_params.append({'name': 'sfr_fraction', 'N': 1,
+                        'isfree': True,
+                        'init': [],
+                        'units': 'Msun',
+                        'prior_function': priors.tophat,
+                        'prior_args':{'mini':0.0, 'maxi':1.0}})
 
 ########    IMF  ##############
 model_params.append({'name': 'imf_type', 'N': 1,
@@ -374,14 +376,14 @@ model_params.append({'name': 'duste_qpah', 'N': 1,
 ###### Nebular Emission ###########
 model_params.append({'name': 'add_neb_emission', 'N': 1,
                         'isfree': False,
-                        'init': 1,
+                        'init': 0,
                         'units': r'log Z/Z_\odot',
                         'prior_function_name': None,
                         'prior_args': None})
 
 model_params.append({'name': 'add_neb_continuum', 'N': 1,
                         'isfree': False,
-                        'init': True,
+                        'init': False,
                         'units': r'log Z/Z_\odot',
                         'prior_function_name': None,
                         'prior_args': None})
@@ -411,11 +413,19 @@ model_params.append({'name': 'phot_jitter', 'N': 1,
                         'prior_function':tophat,
                         'prior_args': {'mini':0.0, 'maxi':0.5}})
 
+####### Units ##########
+model_params.append({'name': 'peraa', 'N': 1,
+                     'isfree': False,
+                     'init': False})
+
+model_params.append({'name': 'mass_units', 'N': 1,
+                     'isfree': False,
+                     'init': 'mstar'})
 
 #### resort list of parameters 
 #### so that major ones are fit first
 parnames = [m['name'] for m in model_params]
-fit_order = ['logmass','dust2', 'logzsol', 'dust_index', 'dust1', 'duste_qpah', 'duste_gamma', 'duste_umin']
+fit_order = ['sfr_fraction','dust2', 'logzsol', 'dust_index', 'dust1', 'duste_qpah', 'duste_gamma', 'duste_umin']
 tparams = [model_params[parnames.index(i)] for i in fit_order]
 for param in model_params: 
     if param['name'] not in fit_order:
@@ -447,6 +457,7 @@ class BurstyModel(sedmodel.SedModel):
             if len(np.unique(np.round(outlier_locs))) != len(outlier_locs):
                 return -np.inf
 
+        # dust1/dust2 ratio
         if 'dust1' in self.theta_index:
             if 'dust2' in self.theta_index:
                 start,end = self.theta_index['dust1']
@@ -460,6 +471,13 @@ class BurstyModel(sedmodel.SedModel):
                     return -np.inf
                 '''
 
+        # sum of SFH fractional bins <= 1.0
+        if 'sfr_fraction' in self.theta_index:
+            start,end = self.theta_index['sfr_fraction']
+            sfr_fraction = theta[start:end]
+            if np.sum(sfr_fraction) > 1.0:
+                return -np.inf
+
         for k, v in self.theta_index.iteritems():
             start, end = v
             this_prior = np.sum(self._config_dict[k]['prior_function']
@@ -469,6 +487,41 @@ class BurstyModel(sedmodel.SedModel):
                 print('WARNING: ' + k + ' is out of bounds')
             lnp_prior += this_prior
         return lnp_prior
+
+class FracSFH(StepSFHBasis):
+    
+    @property
+    def all_ssp_weights(self):
+        # Cache age bins and relative weights.  This means params['agebins']
+        # *must not change* without also setting _ages = None
+        if getattr(self, '_ages', None) is None:
+            self._ages = self.params['agebins']
+            nbin, nssp = len(self._ages), len(self.logage) + 1
+            self._bin_weights = np.zeros([nbin, nssp])
+            self._time_per_bin = np.zeros(nbin)
+            for i, (t1, t2) in enumerate(self._ages):
+                # These *should* sum to one (or zero) for each bin
+                self._bin_weights[i,:] = self.bin_weights(t1, t2)
+                self._time_per_bin[i] = 10**t2-10**t1
+
+        # Now normalize the weights in each bin by the massfrac parameter, and sum
+        # over bins.
+        bin_masses = np.array(self.params['sfr_fraction'])
+        bin_masses = np.append(bin_masses,(1-np.sum(self.params['sfr_fraction'])))*self._time_per_bin
+        if np.all(self.params.get('mass_units', 'mstar') == 'mstar'):
+            # Convert from mstar to mformed for each bin.  We have to do this
+            # here as well as in get_spectrum because the *relative*
+            # normalization in each bin depends on the units, as well as the
+            # overall normalization.
+            bin_masses /= self.bin_mass_fraction
+        w = (bin_masses[:, None] * self._bin_weights).sum(axis=0)
+
+        return w
+
+def load_sps(**extras):
+
+    sps = FracSFH(**extras)
+    return sps
 
 def load_model(objname='', agelims=[], **extras):
 
@@ -487,17 +540,16 @@ def load_model(objname='', agelims=[], **extras):
     #### ADJUST MODEL PARAMETERS #####
     n = [p['name'] for p in model_params]
 
-    model_params[n.index('logmass')]['N'] = ncomp
-    model_params[n.index('logmass')]['init'] = np.log10(mass_init)
-    model_params[n.index('logmass')]['prior_args'] = {'maxi':np.full(ncomp,14.0), 'mini':np.full(ncomp,1.0)}
-    model_params[n.index('logmass')]['init_disp'] = 0.6
-
-    model_params[n.index('mass')]['N'] = ncomp
-    model_params[n.index('mass')]['init'] = mass_init
-    model_params[n.index('mass')]['prior_args'] = {'maxi':np.full(ncomp,10**14.0), 'mini':np.full(ncomp,10**1.0)}
-
+    #### SET UP AGEBINS
     model_params[n.index('agebins')]['N'] = ncomp
     model_params[n.index('agebins')]['init'] = agebins.T
+
+    #### FRACTIONAL MASS
+    # N-1 bins, last is set by x = 1 - np.sum(sfr_fraction)
+    model_params[n.index('sfr_fraction')]['N'] = ncomp-1
+    model_params[n.index('sfr_fraction')]['init'] = mass_init[:-1] / np.sum(mass_init)
+    model_params[n.index('sfr_fraction')]['prior_args'] = {'maxi':np.full(ncomp-1,1.0), 'mini':np.full(ncomp-1,0.0)}
+    model_params[n.index('sfr_fraction')]['init_disp'] = 0.15
 
     #### INSERT REDSHIFT INTO MODEL PARAMETER DICTIONARY ####
     zind = n.index('zred')

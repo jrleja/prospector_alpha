@@ -169,7 +169,7 @@ def offset_and_scatter(x,y,biweight=True):
 
 def find_sfh_params(model,theta,obs,sps,sm=None):
 
-	str_sfh_parms = ['sfh','mass','tau','sf_start','tage','sf_trunc','sf_slope','agebins']
+	str_sfh_parms = ['sfh','mass','tau','sf_start','tage','sf_trunc','sf_slope','agebins','sfr_fraction']
 	parnames = model.theta_labels()
 	sfh_out = []
 
@@ -196,6 +196,12 @@ def find_sfh_params(model,theta,obs,sps,sm=None):
 	else: # sps.stellar_mass in bins!
 		sm = sps.bin_mass_fraction
 	
+	# create mass fractions
+	if 'sfr_fraction' in out:
+		out['sfr_fraction_full'] = np.concatenate((out['sfr_fraction'],np.atleast_1d(1-out['sfr_fraction'].sum())))
+		out['mass_fraction'] = out['sfr_fraction_full']*sps._time_per_bin
+		out['mass_fraction'] /= out['mass_fraction'].sum()
+
 	# Need this because mass is 
 	# current mass, not total mass formed!
 	out['mformed'] = out['mass'] / sm
@@ -1353,7 +1359,7 @@ def integrate_sfh(t1,t2,sfh_params):
 			bin_ids = (time_bins[:,1] <= t1) & (time_bins[:,0] >= t2)
 
 		### weights
-		weights = np.zeros(sfh_params['mformed'].shape)
+		weights = np.zeros(sfh_params['mass_fraction'].shape)
 		# if we're all in one bin
 		if np.sum(bin_ids) == 1:
 			weights[bin_ids == 1] = t2-t1
@@ -1376,8 +1382,7 @@ def integrate_sfh(t1,t2,sfh_params):
 		except AssertionError:
 			print 1/0
 
-		fractional_mass = sfh_params['mformed']/sfh_params['mformed'].sum()
-		tot_mformed = np.sum((weights/time_per_bin)*fractional_mass)
+		tot_mformed = np.sum((weights/time_per_bin)*sfh_params['mass_fraction'])
 
 	return tot_mformed
 
@@ -1405,15 +1410,17 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None,
 	model.params['zred'] = np.array(0.0)
 
 	# nebon, comes out in erg/s/cm^2/AA at 10pc
-	spec_nebon_flam,mags_nebon,sm = model.mean_model(thetas, obs, sps=sps, peraa=True)
+	model.params['peraa'] = True
+	spec_nebon_flam,mags_nebon,sm = model.mean_model(thetas, obs, sps=sps)
 
 	# neboff
 	model.params['add_neb_emission'] = np.array(False)
 	model.params['add_neb_continuum'] = np.array(False)
-	spec_neboff_flam,mags_neboff,sm = model.mean_model(thetas, obs, sps=sps, peraa=True)
+	spec_neboff_flam,mags_neboff,sm = model.mean_model(thetas, obs, sps=sps)
 	w = sps.wavelengths
 	model.params['add_neb_emission'] = np.array(True)
 	model.params['add_neb_continuum'] = np.array(True)
+	model.params['peraa'] = False
 
 	# fix distance, convert to Lsun
 	spec_neboff_flam *= dfactor_10pc / constants.L_sun.cgs.value
