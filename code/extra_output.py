@@ -35,7 +35,6 @@ def maxprob_model(sample_results,sps):
 	# ensure that maxprob stored is the same as calculated now
 	current_maxprob = threed_dutils.test_likelihood(sps,sample_results['model'],sample_results['obs'],thetas,sample_results['run_params']['param_file'])
 	#current_maxprob = threed_dutils.test_likelihood(None,None,None,thetas,sample_results['run_params']['param_file'])
-	print 1/0
 	print current_maxprob
 	print maxprob
 
@@ -68,22 +67,15 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 
 	##### set call parameters
 	sample_results['ncomp'] = np.sum(['mass' in x for x in sample_results['model'].theta_labels()])
-	deltat=[0.01,0.1,1.0] # for averaging SFR over, in Gyr
 
     ##### initialize output arrays for SFH + emission line posterior draws #####
-	half_time,sfr_10,sfr_100,sfr_1000,ssfr_100,totmass,emp_ha,mips_flux,lir, \
+	half_time,sfr_10,sfr_100,sfr_1000,ssfr_100,totmass,emp_ha,lir,luv, \
 	bdec_cloudy,bdec_calc,ext_5500,dn4000,ssfr_10 = [np.zeros(shape=(ncalc)) for i in range(14)]
 	
-
 	##### information for empirical emission line calculation ######
-	dust1_index = np.array([True if (x[:-sample_results['ncomp']] == 'dust1') or 
-		                            (x == 'dust1') else 
-		                            False for x in parnames])
-	dust2_index = np.array([True if (x[:-sample_results['ncomp']] == 'dust2') or 
-		                            (x == 'dust2') else 
-		                            False for x in parnames])
-	dust_index_index = np.array([True if x == 'dust_index' else False for x in parnames])
-	met_idx = np.array([True if x == 'logzsol' else False for x in parnames])
+	d1_idx = np.array(parnames) == 'dust1'
+	d2_idx = np.array(parnames) == 'dust2'
+	didx = np.array(parnames) == 'dust_index'
 
 	##### use randomized, flattened, thinned chain for posterior draws
 	# don't allow things outside the priors
@@ -120,7 +112,6 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 		
 		##### model call, to set parameters
 		thetas = flatchain[jj,:]
-		sample_results['model'].params['gas_logz'] = thetas[met_idx]
 		spec[:,jj],mags[:,jj],sm = sample_results['model'].mean_model(thetas, sample_results['obs'], sps=sps)
 
 		##### extract sfh parameters
@@ -147,29 +138,29 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 		ssfr_100[jj] = sfr_100[jj] / totmass[jj]
 
 		##### empirical halpha
-		emp_ha[jj] = threed_dutils.synthetic_halpha(sfr_10[jj],flatchain[jj,dust1_index],
-			                          flatchain[jj,dust2_index],-1.0,
-			                          flatchain[jj,dust_index_index],
+		emp_ha[jj] = threed_dutils.synthetic_halpha(sfr_10[jj],flatchain[jj,d1_idx],
+			                          flatchain[jj,d2_idx],-1.0,
+			                          flatchain[jj,didx],
 			                          kriek = (sample_results['model'].params['dust_type'] == 4)[0])
 
 		##### dust extinction at 5500 angstroms
-		ext_5500[jj] = flatchain[jj,dust1_index] + flatchain[jj,dust2_index]
+		ext_5500[jj] = flatchain[jj,d1_idx] + flatchain[jj,d2_idx]
 
 		##### spectral quantities (emission line flux, Balmer decrement, Hdelta absorption, Dn4000)
-		##### and magnitudes (L_IR, MIPS)
+		##### and magnitudes (LIR, LUV)
 		modelout = threed_dutils.measure_emline_lum(sps, thetas = thetas,
 			 										model=sample_results['model'], obs = sample_results['obs'],
-											        measure_ir=True)
+											        measure_ir=True, measure_luv=True)
 
 		##### no dust, to get the intrinsic balmer decrement
 		nd_thetas = copy(thetas)
-		nd_thetas[dust1_index] = 0.0
-		nd_thetas[dust2_index] = 0.0
+		nd_thetas[d1_idx] = 0.0
+		nd_thetas[d2_idx] = 0.0
 
 		##### Balmer decrements
 		bdec_cloudy[jj] = modelout['emlines']['Halpha']['flux'] / modelout['emlines']['Hbeta']['flux']
-		bdec_calc[jj] = threed_dutils.calc_balmer_dec(flatchain[jj,dust1_index], flatchain[jj,dust2_index], -1.0, 
-			                                          flatchain[jj,dust_index_index],
+		bdec_calc[jj] = threed_dutils.calc_balmer_dec(flatchain[jj,d1_idx], flatchain[jj,d2_idx], -1.0, 
+			                                          flatchain[jj,didx],
 			                                          kriek = (sample_results['model'].params['dust_type'] == 4)[0])
 		
 		if jj == 0:
@@ -188,10 +179,9 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 		emflux[jj,:] = np.array([modelout['emlines'][line]['flux'] for line in emnames])
 		emeqw[jj,:] = np.array([modelout['emlines'][line]['eqw'] for line in emnames])
 
-		mips_flux[jj]  = modelout['mips']
 		lir[jj]        = modelout['lir']
+		luv[jj]        = modelout['luv']
 		dn4000[jj] = modelout['dn4000']
-
 
 	##### CALCULATE Q16,Q50,Q84 FOR VARIABLE PARAMETERS
 	ntheta = len(sample_results['initial_theta'])
@@ -256,7 +246,8 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 	observables = {'spec': spec,
 	               'mags': mags,
 	               'lam_obs': sps.wavelengths,
-	               'L_IR':lir}
+	               'L_IR':lir,
+	               'L_UV':luv}
 	sample_results['observables'] = observables
 
 	#### QUANTILE OUTPUTS #
@@ -276,7 +267,7 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 	             'sfr_100':sfr_100[0],
 	             'sfr_1000':sfr_1000[0],
 	             'lir':lir[0],
-	             'mips_flux':mips_flux[0],
+	             'luv':luv[0],
 	             'halpha_flux':emflux[0,emnames == 'Halpha'],
 	             'hbeta_flux':emflux[0,emnames == 'Hbeta'],
 	             'hdelta_flux':emflux[0,emnames == 'Hdelta'],

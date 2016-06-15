@@ -45,53 +45,20 @@ def construct_mocks(basename,outname=None,add_zp_err=False, plot_mock=False):
 	noise               = 0.05            # perturb fluxes
 	reported_noise      = 0.05            # reported noise
 	ntest               = 100             # number of mock galaxies to generate
-	total_mass          = 1e10            # total mass of galaxy
 
 	#### generate random model parameters ####
 	nparams = len(model.initial_theta)
 	testparms = np.zeros(shape=(ntest,nparams))
 	parnames = np.array(model.theta_labels())
 
-	'''
 	#### generate nonparametric SFH distribution
 	# expectation value is constant SFH
 	# get this by using Dirichlet distribution, with expectation = (size of time bins) / total time
-	# TAKE MAX/MIN IN EACH BIN TO BE +/-3 DEX FROM CONSTANT SFH
-
-	dexdiff = 3 # allowed orders of magnitude lower than constant SFR
-	disp = 1e1 # this numeric factor controls the dispersion of the Dirichlet distribution (see docs) (+ is lower, - is higher)
-
-	# calculate bin distribution for constant star formation rate
-	agelims = np.concatenate((np.atleast_1d(model.params['agebins'][0,0]),model.params['agebins'][:,1])) # rebuild agelims with modified tuniv
-	bin_weight = nonparam.expsfh(agelims)
-	bin_weight /= np.sum(bin_weight)
-	
-	# renormalize so that there's an equal probability in last three bins (for variety of mass-weighted ages!)
-	bin_weight[3:] = (1-np.sum(bin_weight[:3]))/3.
-	
-	# convert this into weighting for dirichlet distribution
-	norm_bin_weight = bin_weight / np.sum(bin_weight)*disp
-	norm_bin_tuple = tuple(bin for bin in norm_bin_weight)
-
-	# iterative generation of dirichlet distribution
-	nbins = model.params['mass'].shape[0]
-	min_sfr = norm_bin_weight*total_mass/(10**dexdiff)
-	sfh_distribution = np.zeros(shape=(ntest,nbins))
-	n = 0
-	while n < ntest:
-		testdistr = np.random.dirichlet(norm_bin_tuple, 1)*total_mass
-
-		#### CHECK THAT IT's +/- 3 DEX FROM CONSTANT SFH
-		check = np.sum(testdistr > min_sfr) == nbins
-		if check:
-			sfh_distribution[n,:] = testdistr
-			n+=1
-	'''
-
 	nbins = model.params['sfr_fraction'].shape[0]+1
 	sfh_distribution = np.random.dirichlet(tuple(1.0 for x in xrange(nbins)),ntest)
 	for ii in xrange(ntest): sfh_distribution[ii,:] /= np.sum(sfh_distribution[ii,:])
 
+	#### generate all parameters
 	for ii in xrange(nparams):
 		
 		#### nonparametric bins, using Dirichlet distribution
@@ -162,10 +129,12 @@ def construct_mocks(basename,outname=None,add_zp_err=False, plot_mock=False):
 			ax[ii].plot(np.log10(sps.wavelengths[good]),np.log10(spec[good]*factor))
 
 			## write mass in each bin
+			frac = 0.0
 			for nn in xrange(nparams):
 				if 'sfr_fraction' in parnames[nn]:
 					ax[ii].text(0.98,0.95-nn*0.05,"{:.2f}".format(testparms[ii,nn]),fontsize=8,transform = ax[ii].transAxes,ha='right')
-			ax[ii].text(0.98,0.95-(nbins)*0.05,"{:.2f}".format(1-testparms[ii,:nbins-1].sum()),fontsize=8,transform = ax[ii].transAxes,ha='right')
+					frac += testparms[ii,nn]
+			ax[ii].text(0.98,0.95-(nbins)*0.05,"{:.2f}".format(1-frac),fontsize=8,transform = ax[ii].transAxes,ha='right')
 
 			## write sSFR(10 Myr, 100 Myr, 1 Gyr)
 			sfh_params = threed_dutils.find_sfh_params(model,testparms[ii,:],obs,sps,sm=sm)
@@ -174,7 +143,7 @@ def construct_mocks(basename,outname=None,add_zp_err=False, plot_mock=False):
 				print sfh_params.keys()
 			ssfr = np.array([threed_dutils.calculate_sfr(sfh_params, 0.01, minsfr=-np.inf, maxsfr=np.inf),\
 			                 threed_dutils.calculate_sfr(sfh_params, 0.1,  minsfr=-np.inf, maxsfr=np.inf),\
-			                 threed_dutils.calculate_sfr(sfh_params, 1.0,  minsfr=-np.inf, maxsfr=np.inf)])/total_mass
+			                 threed_dutils.calculate_sfr(sfh_params, 1.0,  minsfr=-np.inf, maxsfr=np.inf)])/sfh_params['mass']
 			ssfr_label = ['10 Myr','100 Myr','1 Gyr']
 			for nn in xrange(ssfr.shape[0]): ax[ii].text(0.05,0.2-nn*0.05,"{:.2e}".format(ssfr[nn])+' '+ssfr_label[nn],fontsize=8,transform = ax[ii].transAxes)
 
@@ -200,6 +169,8 @@ def construct_mocks(basename,outname=None,add_zp_err=False, plot_mock=False):
 		plt.tight_layout()
 		plt.savefig(plot_mock,dpi=150)
 		plt.close()
+
+	print 1/0
 
 	#### output ####
 	#### ids first ####

@@ -191,10 +191,11 @@ def find_sfh_params(model,theta,obs,sps,sm=None):
 	# if we pass sm from a prior model call,
 	# we don't have to calculate it here
 	if sm is None and out['mass'].shape[0] == 1:
-		_,_,_=model.sed(theta, obs, sps=sps)
-		sm = sps.csp.stellar_mass
-	else: # sps.stellar_mass in bins!
-		sm = sps.bin_mass_fraction
+		_,_,sm_new=model.sed(theta, obs, sps=sps)
+		try:
+			sm = sps.csp.stellar_mass
+		except AttributeError as e: 
+			sm = sm_new
 	
 	# create mass fractions
 	if 'sfr_fraction' in out:
@@ -205,7 +206,6 @@ def find_sfh_params(model,theta,obs,sps,sm=None):
 	# Need this because mass is 
 	# current mass, not total mass formed!
 	out['mformed'] = out['mass'] / sm
-
 	return out
 
 def test_likelihood(sps,model,obs,thetas,param_file):
@@ -217,7 +217,7 @@ def test_likelihood(sps,model,obs,thetas,param_file):
 	can be run in different environments as a test
 	'''
 
-	from prospect.likelihood import LikelihoodFunction
+	from prospect.likelihood import lnlike_spec,lnlike_phot
 
 	run_params = model_setup.get_run_params(param_file=param_file)
 
@@ -233,21 +233,26 @@ def test_likelihood(sps,model,obs,thetas,param_file):
 	if thetas is None:
 		thetas = np.array(model.initial_theta)
 
-	# setup gp
-	gp_spec, gp_phot = model_setup.load_gp(**run_params)
-	try:
-		s, a, l = model.phot_gp_params(obs=obs)
-		gp_phot.kernel = np.array( list(a) + list(l) + [s])
-	except(AttributeError):
-		# There was no phot_gp_params method
-		pass
+	spec_noise, phot_noise = model_setup.load_gp(**run_params)
 
-	likefn = LikelihoodFunction()
-	mu, phot, x = model.mean_model(thetas, obs, sps = sps)
-	lnp_phot = likefn.lnlike_phot(phot, obs=obs, gp=gp_phot)
+	# generate photometry
+	mu, phot, x = model.mean_model(thetas, obs, sps=sps)
+
+	# Noise modeling
+	if spec_noise is not None:
+		spec_noise.update(**model.params)
+	if phot_noise is not None:
+		phot_noise.update(**model.params)
+	vectors = {'spec': mu, 'unc': obs['unc'],
+	           'sed': model._spec, 'cal': model._speccal,
+	           'phot': phot, 'maggies_unc': obs['maggies_unc']}
+
+	# Calculate likelihoods
 	lnp_prior = model.prior_product(thetas)
+	lnp_spec = lnlike_spec(mu, obs=obs, spec_noise=spec_noise, **vectors)
+	lnp_phot = lnlike_phot(phot, obs=obs, phot_noise=phot_noise, **vectors)
 
-	return lnp_phot + lnp_prior
+	return lnp_prior + lnp_phot + lnp_spec
 
 def setup_sps(zcontinuous=2,compute_vega_magnitudes=False,custom_filter_key=None):
 
@@ -598,7 +603,7 @@ def chop_chain(chain):
 	... haha
 	JRL 6/8/15
 	'''
-	nchop=1.66
+	nchop=4./3
 
 	if len(chain.shape) == 3:
 		flatchain = chain[:,int(chain.shape[1]/nchop):,:]
@@ -1174,7 +1179,7 @@ def return_full_sfh(t, sfh_params):
 	set of SFH parameters
 	'''
 
-	deltat=0.0001
+	deltat=0.0001 # Gyr
 
 	# calculate new time vector such that
 	# the spacing from tage back to zero
@@ -1381,14 +1386,13 @@ def integrate_sfh(t1,t2,sfh_params):
 			np.testing.assert_approx_equal(np.sum(weights),t2-t1,significant=5)
 		except AssertionError:
 			print 1/0
-
 		tot_mformed = np.sum((weights/time_per_bin)*sfh_params['mass_fraction'])
 
 	return tot_mformed
 
 def measure_emline_lum(sps, model = None, obs = None, thetas = None, 
 	                   measure_ir = False, measure_luv = False, savestr = None,
-	                   abslines=True):
+	                   abslines = True):
 	
 	'''
 	takes spec(on)-spec(off) to measure emission line luminosity
@@ -1410,6 +1414,8 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None,
 	model.params['zred'] = np.array(0.0)
 
 	# nebon, comes out in erg/s/cm^2/AA at 10pc
+	model.params['add_neb_emission'] = np.array(True)
+	model.params['add_neb_continuum'] = np.array(True)
 	model.params['peraa'] = True
 	spec_nebon_flam,mags_nebon,sm = model.mean_model(thetas, obs, sps=sps)
 
@@ -1447,28 +1453,12 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None,
 	out['emlines'] = measure_emlines(w,spec_nebonly_flam,smooth_spec,savestr=savestr)
 
 	if measure_ir:
-
-		# set up filters
-		try:
-			mips_index = [i for i, s in enumerate(obs['filters']) if 'mips' in s]
-			if np.sum(mips_index) == 0:
-				mips_index = [i for i, s in enumerate(obs['filters']) if 'MIPS' in s]
-		except TypeError as e: # if obs['filters'] is None.... 
-			mips_index = -99999
-
 		lir = return_lir(w,spec_nebon_fnu, z=None, alt_file=None)/constants.L_sun.cgs.value # comes out in ergs/s, convert to Lsun
-
-		# if no MIPS flux...
-		try:
-			mips = mags_nebon[mips_index][0]*1e10 # comes out in maggies, convert to flux such that AB zeropoint is 25 mags
-		except IndexError:
-			mips = np.nan
-
 		out['lir'] = lir
-		out['mips'] = mips
 	if measure_luv:
 		luv = return_luv(w,spec_nebon_fnu, z=None, alt_file=None)/constants.L_sun.cgs.value # comes out in ergs/s, convert to Lsun
 		out['luv'] = luv
+
 	out['spec'] = spec_nebon_fnu
 	return out
 
