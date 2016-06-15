@@ -165,7 +165,7 @@ def construct_mocks(basename,outname=None,add_zp_err=False, plot_mock=False):
 			for nn in xrange(nparams):
 				if 'sfr_fraction' in parnames[nn]:
 					ax[ii].text(0.98,0.95-nn*0.05,"{:.2f}".format(testparms[ii,nn]),fontsize=8,transform = ax[ii].transAxes,ha='right')
-			ax[ii].text(0.98,0.95-(nbins-1)*0.05,"{:.2f}".format(1-testparms[ii,:nbins-1].sum()),fontsize=8,transform = ax[ii].transAxes,ha='right')
+			ax[ii].text(0.98,0.95-(nbins)*0.05,"{:.2f}".format(1-testparms[ii,:nbins-1].sum()),fontsize=8,transform = ax[ii].transAxes,ha='right')
 
 			## write sSFR(10 Myr, 100 Myr, 1 Gyr)
 			sfh_params = threed_dutils.find_sfh_params(model,testparms[ii,:],obs,sps,sm=sm)

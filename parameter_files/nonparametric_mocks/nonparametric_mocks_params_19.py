@@ -425,7 +425,7 @@ model_params.append({'name': 'mass_units', 'N': 1,
 #### resort list of parameters 
 #### so that major ones are fit first
 parnames = [m['name'] for m in model_params]
-fit_order = ['sfr_fraction','dust2', 'logzsol', 'dust_index', 'dust1', 'duste_qpah', 'duste_gamma', 'duste_umin']
+fit_order = ['logmass','sfr_fraction','dust2', 'logzsol', 'dust_index', 'dust1', 'duste_qpah', 'duste_gamma', 'duste_umin']
 tparams = [model_params[parnames.index(i)] for i in fit_order]
 for param in model_params: 
     if param['name'] not in fit_order:
