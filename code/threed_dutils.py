@@ -420,8 +420,6 @@ def load_truths(param_file,model=None,sps=None,obs=None, calc_prob = True):
 	will load sps, model, obs, etc if not passed!
 	'''
 
-	from prospect.likelihood import LikelihoodFunction
-
 	# load necessary machinery
 	run_params = model_setup.get_run_params(param_file=param_file)
 	if sps is None:
@@ -881,7 +879,7 @@ def create_prosp_filename(filebase):
 	# if we found no files, skip this object
 	if len(times) == 0:
 		print 'Failed to find any files to extract times in ' + folder + ' of form ' + filename
-		return 0
+		return None,None
 
 	# load results
 	mcmc_filename=filebase+'_'+max(times)+"_mcmc"

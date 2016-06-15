@@ -76,7 +76,7 @@ def add_to_corner(fig, sample_results, sps, model,truths=None,maxprob=True,powel
     plotname   = sample_results['extras'].get('parnames',None)
 
     to_show = ['half_time','ssfr_100','sfr_100']
-    ptitle = [r't$_{\mathrm{half}}$ [Gyr]',r'sSFR(100 Myr) [yr$^{-1}$]',r'SFR(100 Myr) [yr$^{-1}$]']
+    ptitle = [r't$_{\mathrm{half}}$ [Gyr]',r'sSFR(100 Myr) [yr$^{-1}$]',r'SFR(100 Myr) [M$_{\odot}$ yr$^{-1}$]']
     if sample_results['ncomp'] > 1:
         to_show.append('totmass')
         ptitle.append(r'stellar mass [M$_{\odot}$]')
@@ -927,7 +927,10 @@ def make_all_plots(filebase=None,
 	if not os.path.isdir(outfolder):
 		os.makedirs(outfolder)
 
-	sample_results, powell_results, model = threed_dutils.load_prospector_data(filebase)
+	try:
+		sample_results, powell_results, model = threed_dutils.load_prospector_data(filebase)
+	except TypeError:
+		return
 
 	run_params = model_setup.get_run_params(param_file=param_name)
 	sps = model_setup.load_sps(**run_params)

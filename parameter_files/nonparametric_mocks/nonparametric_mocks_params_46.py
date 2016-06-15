@@ -21,8 +21,8 @@ run_params = {'verbose':True,
               'maxfev':5000,
               # MCMC params
               'nwalkers':546,
-              'nburn':[150,200], 
-              'niter': 1000,
+              'nburn':[150,200,400], 
+              'niter': 4000,
               # Model info
               'zcontinuous': 2,
               'compute_vega_mags': False,
