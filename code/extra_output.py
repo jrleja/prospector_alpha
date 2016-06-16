@@ -98,6 +98,7 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 		t = np.concatenate((np.ravel(in_years)*0.9999, np.ravel(in_years)*1.001))
 		t.sort()
 		t = t[1:-1] # remove older than oldest bin, younger than youngest bin
+		t = np.clip(t,1e-3,np.inf) # nothing younger than 1 Myr!
 	else:
 		print 'not sure how to set up the time array here...'
 		print 1/0
@@ -313,7 +314,11 @@ def post_processing(param_name, add_extra=True, **extras):
 	except OSError:
 		pass
 
- 	sample_results, powell_results, model = threed_dutils.load_prospector_data(outname)
+	try:
+ 		sample_results, powell_results, model = threed_dutils.load_prospector_data(outname)
+ 	except:
+ 		print 'failed to load '+param_name
+ 		return
 
 	if add_extra:
 		print 'ADDING EXTRA OUTPUT FOR ' + sample_results['run_params']['objname'] + ' in ' + outfolder

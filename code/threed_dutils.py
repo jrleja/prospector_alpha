@@ -1224,7 +1224,7 @@ def calculate_sfr(sfh_params, timescale, tcalc = None,
 	if sfh_params['sfh'] == 0:
 		min_t = np.min(10**sfh_params['agebins']/1e9)
 		tdefined = tage - min_t
-		if tdefined > tcalc-timescale:
+		if tcalc > tdefined:
 			calc_timescale = timescale-(tcalc-tdefined)
 
 	sfr=integrate_sfh(tcalc-timescale, tcalc, sfh_params) * \
@@ -1384,6 +1384,7 @@ def integrate_sfh(t1,t2,sfh_params):
 			np.testing.assert_approx_equal(np.sum(weights),t2-t1,significant=5)
 		except AssertionError:
 			print 1/0
+
 		tot_mformed = np.sum((weights/time_per_bin)*sfh_params['mass_fraction'])
 
 	return tot_mformed

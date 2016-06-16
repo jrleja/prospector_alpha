@@ -323,22 +323,23 @@ def add_sfh_plot(sample_results,fig,ax_loc,sps,
 
 		# set up plotting range
 		plotmax_y = np.maximum(np.max(perc[:,1]),np.max(pt))
-		plotmin_y = np.maximum(np.min(perc[:,1]),np.min(pt))
+		plotmin_y = np.minimum(np.min(perc[:,1]),np.min(pt))
 
 	# the minimum time for which the upper percentile is equal to the minimum SFR
 	# exclude any times before the 50th percentile of tage, since those are 
 	# probably after quenching
 	plotmax_x = t[perc[:,2] == np.min(perc[:,2])]
+	plotmin_x = np.min(t)
+
 	if 'tage' in sample_results['model'].theta_labels():
 		plotmax_x = np.min(plotmax_x[plotmax_x > sample_results['quantiles']['q50'][np.array(sample_results['model'].theta_labels()) == 'tage']])
 	if truths is not None:
 		plotmax_x = np.max(np.append(plotmax_x,truths['sfh_params']['tage']))
+	if mlike_sfh['sfh'][0] == 0:
+		plotmax_x = np.max(t)
 
 	dynrange = (plotmax_y-plotmin_y)*0.4
-	axlim_sfh=[plotmax_x,
-	           np.min(t),
-	           plotmin_y,
-	           plotmax_y+dynrange]
+	axlim_sfh=[plotmax_x, plotmin_x, plotmin_y, plotmax_y+dynrange]
 	ax_inset.axis(axlim_sfh)
 
 	ax_inset.set_ylabel('log(SFR)',fontsize=axfontsize,weight='bold')
@@ -348,6 +349,10 @@ def add_sfh_plot(sample_results,fig,ax_loc,sps,
 	# labels
 	ax_inset.text(0.92,0.24, 'most likely',color=most_likely_color, transform = ax_inset.transAxes,fontsize=axfontsize*1.4,ha='right')
 	ax_inset.text(0.92,0.16, 'median',color=median_main_color, transform = ax_inset.transAxes,fontsize=axfontsize*1.4,ha='right')
+
+	# use log scale if we're doing nonparametric
+	if mlike_sfh['sfh'][0] == 0:
+		ax_inset.set_xscale('log',nonposx='clip')
 
 	return ax_inset
 
@@ -625,7 +630,7 @@ def return_sedplot_vars(thetas, sample_results, sps, nufnu=True):
 	if nufnu == True:
 		c = 3e8
 		factor = c*1e10
-		mu *= factor/wave_eff**2
+		mu *= factor/wave_eff
 		spec *= factor/sps.wavelengths
 		obs_maggies *= factor/wave_eff
 		obs_maggies_unc *= factor/wave_eff
@@ -714,19 +719,9 @@ def sed_figure(sample_results, sps, model,
 	pfactor = 3e18/wave_eff
 
 	nz = spec_pdf[:,1] > 0
-	#phot.plot(np.log10(w[nz]), np.log10(spec_pdf[nz,1]*sfactor[nz]), linestyle='-',
-    #          color=median_main_color, alpha=0.6)
 	phot.fill_between(w, spec_pdf[:,0]*sfactor, 
 		                 spec_pdf[:,2]*sfactor,
 		                 color=median_err_color)
-
-	#phot.plot(np.log10(wave_eff), np.log10(mag_pdf[mask]*pfactor), color=median_main_color, 
-	#	      marker='o', ms=ms, linestyle=' ', label='median', alpha=alpha, 
-	#	      markeredgewidth=0.7,**kwargs)
-	
-	#res.plot(np.log10(wave_eff), median_chi, 
-	#	     color=median_main_color, marker='o', linestyle=' ', label='median', 
-	#	     ms=ms,alpha=alpha,markeredgewidth=0.7,**kwargs)
 
 	# plot best-fit FAST model
 	if fast:
@@ -765,9 +760,6 @@ def sed_figure(sample_results, sps, model,
 
 	# add RGB
 	try:
-		#field=sample_results['run_params']['photname'].split('/')[-1].split('_')[0]
-		#objnum="%05d" % int(sample_results['run_params']['objname'])
-		#imgname=os.getenv('APPS')+'/threedhst_bsfh/data/RGB_v4.0_field/'+field.lower()+'_'+objnum+'_vJH_6.png'
 		imgname=os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/rgb/'+sample_results['run_params']['objname'].replace(' ','_')+'.png'
 		img=mpimg.imread(imgname)
 		ax_inset2=fig.add_axes([0.34,0.34,0.15,0.15],zorder=32)
