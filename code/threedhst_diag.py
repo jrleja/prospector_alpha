@@ -381,13 +381,13 @@ def plot_sfh_single(truths,parnames,t):
 
 	# prepare outputs
 	nt = t.shape[0]
-	intsfr = np.zeros(shape=(nt))
+	intsfr = np.zeros(nt)
 	deltat=0.0001
 
 	# calculate
 	for jj in xrange(nt): intsfr[jj] = threed_dutils.calculate_sfr(truths['sfh_params'], deltat, tcalc = t[jj])
 
-	return t[::-1], intsfr
+	return intsfr
 
 def create_plotquant(sample_results, logplot = ['mass'], truths=None):
     
