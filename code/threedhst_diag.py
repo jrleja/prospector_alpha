@@ -315,10 +315,10 @@ def add_sfh_plot(sample_results,fig,ax_loc,sps,
 		ax_inset.fill_between(t, perc[:,0], perc[:,2], color='0.75')
 
 		parnames = sample_results['model'].theta_labels()
-		tt,pt = plot_sfh_single(truths,truths['parnames'])
+		pt = plot_sfh_single(truths,truths['parnames'],t)
 		pt = np.log10(pt)
 
-		ax_inset.plot(tt, pt,'-',color='blue')
+		ax_inset.plot(t, pt,'-',color='blue')
 		ax_inset.text(0.92,0.32, 'truth',transform = ax_inset.transAxes,color='blue',fontsize=axfontsize*1.4,ha='right')
 
 		# set up plotting range
@@ -375,23 +375,9 @@ def plot_sfh_fast(tau,tage,mass,tuniv=None):
 
 	return t,sfr
 
-def plot_sfh_single(truths,parnames):
+def plot_sfh_single(truths,parnames,t):
 
 	parnames = np.array(parnames)
-
-	### setup time array in reasonable fashion
-	# different for nonparametric versus parametric
-	if truths['sfh_params']['tage'].shape[0] != 0:
-		nt = 50
-		t = np.linspace(0,truths['sfh_params']['tage'][0],num=nt)
-	elif truths['sfh_params']['agebins'].shape[0] != 0:
-		in_years = 10**truths['sfh_params']['agebins']/1e9
-		t = np.concatenate((np.ravel(in_years)*0.9999, np.ravel(in_years)*1.001))
-		t.sort()
-		t = t[1:-1] # remove older than oldest bin, younger than youngest bin
-	else:
-		print 'not sure how to set up the time array here...'
-		print 1/0
 
 	# prepare outputs
 	nt = t.shape[0]

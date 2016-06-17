@@ -1218,17 +1218,8 @@ def calculate_sfr(sfh_params, timescale, tcalc = None,
 	if tcalc is None:
 		tcalc = tage
 
-	# calculate timescale used in integration
-	# different than input because for nonparametric SFH, SFR is undefined below smallest time bin!
-	calc_timescale = timescale
-	if sfh_params['sfh'] == 0:
-		min_t = np.min(10**sfh_params['agebins']/1e9)
-		tdefined = tage - min_t
-		if tcalc > tdefined:
-			calc_timescale = timescale-(tcalc-tdefined)
-
 	sfr=integrate_sfh(tcalc-timescale, tcalc, sfh_params) * \
-	                  sfh_params['mformed'].sum()/(calc_timescale*1e9)
+	                  sfh_params['mformed'].sum()/(timescale*1e9)
 
 	if minsfr is None:
 		minsfr = sfh_params['mformed'].sum() / (tage*1e9*10000)
