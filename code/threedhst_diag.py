@@ -276,16 +276,11 @@ def add_sfh_plot(sample_results,fig,ax_loc,sps,
 	# plot whole SFH
 	ax_inset.plot(t, perc[:,1],'-',color=median_main_color)
 	ax_inset.plot(t, most_likely,'-',color=most_likely_color)
+	ax_inset.fill_between(t, perc[:,0], perc[:,2], color=median_err_color)
 
 	##### FAST + normal fit SFH #####
 	if truths is None:
 	
-		ax_inset.fill_between(t, perc[:,0], perc[:,2], color=median_err_color)
-
-		#colors=['blue','red']
-		#for aa in xrange(1,perc.shape[1]):
-		#	ax_inset.plot(t, perc[:,aa,1],'-',color=colors[aa-1],alpha=0.4)
-		#	ax_inset.text(0.08,0.83-0.07*(aa-1), 'tau'+str(aa),transform = ax_inset.transAxes,color=colors[aa-1],fontsize=axfontsize*1.4)
 
 		# set up plotting range
 		plotmax_y = np.max(perc[:,1])
@@ -312,18 +307,17 @@ def add_sfh_plot(sample_results,fig,ax_loc,sps,
 	##### TRUTHS + 50th percentile SFH #####
 	else:
 		
-		ax_inset.fill_between(t, perc[:,0], perc[:,2], color='0.75')
 
-		parnames = sample_results['model'].theta_labels()
-		pt = plot_sfh_single(truths,truths['parnames'],t)
-		pt = np.log10(pt)
+		sfh_params_truth = threed_dutils.find_sfh_params(sample_results['model'],truths['truths'],sample_results['obs'],sps)
+		true_sfh = threed_dutils.return_full_sfh(t, sfh_params_truth)
+		true_sfh = np.log10(np.clip(true_sfh,minsfr,np.inf))
 
-		ax_inset.plot(t, pt,'-',color='blue')
+		ax_inset.plot(t, true_sfh,'-',color='blue')
 		ax_inset.text(0.92,0.32, 'truth',transform = ax_inset.transAxes,color='blue',fontsize=axfontsize*1.4,ha='right')
 
 		# set up plotting range
-		plotmax_y = np.maximum(np.max(perc[:,1]),np.max(pt))
-		plotmin_y = np.minimum(np.min(perc[:,1]),np.min(pt))
+		plotmax_y = np.maximum(np.max(perc[:,1]),np.max(true_sfh))
+		plotmin_y = np.minimum(np.min(perc[:,1]),np.min(true_sfh))
 
 	# the minimum time for which the upper percentile is equal to the minimum SFR
 	# exclude any times before the 50th percentile of tage, since those are 
@@ -374,20 +368,6 @@ def plot_sfh_fast(tau,tage,mass,tuniv=None):
 		t = t[::-1]
 
 	return t,sfr
-
-def plot_sfh_single(truths,parnames,t):
-
-	parnames = np.array(parnames)
-
-	# prepare outputs
-	nt = t.shape[0]
-	intsfr = np.zeros(nt)
-	deltat=0.0001
-
-	# calculate
-	for jj in xrange(nt): intsfr[jj] = threed_dutils.calculate_sfr(truths['sfh_params'], deltat, tcalc = t[jj])
-
-	return intsfr
 
 def create_plotquant(sample_results, logplot = ['mass'], truths=None):
     

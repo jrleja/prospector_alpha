@@ -1177,7 +1177,7 @@ def return_full_sfh(t, sfh_params):
 	set of SFH parameters
 	'''
 
-	deltat=0.0001 # Gyr
+	deltat=1e-8 # Gyr
 
 	# calculate new time vector such that
 	# the spacing from tage back to zero
