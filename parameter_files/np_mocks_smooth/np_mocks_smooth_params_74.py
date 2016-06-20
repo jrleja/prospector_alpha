@@ -30,8 +30,8 @@ run_params = {'verbose':True,
               'interp_type': 'logarithmic',
               'agelims': [0.0,8.0,8.5,9.0,9.5,10.0],
               # Data info
-              'photname':os.getenv('APPS')+'/threedhst_bsfh/data/nonparametric_mocks.cat',
-              'truename':os.getenv('APPS')+'/threedhst_bsfh/data/nonparametric_mocks.dat',
+              'photname':os.getenv('APPS')+'/threedhst_bsfh/data/np_mocks_smooth.cat',
+              'truename':os.getenv('APPS')+'/threedhst_bsfh/data/np_mocks_smooth.dat',
               'objname':'74'
               }
 run_params['outfile'] = run_params['outfile']+'_'+run_params['objname']
