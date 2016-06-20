@@ -3,7 +3,7 @@ import numpy as np
 from astropy.table import Table, vstack
 from astropy.io import ascii
 from astropy import units as u
-import nonparametric_mocks_params as nonparam
+import np_mocks_smooth_params as nonparam
 import threed_dutils
 
 #### NONPARAMETRIC GLOBALS
@@ -65,6 +65,12 @@ def construct_mocks(basename,outname=None,add_zp_err=False, plot_mock=False):
 		if 'sfr_fraction' in parnames[ii]:
 			component = int(parnames[ii][-1])-1
 			testparms[:,ii] = sfh_distribution[:,component]
+
+		#### limit mass to a reasonable range
+		elif parnames[ii] == 'logmass':
+			min = 10.0
+			max = 11.0
+			for kk in xrange(ntest): testparms[kk,ii] = random.random()*(max-min)+min
 
 		#### choose reasonable amounts of dust ####
 		elif parnames[ii] == 'dust2':
@@ -169,8 +175,6 @@ def construct_mocks(basename,outname=None,add_zp_err=False, plot_mock=False):
 		plt.tight_layout()
 		plt.savefig(plot_mock,dpi=150)
 		plt.close()
-
-	print 1/0
 
 	#### output ####
 	#### ids first ####
