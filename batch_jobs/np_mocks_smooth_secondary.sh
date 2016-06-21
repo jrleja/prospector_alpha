@@ -19,4 +19,4 @@
 #SBATCH --mail-type=END
 #SBATCH --mail-user=joel.leja@gmail.com
 ### source activate pympi
-python $APPS/threedhst_bsfh/code/extra_output.py $APPS/threedhst_bsfh/parameter_files/nonparametric_mocks/nonparametric_mocks_params_$SLURM_ARRAY_TASK_ID.py 
+python $APPS/threedhst_bsfh/code/extra_output.py $APPS/threedhst_bsfh/parameter_files/np_mocks_smooth/np_mocks_smooth_params_$SLURM_ARRAY_TASK_ID.py 
