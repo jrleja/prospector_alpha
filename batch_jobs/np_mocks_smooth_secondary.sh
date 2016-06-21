@@ -11,10 +11,10 @@
 ### memory per cpu, in MB
 #SBATCH --mem-per-cpu=10000
 ### Job name
-#SBATCH -J 'nonparametric_mockssec'
+#SBATCH -J 'np_smooth_sec'
 ### output and error logs
-#SBATCH -o nonparametric_mocks_sec_%a.out
-#SBATCH -e nonparametric_mocks_sec_%a.err
+#SBATCH -o np_smooth_sec_%a.out
+#SBATCH -e np_smooth_sec_%a.err
 ### mail
 #SBATCH --mail-type=END
 #SBATCH --mail-user=joel.leja@gmail.com
