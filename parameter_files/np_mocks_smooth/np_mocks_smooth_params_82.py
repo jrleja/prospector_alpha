@@ -277,7 +277,7 @@ model_params.append({'name': 'sfr_fraction', 'N': 1,
                         'isfree': True,
                         'init': [],
                         'units': 'Msun',
-                        'prior_function': priors.tophat,
+                        'prior_function': priors.inverse_marginalized_dirichlet,
                         'prior_args':{'mini':0.0, 'maxi':1.0}})
 
 ########    IMF  ##############
@@ -401,7 +401,6 @@ model_params.append({'name': 'gas_logu', 'N': 1,
                         'units': '',
                         'prior_function': tophat,
                         'prior_args': {'mini':-4, 'maxi':-1}})
-
 
 ####### Calibration ##########
 model_params.append({'name': 'phot_jitter', 'N': 1,
@@ -547,7 +546,13 @@ def load_model(objname='', agelims=[], **extras):
     # N-1 bins, last is set by x = 1 - np.sum(sfr_fraction)
     model_params[n.index('sfr_fraction')]['N'] = ncomp-1
     model_params[n.index('sfr_fraction')]['init'] = mass_init[:-1] / np.sum(mass_init)
-    model_params[n.index('sfr_fraction')]['prior_args'] = {'maxi':np.full(ncomp-1,1.0), 'mini':np.full(ncomp-1,0.0)}
+    model_params[n.index('sfr_fraction')]['prior_args'] = {
+                                                           'maxi':1.0, 
+                                                           'mini':0.0,
+                                                           'alpha':1.0,
+                                                           'alpha_sum':ncomp 
+                                                           # NOTE: ncomp instead of ncomp-1 makes the prior take into account the implicit Nth variable too
+                                                          }
     model_params[n.index('sfr_fraction')]['init_disp'] = 0.15
 
     #### INSERT REDSHIFT INTO MODEL PARAMETER DICTIONARY ####

@@ -442,9 +442,9 @@ def load_truths(param_file,model=None,sps=None,obs=None, calc_prob = True):
 	sfh_params = find_sfh_params(model,truths,obs,sps)
 	deltat=0.1
 	sfr_10  = np.log10(calculate_sfr(sfh_params,0.01))
-	ssfr_10 = np.log10(10**sfr_10 / sfh_params['mformed'].sum())
+	ssfr_10 = np.log10(10**sfr_10 / sfh_params['mass'].sum())
 	sfr_100  = np.log10(calculate_sfr(sfh_params,deltat))
-	ssfr_100 = np.log10(calculate_sfr(sfh_params,deltat) / sfh_params['mformed'].sum())
+	ssfr_100 = np.log10(calculate_sfr(sfh_params,deltat) / sfh_params['mass'].sum())
 	totmass = sfh_params['mass'].sum()
 	halftime = halfmass_assembly_time(sfh_params)
 	if calc_prob == True:

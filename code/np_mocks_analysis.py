@@ -156,12 +156,12 @@ def plot_fit_parameters(alldata,outfolder=None):
 
 	#### REGULAR PARAMETERS
 	pars = alldata[0]['parnames']
-	fig, axes = plt.subplots(4, 4, figsize = (20,20))
+	fig, axes = plt.subplots(3, 4, figsize = (20,14))
 	plt.subplots_adjust(wspace=0.3,hspace=0.3)
 	ax = np.ravel(axes)
 
 	### DISTRIBUTION OF ERRORS
-	fig_err, axes_err = plt.subplots(4, 4, figsize = (20,20))
+	fig_err, axes_err = plt.subplots(3, 4, figsize = (20,14))
 	plt.subplots_adjust(wspace=0.3,hspace=0.3)
 	ax_err = np.ravel(axes_err)
 
@@ -234,8 +234,8 @@ def plot_derived_parameters(alldata,outfolder=None):
 	##### EXTRA PARAMETERS
 	epars = alldata[0]['eparnames']
 	epars_truth = alldata[0]['truths']['extra_parnames']
-	pars_to_plot = ['ssfr_10','ssfr_100', 'half_time']#,'ssfr_10','ssfr_100','half_time']
-	parlabels = ['log(sSFR) [10 Myr]','log(sSFR) [100 Myr]', r"log(t$_{\mathrm{half-mass}}$)"]
+	pars_to_plot = ['sfr_100','ssfr_100', 'half_time']#,'ssfr_10','ssfr_100','half_time']
+	parlabels = ['log(SFR) [100 Myr]','log(sSFR) [100 Myr]', r"t$_{\mathrm{half-mass}}$ [Gyr]"]
 
 	fig, axes = plt.subplots(1, 3, figsize = (15,5))
 	plt.subplots_adjust(wspace=0.33,bottom=0.15,top=0.85,left=0.1,right=0.93)
@@ -273,8 +273,16 @@ def plot_derived_parameters(alldata,outfolder=None):
 		ydown = np.log10(ydown)
 		y = np.log10(y)
 
+
+
 		if par == 'half_time':
+			yup = 10**yup
+			ydown = 10**ydown
+			y = 10**y
+			yerr = threed_dutils.asym_errors(y,yup,ydown,log=False)
+		'''
 			x = np.log10(x)
+		'''
 
 		### plot that shit
 		ax[ii].errorbar(x,y,yerr,fmt='o',alpha=0.8,color='#1C86EE')
