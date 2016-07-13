@@ -19,4 +19,4 @@
 #SBATCH --mail-type=END
 #SBATCH --mail-user=joel.leja@gmail.com
 ### source activate pympi
-mpirun -n 32 python $APPS/bsfh/demo/prospectr.py --param_file=$APPS/threedhst_bsfh/parameter_files/np_mocks_smooth/np_mocks_smooth_params_$SLURM_ARRAY_TASK_ID.py  --sps=fsps 
+mpirun -n 32 python $APPS/bsfh/scripts/prospector.py --param_file=$APPS/threedhst_bsfh/parameter_files/np_mocks_smooth/np_mocks_smooth_params_$SLURM_ARRAY_TASK_ID.py 
