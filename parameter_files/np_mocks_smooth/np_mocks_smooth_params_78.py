@@ -22,7 +22,7 @@ run_params = {'verbose':True,
               # MCMC params
               'nwalkers':546,
               'nburn':[150,200,400], 
-              'niter': 4000,
+              'niter': 2000,
               # Model info
               'zcontinuous': 2,
               'compute_vega_mags': False,
