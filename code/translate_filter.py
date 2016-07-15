@@ -76,6 +76,34 @@ def calc_lameff_for_fsps(fsps_filter_list):
 
 	return lameff
 
+def translate_txt_to_sedpy(txt_name,sedpy_filtname,
+					       outfolder='/Users/joel/code/python/sedpy/sedpy/data/filters'):
+
+	'''
+	used to translate text filter curves into sedpy-style filter files
+	INPUT: text filter file
+	OUTPUT: sedpy-style filter definition file at outfolder/sedpy_filtname.par
+	'''
+	dat = np.loadtxt(txt_name, comments = '#',
+					 dtype = {'names':(['lambda','transmission']),
+					         'formats':('f16','f16')})
+
+	outfile=outfolder+'/'+sedpy_filtname+'.par'
+	with open(outfile, 'w') as f:
+
+		# header
+		f.write('\n')
+		f.write('typedef struct {\n')
+		f.write('  double lambda;\n')
+		f.write('  double pass;\n')
+		f.write('} KFILTER;\n')
+		f.write('\n')
+
+		# data
+		for l,t in zip(dat['lambda'],dat['transmission']): f.write('KFILTER  '+"{:.1f}".format(l*1e4)+'  '+"{:.6f}".format(t)+'\n')
+
+	print 'created '+outfile
+
 def translate_fsps_to_sedpy(fsps_filtname,sedpy_filtname,
 					        outfolder='/Users/joel/code/python/sedpy/sedpy/data/filters'):
 

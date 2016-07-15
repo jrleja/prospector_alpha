@@ -3,8 +3,8 @@ import numpy as np
 from astropy.table import Table, vstack
 from astropy.io import ascii
 from astropy import units as u
-import np_mocks_smooth_params as nonparam
 import threed_dutils
+import np_mocks_smooth_params as nonparam
 
 #### NONPARAMETRIC GLOBALS
 sps = nonparam.load_sps(**nonparam.run_params)
