@@ -14,7 +14,7 @@ logarithmic = priors.logarithmic
 
 run_params = {'verbose':True,
               'debug': False,
-              'outfile': os.getenv('APPS')+'/threedhst_bsfh/results/np_mocks_smooth/np_mocks_smooth',
+              'outfile': os.getenv('APPS')+'/threedhst_bsfh/results/brownseds_np/brownseds_np',
               'nofork': True,
               # Optimizer params
               'ftol':0.5e-5, 
