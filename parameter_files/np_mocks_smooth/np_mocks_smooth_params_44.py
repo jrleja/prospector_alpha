@@ -547,7 +547,7 @@ def load_model(objname='', agelims=[], **extras):
     model_params[n.index('sfr_fraction')]['N'] = ncomp-1
     model_params[n.index('sfr_fraction')]['init'] = mass_init[:-1] / np.sum(mass_init)
     model_params[n.index('sfr_fraction')]['prior_args'] = {
-                                                           'maxi':np.full(ncomp-1,1.0), 
+                                                           'maxi':np.full(ncomp-1,0.8), 
                                                            'mini':np.full(ncomp-1,0.0),
                                                            'alpha':1.0,
                                                            'alpha_sum':ncomp 

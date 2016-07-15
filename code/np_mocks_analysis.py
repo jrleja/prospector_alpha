@@ -140,13 +140,14 @@ def collate_data(runname='ha_80myr',outpickle=None):
 		outdat['truths'] = threed_dutils.load_truths(os.getenv('APPS')+'/threed'+sample_results['run_params']['param_file'].split('/threed')[1],
 			                                         sps=sps, calc_prob = True)
 
-
 		### add in d1_d2, ha_ext
 		d1_t = outdat['truths']['truths'][outdat['parnames']=='dust1']
 		d2_t = outdat['truths']['truths'][outdat['parnames']=='dust2']
 		didx_t = outdat['truths']['truths'][outdat['parnames']=='dust_index']
 		outdat['truths']['ha_ext'] = threed_dutils.charlot_and_fall_extinction(6563.0, d1_t, d2_t, -1.0, didx_t, kriek=True)[0]
 		outdat['truths']['d1_d2'] = d1_t/d2_t
+
+		print 1/0
 
 		out.append(outdat)
 		
