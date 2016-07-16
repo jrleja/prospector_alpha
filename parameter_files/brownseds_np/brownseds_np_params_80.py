@@ -109,13 +109,13 @@ def translate_filters(bfilters, full_list = False):
     'W1mag': 'wise_w1',
     '[3.6]': 'spitzer_irac_ch1',
     '[4.5]': 'spitzer_irac_ch2',
-    'W2mag': 'WISE_W2',
+    'W2mag': 'wise_w2',
     '[5.8]': 'spitzer_irac_ch3',
     '[8.0]': 'spitzer_irac_ch4',
-    'W3mag': 'WISE_W3',
+    'W3mag': 'wise_w3',
     'PUIB': np.nan,    # [8.2/15.6]? Spitzer/IRS Blue Peak Up Imaging channel (13.3-18.7um) AB magnitude
     'W4mag': np.nan,    # two WISE4 magnitudes, this one is "native" and must be corrected
-    "W4'mag": 'WISE_W4',
+    "W4'mag": 'wise_w4',
     'PUIR': np.nan,    # Spitzer/IRS Red Peak Up Imaging channel (18.5-26.0um) AB magnitude
     '[24]': 'spitzer_mips_24',
     'pacs70': 'herschel_pacs_70',
