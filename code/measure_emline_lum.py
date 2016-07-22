@@ -402,7 +402,7 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 
 	#### output names
 	objname_short = sample_results['run_params']['objname'].replace(' ','_')
-	base = '/Users/joel/code/python/threedhst_bsfh/plots/brownseds_tightbc/magphys/line_fits/'
+	base = '/Users/joel/code/python/threedhst_bsfh/plots/brownseds_np/magphys/line_fits/'
 	out_em = base+objname_short+'_em_prosp.png'
 	out_abs = base+objname_short+'_abs_prosp.png'
 	out_absobs = base+objname_short+'_absobs.png'

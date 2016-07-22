@@ -198,7 +198,7 @@ def find_sfh_params(model,theta,obs,sps,sm=None):
 			sm = sm_new
 	
 	# create mass fractions
-	if 'sfr_fraction' in out:
+	if out['sfr_fraction'].shape[0] != 0:
 		out['sfr_fraction_full'] = np.concatenate((out['sfr_fraction'],np.atleast_1d(1-out['sfr_fraction'].sum())))
 		out['mass_fraction'] = out['sfr_fraction_full']*sps._time_per_bin
 		out['mass_fraction'] /= out['mass_fraction'].sum()

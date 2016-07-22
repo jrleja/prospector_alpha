@@ -689,7 +689,7 @@ def fmt_emline_info(alldata,add_abs_err = True):
 	##### NAME VARIABLES
 	# Prospector model variables
 	parnames = alldata[0]['pquantiles']['parnames']
-	mass_idx = parnames == 'mass'
+	logmass_idx = parnames == 'logmass'
 	dinx_idx = parnames == 'dust_index'
 	dust1_idx = parnames == 'dust1'
 	dust2_idx = parnames == 'dust2'
@@ -849,9 +849,9 @@ def fmt_emline_info(alldata,add_abs_err = True):
 		d1[ii,1] = dat['pquantiles']['q84'][dust1_idx]
 		d1[ii,2] = dat['pquantiles']['q16'][dust1_idx]
 
-		mass[ii,0] = dat['pquantiles']['q50'][mass_idx]
-		mass[ii,1] = dat['pquantiles']['q84'][mass_idx]
-		mass[ii,2] = dat['pquantiles']['q16'][mass_idx]
+		mass[ii,0] = 10**dat['pquantiles']['q50'][logmass_idx]
+		mass[ii,1] = 10**dat['pquantiles']['q84'][logmass_idx]
+		mass[ii,2] = 10**dat['pquantiles']['q16'][logmass_idx]
 
 		d2[ii,0] = dat['pquantiles']['q50'][dust2_idx]
 		d2[ii,1] = dat['pquantiles']['q84'][dust2_idx]
@@ -1758,7 +1758,7 @@ def obs_vs_model_hdelta(e_pinfo,hflag,outname=None,outname_dnplt=None,eqw=False)
 		        r'model log(H$_{\delta}$ EQW) [marginalized]']
 
 		# only make this plot in EQW
-		fig2, ax2 = plt.subplots(1,3, figsize=(18.75,6))
+		fig2, ax2 = plt.subplots(1,2, figsize=(12.5,6))
 
 	else:
 		min = 5.0
@@ -1829,12 +1829,9 @@ def obs_vs_model_hdelta(e_pinfo,hflag,outname=None,outname_dnplt=None,eqw=False)
 			'''
 			ax[1].errorbar(np.log10(pl_hdel_obs), np.log10(pl_hdel_prosp_em), xerr=errs_obs, linestyle=' ', **pdict)
 			'''
-
 			if eqw:
 				ax2[0].errorbar(np.log10(pl_hdel_obs), dn4000_obs[plt_idx], linestyle=' ',**pdict)
-				'''
 				ax2[1].errorbar(np.log10(pl_hdel_prosp), dn4000_prosp[plt_idx], linestyle=' ',**pdict)
-				'''
 
 	ax[0].text(0.04,0.92, r'S/N H$\delta$ > {0}'.format(int(e_pinfo['obs']['hdelta_sn_cut'])), transform = ax[0].transAxes,horizontalalignment='left')
 	#ax[0].text(0.04,0.92, r'EQW H$\delta$ < -{0} $\AA$'.format(int(e_pinfo['obs']['hdelta_eqw_cut'])), transform = ax[0].transAxes,horizontalalignment='left')
@@ -1847,7 +1844,6 @@ def obs_vs_model_hdelta(e_pinfo,hflag,outname=None,outname_dnplt=None,eqw=False)
 	ax[0].axis(plotlim)
 	ax[0].plot([min,max],[min,max],linestyle='--',color='0.1',alpha=0.8)
 
-	'''
 	ax[1].set_xlabel(xtit[0])
 	ax[1].set_ylabel(ytit[0])
 	off,scat = threed_dutils.offset_and_scatter(np.log10(hdel_obs[:,0]), np.log10(hdel_prosp_em),biweight=True)
@@ -1855,22 +1851,18 @@ def obs_vs_model_hdelta(e_pinfo,hflag,outname=None,outname_dnplt=None,eqw=False)
 	ax[1].text(0.96,0.1, 'mean offset='+"{:.2f}".format(off) + ' dex', transform = ax[1].transAxes,horizontalalignment='right')
 	ax[1].axis(plotlim)
 	ax[1].plot([min,max],[min,max],linestyle='--',color='0.1',alpha=0.8)
-	'''
 
 	### dn4000 plot options
 	if eqw:
 		ax2[0].set_xlabel('observed log(H$_{\delta}$ EQW)')
 		ax2[1].set_xlabel('Prospector log(H$_{\delta}$ EQW)')
-		ax2[2].set_xlabel('MAGPHYS log(H$_{\delta}$ EQW)')
 
 		ax2[0].set_ylabel('observed Dn(4000)')
 		ax2[1].set_ylabel('Prospector Dn(4000)')
-		ax2[2].set_ylabel('MAGPHYS Dn(4000)')
 
 		axlims = (0.3,1.0,0.9,1.5)
 		ax2[0].axis(axlims)
 		ax2[1].axis(axlims)
-		ax2[2].axis(axlims)
 
 		fig2.tight_layout()
 		fig2.savefig(outname_dnplt, dpi=dpi)
@@ -2827,7 +2819,7 @@ def plot_relationships(alldata,outfolder):
 
 	##### find prospector indexes
 	parnames = alldata[0]['pquantiles']['parnames']
-	idx_mass = parnames == 'mass'
+	idx_logmass = parnames == 'logmass'
 	idx_met = parnames == 'logzsol'
 
 	eparnames = alldata[0]['pextras']['parnames']
@@ -2843,10 +2835,10 @@ def plot_relationships(alldata,outfolder):
 		if data:
 			
 			# mass
-			tmp = np.array([data['pquantiles']['q16'][idx_mass][0],
-				            data['pquantiles']['q50'][idx_mass][0],
-				            data['pquantiles']['q84'][idx_mass][0]])
-			promass = np.concatenate((promass,np.atleast_2d(np.log10(tmp))),axis=0)
+			tmp = np.array([data['pquantiles']['q16'][idx_logmass][0],
+				            data['pquantiles']['q50'][idx_logmass][0],
+				            data['pquantiles']['q84'][idx_logmass][0]])
+			promass = np.concatenate((promass,np.atleast_2d(tmp)),axis=0)
 			magmass = np.concatenate((magmass,np.atleast_2d(data['magphys']['percentiles']['M*'][1:4])))
 
 			# SFR
@@ -2982,9 +2974,13 @@ def prospector_comparison(alldata,outfolder,hflag):
 	dust1 versus dust2, everything below -0.45 dust index highlighted
 	'''
 	
+	# if it doesn't exist, make it
+	if not os.path.isdir(outfolder):
+		os.makedirs(outfolder)
+
 	#### find prospector indexes
 	parnames = alldata[0]['pquantiles']['parnames']
-	idx_mass = parnames == 'mass'
+	idx_mass = parnames == 'logmass'
 	didx_idx = parnames == 'dust_index'
 	d1_idx = parnames == 'dust1'
 	d2_idx = parnames == 'dust2'
@@ -3072,7 +3068,7 @@ def prospector_comparison(alldata,outfolder,hflag):
 	mass = np.array([x['pquantiles']['q50'][idx_mass][0] for x in alldata])
 	m_errup = np.array([x['pquantiles']['q84'][idx_mass][0] for x in alldata])
 	m_errdo = np.array([x['pquantiles']['q16'][idx_mass][0] for x in alldata])
-	mass_err = threed_dutils.asym_errors(mass,m_errup,m_errdo,log=True)
+	mass_err = threed_dutils.asym_errors(mass,m_errup,m_errdo,log=False)
 
 	logzsol = np.array([x['pquantiles']['q50'][met_idx][0] for x in alldata])
 	qpah = np.array([x['pquantiles']['q50'][qpah_idx][0] for x in alldata])
@@ -3097,7 +3093,7 @@ def prospector_comparison(alldata,outfolder,hflag):
 	ax[0].set_ylim(-0.5,10)
 	'''
 
-	ax[0].errorbar(np.log10(mass),np.log10(qpah),xerr=mass_err,yerr=qpah_err, alpha=0.6, fmt='o', color='#1C86EE')
+	ax[0].errorbar(mass,np.log10(qpah),xerr=mass_err,yerr=qpah_err, alpha=0.6, fmt='o', color='#1C86EE')
 	ax[0].set_xlabel(r'log(M/M$_{\odot}$)')
 	ax[0].set_ylabel(r'log(Q$_{\mathrm{PAH}}$)')
 	ax[0].set_ylim(np.log10(qpah_low),np.log10(11.0))

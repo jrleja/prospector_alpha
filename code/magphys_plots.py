@@ -8,6 +8,7 @@ import math, measure_emline_lum, brown_io
 import magphys_plot_pref
 import mag_ensemble
 import matplotlib as mpl
+from prospect.models import model_setup
 from astropy import constants
 
 c = 3e18   # angstroms per second
@@ -55,7 +56,7 @@ def median_by_band(x,y,avg=False):
 
 	##### get filter effective wavelengths for sorting
 	delz = 0.06
-	from brownseds_params import translate_filters
+	from brownseds_np_params import translate_filters
 	from translate_filter import calc_lameff_for_fsps
 	filtnames = np.array(translate_filters(0,full_list=True))
 	wave_effective = calc_lameff_for_fsps(filtnames[filtnames != 'nan'])/1e4
@@ -674,7 +675,11 @@ def sed_comp_figure(sample_results, sps, model, magphys,
 	#### SFR and mass
 	# calibrated to be to the right of ax_loc = [0.38,0.68,0.13,0.13]
 	prosp_sfr = sample_results['extras']['q50'][sample_results['extras']['parnames'] == 'sfr_100'][0]
-	prosp_mass = np.log10(sample_results['quantiles']['q50'][np.array(sample_results['model'].theta_labels()) == 'mass'][0])
+	# logmass or mass?
+	try:
+		prosp_mass = np.log10(sample_results['quantiles']['q50'][np.array(sample_results['quantiles']['parnames']) == 'mass'][0])
+	except IndexError:
+		prosp_mass = sample_results['quantiles']['q50'][np.array(sample_results['quantiles']['parnames']) == 'logmass'][0]
 	mag_mass = np.log10(magphys['model']['parameters'][magphys['model']['parnames'] == 'M*'][0])
 	mag_sfr = magphys['model']['parameters'][magphys['model']['parnames'] == 'SFR'][0]
 	
@@ -710,7 +715,7 @@ def sed_comp_figure(sample_results, sps, model, magphys,
 	ax_inset.set_xlim(ax_inset.get_xlim()[0],0.005)
 	ax_inset.set_xlabel('log(t/Gyr)')
 	'''
-	ax_inset.set_xlabel('log(t/Gyr)')
+	ax_inset.set_xlabel('time [Gyr]')
 
 
 	# legend
@@ -793,15 +798,15 @@ def collate_data(filebase=None,
 	if not os.path.isdir(outfolder):
 		os.makedirs(outfolder)
 
-	sample_results, powell_results, model = threed_dutils.load_prospector_data(filebase)
+	# attempt to load data
+	try:
+		sample_results, powell_results, model = threed_dutils.load_prospector_data(filebase)
+	except AttributeError:
+		print 'failed to load ' + filebase
+		return None
 
 	if not sps:
-		# load stellar population, set up custom filters
-		if np.sum([1 for x in sample_results['model'].config_list if x['name'] == 'pmetals']) > 0:
-			sps = threed_dutils.setup_sps(custom_filter_key=sample_results['run_params'].get('custom_filter_key',None))
-		else:
-			sps = threed_dutils.setup_sps(zcontinuous=1,
-										  custom_filter_key=sample_results['run_params'].get('custom_filter_key',None))
+		sps = model_setup.load_sps(**sample_results['run_params'])
 
 	# load magphys
 	objname = sample_results['run_params']['objname']

@@ -18,11 +18,11 @@ run_params = {'verbose':True,
               'nofork': True,
               # Optimizer params
               'ftol':0.5e-5, 
-              'maxfev':5000,
+              'maxfev':3,
               # MCMC params
               'nwalkers':546,
-              'nburn':[150,200,400], 
-              'niter': 2000,
+              'nburn':[5,5], 
+              'niter': 20,
               # Model info
               'zcontinuous': 2,
               'compute_vega_mags': False,
@@ -613,7 +613,6 @@ def load_model(objname='',datname='', agelims=[], **extras):
     agelims[-1] = np.log10(tuniv*1e9)
     agebins = np.array([agelims[:-1], agelims[1:]])
     ncomp = len(agelims) - 1
-    mass_init =  expsfh(agelims, **extras)*1e5
 
     #### ADJUST MODEL PARAMETERS #####
     n = [p['name'] for p in model_params]
@@ -622,10 +621,10 @@ def load_model(objname='',datname='', agelims=[], **extras):
     model_params[n.index('agebins')]['N'] = ncomp
     model_params[n.index('agebins')]['init'] = agebins.T
 
-    #### FRACTIONAL MASS
+    #### FRACTIONAL MASS INITIALIZATION
     # N-1 bins, last is set by x = 1 - np.sum(sfr_fraction)
     model_params[n.index('sfr_fraction')]['N'] = ncomp-1
-    model_params[n.index('sfr_fraction')]['init'] = mass_init[:-1] / np.sum(mass_init)
+    model_params[n.index('sfr_fraction')]['init'] = np.zeros(ncomp-1)+1./ncomp
     model_params[n.index('sfr_fraction')]['prior_args'] = {
                                                            'maxi':np.full(ncomp-1,1.0), 
                                                            'mini':np.full(ncomp-1,0.0),
