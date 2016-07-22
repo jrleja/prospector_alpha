@@ -4,7 +4,7 @@ from matplotlib.ticker import MaxNLocator
 import matplotlib as mpl
 import numpy as np
 import threed_dutils
-from bsfh import model_setup
+from prospect.models import model_setup
 import copy, math
 from scipy.special import erf
 
@@ -28,25 +28,26 @@ alpha = 0.8
 lw = 3
 
 #### define model
-parmfile='/Users/joel/code/python/threedhst_bsfh/parameter_files/brownseds/brownseds_params.py'
-model = model_setup.load_model(parmfile)
-obs   = model_setup.load_obs(parmfile)
-sps = threed_dutils.setup_sps()
+parmfile='/Users/joel/code/python/threedhst_bsfh/parameter_files/brownseds_tightbc/brownseds_tightbc_params.py'
+run_params = model_setup.get_run_params(param_file=parmfile)
+sps = model_setup.load_sps(**run_params)
+model = model_setup.load_model(**run_params)
+obs = model_setup.load_obs(**run_params)
 
 #### output locations
-out1 = '/Users/joel/code/python/threedhst_bsfh/plots/brownseds/pcomp/model_diagram1.png'
-out2 = '/Users/joel/code/python/threedhst_bsfh/plots/brownseds/pcomp/model_diagram2.png'
+out1 = '/Users/joel/code/python/threedhst_bsfh/plots/brownseds_tightbc/pcomp/model_diagram1.png'
+out2 = '/Users/joel/code/python/threedhst_bsfh/plots/brownseds_tightbc/pcomp/model_diagram2.png'
 
 #### set initial theta
-# 'mass', 'tage', 'logtau', 
-# 'dust2', 'delt_trunc', 'sf_tanslope', 
-# 'duste_gamma', 'logzsol', 'dust1', 
-# 'dust_index', 'duste_umin', 'duste_qpah'
+# 'logmass', 'tage', 'logtau', 
+# 'dust2', 'logzsol', 'dust_index',
+# 'delt_trunc', 'sf_tanslope', 'dust1', 
+# 'duste_qpah', 'duste_gamma', 'duste_umin'
 labels = model.theta_labels()
-model.initial_theta = np.array([1e10, 1.1, -0.5,
-                                0.3, 0.75, 0.0,
-                                1e-1, -1.0, 0.3,
-                                -7e-01, 10.0, 3.0])
+model.initial_theta = np.array([10, 1.1, -0.5,
+                                0.3, -1.0, -7e-01,
+                                0.75, 0.0, 0.3,
+                                3.0, 1e-1, 10.0])
 
 class jLogFormatter(mpl.ticker.LogFormatter):
 	'''
@@ -102,7 +103,7 @@ def add_label(ax,label,par=None,par_idx=None,fmt=None,txtlabel=None):
 	for ii,p in enumerate(par):
 		# delt_trunc
 		# translate into Myr ago
-		if par_idx == 4:
+		if par_idx == 6:
 			tmp = model.initial_theta[labels.index('tage')] * (1-p)*1e3
 		else:
 			tmp = p
@@ -125,7 +126,7 @@ def mass_xplot(ax,par,idx):
 	par = [par[0],model.initial_theta[idx],par[1]]
 
 	##### parameter locations
-	for ii,p in enumerate(par): ax.axvline(np.log10(p),color=colors[ii],alpha=alpha,linewidth=lw)
+	for ii,p in enumerate(par): ax.axvline(p,color=colors[ii],alpha=alpha,linewidth=lw)
 
 	#### limits and labels
 	ax.set_xlabel(r'log(M/M$_{\odot}$)')
@@ -183,7 +184,7 @@ def met_triangular_kernel(logzsol):
 	#### available metallicities
 	# in logzsol
 	zsol = 0.019
-	met = np.log10(sps.zlegend/zsol)
+	met = np.log10(sps.csp.zlegend/zsol)
 
 	#### define useful quantities
 	nz = len(met)
@@ -268,7 +269,7 @@ def attn_xplot(ax,par,par_idx,label):
 			#ax.plot(lam/1e4,-np.log(diff_attn),color=faint_color,lw=lw,alpha=alpha,linestyle=linestyle)
 			ax.plot(lam/1e4,-np.log(bc_attn),color=colors[ii],lw=lw,alpha=alpha,linestyle=linestyle)
 
-		elif par_idx == 9: # if dust_index
+		elif par_idx == 5: # if dust_index
 			diff_attn = threed_dutils.charlot_and_fall_extinction(lam,bc,diff,didx_bc,p, kriek=True, nobc=True, nodiff=False)
 			#bc_attn   = threed_dutils.charlot_and_fall_extinction(lam,bc,diff,didx_bc,p, kriek=True, nobc=False, nodiff=True)
 
@@ -337,10 +338,10 @@ def dust_heating_xplot(ax, par, par_idx):
 	theta = copy.copy(model.initial_theta)
 	for ii,p in enumerate(par):
 
-		if par_idx == 6: # duste_gamma
+		if par_idx == 10: # duste_gamma
 			u,intensity_distr = dlogm_du(p,duste_umin)
 			ax.plot(np.log10(u),np.log10(intensity_distr),color=colors[ii],lw=lw,alpha=alpha)
-		elif par_idx == 10: # duste_umin
+		elif par_idx == 11: # duste_umin
 			u,intensity_distr = dlogm_du(duste_gamma,p)
 			ax.plot(np.log10(u),np.log10(intensity_distr),color=colors[ii],lw=lw,alpha=alpha)
 		else:
@@ -517,17 +518,16 @@ def plot_sed(ax,ax_res,par_idx,par=None,txtlabel=None,fmt="{:.2e}"):
 	spec_sav = []
 	for ii,p in enumerate(par):
 		theta[par_idx] = p
-		print 1/0
-		spec,mags,_ = model.mean_model(theta, obs, sps=sps,norm_spec=False)
-		spec *= c/sps.wavelengths
+		spec,mags,_ = model.mean_model(theta, obs, sps=sps)
+		spec *= c/sps.csp.wavelengths
 
-		spec = threed_dutils.smooth_spectrum(sps.wavelengths,spec,200,minlam=3e3,maxlam=1e4)
+		spec = threed_dutils.smooth_spectrum(sps.csp.wavelengths,spec,200,minlam=3e3,maxlam=1e4)
 
-		ax.plot(sps.wavelengths/1e4,np.log10(spec),color=colors[ii],lw=lw,alpha=alpha)
+		ax.plot(sps.csp.wavelengths/1e4,np.log10(spec),color=colors[ii],lw=lw,alpha=alpha)
 		spec_sav.append(spec)
 
 	for ii,p in enumerate(par):
-		ax_res.plot(sps.wavelengths/1e4,np.log10(spec_sav[ii]/spec_sav[1]),color=colors[ii],lw=lw,alpha=alpha)
+		ax_res.plot(sps.csp.wavelengths/1e4,np.log10(spec_sav[ii]/spec_sav[1]),color=colors[ii],lw=lw,alpha=alpha)
 
 	#### limits and labels [main plot]
 	xlim = (10**-1.05,10**2.6)
@@ -564,13 +564,13 @@ def main_plot():
 	gs2.update(left=0.14, right=0.27, top=0.98,bottom=0.05)
 
 	#### PLOT 1 MASS
-	idx = labels.index('mass')
-	par = [5e9,2e10]
+	idx = labels.index('logmass')
+	par = [9.7,10.3]
 	a1 = plt.subplot(gs2[0])
-	add_label(a1,'stellar \n mass',par=par,par_idx=idx, txtlabel=r'M/M$_{\odot}$', fmt="{:.1e}")
+	add_label(a1,'stellar \n mass',par=par,par_idx=idx, txtlabel=r'log(M/M$_{\odot}$)', fmt="{:.2f}")
 	mass_xplot(a1,par,idx)
 	plot_sed(plt.subplot(gs1[0,0]),plt.subplot(gs1[0,1]),idx,
-						 par=[5e9,2e10])
+						 par=par)
 
 	#### PLOT 2 METALLICITY
 	idx = labels.index('logzsol')
