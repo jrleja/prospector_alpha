@@ -742,7 +742,7 @@ def sed_figure(sample_results, sps, model,
 	# calculate reduced chi-squared
 	chisq=np.sum(chi**2)
 	chisq_median=np.sum(median_chi**2)
-	ndof = np.sum(sample_results['obs']['phot_mask']) - len(sample_results['model'].free_params)-1
+	ndof = np.sum(sample_results['obs']['phot_mask']) - sample_results['model'].ndim-1
 	reduced_chisq = chisq/(ndof)
 	reduced_chisq_median = chisq_median/(ndof)
 

@@ -1844,6 +1844,7 @@ def obs_vs_model_hdelta(e_pinfo,hflag,outname=None,outname_dnplt=None,eqw=False)
 	ax[0].axis(plotlim)
 	ax[0].plot([min,max],[min,max],linestyle='--',color='0.1',alpha=0.8)
 
+	'''
 	ax[1].set_xlabel(xtit[0])
 	ax[1].set_ylabel(ytit[0])
 	off,scat = threed_dutils.offset_and_scatter(np.log10(hdel_obs[:,0]), np.log10(hdel_prosp_em),biweight=True)
@@ -1851,6 +1852,7 @@ def obs_vs_model_hdelta(e_pinfo,hflag,outname=None,outname_dnplt=None,eqw=False)
 	ax[1].text(0.96,0.1, 'mean offset='+"{:.2f}".format(off) + ' dex', transform = ax[1].transAxes,horizontalalignment='right')
 	ax[1].axis(plotlim)
 	ax[1].plot([min,max],[min,max],linestyle='--',color='0.1',alpha=0.8)
+	'''
 
 	### dn4000 plot options
 	if eqw:
@@ -2972,6 +2974,7 @@ def prospector_comparison(alldata,outfolder,hflag):
 	dust_index versus total attenuation
 	dust_index versus SFR
 	dust1 versus dust2, everything below -0.45 dust index highlighted
+	PAH fraction versus dust_index
 	'''
 	
 	# if it doesn't exist, make it
@@ -3071,6 +3074,15 @@ def prospector_comparison(alldata,outfolder,hflag):
 	mass_err = threed_dutils.asym_errors(mass,m_errup,m_errdo,log=False)
 
 	logzsol = np.array([x['pquantiles']['q50'][met_idx][0] for x in alldata])
+	logzsol_errup = np.array([x['pquantiles']['q84'][met_idx][0] for x in alldata])
+	logzsol_errdo = np.array([x['pquantiles']['q16'][met_idx][0] for x in alldata])
+	logzsol_err = threed_dutils.asym_errors(logzsol,logzsol_errup,logzsol_errdo,log=False)
+
+	didx = np.array([x['pquantiles']['q50'][didx_idx][0] for x in alldata])
+	didx_errup = np.array([x['pquantiles']['q84'][didx_idx][0] for x in alldata])
+	didx_errdo = np.array([x['pquantiles']['q16'][didx_idx][0] for x in alldata])
+	didx_err = threed_dutils.asym_errors(didx,didx_errup,didx_errdo,log=False)
+
 	qpah = np.array([x['pquantiles']['q50'][qpah_idx][0] for x in alldata])
 	qpah_errup = np.array([x['pquantiles']['q84'][qpah_idx][0] for x in alldata])
 	qpah_errdo = np.array([x['pquantiles']['q16'][qpah_idx][0] for x in alldata])
@@ -3086,13 +3098,6 @@ def prospector_comparison(alldata,outfolder,hflag):
 	lir_err = threed_dutils.asym_errors(lir,lir_up,lir_do,log=True)
 	lir = np.log10(lir)
 
-	'''
-	ax[0].errorbar(logzsol, qpah, alpha=0.6, fmt='o', color='#1C86EE')
-	ax[0].set_xlabel(r'log(Z/Z$_{\odot}$)')
-	ax[0].set_ylabel(r'Q$_{\mathrm{PAH}}$')
-	ax[0].set_ylim(-0.5,10)
-	'''
-
 	ax[0].errorbar(mass,np.log10(qpah),xerr=mass_err,yerr=qpah_err, alpha=0.6, fmt='o', color='#1C86EE')
 	ax[0].set_xlabel(r'log(M/M$_{\odot}$)')
 	ax[0].set_ylabel(r'log(Q$_{\mathrm{PAH}}$)')
@@ -3106,6 +3111,23 @@ def prospector_comparison(alldata,outfolder,hflag):
 
 	plt.tight_layout()
 	plt.savefig(outfolder+'qpah_comp.png', dpi=dpi)
+	plt.close()
+
+	#### qpah versus dust_index, metallicity
+	fig, ax = plt.subplots(1,2, figsize = (12.5,6))
+
+	ax[0].errorbar(logzsol, np.log10(qpah), xerr=logzsol_err, yerr=qpah_err, alpha=0.6, fmt='o', color='#1C86EE')
+	ax[0].set_xlabel(r'log(Z/Z$_{\odot}$)')
+	ax[0].set_ylabel(r'log(Q$_{\mathrm{PAH}}$)')
+	ax[0].set_ylim(np.log10(qpah_low),1)
+
+	ax[1].errorbar(didx, np.log10(qpah), xerr=didx_err, yerr=qpah_err, alpha=0.6, fmt='o', color='#1C86EE')
+	ax[1].set_xlabel(r'dust index')
+	ax[1].set_ylabel(r'log(Q$_{\mathrm{PAH}}$)')
+	ax[1].set_ylim(np.log10(qpah_low),1)
+
+	plt.tight_layout()
+	plt.savefig(outfolder+'qpah_comp_additional.png', dpi=dpi)
 	plt.close()
 
 def plot_comparison(alldata,outfolder):
@@ -3141,7 +3163,7 @@ def plot_comparison(alldata,outfolder):
 
 	##### find prospector indexes
 	parnames = alldata[0]['pquantiles']['parnames']
-	idx_mass = parnames == 'mass'
+	idx_mass = parnames == 'logmass'
 	idx_met = parnames == 'logzsol'
 	dinx_idx = parnames == 'dust_index'
 	dust1_idx = parnames == 'dust1'

@@ -231,7 +231,7 @@ def plot_all_residuals(alldata,runname):
 	phot_hist.set_ylabel('N')
 	phot_hist.xaxis.set_major_locator(MaxNLocator(4))
 
-	phot_hist.set_xlabel(r'log($\chi^2_{\mathrm{phot}}/$N$_{\mathrm{phot}}$)')
+	phot_hist.set_xlabel(r'log(reduced $\chi^2_{\mathrm{phot}}$)')
 
 	##### load and plot spectroscopic residuals
 	label = ['Optical','Akari', 'Spitzer IRS']
@@ -379,20 +379,17 @@ def load_spectra(objname, nufnu=True):
 	return out
 
 
-def return_sedplot_vars(thetas, sample_results, sps, nufnu=True):
+def return_sedplot_vars(spec, mu, obs, sps, nufnu=True):
 
 	'''
 	if nufnu == True: return in units of nu * fnu (maggies * Hz). Else, return maggies.
 	'''
 
 	# observational information
-	mask = sample_results['obs']['phot_mask']
-	wave_eff = sample_results['obs']['wave_effective'][mask]
-	obs_maggies = sample_results['obs']['maggies'][mask]
-	obs_maggies_unc = sample_results['obs']['maggies_unc'][mask]
-
-	# model information
-	spec, mu ,_ = sample_results['model'].mean_model(thetas, sample_results['obs'], sps=sps)
+	mask = obs['phot_mask']
+	wave_eff = obs['wave_effective'][mask]
+	obs_maggies = obs['maggies'][mask]
+	obs_maggies_unc = obs['maggies_unc'][mask]
 	mu = mu[mask]
 
 	# output units
@@ -578,8 +575,8 @@ def sed_comp_figure(sample_results, sps, model, magphys,
 	# plot the spectrum, photometry, and chi values
 	try:
 		wave_eff, obsmags, obsmags_unc, modmags, chi, frac_prosp, modspec, modlam = \
-		return_sedplot_vars(sample_results['bfit']['maxprob_params'], 
-			                sample_results, sps)
+		return_sedplot_vars(sample_results['bfit']['spec'], sample_results['bfit']['mags'],
+			                sample_results['obs'], sps)
 	except KeyError as e:
 		print e
 		print "You must run post-processing on the Prospector " + \
@@ -684,9 +681,9 @@ def sed_comp_figure(sample_results, sps, model, magphys,
 	mag_sfr = magphys['model']['parameters'][magphys['model']['parnames'] == 'SFR'][0]
 	
 	# calculate reduced chi-squared
-	chisq=np.sum(chi**2)/np.sum(sample_results['obs']['phot_mask'])
+	chisq=np.sum(chi**2)/(np.sum(sample_results['obs']['phot_mask'])-sample_results['model'].ndim-1)
 	chisq_magphys=np.sum(chi_magphys**2)/np.sum(sample_results['obs']['phot_mask'])
-	phot.text(textx, texty-deltay, r'best-fit $\chi^2/$N$_{\mathrm{phot}}$='+"{:.2f}".format(chisq),
+	phot.text(textx, texty-deltay, r'best-fit reduced $\chi^2=$'+"{:.2f}".format(chisq),
 			  fontsize=14, ha='right', color=prosp_color,transform = phot.transAxes)
 		
 	z_txt = sample_results['model'].params['zred'][0]
@@ -855,8 +852,10 @@ def plt_all(runname=None,startup=True,**extras):
 		for jj in xrange(len(filebase)):
 			print 'iteration '+str(jj) 
 
-			#if filebase[jj].split('_')[-1] != 'NGC 7331':
-			#	continue
+			'''
+			if filebase[jj].split('_')[-1] != 'NGC 5992':
+				continue
+			'''
 
 			dictionary = collate_data(filebase=filebase[jj],\
 			                           outfolder=outfolder,

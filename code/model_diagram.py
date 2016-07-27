@@ -21,6 +21,7 @@ mpl.rcParams['font.sans-serif']='Geneva'
 mpl.rc('text', usetex=True)
 mpl.rcParams['text.latex.preamble']=[r"\usepackage{bm}"]
 mpl.rcParams.update({'font.size': 30})
+sfhsize = 40
 
 #### parameter plot style
 colors = ['blue', 'black', 'red']
@@ -28,26 +29,28 @@ alpha = 0.8
 lw = 3
 
 #### define model
-parmfile='/Users/joel/code/python/threedhst_bsfh/parameter_files/brownseds_tightbc/brownseds_tightbc_params.py'
-run_params = model_setup.get_run_params(param_file=parmfile)
+param_file='/Users/joel/code/python/threedhst_bsfh/parameter_files/brownseds_np/brownseds_np_params.py'
+run_params = model_setup.get_run_params(param_file=param_file)
 sps = model_setup.load_sps(**run_params)
 model = model_setup.load_model(**run_params)
 obs = model_setup.load_obs(**run_params)
 
 #### output locations
-out1 = '/Users/joel/code/python/threedhst_bsfh/plots/brownseds_tightbc/pcomp/model_diagram1.png'
-out2 = '/Users/joel/code/python/threedhst_bsfh/plots/brownseds_tightbc/pcomp/model_diagram2.png'
+out1 = '/Users/joel/code/python/threedhst_bsfh/plots/brownseds_np/pcomp/model_diagram1.png'
+out2 = '/Users/joel/code/python/threedhst_bsfh/plots/brownseds_np/pcomp/model_diagram2.png'
 
 #### set initial theta
-# 'logmass', 'tage', 'logtau', 
-# 'dust2', 'logzsol', 'dust_index',
-# 'delt_trunc', 'sf_tanslope', 'dust1', 
+# 'logmass','sfr_fraction_1', sfr_fraction_2,
+# sfr_fraction_3, sfr_fraction_4, 'dust2', 
+#  'logzsol', 'dust_index', 'dust1', 
 # 'duste_qpah', 'duste_gamma', 'duste_umin'
+
 labels = model.theta_labels()
-model.initial_theta = np.array([10, 1.1, -0.5,
-                                0.3, -1.0, -7e-01,
-                                0.75, 0.0, 0.3,
-                                3.0, 1e-1, 10.0])
+itheta = np.array([10, 0.02, 0.1,
+                   0.2, 0.3, 0.3,
+                   -1.0, 0.0, 0.3,
+                   3.0, 1e-1, 10.0])
+model.initial_theta = itheta
 
 class jLogFormatter(mpl.ticker.LogFormatter):
 	'''
@@ -88,7 +91,7 @@ def make_ticklabels_invisible(ax,showx=False):
 	    for tl in ax.get_xticklabels() + ax.get_yticklabels():
 	        tl.set_visible(False)
 
-def add_label(ax,label,par=None,par_idx=None,fmt=None,txtlabel=None):
+def add_label(ax,label,par=None,par_idx=None,fmt=None,txtlabel=None,fontsize=None,secondary_text=None):
 
 	tx = -0.65
 	ty = 0.5
@@ -97,17 +100,14 @@ def add_label(ax,label,par=None,par_idx=None,fmt=None,txtlabel=None):
 	#### sandwich 'regular' spectra in between examples
 	par = [par[0],model.initial_theta[par_idx],par[1]]
 
-	ax.text(tx, ty, label, transform = ax.transAxes,ha='center',weight='bold',fontsize=60)
+	if secondary_text is None:
+		ax.text(tx, ty, label, transform = ax.transAxes,ha='center',weight='bold',fontsize=60)
+	else:
+		ax.text(tx, ty+0.1, label, transform = ax.transAxes,ha='center',weight='bold',fontsize=60)
+		ax.text(tx, ty-0.02, secondary_text, transform = ax.transAxes,ha='center',weight='bold',fontsize=40)
 
 	#### text
-	for ii,p in enumerate(par):
-		# delt_trunc
-		# translate into Myr ago
-		if par_idx == 6:
-			tmp = model.initial_theta[labels.index('tage')] * (1-p)*1e3
-		else:
-			tmp = p
-		ax.text(tx,ty-dy*(ii+1)-dy*0.3,txtlabel+'='+fmt.format(tmp),ha='center',weight='bold',transform=ax.transAxes,color=colors[ii])
+	for ii,p in enumerate(par): ax.text(tx,ty-dy*(ii+1)-dy*0.3,txtlabel+'='+fmt.format(p),ha='center',weight='bold',transform=ax.transAxes,color=colors[ii])
 
 
 def mass_xplot(ax,par,idx):
@@ -184,7 +184,7 @@ def met_triangular_kernel(logzsol):
 	#### available metallicities
 	# in logzsol
 	zsol = 0.019
-	met = np.log10(sps.csp.zlegend/zsol)
+	met = np.log10(sps.ssp.zlegend/zsol)
 
 	#### define useful quantities
 	nz = len(met)
@@ -209,16 +209,26 @@ def sfh_xplot(ax,par,par_idx):
 	#### sandwich 'regular' spectra in between examples
 	par = [par[0],model.initial_theta[par_idx],par[1]]
 
-	#### time (DEFINE DYNAMICALLY FOR TAGE)
-	if par_idx == 1:
-		t = np.linspace(0,np.max(par),100)
-	else:
-		t = np.linspace(0,1.1,100)
+	#### calculate time array
+	in_years = 10**model.params['agebins']/1e9
+	t = np.concatenate((np.ravel(in_years)*0.9999, np.ravel(in_years)*1.001))
+	t.sort()
+	t = t[1:-1] # remove older than oldest bin, younger than youngest bin
+	t = np.clip(t,1e-3,np.inf) # nothing younger than 1 Myr!
+
+	### calculate time per bin for weighting
+	nbin = in_years.shape[0]
+	time_per_bin = np.zeros(nbin)
+	for i, (t1, t2) in enumerate(in_years): time_per_bin[i] = t2-t1
+	time_sum = time_per_bin.sum()
 
 	#### calculate and plot different SFHs
 	theta = copy.copy(model.initial_theta)
+	indices = [i for i, s in enumerate(labels) if ('sfr_fraction' in s) and (i != par_idx)]
 	for ii,p in enumerate(par):
 
+		#theta[indices] = itheta[indices] + (par[1] - p)*time_per_bin[np.array(indices)-1]/(time_sum - time_per_bin[par_idx-1])
+		theta[indices] = itheta[indices] + (par[1] - p)*itheta[indices]/(1-p)
 		theta[par_idx] = p
 		sfh_pars = threed_dutils.find_sfh_params(model,theta,obs,sps)
 		sfh = threed_dutils.return_full_sfh(t, sfh_pars)
@@ -227,11 +237,13 @@ def sfh_xplot(ax,par,par_idx):
 
 	#### limits and labels
 	#ax.set_xlim(3.3,6.6)
-	ax.set_ylim(-0.5,1.7)
-	ax.set_xlabel(r'lookback time [Gyr]')
+	ax.set_ylim(-1.5,0.4)
+	ax.set_xlabel(r'log(lookback time [Gyr])')
 	ax.set_ylabel(r'log(SFR [M$_{\odot}$/yr])')
-
-	ax.set_xlim(ax.get_xlim()[1],ax.get_xlim()[0])
+	ax.set_xlim(11,0.04)
+	ax.set_xscale('log',nonposx='clip',subsx=[1])
+	ax.xaxis.set_minor_formatter(minorFormatter)
+	ax.xaxis.set_major_formatter(majorFormatter)
 
 def attn_xplot(ax,par,par_idx,label):
 
@@ -255,32 +267,21 @@ def attn_xplot(ax,par,par_idx,label):
 	#### calculate and plot different attenuation curves
 	theta = copy.copy(model.initial_theta)
 	for ii,p in enumerate(par):
-		if par_idx == 3: # if dust2
+		if par_idx == 5: # if dust2
 			diff_attn = threed_dutils.charlot_and_fall_extinction(lam,bc,p,didx_bc,didx_diff, kriek=True, nobc=True, nodiff=False)
-			#bc_attn   = threed_dutils.charlot_and_fall_extinction(lam,bc,p,didx_bc,didx_diff, kriek=True, nobc=False, nodiff=True)
-
 			ax.plot(lam/1e4,-np.log(diff_attn),color=colors[ii],lw=lw,alpha=alpha,linestyle=linestyle)
-			#ax.plot(lam/1e4,-np.log(bc_attn),color=faint_color,lw=lw,alpha=alpha,linestyle=bc_linestyle)
-
 		elif par_idx == 8: # if dust1
-			diff_attn = threed_dutils.charlot_and_fall_extinction(lam,p,diff,didx_bc,didx_diff, kriek=True, nobc=True, nodiff=False)
 			bc_attn   = threed_dutils.charlot_and_fall_extinction(lam,p,diff,didx_bc,didx_diff, kriek=True, nobc=False, nodiff=True)
-
-			#ax.plot(lam/1e4,-np.log(diff_attn),color=faint_color,lw=lw,alpha=alpha,linestyle=linestyle)
 			ax.plot(lam/1e4,-np.log(bc_attn),color=colors[ii],lw=lw,alpha=alpha,linestyle=linestyle)
-
-		elif par_idx == 5: # if dust_index
+		elif par_idx == 7: # if dust_index
 			diff_attn = threed_dutils.charlot_and_fall_extinction(lam,bc,diff,didx_bc,p, kriek=True, nobc=True, nodiff=False)
-			#bc_attn   = threed_dutils.charlot_and_fall_extinction(lam,bc,diff,didx_bc,p, kriek=True, nobc=False, nodiff=True)
-
 			ax.plot(lam/1e4,-np.log(diff_attn),color=colors[ii],lw=lw,alpha=alpha,linestyle=linestyle)
-			#ax.plot(lam/1e4,-np.log(bc_attn),color=faint_color,lw=lw,alpha=alpha,linestyle=bc_linestyle)
 
 	#### limits and labels
 	ax.set_xlim(10**-1,10**-0.2)
-	ax.set_ylim(-0.1,10)
+	ax.set_ylim(-0.1,6)
 	ax.set_xlabel(r'wavelength [microns]')
-	ax.set_ylabel(label + r' optical depth ($\lambda$)')
+	ax.set_ylabel(label + r' optical depth')
 
 	#ax.set_xscale('log',nonposx='clip')
 
@@ -511,27 +512,34 @@ def qpah_xplot(ax, par, par_idx):
 def plot_sed(ax,ax_res,par_idx,par=None,txtlabel=None,fmt="{:.2e}"):
 
 	#### sandwich 'regular' spectra in between examples
-	par = [par[0],model.initial_theta[par_idx],par[1]]
+	par = [par[0],itheta[par_idx],par[1]]
 
 	#### loop, plot first plot
-	theta = copy.copy(model.initial_theta)
+	theta = copy.deepcopy(itheta)
+	sfr_indices = [i for i, s in enumerate(labels) if 'sfr_fraction' in s]
 	spec_sav = []
+
 	for ii,p in enumerate(par):
+
+		sps.ssp.params.dirtiness = 1
+		# sfr fraction? 
+		if par_idx in sfr_indices:
+			theta[sfr_indices] = (1.-p)/4.
 		theta[par_idx] = p
 		spec,mags,_ = model.mean_model(theta, obs, sps=sps)
-		spec *= c/sps.csp.wavelengths
+		spec *= c/sps.wavelengths
 
-		spec = threed_dutils.smooth_spectrum(sps.csp.wavelengths,spec,200,minlam=3e3,maxlam=1e4)
+		spec = threed_dutils.smooth_spectrum(sps.wavelengths,spec,200,minlam=3e3,maxlam=1e4)
 
-		ax.plot(sps.csp.wavelengths/1e4,np.log10(spec),color=colors[ii],lw=lw,alpha=alpha)
+		ax.plot(sps.wavelengths/1e4,np.log10(spec),color=colors[ii],lw=lw,alpha=alpha)
 		spec_sav.append(spec)
 
 	for ii,p in enumerate(par):
-		ax_res.plot(sps.csp.wavelengths/1e4,np.log10(spec_sav[ii]/spec_sav[1]),color=colors[ii],lw=lw,alpha=alpha)
+		ax_res.plot(sps.wavelengths/1e4,np.log10(spec_sav[ii]/spec_sav[1]),color=colors[ii],lw=lw,alpha=alpha)
 
 	#### limits and labels [main plot]
 	xlim = (10**-1.05,10**2.6)
-	ylim = (7.5,10.3)
+	ylim = (6.5,9.3)
 	ax.set_xlim(xlim)
 	ax.set_ylim(ylim)
 	ax.set_xlabel(r'wavelength [microns]')
@@ -542,7 +550,7 @@ def plot_sed(ax,ax_res,par_idx,par=None,txtlabel=None,fmt="{:.2e}"):
 
 	#### limits and labels [residual plot]
 	ax_res.set_xlim(xlim)
-	ax_res.set_ylim(-0.8,0.8)
+	ax_res.set_ylim(-0.6,0.6)
 	ax_res.set_xlabel(r'wavelength [microns]')
 	ax_res.set_ylabel(r'relative change [dex]')
 	ax_res.set_xscale('log',nonposx='clip',subsx=(1,2,5))
@@ -570,7 +578,7 @@ def main_plot():
 	add_label(a1,'stellar \n mass',par=par,par_idx=idx, txtlabel=r'log(M/M$_{\odot}$)', fmt="{:.2f}")
 	mass_xplot(a1,par,idx)
 	plot_sed(plt.subplot(gs1[0,0]),plt.subplot(gs1[0,1]),idx,
-						 par=par)
+						 par=[9.7,10.3])
 
 	#### PLOT 2 METALLICITY
 	idx = labels.index('logzsol')
@@ -581,38 +589,38 @@ def main_plot():
 	plot_sed(plt.subplot(gs1[1,0]),plt.subplot(gs1[1,1]),idx,
 						 par=[-1.8,0.1])
 
-	#### PLOT 3 LOGTAU
+	#### PLOT 3 SFR1
 	a3 = plt.subplot(gs2[2])
-	idx = labels.index('logtau')
-	par = [-0.8,0.1]
-	add_label(a3,r'SFH' '\n' r'log($\bm{\tau}$)',par=par,par_idx=idx, txtlabel=r'log($\tau$/Gyr)', fmt="{:.2f}")
+	idx = labels.index('sfr_fraction_1')
+	par = [0.01,0.04]
+	add_label(a3,r'SFH',par=par,par_idx=idx, txtlabel=r'fraction', fmt="{:.2f}",secondary_text='0-100 Myr')
 	sfh_xplot(a3,par,idx)
 	plot_sed(plt.subplot(gs1[2,0]),plt.subplot(gs1[2,1]),idx,
 						    par=par)
 
-	#### PLOT 4 TAGE
+	#### PLOT 4 SFR2
 	a4 = plt.subplot(gs2[3])
-	idx = labels.index('tage')
-	par = [0.5,2.0]
-	add_label(a4,r'SFH' '\n' r't$_{\mathbf{age}}$',par=par,par_idx=idx, txtlabel=r't$_{\mathrm{age}}$/Gyr', fmt="{:.1f}")
+	idx = labels.index('sfr_fraction_2')
+	par = [0.02,0.3]
+	add_label(a4,r'SFH',par=par,par_idx=idx, txtlabel=r'fraction', fmt="{:.2f}",secondary_text='100-300 Myr')
 	sfh_xplot(a4,par,idx)
 	plot_sed(plt.subplot(gs1[3,0]),plt.subplot(gs1[3,1]),idx,
 						    par=par)
 
-	#### PLOT 5 SFTRUNC
+	#### PLOT 5 SFR3
 	a5 = plt.subplot(gs2[4])
-	idx = labels.index('delt_trunc')
-	par = [0.4,1.0]
-	add_label(a5,r'SFH' '\n' r't$_{\mathbf{trunc}}$',par=par,par_idx=idx, txtlabel=r't$_{\mathrm{trunc}}$/Myr', fmt="{:.1f}")
+	idx = labels.index('sfr_fraction_3')
+	par = [0.02,0.4]
+	add_label(a5,r'SFH',par=par,par_idx=idx, txtlabel=r'fraction', fmt="{:.2f}",secondary_text='300 Myr-1 Gyr')
 	sfh_xplot(a5,par,idx)
 	plot_sed(plt.subplot(gs1[4,0]),plt.subplot(gs1[4,1]),idx,
 						 par=par)
 
-	#### PLOT 6 SFSLOPE
+	#### PLOT 6 SFR4
 	a6 = plt.subplot(gs2[5])
-	idx = labels.index('sf_tanslope')
-	par = [-1.4,1.4]
-	add_label(a6,r'SFH' '\n' r'sf$_{\mathbf{slope}}$',par=par,par_idx=idx, txtlabel=r'tan(sf$_{\mathbf{slope}}$)', fmt="{:.1f}")
+	idx = labels.index('sfr_fraction_4')
+	par = [0.1,0.5]
+	add_label(a6,r'SFH',par=par,par_idx=idx, txtlabel=r'fraction', fmt="{:.2f}",secondary_text='1-3 Gyr')
 	sfh_xplot(a6,par,idx)
 	plot_sed(plt.subplot(gs1[5,0]),plt.subplot(gs1[5,1]), idx,
 						 par=par)
@@ -649,7 +657,7 @@ def main_plot():
 	#### PLOT 9 DUST2_INDEX
 	a9 = plt.subplot(gs2[2])
 	idx = labels.index('dust_index')
-	par = [-1.2,-0.4]
+	par = [-0.3,0.3]
 	add_label(a9,r'diffuse' '\n' r'dust index',par=par,par_idx=idx, txtlabel=r'$n_{\mathbf{diff}}$', fmt="{:.1f}")
 	attn_xplot(a9,par,idx, 'diffuse')
 	plot_sed(plt.subplot(gs1[2,0]),plt.subplot(gs1[2,1]), idx,

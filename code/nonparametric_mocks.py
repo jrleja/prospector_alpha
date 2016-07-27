@@ -4,7 +4,7 @@ from astropy.table import Table, vstack
 from astropy.io import ascii
 from astropy import units as u
 import threed_dutils
-import np_mocks_smooth_params as nonparam
+import np_mocks_params as nonparam
 
 #### NONPARAMETRIC GLOBALS
 sps = nonparam.load_sps(**nonparam.run_params)
@@ -75,7 +75,7 @@ def construct_mocks(basename,outname=None,add_zp_err=False, plot_mock=False):
 		#### choose reasonable amounts of dust ####
 		elif parnames[ii] == 'dust2':
 			min = 0.0
-			max = 0.5
+			max = 0.75
 			for kk in xrange(ntest): testparms[kk,ii] = random.random()*(max-min)+min
 
 		#### dust1 must match the dust1/dust2 prior #### 
@@ -138,9 +138,9 @@ def construct_mocks(basename,outname=None,add_zp_err=False, plot_mock=False):
 			frac = 0.0
 			for nn in xrange(nparams):
 				if 'sfr_fraction' in parnames[nn]:
-					ax[ii].text(0.98,0.95-nn*0.05,"{:.2f}".format(testparms[ii,nn]),fontsize=8,transform = ax[ii].transAxes,ha='right')
+					ax[ii].text(0.95,0.95-nn*0.05,"{:.2f}".format(testparms[ii,nn]),fontsize=8,transform = ax[ii].transAxes,ha='right')
 					frac += testparms[ii,nn]
-			ax[ii].text(0.98,0.95-(nbins)*0.05,"{:.2f}".format(1-frac),fontsize=8,transform = ax[ii].transAxes,ha='right')
+			ax[ii].text(0.95,0.95-(nbins)*0.05,"{:.2f}".format(1-frac),fontsize=8,transform = ax[ii].transAxes,ha='right')
 
 			## write sSFR(10 Myr, 100 Myr, 1 Gyr)
 			sfh_params = threed_dutils.find_sfh_params(model,testparms[ii,:],obs,sps,sm=sm)
