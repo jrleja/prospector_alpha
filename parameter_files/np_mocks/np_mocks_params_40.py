@@ -257,7 +257,7 @@ model_params.append({'name': 'sfr_fraction', 'N': 1,
                         'isfree': True,
                         'init': [],
                         'units': 'Msun',
-                        'prior_function': priors.inverse_marginalized_dirichlet,
+                        'prior_function': priors.tophat,
                         'prior_args':{'mini':0.0, 'maxi':1.0}})
 
 ########    IMF  ##############
@@ -526,11 +526,8 @@ def load_model(objname='', agelims=[], **extras):
     model_params[n.index('sfr_fraction')]['N'] = ncomp-1
     model_params[n.index('sfr_fraction')]['init'] = np.zeros(ncomp-1)+1./ncomp
     model_params[n.index('sfr_fraction')]['prior_args'] = {
-                                                           'maxi':np.full(ncomp-1,0.8), 
+                                                           'maxi':np.full(ncomp-1,1.0), 
                                                            'mini':np.full(ncomp-1,0.0),
-                                                           'alpha':1.0,
-                                                           'alpha_sum':ncomp 
-                                                           # NOTE: ncomp instead of ncomp-1 makes the prior take into account the implicit Nth variable too
                                                           }
     model_params[n.index('sfr_fraction')]['init_disp'] = 0.15
 

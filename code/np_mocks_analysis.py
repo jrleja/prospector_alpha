@@ -147,22 +147,28 @@ def collate_data(runname='ha_80myr',outpickle=None):
 		outdat['truths']['ha_ext'] = threed_dutils.charlot_and_fall_extinction(6563.0, d1_t, d2_t, -1.0, didx_t, kriek=True)[0]
 		outdat['truths']['d1_d2'] = d1_t/d2_t
 
-		print 1/0
-
 		out.append(outdat)
 		
 	pickle.dump(out,open(outpickle, "wb"))
 
 def plot_fit_parameters(alldata,outfolder=None):
 
-	#### REGULAR PARAMETERS
+	#### check parameter space
 	pars = alldata[0]['parnames']
-	fig, axes = plt.subplots(3, 4, figsize = (20,14))
+	if len(pars) > 12:
+		xfig, yfig = 4,4
+		size = (20,20)
+	else:
+		xfig, yfig = 3,4
+		size = (20,14)
+
+	#### REGULAR PARAMETERS
+	fig, axes = plt.subplots(xfig, yfig, figsize = size)
 	plt.subplots_adjust(wspace=0.3,hspace=0.3)
 	ax = np.ravel(axes)
 
 	### DISTRIBUTION OF ERRORS
-	fig_err, axes_err = plt.subplots(3, 4, figsize = (20,14))
+	fig_err, axes_err = plt.subplots(xfig, yfig, figsize = size)
 	plt.subplots_adjust(wspace=0.3,hspace=0.3)
 	ax_err = np.ravel(axes_err)
 

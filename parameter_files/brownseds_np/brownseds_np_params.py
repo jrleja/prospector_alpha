@@ -608,8 +608,6 @@ def load_model(objname='',datname='', agelims=[], **extras):
     model_params[n.index('sfr_fraction')]['prior_args'] = {
                                                            'maxi':np.full(ncomp-1,1.0), 
                                                            'mini':np.full(ncomp-1,0.0),
-                                                           'alpha':1.0,
-                                                           'alpha_sum':ncomp 
                                                            # NOTE: ncomp instead of ncomp-1 makes the prior take into account the implicit Nth variable too
                                                           }
     model_params[n.index('sfr_fraction')]['init_disp'] = 0.15
