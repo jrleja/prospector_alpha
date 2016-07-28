@@ -63,7 +63,7 @@ def make_plots(runname='nonparametric_mocks', recollate_data = False):
 	# SFR_10 (truth) versus SFR_100 (truth) [there better be differences, goddamnit]
 
 
-def calc_onesig(fit_pars,true_pars):
+def calc_sigma(fit_pars,true_pars):
 
 	'''
 	(1) calculate normalized residual distribution
@@ -72,13 +72,30 @@ def calc_onesig(fit_pars,true_pars):
 	'''
 
 	residual_distribution = norm_resid(fit_pars,true_pars)
-	residual_percentiles = quantile(residual_distribution,[0.16,0.5,0.84])
-
-	mean = residual_percentiles[1]
-	onesig = (residual_percentiles[2] - residual_percentiles[0])/2.
+	onesig = (np.abs(residual_distribution) < 1).sum()/float(residual_distribution.shape[0])
 
 	return residual_distribution, onesig, mean
 
+def pdf_distance(chain, truths, chainnames=None, truthnames=None):
+
+	#### everything is properly ordered
+	if (chainnames == None) & (truthnames == None):
+		npars = chain.shape[1]
+		nsamp = float(chain.shape[0])
+		pdf_dist = np.zeros(npars)
+
+		for i in xrange(npars): pdf_dist[i] = (chain[:,i] > truths[i]).sum()/nsamp
+	#### we do the sorting ourselves
+	else: 
+		npars = len(truthnames) # assumes that everything in truths is also in the chain
+		nsamp = float(chain.shape[0])
+		pdf_dist = np.zeros(npars)
+
+		for i in xrange(npars):
+			match = chainnames == truthnames[i]
+			pdf_dist[i] = (chain[:,match] > truths[i]).sum()/nsamp
+
+	return pdf_dist
 
 def collate_data(runname='ha_80myr',outpickle=None):
 
@@ -88,6 +105,7 @@ def collate_data(runname='ha_80myr',outpickle=None):
 	sps = None
 	for jj in xrange(len(filebase)):
 
+		#### load sampler
 		outdat = {}
 		try:
 			sample_results, powell_results, model = threed_dutils.load_prospector_data(filebase[jj])
@@ -98,16 +116,25 @@ def collate_data(runname='ha_80myr',outpickle=None):
 		if sps == None:
 			sps = model_setup.load_sps(**sample_results['run_params'])
 
+		### load truths
+		truename = os.getenv('APPS')+'/threed'+sample_results['run_params']['truename'].split('/threed')[1]
+		outdat['truths'] = threed_dutils.load_truths(os.getenv('APPS')+'/threed'+sample_results['run_params']['param_file'].split('/threed')[1],
+			                                         sps=sps, calc_prob = True)
+
+
 		### save all fit + derived parameters
 		outdat['parnames'] = np.array(sample_results['quantiles']['parnames'])
 		outdat['q50'] = sample_results['quantiles']['q50']
 		outdat['q84'] = sample_results['quantiles']['q84']
 		outdat['q16'] = sample_results['quantiles']['q16']
+		outdat['pdf_dist'] = pdf_distance(sample_results['flatchain'],outdat['truths']['truths'])
 
 		outdat['eparnames'] = sample_results['extras']['parnames']
 		outdat['eq50'] = sample_results['extras']['q50']
 		outdat['eq84'] = sample_results['extras']['q84']
 		outdat['eq16'] = sample_results['extras']['q16']
+		outdat['epdf_dist'] = pdf_distance(sample_results['extras']['flatchain'],outdat['truths']['extra_truths'],
+			                               chainnames=sample_results['extras']['parnames'], truthnames=outdat['truths']['extra_parnames'])
 
 		### save spectral parameters
 		outdat['eline_flux_q50'] = sample_results['model_emline']['flux']['q50']
@@ -135,11 +162,6 @@ def collate_data(runname='ha_80myr',outpickle=None):
 		### max probability
 		outdat['maxprob'] = sample_results['bfit']['maxprob']
 
-		### load truths, calculate details
-		truename = os.getenv('APPS')+'/threed'+sample_results['run_params']['truename'].split('/threed')[1]
-		outdat['truths'] = threed_dutils.load_truths(os.getenv('APPS')+'/threed'+sample_results['run_params']['param_file'].split('/threed')[1],
-			                                         sps=sps, calc_prob = True)
-
 		### add in d1_d2, ha_ext
 		d1_t = outdat['truths']['truths'][outdat['parnames']=='dust1']
 		d2_t = outdat['truths']['truths'][outdat['parnames']=='dust2']
@@ -161,6 +183,9 @@ def plot_fit_parameters(alldata,outfolder=None):
 	else:
 		xfig, yfig = 3,4
 		size = (20,14)
+		pnames = [r'log(M/M$_{\odot}$)', 'SFH 0-100 Myr', 'SFH 100-300 Myr', 'SFH 300 Myr-1 Gyr', 
+		          'SFH 1-3 Gyr', 'diffuse dust', r'log(Z/Z$_{\odot}$)', 'diffuse dust index',
+		          'birth-cloud dust', r'dust emission Q$_{\mathrm{PAH}}$',r'dust emission $\gamma$',r'dust emission U$_{\mathrm{min}}$']
 
 	#### REGULAR PARAMETERS
 	fig, axes = plt.subplots(xfig, yfig, figsize = size)
@@ -173,7 +198,7 @@ def plot_fit_parameters(alldata,outfolder=None):
 	ax_err = np.ravel(axes_err)
 
 
-	for ii,par in enumerate(pars):
+	for ii,par in enumerate(pnames):
 
 		#### fit parameter
 		y = np.array([dat['q50'][ii] for dat in alldata])
@@ -197,43 +222,31 @@ def plot_fit_parameters(alldata,outfolder=None):
 		ax[ii].xaxis.set_major_locator(MaxNLocator(5))
 		ax[ii].yaxis.set_major_locator(MaxNLocator(5))
 
-		##### distribution of errors
-		fit_pars = np.transpose(np.vstack((y,yup,ydown)))
-		residual_distribution, onesig, median = calc_onesig(fit_pars,x)
+		##### gather the PDF
+		pdf_dist = np.array([dat['pdf_dist'][ii] for dat in alldata])
 
-		# plot histogram, overplot gaussian 1sig, write onesig and mean
+		##### plot histogram
 		nbins_hist = 25
 		histcolor = '#0000CD'
-		gausscolor = '#FF0000'
+		truecolor = '#FF420E'
 
-		if np.max(np.abs(residual_distribution)) > 20:
-			range = (-20,20)
-		else:
-			range = None
+		n, bins, patches = ax_err[ii].hist(pdf_dist, range=(0.0,1.0),
+	                 			           bins=nbins_hist, histtype='step',
+	                 			           alpha=0.7,lw=2,color=histcolor,
+	                 			           cumulative=True,normed=True)
 
-		n, bins, patches = ax_err[ii].hist(residual_distribution,
-	                 			           nbins_hist, histtype='bar',
-	                 			           alpha=0.9,lw=2,color=histcolor,
-	                 			           range=range)
+		ax_err[ii].plot([0,1],[0,1],color=truecolor,lw=2,alpha=0.5)
 
-		### Need to multiply with Gaussian amplitude A such that AREA = NPOINTS
-		# AREA = AMPLITUDE * SIGMA * (2*pi)**0.5
-		gnorm = residual_distribution.shape[0]/(onesig*np.sqrt(2*np.pi))*(bins[1]-bins[0])
-		xplot = np.linspace(np.min(bins),np.max(bins),1e4)
-		plot_gauss = gaussian(xplot,median,onesig)*gnorm
+		ax_err[ii].text(0.05,0.9,'ideal distribution',transform=ax_err[ii].transAxes,color=truecolor,ha='left',fontsize=12,weight='bold')
+		ax_err[ii].text(0.05,0.82,'mock distribution',transform=ax_err[ii].transAxes,color=histcolor,ha='left',fontsize=12,weight='bold')
 
-		ax_err[ii].plot(xplot,plot_gauss,color=gausscolor,lw=3)
-
-		ax_err[ii].text(0.95,0.9,'median='+"{:.2f}".format(median),transform=ax_err[ii].transAxes,color=gausscolor,ha='right')
-		ax_err[ii].text(0.95,0.8,r'1$\sigma$='+"{:.2f}".format(onesig),transform=ax_err[ii].transAxes,color=gausscolor,ha='right')
-
-		ax_err[ii].set_xlabel(r'(true-fit)/1$\sigma$ error')
-		ax_err[ii].set_ylabel('N')
+		ax_err[ii].set_xlabel(r'location of truth within PDF')
+		ax_err[ii].set_ylabel('cumulative density')
 		ax_err[ii].set_title(par)
-
+		ax_err[ii].set_ylim(0,1)
 
 	fig.savefig(outfolder+'fit_parameter_recovery.png',dpi=150)
-	fig_err.savefig(outfolder+'residual_fitpars.png',dpi=150)
+	fig_err.savefig(outfolder+'fit_parameter_PDF.png',dpi=150)
 	plt.close()
 
 def plot_derived_parameters(alldata,outfolder=None):
@@ -280,16 +293,11 @@ def plot_derived_parameters(alldata,outfolder=None):
 		ydown = np.log10(ydown)
 		y = np.log10(y)
 
-
-
 		if par == 'half_time':
 			yup = 10**yup
 			ydown = 10**ydown
 			y = 10**y
 			yerr = threed_dutils.asym_errors(y,yup,ydown,log=False)
-		'''
-			x = np.log10(x)
-		'''
 
 		### plot that shit
 		ax[ii].errorbar(x,y,yerr,fmt='o',alpha=0.8,color='#1C86EE')
