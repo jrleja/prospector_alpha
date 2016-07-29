@@ -198,7 +198,7 @@ def plot_fit_parameters(alldata,outfolder=None):
 	ax_err = np.ravel(axes_err)
 
 
-	for ii,par in enumerate(pnames):
+	for ii,par in enumerate(pars):
 
 		#### fit parameter
 		y = np.array([dat['q50'][ii] for dat in alldata])
@@ -312,42 +312,31 @@ def plot_derived_parameters(alldata,outfolder=None):
 		ax[ii].xaxis.set_major_locator(MaxNLocator(5))
 		ax[ii].yaxis.set_major_locator(MaxNLocator(5))
 
-		##### distribution of errors
-		fit_pars = np.transpose(np.vstack((y,yup,ydown)))
-		residual_distribution, onesig, median = calc_onesig(fit_pars,x)
+		##### gather the PDF
+		pdf_dist = np.array([dat['epdf_dist'][idx] for dat in alldata])
 
-		# plot histogram, overplot gaussian 1sig, write onesig and mean
+		##### plot histogram
 		nbins_hist = 25
 		histcolor = '#0000CD'
-		gausscolor = '#FF0000'
+		truecolor = '#FF420E'
 
-		if np.max(np.abs(residual_distribution)) > 20:
-			range = (-20,20)
-		else:
-			range = None
+		n, bins, patches = ax_err[ii].hist(pdf_dist, range=(0.0,1.0),
+	                 			           bins=nbins_hist, histtype='step',
+	                 			           alpha=0.7,lw=2,color=histcolor,
+	                 			           cumulative=True,normed=True)
 
-		n, bins, patches = ax_err[ii].hist(residual_distribution,
-	                 			           nbins_hist, histtype='bar',
-	                 			           alpha=0.9,lw=2,color=histcolor,
-	                 			           range=range)
+		ax_err[ii].plot([0,1],[0,1],color=truecolor,lw=2,alpha=0.5)
 
-		### Need to multiply with Gaussian amplitude A such that AREA = NPOINTS
-		# AREA = AMPLITUDE * SIGMA * (2*pi)**0.5
-		gnorm = residual_distribution.shape[0]/(onesig*np.sqrt(2*np.pi))*(bins[1]-bins[0])
-		xplot = np.linspace(np.min(bins),np.max(bins),1e4)
-		plot_gauss = gaussian(xplot,median,onesig)*gnorm
+		ax_err[ii].text(0.05,0.9,'ideal distribution',transform=ax_err[ii].transAxes,color=truecolor,ha='left',fontsize=12,weight='bold')
+		ax_err[ii].text(0.05,0.82,'mock distribution',transform=ax_err[ii].transAxes,color=histcolor,ha='left',fontsize=12,weight='bold')
 
-		ax_err[ii].plot(xplot,plot_gauss,color=gausscolor,lw=3)
-
-		ax_err[ii].text(0.95,0.9,'median='+"{:.2f}".format(median),transform=ax_err[ii].transAxes,color=gausscolor,ha='right')
-		ax_err[ii].text(0.95,0.8,r'1$\sigma$='+"{:.2f}".format(onesig),transform=ax_err[ii].transAxes,color=gausscolor,ha='right')
-
-		ax_err[ii].set_xlabel(r'(true-fit)/1$\sigma$ error')
-		ax_err[ii].set_ylabel('N')
+		ax_err[ii].set_xlabel(r'location of truth within PDF')
+		ax_err[ii].set_ylabel('cumulative density')
 		ax_err[ii].set_title(parlabels[ii])
+		ax_err[ii].set_ylim(0,1)
 
 	fig.savefig(outfolder+'derived_parameter_recovery.png',dpi=150)
-	fig_err.savefig(outfolder+'residual_derivedpars.png',dpi=150)
+	fig_err.savefig(outfolder+'derived_parameter_PDF.png',dpi=150)
 
 	plt.close()
 
