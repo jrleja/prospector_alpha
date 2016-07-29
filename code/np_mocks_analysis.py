@@ -93,7 +93,12 @@ def pdf_distance(chain, truths, chainnames=None, truthnames=None):
 
 		for i in xrange(npars):
 			match = chainnames == truthnames[i]
+			# truths are in log...
+			if 'sfr' in truthnames[i]:
+				temptruths = 10**truths[i]
 			pdf_dist[i] = (chain[:,match] > truths[i]).sum()/nsamp
+
+			print truthnames[i],pdf_dist[i]
 
 	return pdf_dist
 
@@ -298,6 +303,8 @@ def plot_derived_parameters(alldata,outfolder=None):
 			ydown = 10**ydown
 			y = 10**y
 			yerr = threed_dutils.asym_errors(y,yup,ydown,log=False)
+		else:
+			x = np.log10(x)
 
 		### plot that shit
 		ax[ii].errorbar(x,y,yerr,fmt='o',alpha=0.8,color='#1C86EE')

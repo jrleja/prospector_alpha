@@ -253,12 +253,6 @@ def add_sfh_plot(sample_results,fig,ax_loc,sps,
 	for jj in xrange(len(t)): perc[jj,:] = np.percentile(sample_results['extras']['sfh'][jj,:],[16.0,50.0,84.0])
 	axfontsize=4*text_size
 	
-	#### load most likely SFH
-	mlike_sfh = threed_dutils.find_sfh_params(sample_results['model'],
-		                                      sample_results['bfit']['maxprob_params'],
-		                                      sample_results['obs'],sps)
-	most_likely = threed_dutils.return_full_sfh(t, mlike_sfh)
-
 	# set up plotting
 	if fig is not None:
 		ax_inset=fig.add_axes(ax_loc,zorder=32)
@@ -271,11 +265,9 @@ def add_sfh_plot(sample_results,fig,ax_loc,sps,
 	minsfr = sample_results['extras']['q50'][extra_parnames=='totmass'] / 1e10 / 1e5
 
 	perc = np.log10(np.clip(perc,minsfr,np.inf))
-	most_likely= np.log10(np.clip(most_likely,minsfr,np.inf))
 
 	# plot whole SFH
 	ax_inset.plot(t, perc[:,1],'-',color=median_main_color)
-	ax_inset.plot(t, most_likely,'-',color=most_likely_color)
 	ax_inset.fill_between(t, perc[:,0], perc[:,2], color=median_err_color)
 
 	##### FAST + normal fit SFH #####
@@ -329,7 +321,7 @@ def add_sfh_plot(sample_results,fig,ax_loc,sps,
 		plotmax_x = np.min(plotmax_x[plotmax_x > sample_results['quantiles']['q50'][np.array(sample_results['model'].theta_labels()) == 'tage']])
 	if truths is not None:
 		plotmax_x = np.max(np.append(plotmax_x,truths['sfh_params']['tage']))
-	if mlike_sfh['sfh'][0] == 0:
+	if 'sfr_fraction_1' in sample_results['model'].theta_labels():
 		plotmax_x = np.max(t)
 
 	dynrange = (plotmax_y-plotmin_y)*0.4
@@ -341,11 +333,10 @@ def add_sfh_plot(sample_results,fig,ax_loc,sps,
 	ax_inset.tick_params(labelsize=axfontsize)
 
 	# labels
-	ax_inset.text(0.92,0.24, 'most likely',color=most_likely_color, transform = ax_inset.transAxes,fontsize=axfontsize*1.4,ha='right')
 	ax_inset.text(0.92,0.16, 'median',color=median_main_color, transform = ax_inset.transAxes,fontsize=axfontsize*1.4,ha='right')
 
 	# use log scale if we're doing nonparametric
-	if mlike_sfh['sfh'][0] == 0:
+	if 'sfr_fraction_1' in sample_results['model'].theta_labels():
 		ax_inset.set_xscale('log',nonposx='clip')
 
 	return ax_inset
@@ -742,7 +733,7 @@ def sed_figure(sample_results, sps, model,
 	# calculate reduced chi-squared
 	chisq=np.sum(chi**2)
 	chisq_median=np.sum(median_chi**2)
-	ndof = np.sum(sample_results['obs']['phot_mask']) - sample_results['model'].ndim-1
+	ndof = np.sum(sample_results['obs']['phot_mask'])
 	reduced_chisq = chisq/(ndof)
 	reduced_chisq_median = chisq_median/(ndof)
 
@@ -751,16 +742,16 @@ def sed_figure(sample_results, sps, model,
 		try:
 			chisq_truth=np.sum(chi_truth**2)
 			reduced_chisq_truth = chisq_truth/(ndof-1)
-			phot.text(textx, texty, r'best-fit $\chi^2_n$='+"{:.2f}".format(reduced_chisq)+' (true='
+			phot.text(textx, texty, r'best-fit $\chi^2$/N$_{\mathrm{phot}}$='+"{:.2f}".format(reduced_chisq)+' (true='
 				      +"{:.2f}".format(reduced_chisq_truth)+')',
 				      fontsize=10, ha='right',transform = phot.transAxes)
 		except NameError:
 			pass
 	else:
-		phot.text(textx, texty, r'best-fit $\chi^2_n$='+"{:.2f}".format(reduced_chisq),
+		phot.text(textx, texty, r'best-fit $\chi^2$/N$_{\mathrm{phot}}$='+"{:.2f}".format(reduced_chisq),
 			  fontsize=10, ha='right',transform = phot.transAxes)
 	
-	phot.text(textx, texty-deltay, r'median of PDF $\chi^2_n$='+"{:.2f}".format(reduced_chisq_median),
+	phot.text(textx, texty-deltay, r'median of PDF $\chi^2$/N$_{\mathrm{phot}}$='+"{:.2f}".format(reduced_chisq_median),
 		  fontsize=10, ha='right',transform = phot.transAxes)
 	phot.text(textx, texty-2*deltay, r'avg acceptance='+"{:.2f}".format(np.mean(sample_results['acceptance'])),
 				 fontsize=10, ha='right',transform = phot.transAxes)

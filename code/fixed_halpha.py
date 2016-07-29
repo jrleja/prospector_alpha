@@ -13,7 +13,7 @@ from astropy import constants
 random.seed(69)
 
 #### define parameter file
-param_file = os.getenv('APPS') + '/threedhst_bsfh/parameter_files/brownseds_tightbc/brownseds_tightbc_params_1.py'
+param_file = os.getenv('APPS') + '/threedhst_bsfh/parameter_files/brownseds_np/brownseds_np_params_1.py'
 
 #### load test model, build sps, build important variables ####
 model = model_setup.load_model(param_file)
@@ -86,7 +86,7 @@ def random_theta_draw(theta):
 			dust2 = theta[parnames == 'dust2']
 			min,max = (0.5*dust2,2.0*dust2)
 		elif par == 'dust_index':
-			min,max = (-0.4,-1.0)
+			min,max = (-0.4,0.4)
 		else:
 			min,max = model.theta_bounds()[idx] # everything else
 		theta[idx] = random.random()*(max-min)+min

@@ -231,7 +231,7 @@ def plot_all_residuals(alldata,runname):
 	phot_hist.set_ylabel('N')
 	phot_hist.xaxis.set_major_locator(MaxNLocator(4))
 
-	phot_hist.set_xlabel(r'log(reduced $\chi^2_{\mathrm{phot}}$)')
+	phot_hist.set_xlabel(r'log($\chi^2_{\mathrm{phot}}$/N$_{\mathrm{phot}}$)')
 
 	##### load and plot spectroscopic residuals
 	label = ['Optical','Akari', 'Spitzer IRS']
@@ -681,9 +681,9 @@ def sed_comp_figure(sample_results, sps, model, magphys,
 	mag_sfr = magphys['model']['parameters'][magphys['model']['parnames'] == 'SFR'][0]
 	
 	# calculate reduced chi-squared
-	chisq=np.sum(chi**2)/(np.sum(sample_results['obs']['phot_mask'])-sample_results['model'].ndim-1)
+	chisq=np.sum(chi**2)/(np.sum(sample_results['obs']['phot_mask']))
 	chisq_magphys=np.sum(chi_magphys**2)/np.sum(sample_results['obs']['phot_mask'])
-	phot.text(textx, texty-deltay, r'best-fit reduced $\chi^2=$'+"{:.2f}".format(chisq),
+	phot.text(textx, texty-deltay, r'best-fit $\chi^2$/N$_{\mathrm{phot}}$='+"{:.2f}".format(chisq),
 			  fontsize=14, ha='right', color=prosp_color,transform = phot.transAxes)
 		
 	z_txt = sample_results['model'].params['zred'][0]
