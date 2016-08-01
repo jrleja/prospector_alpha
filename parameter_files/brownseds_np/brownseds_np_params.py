@@ -20,15 +20,15 @@ run_params = {'verbose':True,
               'ftol':0.5e-5, 
               'maxfev':5000,
               # MCMC params
-              'nwalkers':546,
+              'nwalkers':620,
               'nburn':[150,200,400], 
-              'niter': 2000,
+              'niter': 3000,
               # Model info
               'zcontinuous': 2,
               'compute_vega_mags': False,
               'initial_disp':0.1,
               'interp_type': 'logarithmic',
-              'agelims': [0.0,8.0,8.5,9.0,9.5,10.0],
+              'agelims': [0.0,8.0,8.5,9.0,9.5,9.8,10.0],
               # Data info
               'datname':os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/table1.fits',
               'photname':os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/table3.fits',

@@ -20,15 +20,15 @@ run_params = {'verbose':True,
               'ftol':0.5e-5, 
               'maxfev':5000,
               # MCMC params
-              'nwalkers':546,
+              'nwalkers':620,
               'nburn':[150,200,400], 
-              'niter': 2000,
+              'niter': 3000,
               # Model info
               'zcontinuous': 2,
               'compute_vega_mags': False,
               'initial_disp':0.1,
               'interp_type': 'logarithmic',
-              'agelims': [0.0,8.0,8.5,9.0,9.5,10.0],
+              'agelims': [0.0,8.0,8.5,9.0,9.5,9.8,10.0],
               # Data info
               'datname':os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/table1.fits',
               'photname':os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/table3.fits',
@@ -239,26 +239,6 @@ def load_obs(photname='', extinctname='', herschname='', objname='', **extras):
     extinct.close()
     herschel.close()
     return obs
-
-def expsfh(agelims, tau=1e5, power=1, **extras):
-    """
-    Calculate the mass in a set of step functions that is equivalent to an
-    exponential SFH.  That is, \int_amin^amax \, dt \, e^(-t/\tau) where
-    amin,amax are the age limits of the bins making up the step function.
-    """
-    from scipy.special import gamma, gammainc
-    tage = 10**np.max(agelims) / 1e9
-    t = tage - 10**np.array(agelims)/1e9
-    nb = len(t)
-    mformed = np.zeros(nb-1)
-    t = np.insert(t, 0, tage)
-    for i in range(nb-1):
-        t1, t2 = t[i+1], t[i]
-        normalized_times = (np.array([t1, t2, tage])[:, None]) / tau
-        mass = gammainc(power, normalized_times)
-        intsfr = (mass[1,...] - mass[0,...]) / mass[2,...]
-        mformed[i] = intsfr
-    return mformed * 1e3
         
 ######################
 # GENERATING FUNCTIONS
@@ -613,7 +593,6 @@ def load_model(objname='',datname='', agelims=[], **extras):
     agelims[-1] = np.log10(tuniv*1e9)
     agebins = np.array([agelims[:-1], agelims[1:]])
     ncomp = len(agelims) - 1
-    mass_init =  expsfh(agelims, **extras)*1e5
 
     #### ADJUST MODEL PARAMETERS #####
     n = [p['name'] for p in model_params]
@@ -622,15 +601,13 @@ def load_model(objname='',datname='', agelims=[], **extras):
     model_params[n.index('agebins')]['N'] = ncomp
     model_params[n.index('agebins')]['init'] = agebins.T
 
-    #### FRACTIONAL MASS
+    #### FRACTIONAL MASS INITIALIZATION
     # N-1 bins, last is set by x = 1 - np.sum(sfr_fraction)
     model_params[n.index('sfr_fraction')]['N'] = ncomp-1
-    model_params[n.index('sfr_fraction')]['init'] = mass_init[:-1] / np.sum(mass_init)
+    model_params[n.index('sfr_fraction')]['init'] = np.zeros(ncomp-1)+1./ncomp
     model_params[n.index('sfr_fraction')]['prior_args'] = {
                                                            'maxi':np.full(ncomp-1,1.0), 
                                                            'mini':np.full(ncomp-1,0.0),
-                                                           'alpha':1.0,
-                                                           'alpha_sum':ncomp 
                                                            # NOTE: ncomp instead of ncomp-1 makes the prior take into account the implicit Nth variable too
                                                           }
     model_params[n.index('sfr_fraction')]['init_disp'] = 0.15

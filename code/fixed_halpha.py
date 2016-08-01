@@ -1,7 +1,7 @@
 import numpy as np
 import threed_dutils
 import os
-from bsfh import model_setup
+from prospect.models import model_setup
 import matplotlib as mpl
 import random
 import pickle
@@ -13,14 +13,19 @@ from astropy import constants
 random.seed(69)
 
 #### define parameter file
-param_file = os.getenv('APPS') + '/threedhst_bsfh/parameter_files/brownseds_np/brownseds_np_params_1.py'
+import brownseds_np_cr_params_1 as nonparam
 
 #### load test model, build sps, build important variables ####
-model = model_setup.load_model(param_file)
-model.params['zred'] = np.atleast_1d(0.0)
-obs   = model_setup.load_obs(param_file)
+sps = nonparam.load_sps(**nonparam.run_params)
+model = nonparam.load_model(**nonparam.run_params)
+obs = nonparam.load_obs(**nonparam.run_params)
+sps.update(**model.params)
+
+sfrstart,sfrend = model.theta_index['sfr_fraction'] # gonna need these
+nbins = model.params['sfr_fraction'].shape[0]+1 # and these
+model.params['zred'] = np.atleast_1d(0.0) # yup, that's necessary
 obs['filters'] = None # don't generate photometry, for speed
-sps = threed_dutils.setup_sps()
+
 parnames = np.array(model.theta_labels())
 
 # don't cache emission line strength
@@ -74,7 +79,7 @@ def random_theta_draw(theta):
 	draw a random set of thetas in the SFH, metallicity, and dust parameters
 	'''
 
-	to_draw = ['tage','logtau','delt_trunc','sf_tanslope','dust2','dust1','dust_index','logzsol']
+	to_draw = ['dust2','dust1','dust_index','logzsol']
 
 	for par in to_draw:
 		idx = np.where(parnames == par)[0][0]
@@ -91,12 +96,17 @@ def random_theta_draw(theta):
 			min,max = model.theta_bounds()[idx] # everything else
 		theta[idx] = random.random()*(max-min)+min
 
+	# draw SFH parameters
+	sfh_distribution = np.random.dirichlet(tuple(1.0 for x in xrange(nbins)),1)
+	sfh = sfh_distribution[0,:]/np.sum(sfh_distribution[0,:])
+	theta[sfrstart:sfrend] = sfh[:-1]
+
 	return theta
 
 def apply_metallicity_correction(ha_lum,logzsol):
 	'''
-	placeholder. must fit the CLOUDY / Kennicutt curve as function of logzsol, 
-	apply correction here.
+	fit the CLOUDY / Kennicutt curve as function of logzsol, 
+	applied correction here.
 	'''
 	ratio = 10**fit(logzsol)
 	return ha_lum*ratio
@@ -119,80 +129,92 @@ def halpha_draw(theta0, delta, ndraw, thetas_start=None, fixed_lbol=None, ha_lum
 	out_luv = np.zeros(0)
 	out_lir = np.zeros(0)
 	out_ha = np.zeros(0)
+	out_ha_eqw = np.zeros(0)
 
 	ntest=0
 	while out_pars.shape[1] < ndraw:
 
 		# draw random dust, SFH, metallicity properties
-		theta = random_theta_draw(theta0)
-
-		'''
-		#### if we have them, use previous guesses
 		if thetas_start is not None:
-			if thetas_start['pars'].shape[1] != 0:
-				theta = thetas_start['pars'][:,0]
-				thetas_start['pars'] = thetas_start['pars'][:,1:]
+			theta = thetas_start['pars'][:,out_pars.shape[1]]
+		else:
+			theta = random_theta_draw(theta0)
 
-		# calculate SFR(10 Myr)
-		spec,mags,sm = model.mean_model(theta, obs, sps=sps)
-		sfh_params = threed_dutils.find_sfh_params(model,theta,obs,sps,sm=sm)
-		sfr_10     = threed_dutils.calculate_sfr(sfh_params, 0.01, minsfr=-np.inf, maxsfr=np.inf)
-
-		# calculate synthetic Halpha, in Lsun
-		ha_lum = threed_dutils.synthetic_halpha(sfr_10,theta[parnames=='dust1'],theta[parnames=='dust2'],
-			                                    -1.0,theta[parnames=='dust_index'],kriek=True) / constants.L_sun.cgs.value
-
-		# metallicity correction to CLOUDY scale
-		ha_lum_adj = apply_metallicity_correction(ha_lum,theta[parnames=='logzsol'])[0]
-
-		# calculate LIR, LUV
-		luv = threed_dutils.return_luv(sps.wavelengths,spec) / 3.846e33
-		lir = threed_dutils.return_lir(sps.wavelengths,spec) / 3.846e33
-		'''
-		#### SPEED TEST
-		# just assume we have 90% of recycled mass
-		# must have sSFR > 1e-10
 		if ha_lum_fixed is not None:
-			sfh_params = threed_dutils.find_sfh_params(model,theta,obs,sps,sm=0.9)
-			sfr_10     = threed_dutils.calculate_sfr(sfh_params, 0.01, minsfr=-np.inf, maxsfr=np.inf)
-			if sfr_10/theta[0] > 1e-12:
-				match = False
-				# play with sf_slope until we have the right SFR
-				while match==False:
-					out = threed_dutils.measure_emline_lum(sps, thetas=theta, model=model, obs=obs,measure_ir=True, measure_luv=True)
-					ratio = np.abs(out['emlines']['Halpha']['eqw']/ha_lum_fixed - 1)
-					print ratio,out_pars.shape[1]
-					if ratio < delta:
-						out_pars = np.concatenate((out_pars,theta[:,None]),axis=1)
-						out_spec = np.concatenate((out_spec,out['spec'][:,None]),axis=1)
-						out_lir = np.concatenate((out_lir,np.atleast_1d(out['lir'])))
-						out_luv = np.concatenate((out_luv,np.atleast_1d(out['luv'])))
-						out_ha = np.concatenate((out_ha,np.atleast_1d(out['emlines']['Halpha']['eqw'])))
-						match = True
-						print out_pars.shape[1]
-					else:
-						if ratio > delta*20:
-							theta[5] = theta[5] * ratio**-0.05
-						else:
-							theta[5] = theta[5] * ratio**-0.005
+			match = False
+			ncount = 0
+			while (match==False) and (ncount < 20):# play with SFH until we have the right halpha
+				out = threed_dutils.measure_emline_lum(sps, thetas=theta, model=model, obs=obs,measure_ir=True, measure_luv=True)
+				ratio = np.abs(out['emlines']['Halpha']['flux']/ha_lum_fixed)
+
+				### don't know why this happens sometimes
+				if np.isfinite(ratio) == False:
+					break
+
+				print ratio,out_pars.shape[1]
+				if np.abs(ratio-1) < delta:
+					out_pars = np.concatenate((out_pars,theta[:,None]),axis=1)
+					out_spec = np.concatenate((out_spec,out['spec'][:,None]),axis=1)
+					out_lir = np.concatenate((out_lir,np.atleast_1d(out['lir'])))
+					out_luv = np.concatenate((out_luv,np.atleast_1d(out['luv'])))
+					out_ha = np.concatenate((out_ha,np.atleast_1d(out['emlines']['Halpha']['flux'])))
+					out_ha_eqw = np.concatenate((out_ha_eqw,np.atleast_1d(out['emlines']['Halpha']['eqw'])))
+					match = True
+					ntest+=1
+					print out_pars.shape[1]
+				else:
+					tnew = theta[sfrstart] * ratio**-0.3 # generate new SFR(30 Myr) bin fraction
+					other_binfraction_sum = 1 - theta[sfrstart] # what we have
+					other_binfraction_newsum = 1 - tnew # what we need to have
+					theta[sfrstart+1:sfrend] *=  other_binfraction_newsum/other_binfraction_sum
+					theta[sfrstart] = tnew
+
+					ncount += 1
 
 		elif fixed_lbol is not None:
-			out = threed_dutils.measure_emline_lum(sps, thetas=theta, model=model,obs=obs, savestr='test',measure_ir=True, measure_luv=True)
-			lbol = out['luv'] + out['lir']
-			lbol_ratio = np.abs(lbol/fixed_lbol - 1)
-			if (lbol_ratio < delta) & (sfr_10 > 0.0):
-				out_pars = np.concatenate((out_pars,theta[:,None]),axis=1)
-				out_spec = np.concatenate((out_spec,out['spec'][:,None]),axis=1)
-				out_lir = np.concatenate((out_lir,np.atleast_1d(out['lir'])))
-				out_luv = np.concatenate((out_luv,np.atleast_1d(out['luv'])))
-				out_ha = np.concatenate((out_ha,np.atleast_1d(out['emlines']['Halpha']['eqw'])))
-				print out_pars.shape[1]
+			match = False
+			ncount = 0
+			while (match==False) and (ncount < 12):# play with SFH until we have the right SFR
+				out = threed_dutils.measure_emline_lum(sps, thetas=theta, model=model,obs=obs, savestr='test',measure_ir=True, measure_luv=True)
+				lbol = out['luv'] + out['lir']
+				lbol_ratio = np.abs(lbol/fixed_lbol)
 
-		ntest+=1
+				print lbol_ratio,out_pars.shape[1]
+				if np.abs(lbol_ratio-1) < delta:
+					out_pars = np.concatenate((out_pars,theta[:,None]),axis=1)
+					out_spec = np.concatenate((out_spec,out['spec'][:,None]),axis=1)
+					out_lir = np.concatenate((out_lir,np.atleast_1d(out['lir'])))
+					out_luv = np.concatenate((out_luv,np.atleast_1d(out['luv'])))
+					out_ha = np.concatenate((out_ha,np.atleast_1d(out['emlines']['Halpha']['flux'])))
+					out_ha_eqw = np.concatenate((out_ha_eqw,np.atleast_1d(out['emlines']['Halpha']['eqw'])))
+					print out_pars.shape[1]
+					ntest+=1
+					match = True
+				else:
+					if lbol_ratio < 0.7 or lbol_ratio > 1.3:
+						power = -0.3
+					else:
+						power = -0.1
+
+					theta[sfrstart+1:sfrend] *=  other_binfraction_newsum/other_binfraction_sum
+					theta[sfrstart] = tnew
+
+					tnew1 = theta[sfrstart] * lbol_ratio**power # generate new SFR(30 Myr)
+					tnew2 = theta[sfrstart+1] * lbol_ratio**power # generate new SFR(100 Myr)
+
+					other_binfraction_sum = 1 - theta[sfrstart] - theta[sfrstart+1] # what we have
+					other_binfraction_newsum = 1 - tnew1 - tnew2 # what we need to have
+
+					theta[sfrstart+2:sfrend] *=  other_binfraction_newsum/other_binfraction_sum
+					theta[sfrstart] = tnew1
+					theta[sfrstart+1] = tnew2
+					ncount += 1
+
+
 
 	print 'total of {0} combinations tested'.format(ntest)
 
-	return out_pars,out_spec,out_lir,out_luv,out_ha
+	return out_pars,out_spec,out_lir,out_luv,out_ha,out_ha_eqw
 
 def label_sed(sedax,ylim):
 
@@ -233,7 +255,7 @@ def main(redraw_thetas=True,pass_guesses=False,redraw_lbol_thetas=True):
 	#### name draws
 	colors = ['red','green','blue']
 	names = ['5e6','5e7','5e8'] # 3e7 is SFR = 1 Msun / yr, dust1 = 0.3, dust2 = 0.15
-	names = ['1','10','100']
+	#names = ['1','10','100']
 	smoothing = 10000 # km/s smooth
 	lw = 2
 
@@ -255,7 +277,7 @@ def main(redraw_thetas=True,pass_guesses=False,redraw_lbol_thetas=True):
 			else:
 				load_thetas = None
 
-			temp['pars'],temp['spec'],temp['lir'],temp['luv'],temp['ha'] = \
+			temp['pars'],temp['spec'],temp['lir'],temp['luv'],temp['ha'],temp['ha_eqw'] = \
 			halpha_draw(model.initial_theta,delta,ndraw,
 				        thetas_start=load_thetas,
 				        ha_lum_fixed=float(name))
@@ -273,8 +295,8 @@ def main(redraw_thetas=True,pass_guesses=False,redraw_lbol_thetas=True):
 	#### load or create lbol draws
 	outpickle_fixedlbol = '/Users/joel/code/python/threedhst_bsfh/data/pickles/lbol_fixed.pickle'
 	if redraw_lbol_thetas:
-		ndraw = 50
-		delta = 0.008
+		ndraw_lbol = 50
+		delta_lbol = 0.02
 		thetas_lbol = {}
 		name = names[1]
 
@@ -284,8 +306,8 @@ def main(redraw_thetas=True,pass_guesses=False,redraw_lbol_thetas=True):
 		else:
 			load_thetas = None
 
-		thetas_lbol['pars'],thetas_lbol['spec'],thetas_lbol['lir'],thetas_lbol['luv'],thetas_lbol['ha'] = \
-		halpha_draw(model.initial_theta,delta,ndraw,
+		thetas_lbol['pars'],thetas_lbol['spec'],thetas_lbol['lir'],thetas_lbol['luv'],thetas_lbol['ha'],thetas_lbol['ha_eqw'] = \
+		halpha_draw(model.initial_theta,delta_lbol,ndraw_lbol,
 			        thetas_start=load_thetas,
 			        fixed_lbol=1.61e10) # from the median of halpha_lum=5e7
 			
@@ -293,7 +315,7 @@ def main(redraw_thetas=True,pass_guesses=False,redraw_lbol_thetas=True):
 	else:
 		with open(outpickle_fixedlbol, "rb") as f:
 			thetas_lbol=pickle.load(f)
-		ndraw = thetas_lbol.values()[0].shape[0]
+		ndraw_lbol = thetas_lbol.values()[0].shape[0]
 
 	#### Open figure
 	sedfig = plt.figure(figsize=(18, 8))
@@ -323,9 +345,6 @@ def main(redraw_thetas=True,pass_guesses=False,redraw_lbol_thetas=True):
 
 		#### smooth and log spectra
 		for nn in xrange(3): spec_perc[:,nn] = np.log10(threed_dutils.smooth_spectrum(sps.wavelengths,spec_perc[:,nn],smoothing))
-
-		#### normalize at 10,000 angstroms
-		# spec_perc -= spec_perc[norm_idx,0]-8.5
 
 		#### plot spectra
 		sedax[0].plot(sps.wavelengths/1e4,spec_perc[:,0],color=colors[ii],lw=lw,zorder=1)
@@ -358,33 +377,18 @@ def main(redraw_thetas=True,pass_guesses=False,redraw_lbol_thetas=True):
 			pickle.dump(thetas,open(outpickle_fixedha, "wb"))
 
 		#### relationship plot
-		xplot = thetas[name]['lir']/thetas[name]['luv']
 		xplot = np.log10(1./thetas[name]['ha_ext'])
 		yplot = np.log10(thetas[name]['lir']+thetas[name]['luv'])
 		
-		'''
-		if name == '5e6':
-			slope = (8.5-8.4) / ((-0.2)-(-0.1))
-			b = 8.5 - slope*(-0.2)
-			bad = yplot > (slope*xplot+b)
-			xplot = xplot[~bad]
-			yplot = yplot[~bad]
-		if name == '5e7':
-			bad = (xplot < 2) & (yplot > 9.25)
-			xplot = xplot[~bad]
-			yplot = yplot[~bad]
-		'''
 		relax.plot(xplot, yplot, 'o', color=colors[ii])
 
-	#### plot sample of SEDs at fixeed
-	#### sample evenly in halpha extinction
-	#name = names[1]
-	#cquant = thetas[name]['ha_ext']
-	#cquant = np.log10(thetas[name]['lir']/thetas[name]['luv'])
+	#### plot sample of SEDs
+	# evenly sampled in Halpha
 	cquant = np.log10(thetas_lbol['ha'])
 	vmin = np.min(cquant)
 	vmax = np.max(cquant)
 
+	# how many to plot? space evenly throughout the sample
 	nplot = 6
 	nsample = ndraw / nplot
 	delta = (vmax-vmin)/nplot
@@ -403,9 +407,6 @@ def main(redraw_thetas=True,pass_guesses=False,redraw_lbol_thetas=True):
 		#### smooth and log spectra
 		spec_to_plot = np.log10(threed_dutils.smooth_spectrum(sps.wavelengths,spec_to_plot,smoothing))
 
-		#### normalize at 10,000 angstroms
-		#spec_to_plot -= spec_to_plot[norm_idx]-8.5
-
 		#### get color
 		color = scalarMap.to_rgba(cquant[idx])
 
@@ -419,7 +420,7 @@ def main(redraw_thetas=True,pass_guesses=False,redraw_lbol_thetas=True):
                                 	orientation='vertical')
 	cb1.set_label(r'F$_{\mathrm{intrinsic}}$/F$_{\mathrm{extincted}}$ (6563 $\AA$)')
 	cb1.set_label(r'log(L$_{\mathrm{IR}}$ / L$_{\mathrm{UV}}$)')
-	cb1.set_label(r'log(H$_{\alpha}$ luminosity)')
+	cb1.set_label(r'log(H$_{\alpha}$ EQW)')
 	cb1.ax.yaxis.set_ticks_position('left')
 	cb1.ax.yaxis.set_label_position('left')
 
@@ -436,9 +437,9 @@ def main(redraw_thetas=True,pass_guesses=False,redraw_lbol_thetas=True):
 	yt = 0.945
 	xt = 0.98
 	deltay = 0.015
-	sedax[0].text(xt,yt,r'H$_{\mathbf{\alpha}}$ luminosity',weight='bold',transform = sedax[0].transAxes,ha='right',fontsize=fontsize)
+	sedax[0].text(xt,yt,r'H$_{\mathbf{\alpha}}$ EQW',weight='bold',transform = sedax[0].transAxes,ha='right',fontsize=fontsize)
 	for ii, name in enumerate(names):
-		sedax[0].text(xt,yt-(ii+1)*0.05,name+r' L$_{\odot}$',
+		sedax[0].text(xt,yt-(ii+1)*0.05,name+r' $\AA$ EQW',
 			       color=colors[ii],transform = sedax[0].transAxes,
 			       ha='right',fontsize=fontsize)
 
