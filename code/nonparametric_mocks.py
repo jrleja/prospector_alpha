@@ -4,7 +4,7 @@ from astropy.table import Table, vstack
 from astropy.io import ascii
 from astropy import units as u
 import threed_dutils
-import np_mocks_midcr_params as nonparam
+import np_mocks_params as nonparam
 
 #### NONPARAMETRIC GLOBALS
 sps = nonparam.load_sps(**nonparam.run_params)
@@ -44,7 +44,7 @@ def construct_mocks(basename,outname=None,add_zp_err=False, plot_mock=False):
 	# so i can calculate sfr each time
 	noise               = 0.05            # perturb fluxes
 	reported_noise      = 0.05            # reported noise
-	ntest               = 100             # number of mock galaxies to generate
+	ntest               = 250             # number of mock galaxies to generate
 
 	#### generate random model parameters ####
 	nparams = len(model.initial_theta)
