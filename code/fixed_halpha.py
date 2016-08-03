@@ -13,7 +13,7 @@ from astropy import constants
 random.seed(69)
 
 #### define parameter file
-import brownseds_np_cr_params_1 as nonparam
+import brownseds_np_params_1 as nonparam
 
 #### load test model, build sps, build important variables ####
 sps = nonparam.load_sps(**nonparam.run_params)
@@ -143,7 +143,7 @@ def halpha_draw(theta0, delta, ndraw, thetas_start=None, fixed_lbol=None, ha_lum
 		if ha_lum_fixed is not None:
 			match = False
 			ncount = 0
-			while (match==False) and (ncount < 20):# play with SFH until we have the right halpha
+			while (match==False) and (ncount < 50):# play with SFH until we have the right halpha
 				out = threed_dutils.measure_emline_lum(sps, thetas=theta, model=model, obs=obs,measure_ir=True, measure_luv=True)
 				ratio = np.abs(out['emlines']['Halpha']['flux']/ha_lum_fixed)
 
@@ -163,7 +163,7 @@ def halpha_draw(theta0, delta, ndraw, thetas_start=None, fixed_lbol=None, ha_lum
 					ntest+=1
 					print out_pars.shape[1]
 				else:
-					tnew = theta[sfrstart] * ratio**-0.3 # generate new SFR(30 Myr) bin fraction
+					tnew = theta[sfrstart] * ratio**-0.5 # generate new SFR(30 Myr) bin fraction
 					other_binfraction_sum = 1 - theta[sfrstart] # what we have
 					other_binfraction_newsum = 1 - tnew # what we need to have
 					theta[sfrstart+1:sfrend] *=  other_binfraction_newsum/other_binfraction_sum
@@ -192,22 +192,17 @@ def halpha_draw(theta0, delta, ndraw, thetas_start=None, fixed_lbol=None, ha_lum
 					match = True
 				else:
 					if lbol_ratio < 0.7 or lbol_ratio > 1.3:
-						power = -0.3
+						power = -0.6
 					else:
-						power = -0.1
+						power = -0.3
+
+					tnew = theta[sfrstart] * lbol_ratio**power # generate new SFR(30 Myr)
+
+					other_binfraction_sum = 1 - theta[sfrstart] # what we have
+					other_binfraction_newsum = 1 - tnew # what we need to have
 
 					theta[sfrstart+1:sfrend] *=  other_binfraction_newsum/other_binfraction_sum
 					theta[sfrstart] = tnew
-
-					tnew1 = theta[sfrstart] * lbol_ratio**power # generate new SFR(30 Myr)
-					tnew2 = theta[sfrstart+1] * lbol_ratio**power # generate new SFR(100 Myr)
-
-					other_binfraction_sum = 1 - theta[sfrstart] - theta[sfrstart+1] # what we have
-					other_binfraction_newsum = 1 - tnew1 - tnew2 # what we need to have
-
-					theta[sfrstart+2:sfrend] *=  other_binfraction_newsum/other_binfraction_sum
-					theta[sfrstart] = tnew1
-					theta[sfrstart+1] = tnew2
 					ncount += 1
 
 
@@ -420,7 +415,7 @@ def main(redraw_thetas=True,pass_guesses=False,redraw_lbol_thetas=True):
                                 	orientation='vertical')
 	cb1.set_label(r'F$_{\mathrm{intrinsic}}$/F$_{\mathrm{extincted}}$ (6563 $\AA$)')
 	cb1.set_label(r'log(L$_{\mathrm{IR}}$ / L$_{\mathrm{UV}}$)')
-	cb1.set_label(r'log(H$_{\alpha}$ EQW)')
+	cb1.set_label(r'log(H$_{\alpha}$ luminosity) [L$_{\odot}]$')
 	cb1.ax.yaxis.set_ticks_position('left')
 	cb1.ax.yaxis.set_label_position('left')
 
@@ -437,9 +432,9 @@ def main(redraw_thetas=True,pass_guesses=False,redraw_lbol_thetas=True):
 	yt = 0.945
 	xt = 0.98
 	deltay = 0.015
-	sedax[0].text(xt,yt,r'H$_{\mathbf{\alpha}}$ EQW',weight='bold',transform = sedax[0].transAxes,ha='right',fontsize=fontsize)
+	sedax[0].text(xt,yt,r'H$_{\mathbf{\alpha}}$ luminosity',weight='bold',transform = sedax[0].transAxes,ha='right',fontsize=fontsize)
 	for ii, name in enumerate(names):
-		sedax[0].text(xt,yt-(ii+1)*0.05,name+r' $\AA$ EQW',
+		sedax[0].text(xt,yt-(ii+1)*0.05,name+r' L$_{\odot}$',
 			       color=colors[ii],transform = sedax[0].transAxes,
 			       ha='right',fontsize=fontsize)
 

@@ -867,14 +867,7 @@ def plt_all(runname=None,startup=True,**extras):
 
 	#### herschel flag
 	hflag = np.array([True if np.sum(dat['residuals']['phot']['lam_obs'] > 5e5) else False for dat in alldata])
-
-	#### test different time_res_incr prescriptions
-	time_res_test = False
-	if time_res_test == True:
-		with open('/Users/joel/code/magphys/data/pickles/old/alldata.pickle', "rb") as f:
-			alldata_low=pickle.load(f)
-		mag_ensemble.time_res_incr_comp(alldata_low,alldata)
-
+	
 	plot_all_residuals(alldata,runname)
 	mag_ensemble.prospector_comparison(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/pcomp/',hflag)
 	mag_ensemble.plot_emline_comp(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/magphys/emlines_comp/',hflag)

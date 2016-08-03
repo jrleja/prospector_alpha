@@ -18,7 +18,6 @@ dpi = 150
 
 #### herschel / non-herschel
 nhargs = {'fmt':'o','alpha':0.7,'color':'0.2'}
-#hargs = {'fmt':'D','alpha':0.7,'color':'#E60000'}
 hargs = {'fmt':'o','alpha':0.7,'color':'0.2'}
 herschdict = [copy.copy(hargs),copy.copy(nhargs)]
 
@@ -54,6 +53,22 @@ def minlog(x,axis=None):
 			#x[zeros,kk] = np.mean(x[~zeros,kk])
 
 	return np.log10(x)
+
+def pdf_distance(chain, truth):
+
+	npars = chain.shape[1]
+	nsamp = float(chain.shape[0])
+	pdf_dist = np.zeros(npars)
+
+	for i in xrange(npars): pdf_dist[i] = (chain[:,i] > truth[i]).sum()/nsamp
+
+	return pdf_dist
+
+def specpar_pdf_distance(pinfo,alldata, cdf=True, add_obs_errs=True):
+
+	to_test = ['halpha','hbeta','balmer_decrement','zmet','dn4000','hdelta']
+
+	print 1/0
 
 def merge_dicts(*dict_args):
     '''
@@ -446,7 +461,7 @@ def compare_model_flux(alldata, emline_names, outname = 'test.png'):
 	plt.savefig(outname,dpi=dpi)
 	plt.close()	
 
-def fmt_emline_info(alldata,add_abs_err = True):
+def fmt_emline_info(alldata,add_abs_err = False):
 
 	ngals = len(alldata)
 
@@ -579,8 +594,6 @@ def fmt_emline_info(alldata,add_abs_err = True):
 	if add_abs_err:
 		
 		# this is the relevant fraction of absorption flux to add to each error
-		# currently scaled by the 0.178 dex scatter in Hdelta absorption flux
-		# which is almost exactly 50%
 		# CURRENTLY USING 0.25 BASED ON ERROR ANALYSIS PLOT, SO HALF OF WHAT'S SUGGESTED BY HDELTA COMPARISON
 		# LOOK INTO IMPROVING CONTINUUM ESTIMATE FOR HDELTA
 		hdel_scatter = 0.25
@@ -1038,29 +1051,6 @@ def gas_phase_metallicity(e_pinfo, hflag, outfolder='',ssfr_cut=False):
 
 	plt.close()
 
-	'''
-	# rough and dirty new figure
-	# Halpha_predicted,prosp / Halpha_observed vs (Z_prospector/Z_elines)
-	# for star-forming only
-	ha_mod = e_pinfo['prosp']['cloudy_ha_eqw'][keep_idx,0]
-	ha_obs = e_pinfo['obs']['eqw_ha'][keep_idx,0]
-
-	fig, ax = plt.subplots(1,1,figsize=(7,7))
-	fig.subplots_adjust(left=0.15,bottom=0.1,top=0.95,right=0.95)
-	ax.plot(np.log10(ha_mod[sfing]/ha_obs[sfing]),logzsol[sfing]-logzgas[sfing],'o',**bptdict[0])
-	#ax.plot(np.log10(ha_mod/ha_obs),logzsol-logzgas,'o',**bptdict[0])
-	ax.set_xlabel(r'log(H$_{\alpha,\mathrm{model}}$/H$_{\alpha,\mathrm{obs}}$)')
-	ax.set_ylabel(r'log(Z$_{\mathrm{stars,model}}$/Z$_{\mathrm{gas,obs}}$)')
-	ax.set_xlim(-0.5,0.5)
-	ax.axhline(0, linestyle=':', color='grey')
-	ax.axvline(0, linestyle=':', color='grey')
-	plt.show()
-	plt.savefig('met_residuals_vs_halpha_residuals.png',dpi=150)
-	plt.close()	
-	'''
-
-
-
 def bpt_diagram(e_pinfo,hflag,outname=None):
 
 	########################################
@@ -1353,15 +1343,6 @@ def obs_vs_kennicutt_ha(e_pinfo,hflag,outname_prosp='test.png',outname_mag='test
 	ax3[1].text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat) + ' dex', transform = ax3[1].transAxes,horizontalalignment='right')
 	ax3[1].text(0.96,0.1, 'mean offset='+"{:.2f}".format(off) + ' dex', transform = ax3[1].transAxes,horizontalalignment='right')
 
-	'''
-	ax3[2].set_xlabel(r'log(Z/Z$_{\odot}$) [marginalized, Prospector]')
-	ax3[2].set_ylabel(r'log(Z/Z$_{\odot}$) [best-fit, MAGPHYS]')
-	ax3[2] = threed_dutils.equalize_axes(ax3[2], pmet[:,0], mmet)
-	off,scat = threed_dutils.offset_and_scatter(pmet[:,0], mmet, biweight=True)
-	ax3[2].text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat), transform = ax3[2].transAxes,horizontalalignment='right')
-	ax3[2].text(0.96,0.1, 'mean offset='+"{:.2f}".format(off), transform = ax3[2].transAxes,horizontalalignment='right')
-	'''
-
 	ax4[0].text(0.04,0.92, r'S/N H$\alpha$ > {0}'.format(int(e_pinfo['obs']['sn_cut'])), transform = ax4[0].transAxes,horizontalalignment='left')
 	#ax4[0].text(0.04,0.92, r'EQW H$\alpha$ > {0} $\AA$'.format(int(e_pinfo['obs']['eqw_cut'])), transform = ax4[0].transAxes,horizontalalignment='left')
 	ax4[0].text(0.04,0.87, r'N = '+str(int(np.sum(keep_idx))), transform = ax4[0].transAxes,horizontalalignment='left')
@@ -1400,16 +1381,6 @@ def fit_and_save(met,ha_ratio):
 
 	z = np.polyfit(fit_met, fit_ha_ratio, 7)
 
-	'''
-	fit = np.poly1d(z)
-
-	plt.plot(fit_met, fit_ha_ratio, 'ob', linestyle=' ')
-
-	tmet = np.linspace(-2.0,0.19,num=40)
-	plt.plot(tmet,fit(tmet),'r')
-	plt.show()
-	'''
-
 	outloc = '/Users/joel/code/python/threedhst_bsfh/data/pickles/ha_ratio.pickle'
 	pickle.dump(z,open(outloc, "wb"))
 
@@ -1445,7 +1416,6 @@ def minimize_bdec_corr_eqn(x, hdel_eqw_obs, hdel_eqw_model, halpha_obs, hbeta_ob
 	                          halpha_continuum, hbeta_continuum,
 	                          additive,
 	                          bdec_model):
-
 	'''
 	minimize the scatter in bdec_to_ext(obs_bdec), bdec_to_ext(model_bdec)
 	by some function bdec_corr_eqw() described above
@@ -1483,13 +1453,6 @@ def paper_summary_plot(e_pinfo, hflag, outname='test.png'):
 		                  (e_pinfo['obs']['f_ha'][:,0] > 0) & \
 		                  (e_pinfo['obs']['f_hb'][:,0] > 0) & \
 		                  (e_pinfo['prosp']['cloudy_ha'][:,0] > 0))
-	
-	'''
-	keep_idx = np.squeeze((sn_ha > e_pinfo['obs']['sn_cut']) & \
-		                  (e_pinfo['obs']['eqw_ha'][:,0] > e_pinfo['obs']['eqw_cut']) & \
-		                  (e_pinfo['obs']['f_ha'][:,0] > 0) & \
-		                  (e_pinfo['prosp']['cloudy_ha'][:,0] > 0))
-	'''
 
 	##### AGN identifiers
 	sfing, composite, agn = return_agn_str(keep_idx)
@@ -2744,6 +2707,9 @@ def plot_emline_comp(alldata,outfolder,hflag):
 	##### format emission line data for plotting
 	e_pinfo = fmt_emline_info(alldata)
 
+	##### add in 'location in truth' PDF
+	e_pinfo['truth_pdf'] = specpar_pdf_distance(e_pinfo,alldata)
+
 	# errors
 	eline_errs(e_pinfo,hflag,outname=outfolder+'error_sig.png')
 
@@ -3361,126 +3327,5 @@ def plot_comparison(alldata,outfolder):
 
 	plt.savefig(outfolder+'basic_comparison.png',dpi=dpi)
 	plt.close()
-
-def time_res_incr_comp(alldata_2,alldata_7):
-
-	'''
-	compare time_res_incr = 2, 7. input is 7. load 2 separately.
-	'''
-
-	mass_2 = np.array([f['bfit']['maxprob_params'][0] for f in alldata_2])
-	mass_7 = np.array([f['bfit']['maxprob_params'][0] for f in alldata_7])
-
-	sfr_2 = np.log10(np.clip([f['bfit']['sfr_100'] for f in alldata_2],1e-4,np.inf))
-	sfr_7 = np.log10(np.clip([f['bfit']['sfr_100'] for f in alldata_7],1e-4,np.inf))
-
-	fig, ax = plt.subplots(1,2, figsize = (18,8))
-
-	ax[0].errorbar(np.log10(mass_2), np.log10(mass_7), fmt='o',alpha=0.6,linestyle=' ',color='0.4')
-	ax[0].set_xlabel(r'log(best-fit M/M$_{\odot}$) [tres = 2]')
-	ax[0].set_ylabel(r'log(best-fit M/M$_{\odot}$) [tres = 7]')
-	ax[0] = threed_dutils.equalize_axes(ax[0], np.log10(mass_2),np.log10(mass_7))
-	off,scat = threed_dutils.offset_and_scatter(np.log10(mass_2),np.log10(mass_7),biweight=True)
-	ax[0].text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat),
-			  transform = ax[0].transAxes,horizontalalignment='right')
-	ax[0].text(0.96,0.1, 'mean offset='+"{:.2f}".format(off),
-			      transform = ax[0].transAxes,horizontalalignment='right')
-
-	ax[1].errorbar(sfr_2,sfr_7, fmt='o',alpha=0.6,linestyle=' ',color='0.4')
-	ax[1].set_xlabel(r'log(best-fit SFR) [tres = 2]')
-	ax[1].set_ylabel(r'log(best-fit SFR) [tres = 7]')
-	ax[1] = threed_dutils.equalize_axes(ax[1], sfr_2,sfr_7)
-	off,scat = threed_dutils.offset_and_scatter(sfr_2,sfr_7,biweight=True)
-	ax[1].text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat),
-			  transform = ax[1].transAxes,horizontalalignment='right')
-	ax[1].text(0.96,0.1, 'mean offset='+"{:.2f}".format(off),
-			      transform = ax[1].transAxes,horizontalalignment='right')
-
-	plt.savefig(os.getenv('APPS')+'/threedhst_bsfh/plots/brownseds/pcomp/bestfit_mass_sfr_comp.png',dpi=dpi)
-	plt.close()
-
-	nparams = len(alldata_2[0]['bfit']['maxprob_params'])
-	parnames = alldata_2[0]['pquantiles']['parnames']
-	fig, ax = plt.subplots(4,3, figsize = (23/1.5,30/1.5))
-	ax = np.ravel(ax)
-	for ii in xrange(nparams):
-		
-		cent2 = np.array([dat['pquantiles']['q50'][ii] for dat in alldata_2])
-		up2 = np.array([dat['pquantiles']['q84'][ii] for dat in alldata_2])
-		down2 = np.array([dat['pquantiles']['q16'][ii] for dat in alldata_2])
-
-		cent7 = np.array([dat['pquantiles']['q50'][ii] for dat in alldata_7])
-		up7 = np.array([dat['pquantiles']['q84'][ii] for dat in alldata_7])
-		down7 = np.array([dat['pquantiles']['q16'][ii] for dat in alldata_7])
-
-		if ii == 0:
-			errs2 = threed_dutils.asym_errors(cent2, up2, down2, log=True)
-			cent2 = np.log10(cent2)
-			errs7 = threed_dutils.asym_errors(cent7, up7, down7, log=True)
-			cent7 = np.log10(cent7)
-		else:
-			errs2 = threed_dutils.asym_errors(cent2, up2, down2, log=False)
-			errs7 = threed_dutils.asym_errors(cent7, up7, down7, log=False)
-
-		ax[ii].errorbar(cent2,cent7,xerr=errs2,yerr=errs7,fmt='o',color='0.4',alpha=0.6)
-		ax[ii].set_xlabel(parnames[ii]+' tres=2')
-		ax[ii].set_ylabel(parnames[ii]+' tres=7')
-
-		ax[ii] = threed_dutils.equalize_axes(ax[ii], cent2,cent7)
-		off,scat = threed_dutils.offset_and_scatter(cent2,cent7,biweight=True)
-		ax[ii].text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat),
-			  transform = ax[ii].transAxes,horizontalalignment='right')
-		ax[ii].text(0.96,0.1, 'mean offset='+"{:.2f}".format(off),
-			      transform = ax[ii].transAxes,horizontalalignment='right')
-
-	plt.tight_layout()
-	plt.savefig(os.getenv('APPS')+'/threedhst_bsfh/plots/brownseds/pcomp/model_params_comp.png',dpi=dpi)
-	plt.close()
-
-	nparams = len(alldata_2[0]['pextras']['parnames'])
-	parnames = alldata_2[0]['pextras']['parnames']
-	fig, ax = plt.subplots(3,3, figsize = (18,18))
-	ax = np.ravel(ax)
-	for ii in xrange(nparams):
-		
-		cent2 = np.array([dat['pextras']['q50'][ii] for dat in alldata_2])
-		up2 = np.array([dat['pextras']['q84'][ii] for dat in alldata_2])
-		down2 = np.array([dat['pextras']['q16'][ii] for dat in alldata_2])
-
-		cent7 = np.array([dat['pextras']['q50'][ii] for dat in alldata_7])
-		up7 = np.array([dat['pextras']['q84'][ii] for dat in alldata_7])
-		down7 = np.array([dat['pextras']['q16'][ii] for dat in alldata_7])
-
-		errs2 = threed_dutils.asym_errors(cent2, up2, down2, log=True)
-		errs7 = threed_dutils.asym_errors(cent7, up7, down7, log=True)
-		if 'ssfr' in parnames[ii]:
-			cent2 = np.log10(np.clip(cent2,1e-13,np.inf))
-			cent7 = np.log10(np.clip(cent7,1e-13,np.inf))
-		elif 'sfr' in parnames[ii]:
-			cent2 = np.log10(np.clip(cent2,1e-4,np.inf))
-			cent7 = np.log10(np.clip(cent7,1e-4,np.inf))
-		elif 'emp_ha' in parnames[ii]:
-			cent2 = np.log10(np.clip(cent2,1e37,np.inf))
-			cent7 = np.log10(np.clip(cent7,1e37,np.inf))
-		else:
-			cent2 = np.log10(cent2)
-			cent7 = np.log10(cent7)
-
-
-		ax[ii].errorbar(cent2,cent7,xerr=errs2,yerr=errs7,fmt='o',color='0.4',alpha=0.6)
-		ax[ii].set_xlabel('log('+parnames[ii]+') tres=2')
-		ax[ii].set_ylabel('log('+parnames[ii]+') tres=7')
-
-		ax[ii] = threed_dutils.equalize_axes(ax[ii], cent2,cent7)
-		off,scat = threed_dutils.offset_and_scatter(cent2,cent7,biweight=True)
-		ax[ii].text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat)+' dex',
-			  transform = ax[ii].transAxes,horizontalalignment='right')
-		ax[ii].text(0.96,0.1, 'mean offset='+"{:.2f}".format(off)+ 'dex',
-			      transform = ax[ii].transAxes,horizontalalignment='right')
-
-	plt.tight_layout()
-	plt.savefig(os.getenv('APPS')+'/threedhst_bsfh/plots/brownseds/pcomp/derived_params_comp.png',dpi=dpi)
-	plt.close()
-
 
 

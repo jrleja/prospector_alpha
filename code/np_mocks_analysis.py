@@ -74,7 +74,7 @@ def calc_sigma(fit_pars,true_pars):
 	residual_distribution = norm_resid(fit_pars,true_pars)
 	onesig = (np.abs(residual_distribution) < 1).sum()/float(residual_distribution.shape[0])
 
-	return residual_distribution, onesig, mean
+	return residual_distribution, onesig
 
 def pdf_distance(chain, truths, chainnames=None, truthnames=None):
 

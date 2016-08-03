@@ -52,12 +52,12 @@ def main(coarse_bins=False):
 		outfig = '/Users/joel/my_papers/prospector_brown/figures/nonparametric_templates.png'
 		ylim = 	(0,7)
 	else: 
-		param_file = '/Users/joel/code/python/threedhst_bsfh/parameter_files/np_mocks/np_mocks_params.py'
-		labels = ['0-30 Myr','30 Myr-100 Myr','100 Myr-300 Myr', '300 Myr-1 Gyr','1 Gyr-3 Gyr','3 Gyr-6 Gyr','6 Gyr-13.6 Gyr']
-		y_offsets = [0.0,0.5,0.1,-0.2,-0.35,-0.9,0.0]
-		x_offsets = [0.0,-.03,-0.02,-.05,-.09,.5,0.0]
+		param_file = '/Users/joel/code/python/threedhst_bsfh/parameter_files/np_mocks_midcr/np_mocks_midcr_params.py'
+		labels = ['0 Myr-100 Myr','100 Myr-300 Myr', '300 Myr-1 Gyr','1 Gyr-3 Gyr','3 Gyr-6 Gyr','6 Gyr-13.6 Gyr']
+		y_offsets = [0.68,0.1,-0.2,-0.35,-1.1,-1.45]
+		x_offsets = [-.03,-0.02,-.05,-.09,.3,0.2]
 		idx = 480
-		colors = ['#9400D3','#31A9B8','#375E97','#3F681C','#FFBB00','#FB6542','#FF420E']
+		colors = ['#9400D3','#31A9B8','#375E97','#3F681C','#FF9100','#FF420E']
 		outfig = '/Users/joel/my_papers/prospector_brown/figures/nonparametric_templates.png'
 		ylim = (0,7.5)
 

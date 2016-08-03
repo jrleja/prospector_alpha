@@ -41,15 +41,17 @@ out2 = '/Users/joel/code/python/threedhst_bsfh/plots/brownseds_np/pcomp/model_di
 
 #### set initial theta
 # 'logmass','sfr_fraction_1', sfr_fraction_2,
-# sfr_fraction_3, sfr_fraction_4, 'dust2', 
-#  'logzsol', 'dust_index', 'dust1', 
-# 'duste_qpah', 'duste_gamma', 'duste_umin'
+# sfr_fraction_3, sfr_fraction_4, 'sfr_fraction_5',
+#  dust2', 'logzsol', 'dust_index', 
+# 'dust1', 'duste_qpah', 'duste_gamma', 
+# 'duste_umin'
 
 labels = model.theta_labels()
 itheta = np.array([10, 0.02, 0.1,
-                   0.2, 0.3, 0.3,
-                   -1.0, 0.0, 0.3,
-                   3.0, 1e-1, 10.0])
+                   0.15, 0.2, 0.25, 
+                   0.3, -1.0, 0.0, 
+                   0.3, 3.0, 1e-1, 
+                   10.0])
 model.initial_theta = itheta
 
 class jLogFormatter(mpl.ticker.LogFormatter):
@@ -227,8 +229,7 @@ def sfh_xplot(ax,par,par_idx):
 	indices = [i for i, s in enumerate(labels) if ('sfr_fraction' in s) and (i != par_idx)]
 	for ii,p in enumerate(par):
 
-		#theta[indices] = itheta[indices] + (par[1] - p)*time_per_bin[np.array(indices)-1]/(time_sum - time_per_bin[par_idx-1])
-		theta[indices] = itheta[indices] + (par[1] - p)*itheta[indices]/(1-p)
+		theta[indices] = itheta[indices] * (1-p) / (1-par[1])
 		theta[par_idx] = p
 		sfh_pars = threed_dutils.find_sfh_params(model,theta,obs,sps)
 		sfh = threed_dutils.return_full_sfh(t, sfh_pars)
@@ -240,7 +241,7 @@ def sfh_xplot(ax,par,par_idx):
 	ax.set_ylim(-1.5,0.4)
 	ax.set_xlabel(r'log(lookback time [Gyr])')
 	ax.set_ylabel(r'log(SFR [M$_{\odot}$/yr])')
-	ax.set_xlim(11,0.04)
+	ax.set_xlim(13,0.04)
 	ax.set_xscale('log',nonposx='clip',subsx=[1])
 	ax.xaxis.set_minor_formatter(minorFormatter)
 	ax.xaxis.set_major_formatter(majorFormatter)
@@ -267,13 +268,13 @@ def attn_xplot(ax,par,par_idx,label):
 	#### calculate and plot different attenuation curves
 	theta = copy.copy(model.initial_theta)
 	for ii,p in enumerate(par):
-		if par_idx == 5: # if dust2
+		if par_idx == 6: # if dust2
 			diff_attn = threed_dutils.charlot_and_fall_extinction(lam,bc,p,didx_bc,didx_diff, kriek=True, nobc=True, nodiff=False)
 			ax.plot(lam/1e4,-np.log(diff_attn),color=colors[ii],lw=lw,alpha=alpha,linestyle=linestyle)
-		elif par_idx == 8: # if dust1
+		elif par_idx == 9: # if dust1
 			bc_attn   = threed_dutils.charlot_and_fall_extinction(lam,p,diff,didx_bc,didx_diff, kriek=True, nobc=False, nodiff=True)
 			ax.plot(lam/1e4,-np.log(bc_attn),color=colors[ii],lw=lw,alpha=alpha,linestyle=linestyle)
-		elif par_idx == 7: # if dust_index
+		elif par_idx == 8: # if dust_index
 			diff_attn = threed_dutils.charlot_and_fall_extinction(lam,bc,diff,didx_bc,p, kriek=True, nobc=True, nodiff=False)
 			ax.plot(lam/1e4,-np.log(diff_attn),color=colors[ii],lw=lw,alpha=alpha,linestyle=linestyle)
 
@@ -339,10 +340,10 @@ def dust_heating_xplot(ax, par, par_idx):
 	theta = copy.copy(model.initial_theta)
 	for ii,p in enumerate(par):
 
-		if par_idx == 10: # duste_gamma
+		if par_idx == 11: # duste_gamma
 			u,intensity_distr = dlogm_du(p,duste_umin)
 			ax.plot(np.log10(u),np.log10(intensity_distr),color=colors[ii],lw=lw,alpha=alpha)
-		elif par_idx == 11: # duste_umin
+		elif par_idx == 12: # duste_umin
 			u,intensity_distr = dlogm_du(duste_gamma,p)
 			ax.plot(np.log10(u),np.log10(intensity_distr),color=colors[ii],lw=lw,alpha=alpha)
 		else:
@@ -524,7 +525,7 @@ def plot_sed(ax,ax_res,par_idx,par=None,txtlabel=None,fmt="{:.2e}"):
 		sps.ssp.params.dirtiness = 1
 		# sfr fraction? 
 		if par_idx in sfr_indices:
-			theta[sfr_indices] = (1.-p)/4.
+			theta[sfr_indices] = itheta[sfr_indices] * (1-p) / (1-par[1])
 		theta[par_idx] = p
 		spec,mags,_ = model.mean_model(theta, obs, sps=sps)
 		spec *= c/sps.wavelengths
@@ -575,52 +576,52 @@ def main_plot():
 	idx = labels.index('logmass')
 	par = [9.7,10.3]
 	a1 = plt.subplot(gs2[0])
-	add_label(a1,'stellar \n mass',par=par,par_idx=idx, txtlabel=r'log(M/M$_{\odot}$)', fmt="{:.2f}")
+	add_label(a1,'stellar \n mass',par=par,par_idx=idx, txtlabel=r'log(M/M$_{\odot}$)', fmt="{:.1f}")
 	mass_xplot(a1,par,idx)
 	plot_sed(plt.subplot(gs1[0,0]),plt.subplot(gs1[0,1]),idx,
 						 par=[9.7,10.3])
 
-	#### PLOT 2 METALLICITY
-	idx = labels.index('logzsol')
-	par = [-1.8,0.1]
-	a2 = plt.subplot(gs2[1])
-	add_label(a2,'stellar \n metallicity',par=par,par_idx=idx, txtlabel=r'log(Z/Z$_{\odot}$)', fmt="{:.2f}")
-	met_xplot(a2,par,idx)
-	plot_sed(plt.subplot(gs1[1,0]),plt.subplot(gs1[1,1]),idx,
-						 par=[-1.8,0.1])
-
-	#### PLOT 3 SFR1
-	a3 = plt.subplot(gs2[2])
+	#### PLOT 2 SFR1
+	a3 = plt.subplot(gs2[1])
 	idx = labels.index('sfr_fraction_1')
 	par = [0.01,0.04]
 	add_label(a3,r'SFH',par=par,par_idx=idx, txtlabel=r'fraction', fmt="{:.2f}",secondary_text='0-100 Myr')
 	sfh_xplot(a3,par,idx)
+	plot_sed(plt.subplot(gs1[1,0]),plt.subplot(gs1[1,1]),idx,
+						    par=par)
+
+	#### PLOT 3 SFR2
+	a4 = plt.subplot(gs2[2])
+	idx = labels.index('sfr_fraction_2')
+	par = [0.02,0.2]
+	add_label(a4,r'SFH',par=par,par_idx=idx, txtlabel=r'fraction', fmt="{:.2f}",secondary_text='100-300 Myr')
+	sfh_xplot(a4,par,idx)
 	plot_sed(plt.subplot(gs1[2,0]),plt.subplot(gs1[2,1]),idx,
 						    par=par)
 
-	#### PLOT 4 SFR2
-	a4 = plt.subplot(gs2[3])
-	idx = labels.index('sfr_fraction_2')
-	par = [0.02,0.3]
-	add_label(a4,r'SFH',par=par,par_idx=idx, txtlabel=r'fraction', fmt="{:.2f}",secondary_text='100-300 Myr')
-	sfh_xplot(a4,par,idx)
-	plot_sed(plt.subplot(gs1[3,0]),plt.subplot(gs1[3,1]),idx,
-						    par=par)
-
-	#### PLOT 5 SFR3
-	a5 = plt.subplot(gs2[4])
+	#### PLOT 4 SFR3
+	a5 = plt.subplot(gs2[3])
 	idx = labels.index('sfr_fraction_3')
-	par = [0.02,0.4]
+	par = [0.02,0.3]
 	add_label(a5,r'SFH',par=par,par_idx=idx, txtlabel=r'fraction', fmt="{:.2f}",secondary_text='300 Myr-1 Gyr')
 	sfh_xplot(a5,par,idx)
-	plot_sed(plt.subplot(gs1[4,0]),plt.subplot(gs1[4,1]),idx,
+	plot_sed(plt.subplot(gs1[3,0]),plt.subplot(gs1[3,1]),idx,
 						 par=par)
 
-	#### PLOT 6 SFR4
-	a6 = plt.subplot(gs2[5])
+	#### PLOT 5 SFR4
+	a6 = plt.subplot(gs2[4])
 	idx = labels.index('sfr_fraction_4')
-	par = [0.1,0.5]
+	par = [0.1,0.3]
 	add_label(a6,r'SFH',par=par,par_idx=idx, txtlabel=r'fraction', fmt="{:.2f}",secondary_text='1-3 Gyr')
+	sfh_xplot(a6,par,idx)
+	plot_sed(plt.subplot(gs1[4,0]),plt.subplot(gs1[4,1]), idx,
+						 par=par)
+
+	#### PLOT 6 SFR5
+	a6 = plt.subplot(gs2[5])
+	idx = labels.index('sfr_fraction_5')
+	par = [0.15,0.35]
+	add_label(a6,r'SFH',par=par,par_idx=idx, txtlabel=r'fraction', fmt="{:.2f}",secondary_text='3-6 Gyr')
 	sfh_xplot(a6,par,idx)
 	plot_sed(plt.subplot(gs1[5,0]),plt.subplot(gs1[5,1]), idx,
 						 par=par)
@@ -629,65 +630,74 @@ def main_plot():
 	plt.close()
 
 	#### NEW PLOT
-	fig2 = plt.figure(figsize = (37.5,37.5))
+	fig2 = plt.figure(figsize = (37.5,43.75))
 
-	gs1 = gridspec.GridSpec(6, 2)
+	gs1 = gridspec.GridSpec(7, 2)
 	gs1.update(left=0.28, right=0.985, wspace=0.15, top=0.98,bottom=0.05)
-	gs2 = gridspec.GridSpec(6, 1)
+	gs2 = gridspec.GridSpec(7, 1)
 	gs2.update(left=0.14, right=0.265, top=0.98,bottom=0.05)
 
-	#### PLOT 7 DUST1
-	a7 = plt.subplot(gs2[0])
+	#### PLOT 7 METALLICITY
+	idx = labels.index('logzsol')
+	par = [-1.8,0.1]
+	a2 = plt.subplot(gs2[0])
+	add_label(a2,'stellar \n metallicity',par=par,par_idx=idx, txtlabel=r'log(Z/Z$_{\odot}$)', fmt="{:.2f}")
+	met_xplot(a2,par,idx)
+	plot_sed(plt.subplot(gs1[0,0]),plt.subplot(gs1[0,1]),idx,
+						 par=[-1.8,0.1])
+
+	#### PLOT 8 DUST1
+	a7 = plt.subplot(gs2[1])
 	idx = labels.index('dust1')
 	par = [0.0,1.0]
 	add_label(a7,r'birth cloud' '\n' r'dust',par=par,par_idx=idx, txtlabel=r'$\tau_{\mathbf{bc}}$', fmt="{:.1f}")
 	attn_xplot(a7,par,idx, 'birth cloud')
-	plot_sed(plt.subplot(gs1[0,0]),plt.subplot(gs1[0,1]), idx,
+	plot_sed(plt.subplot(gs1[1,0]),plt.subplot(gs1[1,1]), idx,
 						 par=par)
 
-	#### PLOT 8 DUST2
-	a8 = plt.subplot(gs2[1])
+	#### PLOT 9 DUST2
+	a8 = plt.subplot(gs2[2])
 	idx = labels.index('dust2')
 	par = [0.0,1.0]
 	add_label(a8,r'diffuse' '\n' r'dust',par=par,par_idx=idx, txtlabel=r'$\tau_{\mathbf{diff}}$', fmt="{:.1f}")
 	attn_xplot(a8,par,idx, 'diffuse')
-	plot_sed(plt.subplot(gs1[1,0]),plt.subplot(gs1[1,1]), idx,
+	plot_sed(plt.subplot(gs1[2,0]),plt.subplot(gs1[2,1]), idx,
 						 par=par)
 
-	#### PLOT 9 DUST2_INDEX
-	a9 = plt.subplot(gs2[2])
+	#### PLOT 10 DUST2_INDEX
+	a9 = plt.subplot(gs2[3])
 	idx = labels.index('dust_index')
 	par = [-0.3,0.3]
 	add_label(a9,r'diffuse' '\n' r'dust index',par=par,par_idx=idx, txtlabel=r'$n_{\mathbf{diff}}$', fmt="{:.1f}")
 	attn_xplot(a9,par,idx, 'diffuse')
-	plot_sed(plt.subplot(gs1[2,0]),plt.subplot(gs1[2,1]), idx,
+	plot_sed(plt.subplot(gs1[3,0]),plt.subplot(gs1[3,1]), idx,
 						 par=par)
 
-	#### PLOT 10 DUSTE_GAMMA
-	a10 = plt.subplot(gs2[3])
+	#### PLOT 11 DUSTE_GAMMA
+	a10 = plt.subplot(gs2[4])
 	idx = labels.index('duste_gamma')
 	par = [0.01,0.5]
 	add_label(a10,r'dust' '\n' 'emission' '\n' r'$\bm{\gamma}$',par=par,par_idx=idx, txtlabel=r'$\gamma$', fmt="{:.1f}")
 	dust_heating_xplot(a10,par,idx)
-	plot_sed(plt.subplot(gs1[3,0]),plt.subplot(gs1[3,1]), idx,
+	plot_sed(plt.subplot(gs1[4,0]),plt.subplot(gs1[4,1]), idx,
 						 par=par)
 
 	#### PLOT 11 DUSTE_UMIN
-	a11 = plt.subplot(gs2[4])
+	a11 = plt.subplot(gs2[5])
 	idx = labels.index('duste_umin')
 	par = [1,20]
 	add_label(a11,r'dust' '\n' 'emission' '\n' r'U$_{\mathbf{min}}$',par=par,par_idx=idx, txtlabel=r'U$_{\mathbf{min}}$', fmt="{:.1f}")
 	dust_heating_xplot(a11,par,idx)
-	plot_sed(plt.subplot(gs1[4,0]),plt.subplot(gs1[4,1]), idx,
+	plot_sed(plt.subplot(gs1[5,0]),plt.subplot(gs1[5,1]), idx,
 						 par=par)
 
 	#### PLOT 12 DUSTE_QPAH
-	a12 = plt.subplot(gs2[5])
+	a12 = plt.subplot(gs2[6])
 	idx = labels.index('duste_qpah')
 	par = [0.0,6.0]
 	add_label(a12,r'dust' '\n' 'emission' '\n' r'q$_{\mathbf{PAH}}$',par=par,par_idx=idx, txtlabel=r'q$_{\mathbf{PAH}}$', fmt="{:.1f}")
 	qpah_xplot(a12,par,idx)
-	plot_sed(plt.subplot(gs1[5,0]),plt.subplot(gs1[5,1]), idx,
+	plot_sed(plt.subplot(gs1[6,0]),plt.subplot(gs1[6,1]), idx,
 						 par=par)
 
 	plt.savefig(out2,dpi=dpi)
