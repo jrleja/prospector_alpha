@@ -63,19 +63,6 @@ def make_plots(runname='nonparametric_mocks', recollate_data = False):
 	# SFR_10 (truth) versus SFR_100 (truth) [there better be differences, goddamnit]
 
 
-def calc_sigma(fit_pars,true_pars):
-
-	'''
-	(1) calculate normalized residual distribution
-	(2) calculate 16th, 50th, and 84th percentiles of this distribution
-	(3) return average(84th-50th, 50th-16th) as 1 sigma, and 50th as mean
-	'''
-
-	residual_distribution = norm_resid(fit_pars,true_pars)
-	onesig = (np.abs(residual_distribution) < 1).sum()/float(residual_distribution.shape[0])
-
-	return residual_distribution, onesig
-
 def pdf_distance(chain, truths, chainnames=None, truthnames=None):
 
 	#### everything is properly ordered

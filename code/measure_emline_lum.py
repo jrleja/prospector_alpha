@@ -208,7 +208,7 @@ def bootstrap(obslam, obsflux, model, fitter, noise, line_lam,
 	# we want errors for flux and eqw
 	fluxout = np.array([np.percentile(flux, 50,axis=0),np.percentile(flux, 84,axis=0),np.percentile(flux, 16,axis=0)])
 
-	return fit,fluxout
+	return fit,fluxout,flux
 
 def absline_model(lam):
 	'''
@@ -504,7 +504,7 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 
 	### initial fit to emission
 	# use for normalization purposes
-	gauss_fit,_ = bootstrap(obslam[p_idx], obsflux[p_idx], emmod, fitter, np.min(obsflux[p_idx])*0.001, [1], 
+	gauss_fit,_,_ = bootstrap(obslam[p_idx], obsflux[p_idx], emmod, fitter, np.min(obsflux[p_idx])*0.001, [1], 
 	                          flux_flag=False, nboot=1)
 	
 	### find proper smoothing
@@ -591,7 +591,7 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 	ngauss_init = functional_models.Gaussian1D(mean=0.0,stddev=1e5,amplitude=1e-6)
 	ngauss_init.mean.fixed = True
 	ngauss_init.stddev.max = np.max(np.abs(bin_edges))*0.6
-	noise_gauss,_ = bootstrap((bin_edges[1:]+bin_edges[:-1])/2., hist, ngauss_init, fitter, np.min(hist)*0.001, [1], 
+	noise_gauss,_,_ = bootstrap((bin_edges[1:]+bin_edges[:-1])/2., hist, ngauss_init, fitter, np.min(hist)*0.001, [1], 
                   flux_flag=False, nboot=1)
 
 	##### TEST PLOT
@@ -630,7 +630,7 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 	# flux come out of bootstrap as (nlines,[median,errup,errdown])
 
 	#### now measure emission line fluxes
-	bfit_mod, emline_flux = bootstrap(obslam[p_idx],residuals,emmod,fitter,emline_noise,em_wave)
+	bfit_mod, emline_flux, emline_chain = bootstrap(obslam[p_idx],residuals,emmod,fitter,emline_noise,em_wave)
 
 	#############################
 	#### PLOT ALL THE THINGS ####
@@ -673,40 +673,6 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 		axarr[ii].text(0.98, 0.845, 'abs model', fontsize=16, transform = axarr[ii].transAxes,ha='right',color='#1E90FF')
 		axarr[ii].text(0.98, 0.76, 'observations', fontsize=16, transform = axarr[ii].transAxes,ha='right')
 
-		'''
-		###############################
-		##### ARE HBETAS WRONG? #######
-		###############################
-		ha_idx = emline == r'H$\alpha$'
-		hb_idx = emline == r'H$\beta$'
-
-		# Prospector values
-		ha_flux = emline_flux[0,ha_idx][0]
-		hb_flux = emline_flux[0,hb_idx][0]
-
-		# only do this if observed ha and hb flux is non-negative, and we're in the Hbeta plot
-		if (ha_flux > 0) & (hb_flux > 0) and (ii == 0):
-
-			# determine model balmer decrement
-			bdec_idx = sample_results['extras']['parnames'] == 'bdec_cloudy'
-			mod_bdec = sample_results['extras']['q50'][bdec_idx][0]
-
-			# adjust Hbeta flux
-			hb_flux_adj = (ha_flux / hb_flux) / mod_bdec
-			bfit_mod.amplitude_2.value *= hb_flux_adj
-
-			# replot
-			axarr[ii].plot(obslam[p_idx][p_idx_em],bfit_mod(obslam[p_idx][p_idx_em])+smoothed_absflux[p_idx_em],color='purple')
-
-			# put Balmer decrements up
-			axarr[ii].text(0.03, 0.2, r'H$\beta$ adjust = '+"{:.2f}".format(hb_flux_adj),
-					       fontsize=16, transform = axarr[ii].transAxes, color='purple')				
-			axarr[ii].text(0.03, 0.115, 'model bdec = '+"{:.2f}".format(mod_bdec),
-					       fontsize=16, transform = axarr[ii].transAxes)
-			axarr[ii].text(0.03, 0.03, 'obs bdec = '+"{:.2f}".format(ha_flux / hb_flux),
-					       fontsize=16, transform = axarr[ii].transAxes)
-		'''
-
 	plt.tight_layout()
 	plt.savefig(out_em, dpi = 300)
 	plt.close()
@@ -718,8 +684,9 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 	# currently, NO spectral smoothing; inspect to see if it's important for HDELTA ONLY
 	zadj = bfit_mod.mean_0.value / 4958.92 - 1
 
-	if sigma_spec < 175:
-		obsflux = threed_dutils.smooth_spectrum(obslam/(1+zadj),obsflux,200,minlam=3e3,maxlam=3e8)
+	if sigma_spec < 200:
+		to_convolve = (200.**2 - sigma_spec**2)**0.5
+		obsflux = threed_dutils.smooth_spectrum(obslam/(1+zadj),obsflux,to_convolve,minlam=3e3,maxlam=3e8)
 
 	#### bootstrap
 	nboot = 100
@@ -766,12 +733,14 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 	obs['flux'] = emline_flux[0,:]  / dfactor / (1+magphys['metadata']['redshift'])
 	obs['flux_errup'] = emline_flux[1,:]  / dfactor / (1+magphys['metadata']['redshift'])
 	obs['flux_errdown'] = emline_flux[2,:]  / dfactor / (1+magphys['metadata']['redshift'])
+	obs['flux_chain'] = emline_chain
 
 	obs['dn4000'] = dn4000_obs
 	obs['balmer_lum'] = obs_abs_flux
 	obs['balmer_eqw_rest'] = obs_abs_eqw
 	obs['balmer_flux'] = obs_abs_flux / dfactor / (1+magphys['metadata']['redshift'])
 	obs['balmer_names'] = abslines
+	obs['balmer_eqw_rest_chain'] = tobs_abs_eqw
 
 	obs['continuum_obs'] = obs_abs_flux[:,0] / obs_abs_eqw[:,0] 
 	obs['continuum_lam'] = obs_lam_cont

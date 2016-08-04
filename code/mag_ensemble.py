@@ -9,6 +9,7 @@ from scipy.optimize import minimize
 import pickle
 import corner
 from matplotlib.ticker import MaxNLocator
+import brown_quality_cuts
 
 #### set up colors and plot style
 prosp_color = '#e60000'
@@ -54,21 +55,141 @@ def minlog(x,axis=None):
 
 	return np.log10(x)
 
-def pdf_distance(chain, truth):
+def pdf_distance(chain, truth, bins):
 
-	npars = chain.shape[1]
 	nsamp = float(chain.shape[0])
-	pdf_dist = np.zeros(npars)
+	pdf_dist = (chain > truth).sum()/nsamp
+	hist_loc = (pdf_dist >= bins[:-1]) & (pdf_dist < bins[1:]) # works for delta function...
 
-	for i in xrange(npars): pdf_dist[i] = (chain[:,i] > truth[i]).sum()/nsamp
+	# edge effect
+	if pdf_dist == 1:
+		hist_loc[-1] = True
 
-	return pdf_dist
+	return hist_loc
 
 def specpar_pdf_distance(pinfo,alldata, cdf=True, add_obs_errs=True):
 
-	to_test = ['halpha','hbeta','balmer_decrement','zmet','dn4000','hdelta']
+	#### names and labels
+	test_labels = [r'H$\alpha$ flux',r'H$\beta$ flux','Balmer decrement',
+	               r'log(Z/Z$_{\odot}$)',r'D$_n$4000',r'H$\delta$ EQW']
+	obs_names = ['f_ha','f_hb','bdec',
+	             None,'dn4000','hdel_eqw'] # will have to jig metallicity
 
-	print 1/0
+	# hdelta flags
+	index_flags = np.loadtxt('/Users/joel/code/python/threedhst_bsfh/data/brownseds_data/hdelta_index.txt', dtype = {'names':('name','flag'),'formats':('S40','i4')})
+	anames = alldata[0]['spec_info']['absnames']
+
+	# truth bins
+	nbins = 5
+	bins = np.linspace(0,1,nbins+1)
+
+	### setup figure
+	out = {}
+	for ii, par in enumerate(test_labels):
+		pdf = np.zeros(nbins)
+
+		if ii == 0: # halpha
+			keep_idx = brown_quality_cuts.halpha_cuts(pinfo)
+		if ii == 1: # hbeta
+			keep_idx = brown_quality_cuts.halpha_cuts(pinfo)
+		if ii == 2: # bdec
+			keep_idx = brown_quality_cuts.halpha_cuts(pinfo)
+		if ii == 3: # met
+			_, _, truemet, truemet_errs, a3d_alpha, keep_idx = brown_quality_cuts.load_atlas3d(pinfo)
+		if ii == 4: # dn4000
+			keep_idx = brown_quality_cuts.dn4000_cuts(pinfo)
+		if ii == 5: # hdelta absorption
+			keep_idx = brown_quality_cuts.hdelta_cuts(pinfo)
+
+
+		for kk, dat in enumerate(alldata):
+
+			if keep_idx[kk] == False:
+				continue
+
+			if ii == 0: # halpha
+				chain = dat['model_emline']['flux']['chain'][:,dat['model_emline']['emnames']=='Halpha']
+				truth = pinfo['obs'][obs_names[ii]][kk,0]
+				truth_errs = None
+
+			if ii == 1: # hbeta
+				chain = dat['model_emline']['flux']['chain'][:,dat['model_emline']['emnames']=='Hbeta']
+				truth = pinfo['obs'][obs_names[ii]][kk,0]
+				truth_errs = None
+
+			if ii == 2: # bdec
+				chain = dat['pextras']['flatchain'][:,dat['pextras']['parnames']=='bdec_cloudy']
+				truth = pinfo['obs'][obs_names[ii]][kk]
+				truth_errs = None
+
+			if ii == 3: # met
+				chain = dat['pquantiles']['random_chain'][:,dat['pquantiles']['parnames']=='logzsol']
+				truth = truemet[np.sum(keep_idx[:kk])]
+				truth_errs = None
+
+			if ii == 4: # dn4000
+				chain = dat['spec_info']['dn4000']['chain']
+				truth = pinfo['obs'][obs_names[ii]][0]
+				truth_errs = None
+
+			if ii == 5: # hdelta absorption
+				match = index_flags['name'] == dat['objname'].replace(' ','')
+				flag = index_flags['flag'][match]
+				if flag == 1: hdelta_ind = 'hdelta_narrow'
+				if flag == 0: hdelta_ind = 'hdelta_wide'
+				chain = dat['spec_info']['eqw']['chain'][:,dat['spec_info']['absnames'] == hdelta_ind]
+
+				truth = pinfo['obs'][obs_names[ii]][kk,0]
+				truth_errs = None
+			
+			# to fill in later with PDFs, which are available for HDELTA, HALPHA, HBETA.
+			# can construct Balmer decrement PDF by taking samples from Halpha + Hbeta, ignoring potential correlation
+			# metallicity will be Gaussian error
+			# Dn4000 will be delta function
+			if add_obs_errs == True: 
+				pass
+			pdf += pdf_distance(chain,truth,bins)
+
+		outtemp = {}
+		outtemp['pdf_distance'] = pdf
+		outtemp['bins'] = bins
+		outtemp['plot_bins'] = (bins[:-1] + bins[1:])/2.
+		out[par] = outtemp
+
+	return out
+
+def specpar_pdf_plot(pdf,outname=None):
+
+	fig, axarr = plt.subplots(2,3, figsize = (18,12))
+	ax = np.ravel(axarr)
+
+	idealcolor = '#FF420E'
+	actualcolor = 'black'
+
+	for i, key in enumerate(pdf.keys()):
+		npoints = pdf[key]['pdf_distance'].sum()
+		nbins = pdf[key]['plot_bins'].shape[0]
+		ideal_pdf_size = 1./nbins
+
+		# close the histogram (plotx values because of steps-mid option)
+		plotx = np.concatenate((-np.atleast_1d(pdf[key]['plot_bins'][0]),pdf[key]['plot_bins'],2-np.atleast_1d(pdf[key]['plot_bins'][-1])))
+		ploty = np.concatenate((np.atleast_1d(0.0),pdf[key]['pdf_distance']/npoints,np.atleast_1d(0.0)))
+
+		ax[i].plot(plotx,ploty,alpha=0.8,lw=2,color=actualcolor,drawstyle='steps-mid')
+		ax[i].plot([0,1],[ideal_pdf_size,ideal_pdf_size],alpha=0.8,linestyle='--',lw=2,color=idealcolor)
+		ax[i].set_xlabel('location of observation in model posterior')
+		ax[i].set_ylabel('density')
+		ax[i].set_title(key)
+		ax[i].set_ylim(0.0,ax[i].get_ylim()[1])
+		ax[i].set_xlim(0,1)
+
+		ax[i].text(0.05,0.91,'N='+str(int(npoints)),transform=ax[i].transAxes)
+		ax[i].text(0.05,0.86,'ideal distribution',transform=ax[i].transAxes,color=idealcolor)
+		ax[i].text(0.05,0.81,'actual distribution',transform=ax[i].transAxes,color=actualcolor)
+
+	plt.tight_layout()
+	plt.savefig(outname,dpi=150)
+	os.system('open '+outname)
 
 def merge_dicts(*dict_args):
     '''
@@ -516,8 +637,8 @@ def fmt_emline_info(alldata,add_abs_err = False):
 	# cuts
 	# obslines sncut is 1.0 for now, because otherwise NGC 4473 is in the sample, 
 	# which has S/N ~ 0.95 for Halpha (clearly a crap detection)  12/10/15
-	obslines['sn_cut'] = 5.0
-	obslines['eqw_cut'] = 0.0
+	obslines['sn_cut'] = 10.0
+	obslines['eqw_cut'] = 5.0
 	obslines['hdelta_sn_cut'] = 5.0
 	obslines['hdelta_eqw_cut'] = 1.0
 
@@ -956,34 +1077,7 @@ def fmt_emline_info(alldata,add_abs_err = False):
 
 def atlas_3d_met(e_pinfo,hflag,outfolder=''):
 
-	#### load up atlas3d info
-	dtype={'names': ('name', 'hbeta_ang','hbeta_ang_err', 'fe5015_ang','fe5015_ang_err','mgb_ang','mgb_ang_err','fe5270_ang','fe5270_ang_err','age_ssp','age_ssp_err','z_h_ssp','z_h_ssp_err','a_fe_ssp','a_fe_ssp_err','quality'), \
-	       'formats': ('S16', 'f8', 'f8', 'f8', 'f8', 'f8', 'f8', 'f8', 'f8', 'f8', 'f8', 'f8', 'f8', 'f8', 'f8', 'f8', 'f8', 'i4')}
-	a3d = np.loadtxt('/Users/joel/code/python/threedhst_bsfh/data/brownseds_data/atlas_3d_abundances.dat',dtype=dtype,comments='#')
-
-	#### matching
-	objnames = e_pinfo['objnames']
-	a3d_met,a3d_met_err, a3d_alpha, prosp_met,prosp_met_errup,prosp_met_errdo = [[] for i in range(6)]
-	for i, obj in enumerate(objnames): 
-		match = a3d['name'] == obj.replace(' ','')
-		
-		# no match
-		if np.sum(match) == 0:
-			continue
-
-		# match, save metallicity
-		prosp_met.append(e_pinfo['prosp']['met'][i,0])
-		prosp_met_errup.append(e_pinfo['prosp']['met'][i,1])
-		prosp_met_errdo.append(e_pinfo['prosp']['met'][i,2])
-		a3d_met.append(a3d['z_h_ssp'][match])
-		a3d_met_err.append(a3d['z_h_ssp_err'][match])
-		a3d_alpha.append(a3d['a_fe_ssp'][match])
-
-	prosp_met = np.array(prosp_met)
-	prosp_met_err = threed_dutils.asym_errors(prosp_met, prosp_met_errup,prosp_met_errdo,log=False)
-	a3d_met = np.array(a3d_met)
-	a3d_met_err = np.array(a3d_met_err)
-	a3d_alpha = np.array(a3d_alpha)
+	prosp_met, prosp_met_err, a3d_met, a3d_met_err, a3d_alpha, obj_idx = brown_quality_cuts.load_atlas3d(e_pinfo)
 
 	fig, ax = plt.subplots(1,1,figsize=(7,7))
 	fig.subplots_adjust(left=0.15,bottom=0.1,top=0.95,right=0.95)
@@ -1174,20 +1268,7 @@ def obs_vs_kennicutt_ha(e_pinfo,hflag,outname_prosp='test.png',outname_mag='test
 	#### plot observed Halpha versus model Halpha from Kennicutt relationship
 	#################
 
-	# S/N(Ha) > x, EQW (Ha) > x
-	sn_ha = np.abs(e_pinfo['obs']['f_ha'][:,0] / e_pinfo['obs']['err_ha'])
-	sn_hb = np.abs(e_pinfo['obs']['f_hb'][:,0] / e_pinfo['obs']['err_hb'])
-
-	keep_idx = np.squeeze((sn_ha > e_pinfo['obs']['sn_cut']) & \
-		                  (e_pinfo['obs']['eqw_ha'][:,0] > e_pinfo['obs']['eqw_cut']))
-	
-	keep_idx = np.squeeze((sn_ha > e_pinfo['obs']['sn_cut']) & \
-		                  (sn_hb > e_pinfo['obs']['sn_cut']) & \
-		                  (e_pinfo['obs']['eqw_ha'][:,0] > e_pinfo['obs']['eqw_cut']) & \
-		                  (e_pinfo['obs']['eqw_hb'][:,0] > e_pinfo['obs']['eqw_cut']) & \
-		                  (e_pinfo['obs']['f_ha'][:,0] > 0) & \
-		                  (e_pinfo['obs']['f_hb'][:,0] > 0) & \
-		                  (e_pinfo['prosp']['cloudy_ha'][:,0] > 0))
+	keep_idx = brown_quality_cuts.halpha_cuts(e_pinfo)
 
 	##### create plot quantities
 	if eqw:
@@ -1433,26 +1514,13 @@ def minimize_bdec_corr_eqn(x, hdel_eqw_obs, hdel_eqw_model, halpha_obs, hbeta_ob
 
 def paper_summary_plot(e_pinfo, hflag, outname='test.png'):
 
-	# S/N cut
-	sn_ha = np.abs(e_pinfo['obs']['f_ha'][:,0] / e_pinfo['obs']['err_ha'])
-	sn_hb = np.abs(e_pinfo['obs']['f_hb'][:,0] / e_pinfo['obs']['err_hb'])
-
 	#### paper font preferences
 	pweight = 'semibold'
 	pfontsize = 18
 	px = 0.03
 	py = 0.85
 
-	# ALSO REQUIRE MODEL HALPHA TO BE NONZERO
-	# THOUGH THIS REMOVES A PECULIAR CASE WHICH MAY ACTUALLY BE FUN TO LOOK INTO
-
-	keep_idx = np.squeeze((sn_ha > e_pinfo['obs']['sn_cut']) & \
-		                  (sn_hb > e_pinfo['obs']['sn_cut']) & \
-		                  (e_pinfo['obs']['eqw_ha'][:,0] > e_pinfo['obs']['eqw_cut']) & \
-		                  (e_pinfo['obs']['eqw_hb'][:,0] > e_pinfo['obs']['eqw_cut']) & \
-		                  (e_pinfo['obs']['f_ha'][:,0] > 0) & \
-		                  (e_pinfo['obs']['f_hb'][:,0] > 0) & \
-		                  (e_pinfo['prosp']['cloudy_ha'][:,0] > 0))
+	keep_idx = brown_quality_cuts.halpha_cuts(e_pinfo)
 
 	##### AGN identifiers
 	sfing, composite, agn = return_agn_str(keep_idx)
@@ -1493,7 +1561,7 @@ def paper_summary_plot(e_pinfo, hflag, outname='test.png'):
 
 
 	#### dn4000
-	dn_idx = e_pinfo['obs']['dn4000'] > 0.5
+	dn_idx = brown_quality_cuts.dn4000_cuts(e_pinfo)
 	dn4000_obs = e_pinfo['obs']['dn4000'][dn_idx]
 	dn4000_prosp = e_pinfo['prosp']['dn4000'][dn_idx,0]
 
@@ -1540,20 +1608,7 @@ def obs_vs_prosp_balmlines(e_pinfo,hflag,outname='test.png',outname_resid='test.
 	#################
 	#### plot observed Halpha versus expected (PROSPECTOR ONLY)
 	#################
-
-	# S/N cut
-	sn_ha = np.abs(e_pinfo['obs']['f_ha'][:,0] / e_pinfo['obs']['err_ha'])
-	sn_hb = np.abs(e_pinfo['obs']['f_hb'][:,0] / e_pinfo['obs']['err_hb'])
-
-	# ALSO REQUIRE MODEL HALPHA TO BE NONZERO
-	# THOUGH THIS REMOVES A PECULIAR CASE WHICH MAY ACTUALLY BE FUN TO LOOK INTO
-	keep_idx = np.squeeze((sn_ha > e_pinfo['obs']['sn_cut']) & \
-		                  (sn_hb > e_pinfo['obs']['sn_cut']) & \
-		                  (e_pinfo['obs']['eqw_ha'][:,0] > e_pinfo['obs']['eqw_cut']) & \
-		                  (e_pinfo['obs']['eqw_hb'][:,0] > e_pinfo['obs']['eqw_cut']) & \
-		                  (e_pinfo['obs']['f_ha'][:,0] > 0) & \
-		                  (e_pinfo['obs']['f_hb'][:,0] > 0) & \
-		                  (e_pinfo['prosp']['cloudy_ha'][:,0] > 0))
+	keep_idx = brown_quality_cuts.halpha_cuts(e_pinfo)
 
 	##### AGN identifiers
 	sfing, composite, agn = return_agn_str(keep_idx)
@@ -1690,12 +1745,7 @@ def obs_vs_model_hdelta(e_pinfo,hflag,outname=None,outname_dnplt=None,eqw=False)
 
 	'''
 
-	hdel_sn = np.abs((e_pinfo['obs']['hdel'][:,0]/ e_pinfo['obs']['hdel_err']))
-
-	### define limits
-	good_idx = (hdel_sn > e_pinfo['obs']['hdelta_sn_cut']) & \
-			   (e_pinfo['obs']['hdel_eqw'][:,0] > e_pinfo['obs']['hdelta_eqw_cut']) & \
-	           (e_pinfo['obs']['hdel'][:,0] > 0)
+	good_idx = brown_quality_cuts.hdelta_cuts(e_pinfo)
 
 	##### for dn4000 plots, if necessary
 	dn4000_obs = e_pinfo['obs']['dn4000'][good_idx]
@@ -2019,16 +2069,7 @@ def eline_errs(e_pinfo,hflag,outname='test.png'):
 	error_fraction = np.linspace(0.0,1.0,50)
 	hdel_scat = 0.35
 
-	# S/N cuts
-	# could consider doing this iteratively
-	sn_ha = np.abs(e_pinfo['obs']['f_ha'][:,0] / e_pinfo['obs']['err_ha'])
-	sn_hb = np.abs(e_pinfo['obs']['f_hb'][:,0] / e_pinfo['obs']['err_hb'])
-	keep_idx = np.squeeze((sn_ha > e_pinfo['obs']['sn_cut']) & \
-		                  (sn_hb > e_pinfo['obs']['sn_cut']) & \
-		                  (e_pinfo['obs']['eqw_ha'][:,0] > e_pinfo['obs']['eqw_cut']) & \
-		                  (e_pinfo['obs']['eqw_hb'][:,0] > e_pinfo['obs']['eqw_cut']) & \
-		                  (e_pinfo['obs']['f_ha'][:,0] > 0) & \
-		                  (e_pinfo['obs']['f_hb'][:,0] > 0))
+	keep_idx = brown_quality_cuts.halpha_cuts(e_pinfo)
 
 	#### pull out original halpha / hbeta calculations
 	f_ha = e_pinfo['obs']['f_ha_orig']
@@ -2127,19 +2168,7 @@ def obs_vs_model_bdec(e_pinfo,hflag,outname1='test.png',outname2='test.png'):
 	# first is Prospector CLOUDY marg + MAGPHYS versus observations
 	# second is Prospector CLOUDY bfit, Prospector calc bfit, Prospector calc marg versus observations
 
-	# S/N
-	sn_ha = np.abs(e_pinfo['obs']['f_ha'][:,0] / e_pinfo['obs']['err_ha'])
-	sn_hb = np.abs(e_pinfo['obs']['f_hb'][:,0] / e_pinfo['obs']['err_hb'])
-
-	#### for now, aggressive S/N cuts
-	# S/N(Ha) > 10, S/N (Hbeta) > 10
-	keep_idx = np.squeeze((sn_ha > e_pinfo['obs']['sn_cut']) & \
-		                  (sn_hb > e_pinfo['obs']['sn_cut']) & \
-		                  (e_pinfo['obs']['eqw_ha'][:,0] > e_pinfo['obs']['eqw_cut']) & \
-		                  (e_pinfo['obs']['eqw_hb'][:,0] > e_pinfo['obs']['eqw_cut']) & \
-		                  (e_pinfo['obs']['f_ha'][:,0] > 0) & \
-		                  (e_pinfo['obs']['f_hb'][:,0] > 0) & \
-		                  (e_pinfo['prosp']['cloudy_ha'][:,0] > 0))
+	keep_idx = brown_quality_cuts.halpha_cuts(e_pinfo)
 
 	##### write down plot variables
 	pl_bdec_cloudy_marg = bdec_to_ext(e_pinfo['prosp']['bdec_cloudy_marg'][keep_idx,:])
@@ -2240,15 +2269,7 @@ def obs_vs_prosp_sfr(e_pinfo,hflag,outname='test.png'):
 
 	#### pull out observed Halpha, observed Balmer decrement ####
 	# Make same cuts as Balmer decrement calculation
-	# S/N
-	sn_ha = np.abs(e_pinfo['obs']['f_ha'][:,0] / e_pinfo['obs']['err_ha'])
-	sn_hb = np.abs(e_pinfo['obs']['f_hb'][:,0] / e_pinfo['obs']['err_hb'])
-
-	#### for now, aggressive S/N cuts
-	keep_idx = np.squeeze((sn_ha > e_pinfo['obs']['sn_cut']) & \
-		                  (sn_hb > e_pinfo['obs']['sn_cut']) & \
-		                  (e_pinfo['obs']['eqw_ha'][:,0] > e_pinfo['obs']['eqw_cut']) & \
-		                  (e_pinfo['obs']['eqw_hb'][:,0] > e_pinfo['obs']['eqw_cut']))
+	keep_idx = brown_quality_cuts.halpha_cuts(e_pinfo)
 	
 	# halpha
 	f_ha = e_pinfo['obs']['f_ha'][keep_idx,0]
@@ -2368,13 +2389,7 @@ def residual_plots(e_pinfo,hflag,outfolder):
 
 	fldr = outfolder+'residuals/'
 	
-	sn_ha = np.abs(e_pinfo['obs']['f_ha'][:,0] / e_pinfo['obs']['err_ha'])
-	sn_hb = np.abs(e_pinfo['obs']['f_hb'][:,0] / e_pinfo['obs']['err_hb'])
-
-	keep_idx = np.squeeze((sn_ha > 3.0) & \
-		                  (sn_hb > 3.0) & \
-		                  (e_pinfo['obs']['eqw_ha'][:,0] > e_pinfo['obs']['eqw_cut']) & \
-		                  (e_pinfo['obs']['eqw_hb'][:,0] > e_pinfo['obs']['eqw_cut']))
+	keep_idx = brown_quality_cuts.halpha_cuts(e_pinfo)
 
 	mass = np.log10(e_pinfo['prosp']['mass'][keep_idx,0])
 	sfr_100 = np.log10(e_pinfo['prosp']['sfr_100'][keep_idx,0])
@@ -2708,7 +2723,8 @@ def plot_emline_comp(alldata,outfolder,hflag):
 	e_pinfo = fmt_emline_info(alldata)
 
 	##### add in 'location in truth' PDF
-	e_pinfo['truth_pdf'] = specpar_pdf_distance(e_pinfo,alldata)
+	pdf = specpar_pdf_distance(e_pinfo,alldata)
+	specpar_pdf_plot(pdf,outname=outfolder+'posterior_PDF.png')
 
 	# errors
 	eline_errs(e_pinfo,hflag,outname=outfolder+'error_sig.png')
