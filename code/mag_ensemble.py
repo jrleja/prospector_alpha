@@ -65,7 +65,7 @@ def pdf_stats(bins,pdf):
 
 	return median,onesig_range
 
-def pdf_distance(chain,truth,truth_chain,bins):
+def pdf_distance(chain,truth,truth_chain,bins,delta_functions=False,center_obs=False):
 
 	#### chain properties
 	model_chain_center = np.median(chain)
@@ -76,23 +76,30 @@ def pdf_distance(chain,truth,truth_chain,bins):
 	model_pdf,_ = np.histogram(clipped_centered_chain,bins=bins,density=True)
 
 	#### observed PDF
-	if truth_chain == None: # we have no errors (dn4000), use delta functions
+	if (truth_chain == None) or (delta_functions): # we have no errors (dn4000), use delta functions
 		clipped_truth = np.clip(truth-model_chain_center,bmin,bmax)
+		if center_obs:
+			clipped_truth = np.clip(0.0,bmin,bmax)
 		obs_pdf,_ = np.histogram(clipped_truth,bins=bins,density=True)
 
 	elif len(truth_chain) > 1: # we have a chain
 		clipped_centered_chain = np.clip(truth_chain-model_chain_center,bmin,bmax)
+		if center_obs:
+			clipped_centered_chain = np.clip(truth_chain-np.median(truth_chain),bmin,bmax)
 		clipped_centered_chain = clipped_centered_chain[np.isfinite(clipped_centered_chain)] # remove nans
 		obs_pdf,_ = np.histogram(clipped_centered_chain,bins=bins,density=True)
 
 	elif len(truth_chain) == 1: # we have a sigma, sample from a Gaussian
 		ransamps = np.random.normal(loc=truth-model_chain_center, scale=truth_chain, size=1000)
+		if center_obs:
+			ransamps = np.random.normal(loc=0.0, scale=truth_chain, size=1000)
+		ransamps = np.clip(ransamps,bmin,bmax)
 		obs_pdf,_ = np.histogram(ransamps,bins=bins,density=True)
 
 
 	return model_pdf, obs_pdf
 
-def specpar_pdf_distance(pinfo,alldata, cdf=True, add_obs_errs=True):
+def specpar_pdf_distance(pinfo,alldata, delta_functions=True, center_obs=True):
 
 	#### names and labels
 	test_labels = [r'H$\alpha$ flux',r'H$\beta$ flux','Balmer decrement',
@@ -111,26 +118,38 @@ def specpar_pdf_distance(pinfo,alldata, cdf=True, add_obs_errs=True):
 		if ii == 0: # halpha
 			keep_idx = brown_quality_cuts.halpha_cuts(pinfo)
 			bins = np.linspace(-1,1,51) # dex
+			if delta_functions:
+				bins = np.linspace(-1,1,26) # dex
 			xunit = 'dex'
 		if ii == 1: # hbeta
 			keep_idx = brown_quality_cuts.halpha_cuts(pinfo)
 			bins = np.linspace(-1,1,51) # dex
+			if delta_functions:
+				bins = np.linspace(-1,1,26) # dex
 			xunit = 'dex'
 		if ii == 2: # bdec
 			keep_idx = brown_quality_cuts.halpha_cuts(pinfo)
 			bins = np.linspace(-1,1,51) # BALMER DECREMENT UNITS (?)
+			if delta_functions:
+				bins = np.linspace(-0.5,0.5,26) # dex
 			xunit = 'magnitudes'
 		if ii == 3: # met
 			_, _, truemet, truemet_errs, a3d_alpha, keep_idx = brown_quality_cuts.load_atlas3d(pinfo)
 			bins = np.linspace(-0.6,0.6,51) # dex
+			if delta_functions:
+				bins = np.linspace(-0.21,0.21,16) # dex
 			xunit = 'dex'
 		if ii == 4: # dn4000
 			keep_idx = brown_quality_cuts.dn4000_cuts(pinfo)
 			bins = np.linspace(-0.35,0.35,61) # Dn4000
+			if delta_functions:
+				bins = np.linspace(-0.35,0.35,31) # Dn4000
 			xunit = None
 		if ii == 5: # hdelta absorption
 			keep_idx = brown_quality_cuts.hdelta_cuts(pinfo)
 			bins = np.linspace(-0.6,0.6,51) # dex
+			if delta_functions:
+				bins = np.linspace(-0.4,0.4,26) # dex
 			xunit = 'dex'
 
 		modpdf = np.zeros(bins.shape[0]-1)
@@ -164,7 +183,7 @@ def specpar_pdf_distance(pinfo,alldata, cdf=True, add_obs_errs=True):
 			if ii == 4: # dn4000
 				chain = dat['spec_info']['dn4000']['chain']
 				truth = pinfo['obs'][obs_names[ii]][kk]
-				truth_chain = np.atleast_1d(0.01)
+				truth_chain = np.atleast_1d(0.05)
 
 			if ii == 5: # hdelta absorption
 				match = index_flags['name'] == dat['objname'].replace(' ','')
@@ -177,7 +196,7 @@ def specpar_pdf_distance(pinfo,alldata, cdf=True, add_obs_errs=True):
 				truth_chain = np.log10(np.clip(pinfo['obs']['hdel_eqw_chain'][kk],0.01,np.inf))
 
 
-			tmodpdf, tobspdf = pdf_distance(chain,truth,truth_chain,bins)
+			tmodpdf, tobspdf = pdf_distance(chain,truth,truth_chain,bins,delta_functions=delta_functions,center_obs=center_obs)
 			modpdf += tmodpdf
 			obspdf += tobspdf
 
@@ -230,9 +249,9 @@ def specpar_pdf_plot(pdf,outname=None):
 
 		xunit = ''
 		if pdf[key]['xunit'] != None:
-			xunit = ' '+pdf[key]['xunit']
+			xunit = pdf[key]['xunit']
 
-		ax[i].set_xlabel('sum of posterior PDFs' + xunit)
+		ax[i].set_xlabel(r'$\Sigma$ (posterior probabilities) [' + xunit+']')
 		ax[i].set_ylabel('density')
 		ax[i].set_title(key)
 		ax[i].set_ylim(0.0,ax[i].get_ylim()[1])
@@ -2780,8 +2799,17 @@ def plot_emline_comp(alldata,outfolder,hflag):
 	e_pinfo = fmt_emline_info(alldata)
 
 	##### add in 'location in truth' PDF
-	pdf = specpar_pdf_distance(e_pinfo,alldata)
-	specpar_pdf_plot(pdf,outname=outfolder+'posterior_PDF.png')
+	delta_functions = False
+	center_obs = True
+	if delta_functions:
+		outname = outfolder+'posterior_PDF_delta_functions.png'
+	elif center_obs: 
+		outname = outfolder+'posterior_PDF_obscenter.png'
+	else:
+		outname = outfolder+'posterior_PDF.png'
+
+	pdf = specpar_pdf_distance(e_pinfo,alldata,delta_functions=delta_functions,center_obs=center_obs)
+	specpar_pdf_plot(pdf,outname=outname)
 
 	# errors
 	eline_errs(e_pinfo,hflag,outname=outfolder+'error_sig.png')
