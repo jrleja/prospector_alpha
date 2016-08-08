@@ -729,11 +729,11 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 	obs['lum'] = emline_flux[0,:]
 	obs['lum_errup'] = emline_flux[1,:]
 	obs['lum_errdown'] = emline_flux[2,:]
+	obs['lum_chain'] = emline_chain
 
 	obs['flux'] = emline_flux[0,:]  / dfactor / (1+magphys['metadata']['redshift'])
 	obs['flux_errup'] = emline_flux[1,:]  / dfactor / (1+magphys['metadata']['redshift'])
 	obs['flux_errdown'] = emline_flux[2,:]  / dfactor / (1+magphys['metadata']['redshift'])
-	obs['flux_chain'] = emline_chain
 
 	obs['dn4000'] = dn4000_obs
 	obs['balmer_lum'] = obs_abs_flux

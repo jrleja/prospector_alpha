@@ -10,6 +10,7 @@ import pickle
 import corner
 from matplotlib.ticker import MaxNLocator
 import brown_quality_cuts
+from np_mocks_analysis import gaussian
 
 #### set up colors and plot style
 prosp_color = '#e60000'
@@ -55,17 +56,41 @@ def minlog(x,axis=None):
 
 	return np.log10(x)
 
-def pdf_distance(chain, truth, bins):
+def pdf_stats(bins,pdf):
 
-	nsamp = float(chain.shape[0])
-	pdf_dist = (chain > truth).sum()/nsamp
-	hist_loc = (pdf_dist >= bins[:-1]) & (pdf_dist < bins[1:]) # works for delta function...
+	total = np.sum(pdf)
+	cumsum = np.cumsum(pdf)
+	median = np.interp(total/2., cumsum, bins)
+	onesig_range = np.interp(total*0.84, cumsum, bins) - np.interp(total*0.16, cumsum, bins)
 
-	# edge effect
-	if pdf_dist == 1:
-		hist_loc[-1] = True
+	return median,onesig_range
 
-	return hist_loc
+def pdf_distance(chain,truth,truth_chain,bins):
+
+	#### chain properties
+	model_chain_center = np.median(chain)
+	bmin, bmax = bins.min(),bins.max()
+
+	#### model PDF
+	clipped_centered_chain = np.clip(chain-model_chain_center,bmin,bmax)
+	model_pdf,_ = np.histogram(clipped_centered_chain,bins=bins,density=True)
+
+	#### observed PDF
+	if truth_chain == None: # we have no errors (dn4000), use delta functions
+		clipped_truth = np.clip(truth-model_chain_center,bmin,bmax)
+		obs_pdf,_ = np.histogram(clipped_truth,bins=bins,density=True)
+
+	elif len(truth_chain) > 1: # we have a chain
+		clipped_centered_chain = np.clip(truth_chain-model_chain_center,bmin,bmax)
+		clipped_centered_chain = clipped_centered_chain[np.isfinite(clipped_centered_chain)] # remove nans
+		obs_pdf,_ = np.histogram(clipped_centered_chain,bins=bins,density=True)
+
+	elif len(truth_chain) == 1: # we have a sigma, sample from a Gaussian
+		ransamps = np.random.normal(loc=truth-model_chain_center, scale=truth_chain, size=1000)
+		obs_pdf,_ = np.histogram(ransamps,bins=bins,density=True)
+
+
+	return model_pdf, obs_pdf
 
 def specpar_pdf_distance(pinfo,alldata, cdf=True, add_obs_errs=True):
 
@@ -79,28 +104,37 @@ def specpar_pdf_distance(pinfo,alldata, cdf=True, add_obs_errs=True):
 	index_flags = np.loadtxt('/Users/joel/code/python/threedhst_bsfh/data/brownseds_data/hdelta_index.txt', dtype = {'names':('name','flag'),'formats':('S40','i4')})
 	anames = alldata[0]['spec_info']['absnames']
 
-	# truth bins
-	nbins = 5
-	bins = np.linspace(0,1,nbins+1)
-
 	### setup figure
 	out = {}
 	for ii, par in enumerate(test_labels):
-		pdf = np.zeros(nbins)
 
 		if ii == 0: # halpha
 			keep_idx = brown_quality_cuts.halpha_cuts(pinfo)
+			bins = np.linspace(-1,1,51) # dex
+			xunit = 'dex'
 		if ii == 1: # hbeta
 			keep_idx = brown_quality_cuts.halpha_cuts(pinfo)
+			bins = np.linspace(-1,1,51) # dex
+			xunit = 'dex'
 		if ii == 2: # bdec
 			keep_idx = brown_quality_cuts.halpha_cuts(pinfo)
+			bins = np.linspace(-1,1,51) # BALMER DECREMENT UNITS (?)
+			xunit = 'magnitudes'
 		if ii == 3: # met
 			_, _, truemet, truemet_errs, a3d_alpha, keep_idx = brown_quality_cuts.load_atlas3d(pinfo)
+			bins = np.linspace(-0.6,0.6,51) # dex
+			xunit = 'dex'
 		if ii == 4: # dn4000
 			keep_idx = brown_quality_cuts.dn4000_cuts(pinfo)
+			bins = np.linspace(-0.35,0.35,61) # Dn4000
+			xunit = None
 		if ii == 5: # hdelta absorption
 			keep_idx = brown_quality_cuts.hdelta_cuts(pinfo)
+			bins = np.linspace(-0.6,0.6,51) # dex
+			xunit = 'dex'
 
+		modpdf = np.zeros(bins.shape[0]-1)
+		obspdf = np.zeros(bins.shape[0]-1)
 
 		for kk, dat in enumerate(alldata):
 
@@ -108,52 +142,52 @@ def specpar_pdf_distance(pinfo,alldata, cdf=True, add_obs_errs=True):
 				continue
 
 			if ii == 0: # halpha
-				chain = dat['model_emline']['flux']['chain'][:,dat['model_emline']['emnames']=='Halpha']
-				truth = pinfo['obs'][obs_names[ii]][kk,0]
-				truth_errs = None
+				chain = np.log10(np.squeeze(dat['model_emline']['flux']['chain'][:,dat['model_emline']['emnames']=='Halpha']))
+				truth = np.log10(pinfo['obs'][obs_names[ii]][kk,0])
+				truth_chain = np.log10(pinfo['obs']['pdf_ha'][kk])
 
 			if ii == 1: # hbeta
-				chain = dat['model_emline']['flux']['chain'][:,dat['model_emline']['emnames']=='Hbeta']
-				truth = pinfo['obs'][obs_names[ii]][kk,0]
-				truth_errs = None
+				chain = np.log10(np.squeeze(dat['model_emline']['flux']['chain'][:,dat['model_emline']['emnames']=='Hbeta']))
+				truth = np.log10(pinfo['obs'][obs_names[ii]][kk,0])
+				truth_chain = np.log10(pinfo['obs']['pdf_hb'][kk])
 
 			if ii == 2: # bdec
-				chain = dat['pextras']['flatchain'][:,dat['pextras']['parnames']=='bdec_cloudy']
-				truth = pinfo['obs'][obs_names[ii]][kk]
-				truth_errs = None
+				chain = bdec_to_ext(dat['pextras']['flatchain'][:,dat['pextras']['parnames']=='bdec_cloudy'])
+				truth = bdec_to_ext(pinfo['obs'][obs_names[ii]][kk])
+				truth_chain = bdec_to_ext(np.random.choice(pinfo['obs']['pdf_ha'][kk],size=1000) / np.random.choice(pinfo['obs']['pdf_hb'][kk],size=1000))
 
-			if ii == 3: # met
-				chain = dat['pquantiles']['random_chain'][:,dat['pquantiles']['parnames']=='logzsol']
-				truth = truemet[np.sum(keep_idx[:kk])]
-				truth_errs = None
+			if ii == 3: # met (MAKE SURE THIS WORKS)
+				chain = np.squeeze(dat['pquantiles']['random_chain'][:,dat['pquantiles']['parnames']=='logzsol'])
+				truth = truemet[np.sum(keep_idx[:kk])][0]
+				truth_chain = truemet_errs[np.sum(keep_idx[:kk])]
 
 			if ii == 4: # dn4000
 				chain = dat['spec_info']['dn4000']['chain']
-				truth = pinfo['obs'][obs_names[ii]][0]
-				truth_errs = None
+				truth = pinfo['obs'][obs_names[ii]][kk]
+				truth_chain = np.atleast_1d(0.01)
 
 			if ii == 5: # hdelta absorption
 				match = index_flags['name'] == dat['objname'].replace(' ','')
 				flag = index_flags['flag'][match]
 				if flag == 1: hdelta_ind = 'hdelta_narrow'
 				if flag == 0: hdelta_ind = 'hdelta_wide'
-				chain = dat['spec_info']['eqw']['chain'][:,dat['spec_info']['absnames'] == hdelta_ind]
+				chain = np.log10(np.squeeze(dat['spec_info']['eqw']['chain'][:,dat['spec_info']['absnames'] == hdelta_ind]))
 
-				truth = pinfo['obs'][obs_names[ii]][kk,0]
-				truth_errs = None
-			
-			# to fill in later with PDFs, which are available for HDELTA, HALPHA, HBETA.
-			# can construct Balmer decrement PDF by taking samples from Halpha + Hbeta, ignoring potential correlation
-			# metallicity will be Gaussian error
-			# Dn4000 will be delta function
-			if add_obs_errs == True: 
-				pass
-			pdf += pdf_distance(chain,truth,bins)
+				truth = np.log10(pinfo['obs'][obs_names[ii]][kk,0])
+				truth_chain = np.log10(np.clip(pinfo['obs']['hdel_eqw_chain'][kk],0.01,np.inf))
+
+
+			tmodpdf, tobspdf = pdf_distance(chain,truth,truth_chain,bins)
+			modpdf += tmodpdf
+			obspdf += tobspdf
 
 		outtemp = {}
-		outtemp['pdf_distance'] = pdf
+		outtemp['model_pdf'] = modpdf
+		outtemp['obs_pdf'] = obspdf
 		outtemp['bins'] = bins
 		outtemp['plot_bins'] = (bins[:-1] + bins[1:])/2.
+		outtemp['N'] = np.sum(keep_idx)
+		outtemp['xunit'] = xunit
 		out[par] = outtemp
 
 	return out
@@ -163,29 +197,56 @@ def specpar_pdf_plot(pdf,outname=None):
 	fig, axarr = plt.subplots(2,3, figsize = (18,12))
 	ax = np.ravel(axarr)
 
-	idealcolor = '#FF420E'
-	actualcolor = 'black'
+	obscolor = '#FF420E'
+	modcolor = '#375E97'
 
 	for i, key in enumerate(pdf.keys()):
-		npoints = pdf[key]['pdf_distance'].sum()
-		nbins = pdf[key]['plot_bins'].shape[0]
-		ideal_pdf_size = 1./nbins
 
-		# close the histogram (plotx values because of steps-mid option)
-		plotx = np.concatenate((-np.atleast_1d(pdf[key]['plot_bins'][0]),pdf[key]['plot_bins'],2-np.atleast_1d(pdf[key]['plot_bins'][-1])))
-		ploty = np.concatenate((np.atleast_1d(0.0),pdf[key]['pdf_distance']/npoints,np.atleast_1d(0.0)))
+		#### create step function
+		plotx = np.empty((pdf[key]['bins'].size*2,), dtype=pdf[key]['bins'].dtype)
+		plotx[0::2] = pdf[key]['bins']
+		plotx[1::2] = pdf[key]['bins']
 
-		ax[i].plot(plotx,ploty,alpha=0.8,lw=2,color=actualcolor,drawstyle='steps-mid')
-		ax[i].plot([0,1],[ideal_pdf_size,ideal_pdf_size],alpha=0.8,linestyle='--',lw=2,color=idealcolor)
-		ax[i].set_xlabel('location of observation in model posterior')
+		ploty_mod, ploty_obs = [np.empty((pdf[key]['model_pdf'].size*2,), dtype=pdf[key]['model_pdf'].dtype) for X in xrange(2)]
+		ploty_mod[0::2] = pdf[key]['model_pdf']
+		ploty_mod[1::2] = pdf[key]['model_pdf']
+		ploty_mod = np.concatenate((np.atleast_1d(0.0),ploty_mod,np.atleast_1d(0.0)))
+		ploty_obs[0::2] = pdf[key]['obs_pdf']
+		ploty_obs[1::2] = pdf[key]['obs_pdf']
+		ploty_obs = np.concatenate((np.atleast_1d(0.0),ploty_obs,np.atleast_1d(0.0)))
+
+		medobs, sigobs = pdf_stats(pdf[key]['plot_bins'],pdf[key]['obs_pdf'])
+		medmod, sigmod = pdf_stats(pdf[key]['plot_bins'],pdf[key]['model_pdf'])
+
+		ax[i].plot(plotx,ploty_obs,alpha=0.8,lw=2,color=obscolor)
+		ax[i].plot(plotx,ploty_mod,alpha=0.8,lw=2,color=modcolor)
+
+		ax[i].fill_between(plotx, np.zeros_like(ploty_obs), ploty_obs, 
+						   color=obscolor,
+						   alpha=0.3)
+		ax[i].fill_between(plotx, np.zeros_like(ploty_mod), ploty_mod, 
+						   color=modcolor,
+						   alpha=0.3)
+
+		xunit = ''
+		if pdf[key]['xunit'] != None:
+			xunit = ' '+pdf[key]['xunit']
+
+		ax[i].set_xlabel('sum of posterior PDFs' + xunit)
 		ax[i].set_ylabel('density')
 		ax[i].set_title(key)
 		ax[i].set_ylim(0.0,ax[i].get_ylim()[1])
-		ax[i].set_xlim(0,1)
+		ax[i].set_xlim(pdf[key]['bins'].min(),pdf[key]['bins'].max())
 
-		ax[i].text(0.05,0.91,'N='+str(int(npoints)),transform=ax[i].transAxes)
-		ax[i].text(0.05,0.86,'ideal distribution',transform=ax[i].transAxes,color=idealcolor)
-		ax[i].text(0.05,0.81,'actual distribution',transform=ax[i].transAxes,color=actualcolor)
+		ax[i].text(0.05,0.91,'N='+str(pdf[key]['N']),transform=ax[i].transAxes)
+		ax[i].text(0.05,0.86,'model PDF',transform=ax[i].transAxes,color=modcolor)
+		ax[i].text(0.05,0.81,'observed PDF',transform=ax[i].transAxes,color=obscolor)
+
+		'''
+		ax[i].text(0.97,0.91,r'84$^{\mathrm{th}}$-16$^{\mathrm{th}}$='+"{:.2f}".format(sigmod) + xunit,transform=ax[i].transAxes,color=modcolor,ha='right')
+		ax[i].text(0.97,0.86,r'84$^{\mathrm{th}}$-16$^{\mathrm{th}}$='+"{:.2f}".format(sigobs) + xunit,transform=ax[i].transAxes,color=obscolor,ha='right')
+		ax[i].text(0.97,0.81,'median='+"{:.2f}".format(medobs) + xunit,transform=ax[i].transAxes,color=obscolor,ha='right')
+		'''
 
 	plt.tight_layout()
 	plt.savefig(outname,dpi=150)
@@ -582,7 +643,7 @@ def compare_model_flux(alldata, emline_names, outname = 'test.png'):
 	plt.savefig(outname,dpi=dpi)
 	plt.close()	
 
-def fmt_emline_info(alldata,add_abs_err = False):
+def fmt_emline_info(alldata,add_abs_err = True):
 
 	ngals = len(alldata)
 
@@ -596,6 +657,8 @@ def fmt_emline_info(alldata,add_abs_err = False):
 	continuum =  ret_inf(alldata,'continuum_obs',model='obs')
 	lam_continuum = ret_inf(alldata,'continuum_lam',model='obs')
 	absline_names = alldata[0]['residuals']['emlines']['obs']['balmer_names']
+	emline_names = alldata[0]['residuals']['emlines']['em_name']
+	fillvalue = None
 
 	obslines['ha_obs_cont'] = continuum[:,absline_names == 'halpha_wide'][:,0]
 	obslines['hb_obs_cont'] = continuum[:,absline_names == 'hbeta'][:,0]
@@ -606,11 +669,15 @@ def fmt_emline_info(alldata,add_abs_err = False):
 		                             ret_inf(alldata,'lum_errup',model='obs',name='H$\\alpha$'),
 		                             ret_inf(alldata,'lum_errdown',model='obs',name='H$\\alpha$')]) / constants.L_sun.cgs.value
 	obslines['err_ha'] = (obslines['f_ha'][:,1] - obslines['f_ha'][:,2])/2.
+	idx = emline_names == 'H$\\alpha$'
+	obslines['pdf_ha'] = np.array([np.squeeze(f['residuals']['emlines']['obs']['flux_chain'][:,idx] / constants.L_sun.cgs.value) if f['residuals']['emlines'] is not None else fillvalue for f in alldata])
 
 	obslines['f_hb'] = np.transpose([ret_inf(alldata,'lum',model='obs',name='H$\\beta$'),
 		                             ret_inf(alldata,'lum_errup',model='obs',name='H$\\beta$'),
 		                             ret_inf(alldata,'lum_errdown',model='obs',name='H$\\beta$')]) / constants.L_sun.cgs.value
 	obslines['err_hb'] = (obslines['f_hb'][:,1] - obslines['f_hb'][:,2])/2.
+	idx = emline_names == 'H$\\beta$'
+	obslines['pdf_hb'] = np.array([np.squeeze(f['residuals']['emlines']['obs']['flux_chain'][:,idx] / constants.L_sun.cgs.value) if f['residuals']['emlines'] is not None else fillvalue for f in alldata])
 
 	obslines['f_hd'] = np.transpose([ret_inf(alldata,'lum',model='obs',name='H$\\delta$'),
 		                             ret_inf(alldata,'lum_errup',model='obs',name='H$\\delta$'),
@@ -637,16 +704,10 @@ def fmt_emline_info(alldata,add_abs_err = False):
 	# cuts
 	# obslines sncut is 1.0 for now, because otherwise NGC 4473 is in the sample, 
 	# which has S/N ~ 0.95 for Halpha (clearly a crap detection)  12/10/15
-	obslines['sn_cut'] = 10.0
-	obslines['eqw_cut'] = 5.0
+	obslines['sn_cut'] = 5.0
+	obslines['eqw_cut'] = 0.0
 	obslines['hdelta_sn_cut'] = 5.0
 	obslines['hdelta_eqw_cut'] = 1.0
-
-	'''
-	obslines['sn_cut'] = 1.0
-	obslines['eqw_cut'] = 3.0
-	obslines['hdelta_sn_cut'] = 3
-	'''
 
 	####### Dn4000, obs + MAGPHYS
 	obslines['dn4000'] = ret_inf(alldata,'dn4000',model='obs')
@@ -713,15 +774,12 @@ def fmt_emline_info(alldata,add_abs_err = False):
 
 	##### add Halpha, Hbeta absorption to errors
 	if add_abs_err:
-		
-		# this is the relevant fraction of absorption flux to add to each error
-		# CURRENTLY USING 0.25 BASED ON ERROR ANALYSIS PLOT, SO HALF OF WHAT'S SUGGESTED BY HDELTA COMPARISON
-		# LOOK INTO IMPROVING CONTINUUM ESTIMATE FOR HDELTA
+		# add 25% of Balmer absorption value to 1 sigma errors
 		hdel_scatter = 0.25
 		halpha_corr = hdel_scatter*(10**prosp['halpha_abs_marg'][:,0])
 		hbeta_corr = hdel_scatter*(10**prosp['hbeta_abs_marg'][:,0])
 
-		# keep this shit around, for balmer decrement error plot
+		# keep this around, for balmer decrement error plot
 		obslines['err_ha_orig'] = copy.copy(obslines['err_ha'])
 		obslines['err_hb_orig'] = copy.copy(obslines['err_hb'])
 		obslines['f_ha_orig'] = copy.copy(obslines['f_ha'])
@@ -759,6 +817,7 @@ def fmt_emline_info(alldata,add_abs_err = False):
 	# which index should we use; wide or narrow?
 	hd_lum_prosp_marg,hd_eqw_prosp_marg, \
 	hd_lum_obs, hd_eqw_obs = [np.zeros(shape=(ngals,3)) for i in xrange(4)]
+	hd_eqw_obs_chain = np.zeros(shape=(ngals,100))
 
 	hd_lum_prosp, hd_eqw_prosp, \
 	hd_lum_eline_prosp, hd_eqw_eline_prosp = [np.zeros(ngals) for i in xrange(4)]
@@ -792,6 +851,7 @@ def fmt_emline_info(alldata,add_abs_err = False):
 		#### observed
 		hd_lum_obs[kk,:] = dat['residuals']['emlines']['obs']['balmer_lum'][hd_ind,:]
 		hd_eqw_obs[kk,:] = dat['residuals']['emlines']['obs']['balmer_eqw_rest'][hd_ind,:]
+		hd_eqw_obs_chain[kk,:] = dat['residuals']['emlines']['obs']['balmer_eqw_rest_chain'][hd_ind,:]
 
 	##### hdelta absorption
 	prosp['hdel_abs'] = hd_lum_prosp
@@ -805,6 +865,7 @@ def fmt_emline_info(alldata,add_abs_err = False):
 	obslines['hdel_err'] = (obslines['hdel'][:,1] - obslines['hdel'][:,2]) / 2.
 	obslines['hdel_eqw'] = hd_eqw_obs
 	obslines['hdel_eqw_err'] = (obslines['hdel_eqw'][:,1] - obslines['hdel_eqw'][:,2])/2.
+	obslines['hdel_eqw_chain'] = hd_eqw_obs_chain
 
 	##### names
 	objnames = np.array([f['objname'] for f in alldata])
@@ -1082,7 +1143,7 @@ def atlas_3d_met(e_pinfo,hflag,outfolder=''):
 	fig, ax = plt.subplots(1,1,figsize=(7,7))
 	fig.subplots_adjust(left=0.15,bottom=0.1,top=0.95,right=0.95)
 	ax.errorbar(a3d_met,prosp_met,xerr=a3d_met_err,yerr=prosp_met_err, color='#1C86EE',alpha=0.9,fmt='o')
-	ax.set_xlabel('log(Z$_{\mathrm{ATLAS3D}}$/Z$_{\odot}$)')
+	ax.set_xlabel('log(Z$_{\mathrm{ATLAS-3D}}$/Z$_{\odot}$)')
 	ax.set_ylabel('log(Z$_{\mathrm{Prosp}}$/Z$_{\odot}$)')
 
 	ax = threed_dutils.equalize_axes(ax,a3d_met+0.1,prosp_met-0.1, dynrange=0.1, line_of_equality=True, log=False)
@@ -1360,17 +1421,13 @@ def obs_vs_kennicutt_ha(e_pinfo,hflag,outname_prosp='test.png',outname_mag='test
 				           linestyle=' ',**pdict)
 			ax3[1].errorbar(ha_ext[plt_idx,0], mha_ext[plt_idx], xerr=ha_ext_err, 
 				           linestyle=' ',**pdict)
-			'''
-			ax3[2].errorbar(pmet[plt_idx,0], mmet[plt_idx], xerr=pmet_err, 
-				           linestyle=' ',**pdict)
-			'''
 
 			ax4[0].errorbar(msfr100_marginalized[plt_idx,1], msfr100[plt_idx], xerr=msfr100_err, 
 	           linestyle=' ',**pdict)
 			ax4[1].errorbar(sfr100[plt_idx,0], msfr100_marginalized[plt_idx,1], xerr=sfr100_err, yerr=msfr100_err,
 	           linestyle=' ',**pdict)
 
-	ax1.text(0.04,0.92, r'S/N H$\alpha$ > {0}'.format(int(e_pinfo['obs']['sn_cut'])), transform = ax1.transAxes,horizontalalignment='left')
+	ax1.text(0.04,0.92, r'S/N (H$\alpha$,H$\beta$) > {0}'.format(int(e_pinfo['obs']['sn_cut'])), transform = ax1.transAxes,horizontalalignment='left')
 	#ax1.text(0.04,0.92, r'EQW H$\alpha$ > {0} $\AA$'.format(int(e_pinfo['obs']['eqw_cut'])), transform = ax1.transAxes,horizontalalignment='left')
 	ax1.text(0.04,0.87, r'N = '+str(int(np.sum(keep_idx))), transform = ax1.transAxes,horizontalalignment='left')
 	ax1.set_xlabel(xlab_ha[0])
@@ -1384,7 +1441,7 @@ def obs_vs_kennicutt_ha(e_pinfo,hflag,outname_prosp='test.png',outname_mag='test
 	ax1.text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat) +' dex', transform = ax1.transAxes,horizontalalignment='right')
 	ax1.text(0.96,0.1, 'mean offset='+"{:.2f}".format(off)+ ' dex', transform = ax1.transAxes,horizontalalignment='right')
 
-	axmag.text(0.04,0.92, r'S/N H$\alpha$ > {0}'.format(int(e_pinfo['obs']['sn_cut'])), transform = axmag.transAxes,horizontalalignment='left')
+	axmag.text(0.04,0.92, r'S/N (H$\alpha$,H$\beta$) > {0}'.format(int(e_pinfo['obs']['sn_cut'])), transform = axmag.transAxes,horizontalalignment='left')
 	#axmag.text(0.04,0.92, r'EQW H$\alpha$ > {0} $\AA$'.format(int(e_pinfo['obs']['eqw_cut'])), transform = axmag.transAxes,horizontalalignment='left')
 	axmag.text(0.04,0.87, r'N = '+str(int(np.sum(keep_idx))), transform = axmag.transAxes,horizontalalignment='left')
 	axmag.set_xlabel(xlab_ha[1])
@@ -1399,7 +1456,7 @@ def obs_vs_kennicutt_ha(e_pinfo,hflag,outname_prosp='test.png',outname_mag='test
 	axmag.text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat) +' dex', transform = axmag.transAxes,horizontalalignment='right')
 	axmag.text(0.96,0.1, 'mean offset='+"{:.2f}".format(off)+ ' dex', transform = axmag.transAxes,horizontalalignment='right')
 
-	ax2.text(0.97,0.92, r'S/N H$\alpha$ > {0}'.format(int(e_pinfo['obs']['sn_cut'])), transform = ax2.transAxes,horizontalalignment='right')
+	ax2.text(0.97,0.92, r'S/N (H$\alpha$,H$\beta$) > {0}'.format(int(e_pinfo['obs']['sn_cut'])), transform = ax2.transAxes,horizontalalignment='right')
 	#ax2.text(0.97,0.92, r'EQW H$\alpha$ > {0} $\AA$'.format(int(e_pinfo['obs']['eqw_cut'])), transform = ax2.transAxes,horizontalalignment='right')
 	ax2.text(0.97,0.87, r'N = '+str(int(np.sum(keep_idx))), transform = ax2.transAxes,horizontalalignment='right')
 	ax2.set_ylabel(r'log(Z/Z$_{\odot}$) [Prospector]')
@@ -1407,7 +1464,7 @@ def obs_vs_kennicutt_ha(e_pinfo,hflag,outname_prosp='test.png',outname_mag='test
 	ax2.xaxis.set_major_locator(MaxNLocator(4))
 
 
-	ax3[0].text(0.04,0.92, r'S/N H$\alpha$ > {0}'.format(int(e_pinfo['obs']['sn_cut'])), transform = ax3[0].transAxes,horizontalalignment='left')
+	ax3[0].text(0.04,0.92, r'S/N (H$\alpha$,H$\beta$) > {0}'.format(int(e_pinfo['obs']['sn_cut'])), transform = ax3[0].transAxes,horizontalalignment='left')
 	#ax3[0].text(0.04,0.92, r'EQW H$\alpha$ > {0} $\AA$'.format(int(e_pinfo['obs']['eqw_cut'])), transform = ax3[0].transAxes,horizontalalignment='left')
 	ax3[0].text(0.04,0.87, r'N = '+str(int(np.sum(keep_idx))), transform = ax3[0].transAxes,horizontalalignment='left')
 	ax3[0].set_xlabel(r'log(SFR [10 Myr]) [marginalized, Prospector]')
@@ -1424,7 +1481,7 @@ def obs_vs_kennicutt_ha(e_pinfo,hflag,outname_prosp='test.png',outname_mag='test
 	ax3[1].text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat) + ' dex', transform = ax3[1].transAxes,horizontalalignment='right')
 	ax3[1].text(0.96,0.1, 'mean offset='+"{:.2f}".format(off) + ' dex', transform = ax3[1].transAxes,horizontalalignment='right')
 
-	ax4[0].text(0.04,0.92, r'S/N H$\alpha$ > {0}'.format(int(e_pinfo['obs']['sn_cut'])), transform = ax4[0].transAxes,horizontalalignment='left')
+	ax4[0].text(0.04,0.92, r'S/N (H$\alpha$,H$\beta$) > {0}'.format(int(e_pinfo['obs']['sn_cut'])), transform = ax4[0].transAxes,horizontalalignment='left')
 	#ax4[0].text(0.04,0.92, r'EQW H$\alpha$ > {0} $\AA$'.format(int(e_pinfo['obs']['eqw_cut'])), transform = ax4[0].transAxes,horizontalalignment='left')
 	ax4[0].text(0.04,0.87, r'N = '+str(int(np.sum(keep_idx))), transform = ax4[0].transAxes,horizontalalignment='left')
 	ax4[0].set_xlabel(r'log(SFR [100 Myr]) [marginalized, MAGPHYS]')
@@ -2457,7 +2514,7 @@ def residual_plots(e_pinfo,hflag,outfolder):
 	yplot = bdec_resid
 	for ii in xrange(len(labels)):
 		ax[0].errorbar(xplot[keys[ii]], yplot[keys[ii]], fmt='o',alpha=0.6,linestyle=' ',color=colors[ii],label=labels[ii])
-	ax[0].set_xlabel(r'dust2_index')
+	ax[0].set_xlabel(r'diffuse dust index')
 	ax[0].set_ylabel(r'A$_{\mathrm{H}\beta}$ - A$_{\mathrm{H}\alpha}$ [model - observed]')
 	ax[0].axhline(0, linestyle=':', color='grey')
 	ax[0].set_ylim(-np.max(np.abs(yplot)),np.max(np.abs(yplot)))
@@ -2465,7 +2522,7 @@ def residual_plots(e_pinfo,hflag,outfolder):
 	yplot = ha_resid
 	for ii in xrange(len(labels)):
 		ax[1].errorbar(xplot[keys[ii]], yplot[keys[ii]], fmt='o',alpha=0.6,linestyle=' ',color=colors[ii],label=labels[ii])
-	ax[1].set_xlabel(r'dust2_index')
+	ax[1].set_xlabel('diffuse dust index')
 	ax[1].set_ylabel(r'log(observed/model) [H$_{\alpha}$]')
 	ax[1].legend(loc=3)
 	ax[1].axhline(0, linestyle=':', color='grey')
@@ -2759,7 +2816,7 @@ def plot_emline_comp(alldata,outfolder,hflag):
 	obs_vs_prosp_sfr(e_pinfo,hflag,outname=outfolder+'obs_sfr_comp.png')
 
 	# error plots
-	onesig_error_plot(bdec_errs,bdec_flag,dn4000_errs,dn4000_flag,hdelta_errs,hdelta_flag,ha_errs,ha_flag,outfolder)
+	# onesig_error_plot(bdec_errs,bdec_flag,dn4000_errs,dn4000_flag,hdelta_errs,hdelta_flag,ha_errs,ha_flag,outfolder)
 
 	# model versus observations for Kennicutt Halphas
 	obs_vs_kennicutt_ha(e_pinfo,hflag, eqw=False,

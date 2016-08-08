@@ -8,7 +8,7 @@ import matplotlib.gridspec as gridspec
 
 plt.ioff()
 
-def make_plot(runname='brownseds_tightbc'):
+def make_plot(runname='brownseds_np'):
 
 	#### load alldata
 	alldata = brown_io.load_alldata(runname=runname)
@@ -91,7 +91,7 @@ def add_mass_sfr_plot(alldata,fig):
 
 	##### find prospector indexes
 	parnames = alldata[0]['pquantiles']['parnames']
-	idx_mass = parnames == 'mass'
+	idx_mass = parnames == 'logmass'
 	eparnames = alldata[0]['pextras']['parnames']
 	idx_sfr = eparnames == 'sfr_100'
 
@@ -102,9 +102,9 @@ def add_mass_sfr_plot(alldata,fig):
 	ax = fig.add_axes([0.58,0.71,0.37,0.28])
 
 	for ii,dat in enumerate(alldata):
-		mass[ii,0] = np.log10(dat['pquantiles']['q50'][idx_mass])
-		mass[ii,1] = np.log10(dat['pquantiles']['q84'][idx_mass])
-		mass[ii,2] = np.log10(dat['pquantiles']['q16'][idx_mass])
+		mass[ii,0] = dat['pquantiles']['q50'][idx_mass]
+		mass[ii,1] = dat['pquantiles']['q84'][idx_mass]
+		mass[ii,2] = dat['pquantiles']['q16'][idx_mass]
 
 		sfr[ii,0] = np.clip(dat['pextras']['q50'][idx_sfr],minsfr,np.inf)
 		sfr[ii,1] = np.clip(dat['pextras']['q84'][idx_sfr],minsfr,np.inf)

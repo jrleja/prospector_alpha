@@ -8,13 +8,15 @@ import matplotlib.image as mpimg
 import matplotlib.gridspec as gridspec
 import matplotlib.ticker as ticker
 import math
+import matplotlib.lines as lines
 
 plt.ioff() # don't pop up a window for each plot
 mpl.rcParams['xtick.major.size'] = 2
 mpl.rcParams['ytick.major.size'] = 2
 mpl.rcParams['xtick.major.width'] = 0.5
 mpl.rcParams['ytick.major.width'] = 0.5
-mpl.rcParams['xtick.labelsize'] = 10 # font size of xtick labels
+mpl.rcParams['xtick.labelsize'] = 8 # font size of xtick labels
+mpl.rcParams['ytick.labelsize'] = 8 # font size of ytick labels
 mpl.rcParams['axes.labelsize'] = 12 # font size of x+y labels
 mpl.rcParams['axes.labelpad'] = 2.5 # space between label and axis
 
@@ -86,9 +88,9 @@ def add_png(ax,objname,swapaxes=False):
 
 	# stretch axis
 	# [left, bottom, width, height]
-	ax.set_position([ax.get_position().x0-0.013,
+	ax.set_position([ax.get_position().x0-0.014,
 		             ax.get_position().y0-0.002,
-		             ax.get_position().width+0.0255,
+		             ax.get_position().width+0.028,
 		             ax.get_position().height+0.004])
 	# add RGB
 	try:
@@ -121,10 +123,11 @@ def plot_sfh(ax,t,sfh,sfrmin):
 	ax.fill_between(t, perc[:,0], perc[:,2], color=median_err_color)
 
 	### set up y-plotting range
-	plotmax_y = np.max(perc[:,1])
-	plotmin_y = np.min(perc[:,1])
-	dynrange = (plotmax_y-plotmin_y)*0.4
-	ax.set_ylim(plotmin_y, plotmax_y+dynrange)
+	plotmax_y = np.max(perc)
+	plotmin_y = np.min(perc)
+	dynrange = (plotmax_y-plotmin_y)*0.5
+	dynrange = 0.1
+	ax.set_ylim(plotmin_y-dynrange, plotmax_y+0.1)
 
 	### format x-axis
 	ax.set_xlabel('t [Gyr]',weight='bold')
@@ -133,11 +136,20 @@ def plot_sfh(ax,t,sfh,sfrmin):
 	ax.xaxis.set_minor_formatter(minorFormatter)
 	ax.xaxis.set_major_formatter(majorFormatter)
 
-	ax.set_xlim(13.6,0.001)
+	ax.set_xlim(13.6,0.01)
 
 	### turn off y-axis
-	#ax.yaxis.get_major_ticks()[0].label1On = False
 	for tl in ax.get_yticklabels():tl.set_visible(False)
+
+	### add 0.3 dex line
+	ylim = ax.get_ylim()[0]+0.2
+	lw = 1.3
+	line = lines.Line2D([0.03,0.03],[ylim,ylim+0.3],solid_capstyle='projecting',alpha=0.8,lw=lw,color='black')
+	ax.add_line(line)
+	line = lines.Line2D([0.027,0.033],[ylim+0.3,ylim+0.3],solid_capstyle='projecting',alpha=0.8,lw=lw,color='black')
+	ax.add_line(line)
+	line = lines.Line2D([0.027,0.033],[ylim,ylim],solid_capstyle='projecting',alpha=0.8,lw=lw,color='black')
+	ax.add_line(line)
 
 def main_plot(runname='brownseds_np'):
 
@@ -161,8 +173,9 @@ def main_plot(runname='brownseds_np'):
 
 		# do we need a new page?
 		if i >= npage*ax1.shape[0]:
-			print 'saving as '+outfolder+'sfh_montage_'+str(npage)+'.png'
-			fig.savefig(outfolder+'sfh_montage_'+str(npage)+'.png')
+			outname = outfolder+'sfh_montage_'+str(npage)+'.pdf'
+			print 'saving as '+outname
+			fig.savefig(outname)
 			plt.close()
 			fig, ax1, ax2 = create_formatted_figure()
 			npage+=1
@@ -180,17 +193,22 @@ def main_plot(runname='brownseds_np'):
 			ax1[axidx].set_ylabel('log(SFR)',weight='bold',zorder=-1)
 
 		### half-time label
-		ax1[axidx].text(0.05,0.9,r't$_{\mathbf{half}}$ = '+"{:.2f}".format(thalf[idx])+' Gyr',
-			            ha='left',fontsize=10,weight='bold',transform=ax1[axidx].transAxes)
-		ax1[axidx].text(0.05,0.8,alldata[idx]['objname'],
-			            ha='left',fontsize=10,weight='bold',transform=ax1[axidx].transAxes)
+		if npage > 2:
+			xtext, ha = 0.97, 'right'
+		else:
+			xtext, ha = 0.05, 'left'
+		ax1[axidx].text(xtext,0.9,r't$_{\mathbf{half}}$ = '+"{:.2f}".format(thalf[idx])+' Gyr',
+			            ha=ha,fontsize=10,weight='bold',transform=ax1[axidx].transAxes)
+		ax1[axidx].text(xtext,0.8,alldata[idx]['objname'],
+			            ha=ha,fontsize=10,weight='bold',transform=ax1[axidx].transAxes)
 
 	# turn the remaining axes off
 	for i in xrange(axidx+1,ax1.shape[0]):
 		ax1[i].axis('off')
 		ax2[i].axis('off')
-	print 'saving as '+outfolder+'sfh_montage_'+str(npage)+'.png'
-	fig.savefig(outfolder+'sfh_montage_'+str(npage)+'.png')
+	outname = outfolder+'sfh_montage_'+str(npage)+'.pdf'
+	print 'saving as '+outname
+	fig.savefig(outname)
 	plt.close()
 
 
