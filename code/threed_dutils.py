@@ -887,14 +887,18 @@ def create_prosp_filename(filebase):
 
 	return mcmc_filename,model_filename
 
-def load_prospector_data(filebase):
+def load_prospector_data(filebase,no_sample_results=False):
 
 	from prospect.io import read_results
 
 	mcmc_filename, model_filename = create_prosp_filename(filebase)
-	sample_results, powell_results, model = read_results.read_pickles(mcmc_filename, model_file=model_filename,inmod=None)
 
-	return sample_results, powell_results, model
+	if no_sample_results:
+		powell_results, model = read_results.read_model(model_filename)
+		return powell_results, model
+	else:
+		sample_results, powell_results, model = read_results.read_pickles(mcmc_filename, model_file=model_filename,inmod=None)
+		return sample_results, powell_results, model
 
 
 def load_zp_offsets(field):

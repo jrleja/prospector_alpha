@@ -325,14 +325,13 @@ def post_processing(param_name, add_extra=True, **extras):
 		sample_results['flatchain'] = threed_dutils.chop_chain(sample_results['chain'])
 		sample_results = calc_extra_quantities(sample_results,**extras)
 
+		### MAKE PLOTS HERE
 		threedhst_diag.make_all_plots(sample_results=sample_results,filebase=outname,outfolder=outfolder,param_name=param_name)
-		sample_results['chain'] = None # dump that chain...
 
 		### SAVE OUTPUT HERE
+		sample_results['chain'] = None # dump the chain...
 		mcmc_filename, model_filename = threed_dutils.create_prosp_filename(outname)
 		pickle.dump(sample_results,open(mcmc_filename, "wb"))
-
-	### PLOT HERE
 
 if __name__ == "__main__":
 	post_processing(sys.argv[1])

@@ -555,7 +555,7 @@ def show_chain(sample_results,outname=None,alpha=0.6,truths=None):
 
 
 	if outname is not None:
-		plt.savefig(outname, bbox_inches='tight',dpi=dpi)
+		plt.savefig(outname, bbox_inches='tight',dpi=100)
 		plt.close()
 
 def return_sedplot_vars(thetas, sample_results, sps, nufnu=True):
@@ -876,10 +876,16 @@ def make_all_plots(filebase=None,
 	if not os.path.isdir(outfolder):
 		os.makedirs(outfolder)
 
-	try:
-		sample_results, powell_results, model = threed_dutils.load_prospector_data(filebase)
-	except TypeError:
-		return
+	if sample_results is None:
+		try:
+			sample_results, powell_results, model = threed_dutils.load_prospector_data(filebase)
+		except TypeError:
+			return
+	else: # if we already have sample results, but want powell results
+		try:
+			powell_results, model = threed_dutils.load_prospector_data(filebase,no_sample_results=True)
+		except TypeError:
+			return	
 
 	run_params = model_setup.get_run_params(param_file=param_name)
 	sps = model_setup.load_sps(**run_params)
@@ -898,8 +904,8 @@ def make_all_plots(filebase=None,
 	# define nice plotting quantities
 	sample_results = create_plotquant(sample_results, truths=truths)
 	sample_results['extents'] = return_extent(sample_results)
-    # chain plot
-	if plt_chain: 
+    # chain plot (ONLY WORKS IF WE STILL HAVE CHAIN)
+	if plt_chain and sample_results['chain'] is not None: 
 		print 'MAKING CHAIN PLOT'
 		show_chain(sample_results,
 	               outname=outfolder+objname+'.chain.png',
