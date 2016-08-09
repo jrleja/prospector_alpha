@@ -894,7 +894,7 @@ def load_prospector_data(filebase,no_sample_results=False):
 	mcmc_filename, model_filename = create_prosp_filename(filebase)
 
 	if no_sample_results:
-		powell_results, model = read_results.read_model(model_filename)
+		model, powell_results = read_results.read_model(model_filename)
 		return powell_results, model
 	else:
 		sample_results, powell_results, model = read_results.read_pickles(mcmc_filename, model_file=model_filename,inmod=None)
