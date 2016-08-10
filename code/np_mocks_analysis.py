@@ -8,9 +8,13 @@ from matplotlib.ticker import MaxNLocator
 from corner import quantile
 from prospect.models import model_setup
 import sys
+from extra_output import post_processing
 
 minsfr = 1e-4
 minssfr = 1e-15
+
+obscolor = '#FF420E'
+modcolor = '#375E97'
 
 def norm_resid(fit,truth):
 	
@@ -50,17 +54,59 @@ def make_plots(runname='nonparametric_mocks', recollate_data = False):
 	if not os.path.exists(outfolder):
 		os.makedirs(outfolder)
 
-	plot_fit_parameters(alldata,outfolder=outfolder)
-	plot_derived_parameters(alldata,outfolder=outfolder)
+	plot_fit_parameters(alldata,outfolder=outfolder,cdf=False)
+	plot_derived_parameters(alldata,outfolder=outfolder,cdf=False)
 	plot_spectral_parameters(alldata,outfolder=outfolder)
-	#plot_sfr_resid(alldata,outfolder=outfolder)
-	plot_mass_resid(alldata,outfolder=outfolder)
 	plot_likelihood(alldata,outfolder=outfolder)
 	#### PLOTS TO ADD
 	# SFR_10 deviations versus Halpha deviations
 	# max fit likelihood divided by truth likelihood
 	# hdelta, halpha, hbeta absorption: what about wide / narrow indexes?
-	# SFR_10 (truth) versus SFR_100 (truth) [there better be differences, goddamnit]
+
+def pdf_distance_unitized(chain,truth,parnames,bins, truthnames=None):
+
+	model_dict = {}
+	obs_dict = {}
+	for ii,p in enumerate(parnames):
+
+		tempchain = chain[:,ii]
+
+		# we're in extra_truths, do some sorting
+		if truthnames != None:
+			match = truthnames == parnames[ii]
+
+			if match.sum() == 0:
+				model_dict[p], obs_dict[p] = None, None
+				continue
+
+			temptruth = truth[match]
+			# if truths are in log...
+			if 'sfr' in parnames[ii]:
+				tempchain = np.log10(chain[:,ii])
+			if 'half_time' in parnames[ii]:
+				temptruth = np.log10(truth[match])
+				tempchain = np.log10(chain[:,ii])
+		else:
+			temptruth = truth[ii]
+
+
+		#### chain properties
+		model_chain_center = np.median(tempchain)
+		bmin, bmax = bins[ii].min(),bins[ii].max()
+
+		#### model PDF
+		clipped_centered_chain = np.clip(tempchain-model_chain_center,bmin,bmax)
+		model_dict[p],_ = np.histogram(clipped_centered_chain,bins=bins[ii],density=True)
+
+		#### observed PDF
+		clipped_truth = np.clip(temptruth-model_chain_center,bmin,bmax)
+		obs_dict[p],_ = np.histogram(clipped_truth,bins=bins[ii],density=True)
+
+	out = {}
+	out['model_pdf'] = model_dict
+	out['obs_pdf'] = obs_dict
+
+	return out
 
 
 def pdf_distance(chain, truths, chainnames=None, truthnames=None):
@@ -81,9 +127,10 @@ def pdf_distance(chain, truths, chainnames=None, truthnames=None):
 		for i in xrange(npars):
 			match = chainnames == truthnames[i]
 			# truths are in log...
+			temptruths = truths[i]
 			if 'sfr' in truthnames[i]:
 				temptruths = 10**truths[i]
-			pdf_dist[i] = (chain[:,match] > truths[i]).sum()/nsamp
+			pdf_dist[i] = (chain[:,match] > temptruths).sum()/nsamp
 
 			print truthnames[i],pdf_dist[i]
 
@@ -95,6 +142,39 @@ def collate_data(runname='ha_80myr',outpickle=None):
 
 	out = []
 	sps = None
+
+	#['logmass', 'sfr_fraction_1', 'sfr_fraction_2', 'sfr_fraction_3',
+    #   'sfr_fraction_4', 'sfr_fraction_5', 'dust2', 'logzsol',
+    #   'dust_index', 'dust1', 'duste_qpah', 'duste_gamma', 'duste_umin']
+	nbins = 36
+	bins = [np.linspace(-0.3,0.3,nbins),
+			np.linspace(-0.4,0.4,nbins),
+			np.linspace(-0.4,0.4,nbins),
+			np.linspace(-0.4,0.4,nbins),
+			np.linspace(-0.4,0.4,nbins),
+			np.linspace(-0.4,0.4,nbins),
+			np.linspace(-0.3,0.3,nbins),
+			np.linspace(-0.8,0.8,nbins),
+			np.linspace(-1.0,1.0,nbins),
+			np.linspace(-0.5,0.5,nbins),
+			np.linspace(-1.5,1.5,nbins),
+			np.linspace(-0.5,0.5,nbins),
+			np.linspace(-7.0,7.0,nbins)]
+
+	# ['half_time', 'sfr_10', 'sfr_100', 'sfr_1000', 'ssfr_10', 'ssfr_100',
+    #   'totmass', 'emp_ha', 'bdec_cloudy', 'bdec_calc', 'total_ext5500']
+	ebins = [np.linspace(-0.8,0.8,nbins), # half_time
+			 np.linspace(-0.5,0.5,nbins),
+			 np.linspace(-0.6,0.6,nbins), # sfr_100
+			 np.linspace(-0.5,0.5,nbins),
+			 np.linspace(-0.5,0.5,nbins),
+			 np.linspace(-0.8,0.8,nbins), # ssfr_100
+			 np.linspace(-0.5,0.5,nbins), 
+			 np.linspace(-0.6,0.6,nbins), 
+			 np.linspace(-1,1,nbins), 
+			 np.linspace(-1,1,nbins),
+			 np.linspace(-0.6,0.6,nbins)]
+
 	for jj in xrange(len(filebase)):
 
 		#### load sampler
@@ -105,6 +185,13 @@ def collate_data(runname='ha_80myr',outpickle=None):
 			print 'failed to load number ' + str(int(jj))
 			continue
 
+		try:
+			sample_results['quantiles']
+		except:
+			param_name = os.getenv('APPS')+'/threed'+sample_results['run_params']['param_file'].split('/threed')[1]
+			post_processing(param_name, add_extra=True)
+			sample_results, powell_results, model = threed_dutils.load_prospector_data(filebase[jj])
+
 		if sps == None:
 			sps = model_setup.load_sps(**sample_results['run_params'])
 
@@ -113,13 +200,14 @@ def collate_data(runname='ha_80myr',outpickle=None):
 		outdat['truths'] = threed_dutils.load_truths(os.getenv('APPS')+'/threed'+sample_results['run_params']['param_file'].split('/threed')[1],
 			                                         sps=sps, calc_prob = True)
 
-
 		### save all fit + derived parameters
 		outdat['parnames'] = np.array(sample_results['quantiles']['parnames'])
 		outdat['q50'] = sample_results['quantiles']['q50']
 		outdat['q84'] = sample_results['quantiles']['q84']
 		outdat['q16'] = sample_results['quantiles']['q16']
 		outdat['pdf_dist'] = pdf_distance(sample_results['flatchain'],outdat['truths']['truths'])
+		outdat['parameter_unit_pdfs'] = pdf_distance_unitized(sample_results['flatchain'], outdat['truths']['truths'],outdat['parnames'], bins)
+		outdat['bins'] = bins
 
 		outdat['eparnames'] = sample_results['extras']['parnames']
 		outdat['eq50'] = sample_results['extras']['q50']
@@ -127,6 +215,9 @@ def collate_data(runname='ha_80myr',outpickle=None):
 		outdat['eq16'] = sample_results['extras']['q16']
 		outdat['epdf_dist'] = pdf_distance(sample_results['extras']['flatchain'],outdat['truths']['extra_truths'],
 			                               chainnames=sample_results['extras']['parnames'], truthnames=outdat['truths']['extra_parnames'])
+		outdat['eparameter_unit_pdfs'] = pdf_distance_unitized(sample_results['extras']['flatchain'], outdat['truths']['extra_truths'], outdat['eparnames'],ebins,
+			    												truthnames=outdat['truths']['extra_parnames'])
+		outdat['ebins'] = ebins
 
 		### save spectral parameters
 		outdat['eline_flux_q50'] = sample_results['model_emline']['flux']['q50']
@@ -162,22 +253,25 @@ def collate_data(runname='ha_80myr',outpickle=None):
 		outdat['truths']['d1_d2'] = d1_t/d2_t
 
 		out.append(outdat)
-		
+	
 	pickle.dump(out,open(outpickle, "wb"))
 
-def plot_fit_parameters(alldata,outfolder=None):
+def plot_fit_parameters(alldata,outfolder=None, cdf=False):
 
 	#### check parameter space
 	pars = alldata[0]['parnames']
 	if len(pars) > 12:
-		xfig, yfig = 4,4
-		size = (20,20)
+		xfig, yfig = 5,3
+		size = (14,20)
+		parlabels = [r'log(M/M$_{\odot}$)', 'SFH 0-100 Myr', 'SFH 100-300 Myr', 'SFH 300 Myr-1 Gyr', 
+		         'SFH 1-3 Gyr', 'SFH 3-6 Gyr', 'diffuse dust', r'log(Z/Z$_{\odot}$)', 'diffuse dust index',
+		         'birth-cloud dust', r'dust emission Q$_{\mathrm{PAH}}$',r'dust emission $\gamma$',r'dust emission U$_{\mathrm{min}}$']
 	else:
 		xfig, yfig = 3,4
 		size = (20,14)
-		pnames = [r'log(M/M$_{\odot}$)', 'SFH 0-100 Myr', 'SFH 100-300 Myr', 'SFH 300 Myr-1 Gyr', 
-		          'SFH 1-3 Gyr', 'diffuse dust', r'log(Z/Z$_{\odot}$)', 'diffuse dust index',
-		          'birth-cloud dust', r'dust emission Q$_{\mathrm{PAH}}$',r'dust emission $\gamma$',r'dust emission U$_{\mathrm{min}}$']
+		parlabels = [r'log(M/M$_{\odot}$)', 'SFH 0-100 Myr', 'SFH 100-300 Myr', 'SFH 300 Myr-1 Gyr', 
+		         'SFH 1-3 Gyr', 'diffuse dust', r'log(Z/Z$_{\odot}$)', 'diffuse dust index',
+		         'birth-cloud dust', r'dust emission Q$_{\mathrm{PAH}}$',r'dust emission $\gamma$',r'dust emission U$_{\mathrm{min}}$']
 
 	#### REGULAR PARAMETERS
 	fig, axes = plt.subplots(xfig, yfig, figsize = size)
@@ -186,9 +280,8 @@ def plot_fit_parameters(alldata,outfolder=None):
 
 	### DISTRIBUTION OF ERRORS
 	fig_err, axes_err = plt.subplots(xfig, yfig, figsize = size)
-	plt.subplots_adjust(wspace=0.3,hspace=0.3)
+	plt.subplots_adjust(wspace=0.3,hspace=0.0)
 	ax_err = np.ravel(axes_err)
-
 
 	for ii,par in enumerate(pars):
 
@@ -203,8 +296,8 @@ def plot_fit_parameters(alldata,outfolder=None):
 
 		#### plot
 		ax[ii].errorbar(x,y,yerr,fmt='o',alpha=0.8,color='#1C86EE')
-		ax[ii].set_xlabel('true '+par)
-		ax[ii].set_ylabel('fit '+par)
+		ax[ii].set_xlabel('true '+parlabels[ii])
+		ax[ii].set_ylabel('fit '+parlabels[ii])
 
 		ax[ii] = threed_dutils.equalize_axes(ax[ii], x,y)
 		mean_offset,scat = threed_dutils.offset_and_scatter(x,y)
@@ -214,40 +307,101 @@ def plot_fit_parameters(alldata,outfolder=None):
 		ax[ii].xaxis.set_major_locator(MaxNLocator(5))
 		ax[ii].yaxis.set_major_locator(MaxNLocator(5))
 
-		##### gather the PDF
-		pdf_dist = np.array([dat['pdf_dist'][ii] for dat in alldata])
+		if cdf:
+			##### gather the PDF
+			pdf_dist = np.array([dat['pdf_dist'][ii] for dat in alldata])
 
-		##### plot histogram
-		nbins_hist = 25
-		histcolor = '#0000CD'
-		truecolor = '#FF420E'
+			##### plot histogram
+			nbins_hist = 25
 
-		n, bins, patches = ax_err[ii].hist(pdf_dist, range=(0.0,1.0),
-	                 			           bins=nbins_hist, histtype='step',
-	                 			           alpha=0.7,lw=2,color=histcolor,
-	                 			           cumulative=True,normed=True)
+			n, bins, patches = ax_err[ii].hist(pdf_dist, range=(0.0,1.0),
+		                 			           bins=nbins_hist, histtype='step',
+		                 			           alpha=0.7,lw=2,color=obscolor,
+		                 			           cumulative=True,normed=True)
 
-		ax_err[ii].plot([0,1],[0,1],color=truecolor,lw=2,alpha=0.5)
+			ax_err[ii].plot([0,1],[0,1],color=truecolor,lw=2,alpha=0.5)
 
-		ax_err[ii].text(0.05,0.9,'ideal distribution',transform=ax_err[ii].transAxes,color=truecolor,ha='left',fontsize=12,weight='bold')
-		ax_err[ii].text(0.05,0.82,'mock distribution',transform=ax_err[ii].transAxes,color=histcolor,ha='left',fontsize=12,weight='bold')
+			ax_err[ii].text(0.05,0.9,'ideal distribution',transform=ax_err[ii].transAxes,color=modcolor,ha='left',fontsize=12,weight='bold')
+			ax_err[ii].text(0.05,0.82,'mock distribution',transform=ax_err[ii].transAxes,color=obscolor,ha='left',fontsize=12,weight='bold')
 
-		ax_err[ii].set_xlabel(r'location of truth within PDF')
-		ax_err[ii].set_ylabel('cumulative density')
-		ax_err[ii].set_title(par)
-		ax_err[ii].set_ylim(0,1)
+			ax_err[ii].set_xlabel(r'location of truth within PDF')
+			ax_err[ii].set_ylabel('cumulative density')
+			ax_err[ii].set_title(parlabels[ii])
+			ax_err[ii].set_ylim(0,1)
+		else:
+			##### gather the PDF
+			bins = alldata[0]['bins'][ii]
+			nbins = len(bins)
+			model_dist, obs_dist = np.zeros(nbins-1),np.zeros(nbins-1)
+			for kk, dat in enumerate(alldata):
+				model_dist += dat['parameter_unit_pdfs']['model_pdf'][par]
+				obs_dist += dat['parameter_unit_pdfs']['obs_pdf'][par]
 
+			#### create step function
+			plotx = np.empty((nbins*2,), dtype=float)
+			plotx[0::2] = bins
+			plotx[1::2] = bins
+
+			ploty_mod, ploty_obs = [np.empty((model_dist.size*2,), dtype=model_dist.dtype) for X in xrange(2)]
+			ploty_mod[0::2] = model_dist
+			ploty_mod[1::2] = model_dist
+			ploty_mod = np.concatenate((np.atleast_1d(0.0),ploty_mod,np.atleast_1d(0.0)))
+			ploty_obs[0::2] = obs_dist
+			ploty_obs[1::2] = obs_dist
+			ploty_obs = np.concatenate((np.atleast_1d(0.0),ploty_obs,np.atleast_1d(0.0)))
+
+			ax_err[ii].plot(plotx,ploty_obs,alpha=0.8,lw=2,color=obscolor)
+			ax_err[ii].plot(plotx,ploty_mod,alpha=0.8,lw=2,color=modcolor)
+
+			ax_err[ii].fill_between(plotx, np.zeros_like(ploty_obs), ploty_obs, 
+							   color=obscolor,
+							   alpha=0.3)
+			ax_err[ii].fill_between(plotx, np.zeros_like(ploty_mod), ploty_mod, 
+							   color=modcolor,
+							   alpha=0.3)
+
+			xunit = ''
+			if 'log' in parlabels[ii]:
+				xunit = ' [dex]'
+
+			ax_err[ii].set_xlabel(r'position within model posterior'+xunit)
+			for tl in ax_err[ii].get_yticklabels():tl.set_visible(False)
+			if ii % 3 == 0:
+				ax_err[ii].set_ylabel('density')
+			ax_err[ii].set_title(parlabels[ii])
+			ax_err[ii].set_ylim(0.0,ax_err[ii].get_ylim()[1]*1.125)
+			ax_err[ii].set_xlim(bins.min(),bins.max())
+
+			ax_err[ii].text(0.04,0.93,r'$\Sigma$ (model posteriors)',transform=ax_err[ii].transAxes,color=modcolor)
+			ax_err[ii].text(0.04,0.88,'observations',transform=ax_err[ii].transAxes,color=obscolor)
+
+			'''
+			medobs, sigobs = pdf_stats(pdf[key]['plot_bins'],pdf[key]['obs_pdf'])
+			medmod, sigmod = pdf_stats(pdf[key]['plot_bins'],pdf[key]['model_pdf'])
+
+			ax[i].text(0.97,0.91,r'84$^{\mathrm{th}}$-16$^{\mathrm{th}}$='+"{:.2f}".format(sigmod) + xunit,transform=ax[i].transAxes,color=modcolor,ha='right')
+			ax[i].text(0.97,0.86,r'84$^{\mathrm{th}}$-16$^{\mathrm{th}}$='+"{:.2f}".format(sigobs) + xunit,transform=ax[i].transAxes,color=obscolor,ha='right')
+			ax[i].text(0.97,0.81,'median='+"{:.2f}".format(medobs) + xunit,transform=ax[i].transAxes,color=obscolor,ha='right')
+			'''
+
+	# turn the remaining axes off
+	for i in xrange(ii+1,ax.shape[0]):
+		ax[i].axis('off')
+		ax_err[i].axis('off')
+
+	fig.tight_layout()
 	fig.savefig(outfolder+'fit_parameter_recovery.png',dpi=150)
+	fig_err.tight_layout()
 	fig_err.savefig(outfolder+'fit_parameter_PDF.png',dpi=150)
 	plt.close()
 
-def plot_derived_parameters(alldata,outfolder=None):
+def plot_derived_parameters(alldata,outfolder=None, cdf=False):
 
 	##### EXTRA PARAMETERS
 	epars = alldata[0]['eparnames']
 	epars_truth = alldata[0]['truths']['extra_parnames']
 	pars_to_plot = ['sfr_100','ssfr_100', 'half_time']#,'ssfr_10','ssfr_100','half_time']
-	parlabels = ['log(SFR) [100 Myr]','log(sSFR) [100 Myr]', r"t$_{\mathrm{half-mass}}$ [Gyr]"]
+	parlabels = ['log(SFR) [100 Myr]','log(sSFR) [100 Myr]', r"log(t$_{\mathrm{half-mass}})$ [Gyr]"]
 
 	fig, axes = plt.subplots(1, 3, figsize = (15,5))
 	plt.subplots_adjust(wspace=0.33,bottom=0.15,top=0.85,left=0.1,right=0.93)
@@ -286,11 +440,10 @@ def plot_derived_parameters(alldata,outfolder=None):
 		y = np.log10(y)
 
 		if par == 'half_time':
-			yup = 10**yup
-			ydown = 10**ydown
-			y = 10**y
-			yerr = threed_dutils.asym_errors(y,yup,ydown,log=False)
-		else:
+			#yup = 10**yup
+			#ydown = 10**ydown
+			#y = 10**y
+			#yerr = threed_dutils.asym_errors(y,yup,ydown,log=False)
 			x = np.log10(x)
 
 		### plot that shit
@@ -306,33 +459,82 @@ def plot_derived_parameters(alldata,outfolder=None):
 		ax[ii].xaxis.set_major_locator(MaxNLocator(5))
 		ax[ii].yaxis.set_major_locator(MaxNLocator(5))
 
-		##### gather the PDF
-		pdf_dist = np.array([dat['epdf_dist'][idx] for dat in alldata])
+		if cdf:
+			##### gather the PDF
+			pdf_dist = np.array([dat['epdf_dist'][idx] for dat in alldata])
 
-		##### plot histogram
-		nbins_hist = 25
-		histcolor = '#0000CD'
-		truecolor = '#FF420E'
+			##### plot histogram
+			nbins_hist = 25
+			histcolor = '#0000CD'
+			truecolor = '#FF420E'
 
-		n, bins, patches = ax_err[ii].hist(pdf_dist, range=(0.0,1.0),
-	                 			           bins=nbins_hist, histtype='step',
-	                 			           alpha=0.7,lw=2,color=histcolor,
-	                 			           cumulative=True,normed=True)
+			n, bins, patches = ax_err[ii].hist(pdf_dist, range=(0.0,1.0),
+		                 			           bins=nbins_hist, histtype='step',
+		                 			           alpha=0.7,lw=2,color=histcolor,
+		                 			           cumulative=True,normed=True)
 
-		ax_err[ii].plot([0,1],[0,1],color=truecolor,lw=2,alpha=0.5)
+			ax_err[ii].plot([0,1],[0,1],color=truecolor,lw=2,alpha=0.5)
 
-		ax_err[ii].text(0.05,0.9,'ideal distribution',transform=ax_err[ii].transAxes,color=truecolor,ha='left',fontsize=12,weight='bold')
-		ax_err[ii].text(0.05,0.82,'mock distribution',transform=ax_err[ii].transAxes,color=histcolor,ha='left',fontsize=12,weight='bold')
+			ax_err[ii].text(0.05,0.9,'ideal distribution',transform=ax_err[ii].transAxes,color=truecolor,ha='left',fontsize=12,weight='bold')
+			ax_err[ii].text(0.05,0.82,'mock distribution',transform=ax_err[ii].transAxes,color=histcolor,ha='left',fontsize=12,weight='bold')
 
-		ax_err[ii].set_xlabel(r'location of truth within PDF')
-		ax_err[ii].set_ylabel('cumulative density')
-		ax_err[ii].set_title(parlabels[ii])
-		ax_err[ii].set_ylim(0,1)
+			ax_err[ii].set_xlabel(r'location of truth within PDF')
+			ax_err[ii].set_ylabel('cumulative density')
+			ax_err[ii].set_title(parlabels[ii])
+			ax_err[ii].set_ylim(0,1)
 
+		else:
+			bins = alldata[0]['ebins'][ii]
+			nbins = len(bins)
+			model_dist, obs_dist = np.zeros(nbins-1),np.zeros(nbins-1)
+			for kk, dat in enumerate(alldata):
+				model_dist += dat['eparameter_unit_pdfs']['model_pdf'][par]
+				obs_dist += dat['eparameter_unit_pdfs']['obs_pdf'][par]
+
+			#### create step function
+			plotx = np.empty((nbins*2,), dtype=float)
+			plotx[0::2] = bins
+			plotx[1::2] = bins
+
+			ploty_mod, ploty_obs = [np.empty((model_dist.size*2,), dtype=model_dist.dtype) for X in xrange(2)]
+			ploty_mod[0::2] = model_dist
+			ploty_mod[1::2] = model_dist
+			ploty_mod = np.concatenate((np.atleast_1d(0.0),ploty_mod,np.atleast_1d(0.0)))
+			ploty_obs[0::2] = obs_dist
+			ploty_obs[1::2] = obs_dist
+			ploty_obs = np.concatenate((np.atleast_1d(0.0),ploty_obs,np.atleast_1d(0.0)))
+
+			ax_err[ii].plot(plotx,ploty_obs,alpha=0.8,lw=2,color=obscolor)
+			ax_err[ii].plot(plotx,ploty_mod,alpha=0.8,lw=2,color=modcolor)
+
+			ax_err[ii].fill_between(plotx, np.zeros_like(ploty_obs), ploty_obs, 
+							   color=obscolor,
+							   alpha=0.3)
+			ax_err[ii].fill_between(plotx, np.zeros_like(ploty_mod), ploty_mod, 
+							   color=modcolor,
+							   alpha=0.3)
+
+			xunit = ''
+			if 'log' in parlabels[ii]:
+				xunit = ' [dex]'
+
+			ax_err[ii].set_xlabel(r'position within model posterior'+xunit)
+			ax_err[ii].set_ylabel('density')
+			ax_err[ii].set_title(parlabels[ii])
+			ax_err[ii].set_ylim(0.0,ax_err[ii].get_ylim()[1]*1.125)
+			ax_err[ii].set_xlim(bins.min(),bins.max())
+
+			ax_err[ii].text(0.04,0.93,r'$\Sigma$ (model posteriors)',transform=ax_err[ii].transAxes,color=modcolor)
+			ax_err[ii].text(0.04,0.88,'observations',transform=ax_err[ii].transAxes,color=obscolor)
+
+	fig.tight_layout()
 	fig.savefig(outfolder+'derived_parameter_recovery.png',dpi=150)
+	fig_err.tight_layout()
 	fig_err.savefig(outfolder+'derived_parameter_PDF.png',dpi=150)
 
 	plt.close()
+	print 1/0
+
 
 def plot_spectral_parameters(alldata,outfolder=None):
 

@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import corner, os, math, copy, threed_dutils
 from prospect.io import read_results
 import matplotlib.image as mpimg
+import matplotlib as mpl
 from astropy.cosmology import WMAP9
 import fsps
 from matplotlib.ticker import MaxNLocator
@@ -18,6 +19,38 @@ obs_color = '#545454'
 tiny_number = 1e-3
 big_number = 1e90
 dpi = 150
+
+class jLogFormatter(mpl.ticker.LogFormatter):
+	'''
+	this changes the format from exponential to floating point.
+	'''
+
+	def __call__(self, x, pos=None):
+		"""Return the format for tick val *x* at position *pos*"""
+		vmin, vmax = self.axis.get_view_interval()
+		d = abs(vmax - vmin)
+		b = self._base
+		if x == 0.0:
+			return '0'
+		sign = np.sign(x)
+		# only label the decades
+		fx = math.log(abs(x)) / math.log(b)
+		isDecade = mpl.ticker.is_close_to_int(fx)
+		if not isDecade and self.labelOnlyBase:
+			s = ''
+		elif x > 10000:
+			s = '{0:.3g}'.format(x)
+		elif x < 1:
+			s = '{0:.3g}'.format(x)
+		else:
+			s = self.pprint_val(x, d)
+		if sign == -1:
+			s = '-%s' % s
+		return self.fix_minus(s)
+
+#### format those log plots! 
+minorFormatter = jLogFormatter(base=10, labelOnlyBase=False)
+majorFormatter = jLogFormatter(base=10, labelOnlyBase=True)
 
 def subcorner(sample_results,  sps, model,
                 outname=None, showpars=None,
@@ -324,8 +357,10 @@ def add_sfh_plot(sample_results,fig,ax_loc,sps,
 	if 'sfr_fraction_1' in sample_results['model'].theta_labels():
 		plotmax_x = np.max(t)
 
-	dynrange = (plotmax_y-plotmin_y)*0.4
-	axlim_sfh=[plotmax_x, plotmin_x, plotmin_y, plotmax_y+dynrange]
+	plotmax_y = np.max(perc)
+	plotmin_y = np.min(perc)
+
+	axlim_sfh=[plotmax_x, plotmin_x, plotmin_y, plotmax_y]
 	ax_inset.axis(axlim_sfh)
 
 	ax_inset.set_ylabel('log(SFR)',fontsize=axfontsize,weight='bold')
@@ -333,7 +368,7 @@ def add_sfh_plot(sample_results,fig,ax_loc,sps,
 	ax_inset.tick_params(labelsize=axfontsize)
 
 	# labels
-	ax_inset.text(0.92,0.16, 'median',color=median_main_color, transform = ax_inset.transAxes,fontsize=axfontsize*1.4,ha='right')
+	# ax_inset.text(0.92,0.16, 'median',color=median_main_color, transform = ax_inset.transAxes,fontsize=axfontsize*1.4,ha='right')
 
 	# use log scale if we're doing nonparametric
 	if 'sfr_fraction_1' in sample_results['model'].theta_labels():
@@ -595,7 +630,7 @@ def return_sedplot_vars(thetas, sample_results, sps, nufnu=True):
 	# here we want to return
 	# effective wavelength of photometric bands, observed maggies, observed uncertainty, model maggies, observed_maggies-model_maggies / uncertainties
 	# model maggies, observed_maggies-model_maggies/uncertainties
-	return wave_eff, obs_maggies, obs_maggies_unc, mu, (obs_maggies-mu)/obs_maggies_unc, spec, sps.wavelengths
+	return wave_eff/1e4, obs_maggies, obs_maggies_unc, mu, (obs_maggies-mu)/obs_maggies_unc, spec, sps.wavelengths/1e4
 
 def sed_figure(sample_results, sps, model,
                 alpha=0.3, samples = [-1],
@@ -673,12 +708,11 @@ def sed_figure(sample_results, sps, model,
 	median_chi = (mag_pdf[mask] - sample_results['obs']['maggies'][mask])/sample_results['obs']['maggies_unc'][mask]
 
 	sfactor = 3e18/w
-	pfactor = 3e18/wave_eff
 
 	nz = spec_pdf[:,1] > 0
-	phot.fill_between(w, spec_pdf[:,0]*sfactor, 
-		                 spec_pdf[:,2]*sfactor,
-		                 color=median_err_color)
+	phot.fill_between(w/1e4, spec_pdf[:,0]*sfactor, 
+		                     spec_pdf[:,2]*sfactor,
+		                     color=median_err_color)
 
 	# plot best-fit FAST model
 	if fast:
@@ -688,7 +722,7 @@ def sed_figure(sample_results, sps, model,
 		fspec,fmags,fw,fastparms,fastfields=threed_dutils.return_fast_sed(f_filename,f_objname, sps=sps, obs=sample_results['obs'], dustem = False)
 		nz = fspec > 0
 
-		phot.plot(np.log10(fw[nz]), np.log10(fspec[nz]*(c/(fw[nz]/1e10))), linestyle='-',
+		phot.plot(np.log10(fw[nz]/1e4), np.log10(fspec[nz]*(c/(fw[nz]/1e10))), linestyle='-',
 	              color=fastcolor, alpha=0.6,zorder=-1)
 
 		fwave = sample_results['obs']['wave_effective']
@@ -712,14 +746,14 @@ def sed_figure(sample_results, sps, model,
 			pass
 
 	# add SFH plot
-	ax_loc = [0.2,0.35,0.12,0.14]
+	ax_loc = [0.32,0.35,0.12,0.14]
 	ax_inset = add_sfh_plot(sample_results,fig,ax_loc,sps,truths=truths,fast=fast)
 
 	# add RGB
 	try:
 		imgname=os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/rgb/'+sample_results['run_params']['objname'].replace(' ','_')+'.png'
 		img=mpimg.imread(imgname)
-		ax_inset2=fig.add_axes([0.34,0.34,0.15,0.15],zorder=32)
+		ax_inset2=fig.add_axes([0.46,0.34,0.15,0.15],zorder=32)
 		ax_inset2.imshow(img)
 		ax_inset2.set_axis_off()
 	except IOError:
@@ -832,10 +866,12 @@ def sed_figure(sample_results, sps, model,
     # set labels
 	res.set_ylabel( r'$\chi$')
 	phot.set_ylabel(r'$\nu f_{\nu}$')
-	res.set_xlabel(r'$\lambda_{obs}$ [$\AA$]')
+	res.set_xlabel(r'$\lambda_{obs}$ [$\mu$m]')
 	phot.set_yscale('log',nonposx='clip')
 	phot.set_xscale('log',nonposx='clip')
-	res.set_xscale('log',nonposx='clip')
+	res.set_xscale('log',nonposx='clip',subsx=(2,5))
+	res.xaxis.set_minor_formatter(minorFormatter)
+	res.xaxis.set_major_formatter(majorFormatter)
 
 	# clean up and output
 	fig.add_subplot(phot)
@@ -847,9 +883,11 @@ def sed_figure(sample_results, sps, model,
 	ax2=phot.twiny()
 	ax2.set_xticks(np.arange(0,10,0.2))
 	ax2.set_xlim(x1/(1+z_txt), x2/(1+z_txt))
-	ax2.set_xlabel(r'log($\lambda_{rest}$) [$\AA$]')
+	ax2.set_xlabel(r'log($\lambda_{rest}$) [$\mu$m]')
 	ax2.set_ylim(y1, y2)
-	ax2.set_xscale('log',nonposx='clip')
+	ax2.set_xscale('log',nonposx='clip',subsx=(2,5))
+	ax2.xaxis.set_minor_formatter(minorFormatter)
+	ax2.xaxis.set_major_formatter(majorFormatter)
 
 	# remove ticks
 	phot.set_xticklabels([])

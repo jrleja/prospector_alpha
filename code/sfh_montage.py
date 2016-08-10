@@ -125,9 +125,7 @@ def plot_sfh(ax,t,sfh,sfrmin):
 	### set up y-plotting range
 	plotmax_y = np.max(perc)
 	plotmin_y = np.min(perc)
-	dynrange = (plotmax_y-plotmin_y)*0.5
-	dynrange = 0.1
-	ax.set_ylim(plotmin_y-dynrange, plotmax_y+0.1)
+	ax.set_ylim(plotmin_y-0.1, plotmax_y+0.1)
 
 	### format x-axis
 	ax.set_xlabel('t [Gyr]',weight='bold')

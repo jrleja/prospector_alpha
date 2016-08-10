@@ -213,13 +213,15 @@ def specpar_pdf_distance(pinfo,alldata, delta_functions=True, center_obs=True):
 
 def specpar_pdf_plot(pdf,outname=None):
 
-	fig, axarr = plt.subplots(2,3, figsize = (18,12))
+	fig, axarr = plt.subplots(1,2, figsize = (12,6.5))
 	ax = np.ravel(axarr)
 
 	obscolor = '#FF420E'
 	modcolor = '#375E97'
 
-	for i, key in enumerate(pdf.keys()):
+	keys = [r'H$\alpha$ flux',r'H$\beta$ flux']
+
+	for i, key in enumerate(keys):
 
 		#### create step function
 		plotx = np.empty((pdf[key]['bins'].size*2,), dtype=pdf[key]['bins'].dtype)
@@ -251,15 +253,15 @@ def specpar_pdf_plot(pdf,outname=None):
 		if pdf[key]['xunit'] != None:
 			xunit = pdf[key]['xunit']
 
-		ax[i].set_xlabel(r'$\Sigma$ (posterior probabilities) [' + xunit+']')
+		ax[i].set_xlabel(r'position within model posterior [dex]')
 		ax[i].set_ylabel('density')
 		ax[i].set_title(key)
-		ax[i].set_ylim(0.0,ax[i].get_ylim()[1])
+		ax[i].set_ylim(0.0,ax[i].get_ylim()[1]*1.125)
 		ax[i].set_xlim(pdf[key]['bins'].min(),pdf[key]['bins'].max())
 
-		ax[i].text(0.05,0.91,'N='+str(pdf[key]['N']),transform=ax[i].transAxes)
-		ax[i].text(0.05,0.86,'model PDF',transform=ax[i].transAxes,color=modcolor)
-		ax[i].text(0.05,0.81,'observed PDF',transform=ax[i].transAxes,color=obscolor)
+		ax[i].text(0.04,0.93,r'$\Sigma$ (model posteriors)',transform=ax[i].transAxes,color=modcolor)
+		ax[i].text(0.04,0.88,'observations',transform=ax[i].transAxes,color=obscolor)
+		ax[i].text(0.04,0.83,'N='+str(pdf[key]['N']),transform=ax[i].transAxes)
 
 		'''
 		ax[i].text(0.97,0.91,r'84$^{\mathrm{th}}$-16$^{\mathrm{th}}$='+"{:.2f}".format(sigmod) + xunit,transform=ax[i].transAxes,color=modcolor,ha='right')
@@ -1828,8 +1830,8 @@ def obs_vs_model_hdelta(e_pinfo,hflag,outname=None,outname_dnplt=None,eqw=False)
 	dn4000_prosp = e_pinfo['prosp']['dn4000'][good_idx,0]
 
 	if eqw:
-		min = -0.15
-		max = 1.2
+		min = 0.2
+		max = 1.0
 		plotlim = (min,max,min,max)
 
 		hdel_obs = e_pinfo['obs']['hdel_eqw'][good_idx]
@@ -2799,8 +2801,8 @@ def plot_emline_comp(alldata,outfolder,hflag):
 	e_pinfo = fmt_emline_info(alldata)
 
 	##### add in 'location in truth' PDF
-	delta_functions = False
-	center_obs = True
+	delta_functions = True # for just the median of the observational posteriors
+	center_obs = False # to center the observations at zero too
 	if delta_functions:
 		outname = outfolder+'posterior_PDF_delta_functions.png'
 	elif center_obs: 
