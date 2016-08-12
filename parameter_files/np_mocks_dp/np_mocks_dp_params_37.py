@@ -524,10 +524,10 @@ def load_model(objname='', agelims=[], **extras):
 
     #### FRACTIONAL MASS INITIALIZATION
     # N-1 bins, last is set by x = 1 - np.sum(sfr_fraction)
-    model_params[n.index('sfr_fraction')]['N'] = ncomp-1
+    model_params[n.index('sfr_fraction')]['N'] = ncomp-1ddd
     model_params[n.index('sfr_fraction')]['init'] = np.zeros(ncomp-1)+1./ncomp
     model_params[n.index('sfr_fraction')]['prior_args'] = {
-                                                           'maxi':np.full(ncomp-1,1.0), 
+                                                           'maxi':np.full(ncomp-1,0.995), 
                                                            'mini':np.full(ncomp-1,0.0),
                                                           }
     model_params[n.index('sfr_fraction')]['init_disp'] = 0.15
