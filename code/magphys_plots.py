@@ -530,7 +530,8 @@ def update_model_info(alldata, sample_results, magphys):
 	alldata['pquantiles']['random_chain'] = ransamp
 	alldata['spec_info'] = sample_results['spec_info']
 	alldata['model_emline'] = sample_results['model_emline']
-	alldata['lir'] = sample_results['observables']['L_IR']
+	alldata['observables'] = sample_results['observables']
+
 	alldata['pextras'] = sample_results['extras']
 	alldata['pquantiles']['parnames'] = np.array(sample_results['model'].theta_labels())
 	alldata['bfit'] = sample_results['bfit']

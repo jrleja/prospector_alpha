@@ -56,6 +56,22 @@ def minlog(x,axis=None):
 
 	return np.log10(x)
 
+def pdf_quantiles(bins,truth,model_pdf,bottom_lim,top_lim):
+
+	### CALCULATE RANGE IN PREDICTIONS
+	total = np.sum(model_pdf)
+	cumsum = np.cumsum(model_pdf)
+	lower_bin = np.interp(total*bottom_lim, cumsum, bins) # x_you_want, x_you_have, y_you_have
+	upper_bin = np.interp(total*top_lim, cumsum, bins)
+
+	### CALCULATE WHAT FRACTION OF TRUTHS FALL IN THIS RANGE
+	total_truth = np.sum(truth)
+	cumsum_truth = np.cumsum(truth)
+	lower_tbin = np.interp(lower_bin, bins, cumsum_truth) # x_you_want, x_you_have, y_you_have
+	upper_tbin = np.interp(upper_bin, bins, cumsum_truth)
+
+	return (upper_tbin-lower_tbin)/total_truth
+
 def pdf_stats(bins,pdf):
 
 	total = np.sum(pdf)
@@ -236,9 +252,6 @@ def specpar_pdf_plot(pdf,outname=None):
 		ploty_obs[1::2] = pdf[key]['obs_pdf']
 		ploty_obs = np.concatenate((np.atleast_1d(0.0),ploty_obs,np.atleast_1d(0.0)))
 
-		medobs, sigobs = pdf_stats(pdf[key]['plot_bins'],pdf[key]['obs_pdf'])
-		medmod, sigmod = pdf_stats(pdf[key]['plot_bins'],pdf[key]['model_pdf'])
-
 		ax[i].plot(plotx,ploty_obs,alpha=0.8,lw=2,color=obscolor)
 		ax[i].plot(plotx,ploty_mod,alpha=0.8,lw=2,color=modcolor)
 
@@ -258,20 +271,21 @@ def specpar_pdf_plot(pdf,outname=None):
 		ax[i].set_title(key)
 		ax[i].set_ylim(0.0,ax[i].get_ylim()[1]*1.125)
 		ax[i].set_xlim(pdf[key]['bins'].min(),pdf[key]['bins'].max())
+		for tl in ax[i].get_yticklabels():tl.set_visible(False) # no tick labels
 
 		ax[i].text(0.04,0.93,r'$\Sigma$ (model posteriors)',transform=ax[i].transAxes,color=modcolor)
 		ax[i].text(0.04,0.88,'observations',transform=ax[i].transAxes,color=obscolor)
 		ax[i].text(0.04,0.83,'N='+str(pdf[key]['N']),transform=ax[i].transAxes)
 
-		'''
-		ax[i].text(0.97,0.91,r'84$^{\mathrm{th}}$-16$^{\mathrm{th}}$='+"{:.2f}".format(sigmod) + xunit,transform=ax[i].transAxes,color=modcolor,ha='right')
-		ax[i].text(0.97,0.86,r'84$^{\mathrm{th}}$-16$^{\mathrm{th}}$='+"{:.2f}".format(sigobs) + xunit,transform=ax[i].transAxes,color=obscolor,ha='right')
-		ax[i].text(0.97,0.81,'median='+"{:.2f}".format(medobs) + xunit,transform=ax[i].transAxes,color=obscolor,ha='right')
-		'''
+		onesig_perc = pdf_quantiles(pdf[key]['plot_bins'],pdf[key]['obs_pdf'],pdf[key]['model_pdf'],0.16,0.84)/0.68
+		twosig_perc = pdf_quantiles(pdf[key]['plot_bins'],pdf[key]['obs_pdf'],pdf[key]['model_pdf'],0.025,0.975)/0.95
 
+		ax[i].text(0.05,0.76,r'$\frac{1\sigma_{\mathrm{obs}}}{1\sigma_{\mathrm{true}}}$:'+"{:.2f}".format(onesig_perc),transform=ax[i].transAxes)
+		ax[i].text(0.05,0.69,r'$\frac{2\sigma_{\mathrm{obs}}}{2\sigma_{\mathrm{true}}}$:'+"{:.2f}".format(twosig_perc),transform=ax[i].transAxes)
+		
 	plt.tight_layout()
 	plt.savefig(outname,dpi=150)
-	os.system('open '+outname)
+	plt.close()
 
 def merge_dicts(*dict_args):
     '''
@@ -2623,7 +2637,6 @@ def residual_plots(e_pinfo,hflag,outfolder):
 	plt.close()
 
 	#### dust2_index vs dust2
-	# this is fucked right now
 	fig, ax = plt.subplots(1,1, figsize = (6,6))
 
 	#### calculate dtau / dlambda (tau_0) (lambda = 5500 angstroms)
@@ -3256,7 +3269,7 @@ def plot_comparison(alldata,outfolder):
 			tmp = np.array([data['pquantiles']['q16'][idx_mass][0],
 				            data['pquantiles']['q50'][idx_mass][0],
 				            data['pquantiles']['q84'][idx_mass][0]])
-			promass = np.concatenate((promass,np.atleast_2d(np.log10(tmp))),axis=0)
+			promass = np.concatenate((promass,np.atleast_2d(tmp)),axis=0)
 			magmass = np.concatenate((magmass,np.atleast_2d(data['magphys']['percentiles']['M*'][1:4])))
 
 	proerrs = [promass[:,1]-promass[:,0],

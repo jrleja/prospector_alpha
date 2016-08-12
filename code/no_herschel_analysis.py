@@ -8,6 +8,7 @@ from corner import quantile
 from astropy import constants
 import brown_io
 from matplotlib.ticker import MaxNLocator
+from extra_output import post_processing
 
 def bdec_to_ext(bdec):
 	'''
@@ -15,7 +16,7 @@ def bdec_to_ext(bdec):
 	'''
 	return 2.5*np.log10(bdec/2.86)
 
-def make_plots(runname_nh='brownseds_nohersch',runname_h='brownseds_tightbc', recollate_data = False):
+def make_plots(runname_nh='brownseds_np_nohersch',runname_h='brownseds_np', recollate_data = False):
 
 	outpickle = '/Users/joel/code/python/threedhst_bsfh/data/'+runname_nh+'_extradat.pickle'
 	if not os.path.isfile(outpickle) or recollate_data == True:
@@ -71,7 +72,14 @@ def collate_data(runname_nh=None, runname_h=None,outpickle=None):
 		sample_results_h, powell_results_h, model_h = threed_dutils.load_prospector_data(match)
 
 		### save CLOUDY-marginalized Halpha
-		linenames = sample_results_nh['model_emline']['emnames']
+
+		try: 
+			linenames = sample_results_nh['model_emline']['emnames']
+		except KeyError:
+			param_name = os.getenv('APPS')+'/threed'+sample_results_nh['run_params']['param_file'].split('/threed')[1]
+			post_processing(param_name, add_extra=True)
+			sample_results_nh, powell_results_nh, model_nh = threed_dutils.load_prospector_data(filebase_nh[jj])
+
 		ha_em = linenames == 'Halpha'
 		outdat_nh['ha_q50'] = sample_results_nh['model_emline']['flux']['q50'][ha_em]
 		outdat_nh['ha_q84'] = sample_results_nh['model_emline']['flux']['q84'][ha_em]

@@ -16,6 +16,8 @@ minssfr = 1e-15
 obscolor = '#FF420E'
 modcolor = '#375E97'
 
+dpi = 120
+
 def norm_resid(fit,truth):
 	
 	# define output
@@ -69,6 +71,7 @@ def pdf_distance_unitized(chain,truth,parnames,bins, truthnames=None):
 	obs_dict = {}
 	for ii,p in enumerate(parnames):
 
+		print p
 		tempchain = chain[:,ii]
 
 		# we're in extra_truths, do some sorting
@@ -108,6 +111,21 @@ def pdf_distance_unitized(chain,truth,parnames,bins, truthnames=None):
 
 	return out
 
+def pdf_stats(bins,truth,model_pdf,bottom_lim,top_lim):
+
+	### CALCULATE RANGE IN PREDICTIONS
+	total = np.sum(model_pdf)
+	cumsum = np.cumsum(model_pdf)
+	lower_bin = np.interp(total*bottom_lim, cumsum, bins) # x_you_want, x_you_have, y_you_have
+	upper_bin = np.interp(total*top_lim, cumsum, bins)
+
+	### CALCULATE WHAT FRACTION OF TRUTHS FALL IN THIS RANGE
+	total_truth = np.sum(truth)
+	cumsum_truth = np.cumsum(truth)
+	lower_tbin = np.interp(lower_bin, bins, cumsum_truth) # x_you_want, x_you_have, y_you_have
+	upper_tbin = np.interp(upper_bin, bins, cumsum_truth)
+
+	return (upper_tbin-lower_tbin)/total_truth
 
 def pdf_distance(chain, truths, chainnames=None, truthnames=None):
 
@@ -146,7 +164,7 @@ def collate_data(runname='ha_80myr',outpickle=None):
 	#['logmass', 'sfr_fraction_1', 'sfr_fraction_2', 'sfr_fraction_3',
     #   'sfr_fraction_4', 'sfr_fraction_5', 'dust2', 'logzsol',
     #   'dust_index', 'dust1', 'duste_qpah', 'duste_gamma', 'duste_umin']
-	nbins = 36
+	nbins = 31
 	bins = [np.linspace(-0.3,0.3,nbins),
 			np.linspace(-0.4,0.4,nbins),
 			np.linspace(-0.4,0.4,nbins),
@@ -154,7 +172,7 @@ def collate_data(runname='ha_80myr',outpickle=None):
 			np.linspace(-0.4,0.4,nbins),
 			np.linspace(-0.4,0.4,nbins),
 			np.linspace(-0.3,0.3,nbins),
-			np.linspace(-0.8,0.8,nbins),
+			np.linspace(-0.9,0.9,nbins),
 			np.linspace(-1.0,1.0,nbins),
 			np.linspace(-0.5,0.5,nbins),
 			np.linspace(-1.5,1.5,nbins),
@@ -279,8 +297,8 @@ def plot_fit_parameters(alldata,outfolder=None, cdf=False):
 	ax = np.ravel(axes)
 
 	### DISTRIBUTION OF ERRORS
-	fig_err, axes_err = plt.subplots(xfig, yfig, figsize = size)
-	plt.subplots_adjust(wspace=0.3,hspace=0.0)
+	fig_err, axes_err = plt.subplots(xfig, yfig, figsize = (11,19.5))
+	plt.subplots_adjust(wspace=0.2,hspace=0.4)
 	ax_err = np.ravel(axes_err)
 
 	for ii,par in enumerate(pars):
@@ -364,35 +382,35 @@ def plot_fit_parameters(alldata,outfolder=None, cdf=False):
 			if 'log' in parlabels[ii]:
 				xunit = ' [dex]'
 
-			ax_err[ii].set_xlabel(r'position within model posterior'+xunit)
-			for tl in ax_err[ii].get_yticklabels():tl.set_visible(False)
-			if ii % 3 == 0:
+			ax_err[ii].set_xlabel(r'$\Delta$(prediction)'+xunit)
+			for tl in ax_err[ii].get_yticklabels():tl.set_visible(False) # no tick labels
+			if ii % 3 == 0: # only label every third y-axis
 				ax_err[ii].set_ylabel('density')
+			ax_err[ii].xaxis.set_major_locator(MaxNLocator(4)) # only label up to x tickmarks
+			for tick in ax_err[ii].xaxis.get_major_ticks(): tick.label.set_fontsize(12) 
 			ax_err[ii].set_title(parlabels[ii])
 			ax_err[ii].set_ylim(0.0,ax_err[ii].get_ylim()[1]*1.125)
 			ax_err[ii].set_xlim(bins.min(),bins.max())
 
-			ax_err[ii].text(0.04,0.93,r'$\Sigma$ (model posteriors)',transform=ax_err[ii].transAxes,color=modcolor)
-			ax_err[ii].text(0.04,0.88,'observations',transform=ax_err[ii].transAxes,color=obscolor)
+			fs = 12
+			ax_err[ii].text(0.06,0.88,r'$\Sigma$ (model posteriors)',transform=ax_err[ii].transAxes,color=modcolor,fontsize=fs)
+			ax_err[ii].text(0.06,0.8,'truth',transform=ax_err[ii].transAxes,color=obscolor,fontsize=fs)
 
-			'''
-			medobs, sigobs = pdf_stats(pdf[key]['plot_bins'],pdf[key]['obs_pdf'])
-			medmod, sigmod = pdf_stats(pdf[key]['plot_bins'],pdf[key]['model_pdf'])
+			### from the summed histogram
+			onesig_perc = pdf_stats((bins[1:] + bins[:-1])/2.,obs_dist,model_dist,0.16,0.84)/0.68
+			twosig_perc = pdf_stats((bins[1:] + bins[:-1])/2.,obs_dist,model_dist,0.025,0.975)/0.95
 
-			ax[i].text(0.97,0.91,r'84$^{\mathrm{th}}$-16$^{\mathrm{th}}$='+"{:.2f}".format(sigmod) + xunit,transform=ax[i].transAxes,color=modcolor,ha='right')
-			ax[i].text(0.97,0.86,r'84$^{\mathrm{th}}$-16$^{\mathrm{th}}$='+"{:.2f}".format(sigobs) + xunit,transform=ax[i].transAxes,color=obscolor,ha='right')
-			ax[i].text(0.97,0.81,'median='+"{:.2f}".format(medobs) + xunit,transform=ax[i].transAxes,color=obscolor,ha='right')
-			'''
-
+			ax_err[ii].text(0.06,0.7,r'$\frac{1\sigma_{\mathrm{mock}}}{1\sigma_{\mathrm{true}}}$:'+"{:.2f}".format(onesig_perc),transform=ax_err[ii].transAxes,fontsize=fs)
+			ax_err[ii].text(0.06,0.58,r'$\frac{2\sigma_{\mathrm{mock}}}{2\sigma_{\mathrm{true}}}$:'+"{:.2f}".format(twosig_perc),transform=ax_err[ii].transAxes,fontsize=fs)
+			
 	# turn the remaining axes off
 	for i in xrange(ii+1,ax.shape[0]):
 		ax[i].axis('off')
 		ax_err[i].axis('off')
 
 	fig.tight_layout()
-	fig.savefig(outfolder+'fit_parameter_recovery.png',dpi=150)
-	fig_err.tight_layout()
-	fig_err.savefig(outfolder+'fit_parameter_PDF.png',dpi=150)
+	fig.savefig(outfolder+'fit_parameter_recovery.png',dpi=dpi)
+	fig_err.savefig(outfolder+'fit_parameter_PDF.png',dpi=dpi)
 	plt.close()
 
 def plot_derived_parameters(alldata,outfolder=None, cdf=False):
@@ -407,8 +425,8 @@ def plot_derived_parameters(alldata,outfolder=None, cdf=False):
 	plt.subplots_adjust(wspace=0.33,bottom=0.15,top=0.85,left=0.1,right=0.93)
 
 	### DISTRIBUTION OF ERRORS
-	fig_err, axes_err = plt.subplots(1, 3, figsize = (15,5))
-	plt.subplots_adjust(wspace=0.33,bottom=0.15,top=0.85,left=0.05,right=0.93)
+	fig_err, axes_err = plt.subplots(1, 3, figsize = (12,4))
+	plt.subplots_adjust(wspace=0.2,bottom=0.15,top=0.85,left=0.05,right=0.93)
 
 	ax = np.ravel(axes)
 	ax_err = np.ravel(axes_err)
@@ -484,8 +502,8 @@ def plot_derived_parameters(alldata,outfolder=None, cdf=False):
 			ax_err[ii].set_ylim(0,1)
 
 		else:
-			bins = alldata[0]['ebins'][ii]
-			nbins = len(bins)
+			bins = np.array(alldata[0]['ebins'])[idx][0]
+			nbins = bins.shape[0]
 			model_dist, obs_dist = np.zeros(nbins-1),np.zeros(nbins-1)
 			for kk, dat in enumerate(alldata):
 				model_dist += dat['eparameter_unit_pdfs']['model_pdf'][par]
@@ -518,23 +536,34 @@ def plot_derived_parameters(alldata,outfolder=None, cdf=False):
 			if 'log' in parlabels[ii]:
 				xunit = ' [dex]'
 
-			ax_err[ii].set_xlabel(r'position within model posterior'+xunit)
+
+			ax_err[ii].set_xlabel(r'$\Delta$(prediction)'+xunit)
+			for tl in ax_err[ii].get_yticklabels():tl.set_visible(False) # no tick labels
 			ax_err[ii].set_ylabel('density')
 			ax_err[ii].set_title(parlabels[ii])
+			ax_err[ii].xaxis.set_major_locator(MaxNLocator(5)) # only label up to x tickmarks
 			ax_err[ii].set_ylim(0.0,ax_err[ii].get_ylim()[1]*1.125)
 			ax_err[ii].set_xlim(bins.min(),bins.max())
 
-			ax_err[ii].text(0.04,0.93,r'$\Sigma$ (model posteriors)',transform=ax_err[ii].transAxes,color=modcolor)
-			ax_err[ii].text(0.04,0.88,'observations',transform=ax_err[ii].transAxes,color=obscolor)
+			fs = 16
+			for tick in ax_err[ii].xaxis.get_major_ticks(): tick.label.set_fontsize(fs) 
+			
+			ax_err[ii].text(0.06,0.88,r'$\Sigma$ (model posteriors)',transform=ax_err[ii].transAxes,color=modcolor,fontsize=fs)
+			ax_err[ii].text(0.06,0.8,'truth',transform=ax_err[ii].transAxes,color=obscolor,fontsize=fs)
 
+			### from the summed histogram
+			onesig_perc = pdf_stats((bins[1:] + bins[:-1])/2.,obs_dist,model_dist,0.16,0.84)/0.68
+			twosig_perc = pdf_stats((bins[1:] + bins[:-1])/2.,obs_dist,model_dist,0.025,0.975)/0.95
+
+			ax_err[ii].text(0.06,0.7,r'$\frac{1\sigma_{\mathrm{mock}}}{1\sigma_{\mathrm{true}}}$:'+"{:.2f}".format(onesig_perc),transform=ax_err[ii].transAxes,fontsize=fs)
+			ax_err[ii].text(0.06,0.58,r'$\frac{2\sigma_{\mathrm{mock}}}{2\sigma_{\mathrm{true}}}$:'+"{:.2f}".format(twosig_perc),transform=ax_err[ii].transAxes,fontsize=fs)
+			
 	fig.tight_layout()
-	fig.savefig(outfolder+'derived_parameter_recovery.png',dpi=150)
-	fig_err.tight_layout()
-	fig_err.savefig(outfolder+'derived_parameter_PDF.png',dpi=150)
+	fig.savefig(outfolder+'derived_parameter_recovery.png',dpi=dpi)
+	fig_err.savefig(outfolder+'derived_parameter_PDF.png',dpi=dpi)
 
 	plt.close()
 	print 1/0
-
 
 def plot_spectral_parameters(alldata,outfolder=None):
 
@@ -633,201 +662,7 @@ def plot_spectral_parameters(alldata,outfolder=None):
 	ax[ii+2].xaxis.set_major_locator(MaxNLocator(5))
 	ax[ii+2].yaxis.set_major_locator(MaxNLocator(5))
 
-	plt.savefig(outfolder+'spectral_parameter_recovery.png',dpi=150)
-	plt.close()
-
-def plot_sfr_resid(alldata,outfolder=None):
-
-	#### what ratio to clip to?
-	rclip = (10**-0.5,10**0.5)
-	rbounds = (-0.55,0.55)
-
-	#### grab names to index
-	pars = alldata[0]['parnames']
-	epars = alldata[0]['eparnames']
-	epars_truth = alldata[0]['truths']['extra_parnames']
-
-	#### grab Halpha predicted + true
-	emnames = alldata[0]['truths']['emnames']
-	idx = emnames == 'Halpha'
-	true_ha = np.array([dat['truths']['emflux'][idx] for dat in alldata])
-	ha_ratio = true_ha/np.array([dat['eline_flux_q50'][idx] for dat in alldata])
-	ydown = true_ha/np.array([dat['eline_flux_q84'][idx] for dat in alldata])
-	yup =  true_ha/np.array([dat['eline_flux_q16'][idx] for dat in alldata])
-
-	##### clip
-	ha_ratio = np.clip(ha_ratio,rclip[0],rclip[1])
-	ydown = np.clip(ydown,rclip[0],rclip[1])
-	yup = np.clip(yup,rclip[0],rclip[1])
-
-	#### errors + logify
-	ha_ratio_err= threed_dutils.asym_errors(ha_ratio,yup,ydown,log=True)
-	ha_ratio = np.log10(ha_ratio)
-
-
-	#### SFR10
-	idx = epars == 'sfr_10'
-	idx_true = epars_truth == 'sfr_10'
-	sfr10_true = 10**np.squeeze([dat['truths']['extra_truths'][idx_true] for dat in alldata])
-	sfr10_ratio = sfr10_true/np.squeeze([dat['eq50'][idx] for dat in alldata])
-	ydown = sfr10_true/np.squeeze([dat['eq84'][idx] for dat in alldata])
-	yup = sfr10_true/np.squeeze([dat['eq16'][idx] for dat in alldata])
-
-	##### clip
-	sfr10_ratio = np.clip(sfr10_ratio,rclip[0],rclip[1])
-	ydown = np.clip(ydown,rclip[0],rclip[1])
-	yup = np.clip(yup,rclip[0],rclip[1])
-	sfr10_ratio_err = threed_dutils.asym_errors(sfr10_ratio,yup,ydown,log=True)
-	sfr10_ratio = np.log10(sfr10_ratio)
-
-
-
-	#### SFR100
-	idx = epars == 'sfr_100'
-	idx_true = epars_truth == 'sfr_100'
-	sfr100_true = 10**np.squeeze([dat['truths']['extra_truths'][idx_true] for dat in alldata])
-	sfr100_ratio = sfr100_true/np.squeeze([dat['eq50'][idx] for dat in alldata])
-	ydown = sfr100_true/np.squeeze([dat['eq84'][idx] for dat in alldata])
-	yup = sfr100_true/np.squeeze([dat['eq16'][idx] for dat in alldata])
-
-	#### clip
-	sfr100_ratio = np.clip(sfr100_ratio,rclip[0],rclip[1])
-	ydown = np.clip(ydown,rclip[0],rclip[1])
-	yup = np.clip(yup,rclip[0],rclip[1])
-	sfr100_ratio_err = threed_dutils.asym_errors(sfr100_ratio,yup,ydown,log=True)
-	sfr100_ratio = np.log10(sfr100_ratio)
-
-
-
-	#### LOGZSOL
-	idx = pars == 'logzsol'
-	logzsol_true = np.squeeze([dat['truths']['truths'][idx] for dat in alldata])
-	logzsol_ratio = logzsol_true-np.squeeze([dat['q50'][idx] for dat in alldata])
-	ydown = logzsol_true-np.squeeze([dat['q84'][idx] for dat in alldata])
-	yup = logzsol_true-np.squeeze([dat['q16'][idx] for dat in alldata])
-	logzsol_ratio_err = threed_dutils.asym_errors(logzsol_ratio,yup,ydown,log=False)
-
-
-
-	### ha extinction ratio
-	true_ha_ext = np.squeeze([dat['truths']['ha_ext'] for dat in alldata])
-	ha_ext = true_ha_ext/np.squeeze([dat['ha_ext_q50'] for dat in alldata])
-	ha_ext_up = true_ha_ext/np.squeeze([dat['ha_ext_q16'] for dat in alldata])
-	ha_ext_down = true_ha_ext/np.squeeze([dat['ha_ext_q84'] for dat in alldata])
-	ha_ext_err = threed_dutils.asym_errors(ha_ext,ha_ext_up,ha_ext_down,log=True)
-	ha_ext = np.log10(ha_ext)
-
-	### d1_d2 ratio
-	true_d1_d2 = np.squeeze([dat['truths']['d1_d2'] for dat in alldata])
-	d1_d2 = true_d1_d2/np.squeeze([dat['d1_d2_q50'] for dat in alldata])
-	d1_d2_up = true_d1_d2/np.squeeze([dat['d1_d2_q16'] for dat in alldata])
-	d1_d2_down = true_d1_d2/np.squeeze([dat['d1_d2_q84'] for dat in alldata])
-	d1_d2_err = threed_dutils.asym_errors(d1_d2,d1_d2_up,d1_d2_down,log=False)
-
-	#### true slope
-	idx_slope = pars == 'sf_tanslope'
-	true_slope = np.array([dat['truths']['truths'][idx_slope] for dat in alldata])
-
-	##### plots
-	fig, axes = plt.subplots(2, 4, figsize = (24,12))
-	plt.subplots_adjust(wspace=0.3,hspace=0.2,bottom=0.1,top=0.9,left=0.1,right=0.9)
-	ax = np.ravel(axes)
-
-	ax[0].errorbar(np.log10(sfr100_true),np.log10(sfr10_true),fmt='o',alpha=0.8,color='#1C86EE')
-	ax[0].set_xlabel('true log(SFR) [100 Myr]')
-	ax[0].set_ylabel('true log(SFR) [10 Myr]')
-
-	ax[0] = threed_dutils.equalize_axes(ax[0], np.log10(sfr100_true),np.log10(sfr10_true))
-	mean_offset,scat = threed_dutils.offset_and_scatter(np.log10(sfr100_true),np.log10(sfr10_true))
-	ax[0].text(0.96,0.12, 'scatter='+"{:.2f}".format(scat),transform = ax[0].transAxes,ha='right')
-	ax[0].text(0.96,0.05, 'mean offset='+"{:.2f}".format(mean_offset), transform = ax[0].transAxes,ha='right')
-
-	ax[0].xaxis.set_major_locator(MaxNLocator(5))
-	ax[0].yaxis.set_major_locator(MaxNLocator(6))
-
-	ax[1].errorbar(sfr10_ratio,ha_ratio,xerr=sfr10_ratio_err,yerr=ha_ratio_err,fmt='o',alpha=0.8,color='#1C86EE')
-	ax[1].set_xlabel(r'log(SFR$_{\mathrm{true}}$/SFR$_{\mathrm{fit}}$) [10 Myr]')
-	ax[1].set_ylabel(r'log(H$\alpha_{\mathrm{true}}$/H$\alpha_{\mathrm{fit}}$)')
-	ax[1].axis((rbounds[0],rbounds[1],rbounds[0],rbounds[1]))
-
-	ax[1].axvline(0.0, ls="dashed", color='k',linewidth=1.5)
-	ax[1].axhline(0.0, ls="dashed", color='k',linewidth=1.5)
-
-	ax[1].xaxis.set_major_locator(MaxNLocator(5))
-	ax[1].yaxis.set_major_locator(MaxNLocator(6))
-
-	ax[2].errorbar(sfr100_ratio,ha_ratio,xerr=sfr100_ratio_err,yerr=ha_ratio_err,fmt='o',alpha=0.8,color='#1C86EE')
-	ax[2].set_xlabel(r'log(SFR$_{\mathrm{true}}$/SFR$_{\mathrm{fit}}$) [100 Myr]')
-	ax[2].set_ylabel(r'log(H$\alpha_{\mathrm{true}}$/H$\alpha_{\mathrm{fit}}$)')
-	ax[2].axis((rbounds[0],rbounds[1],rbounds[0],rbounds[1]))
-
-	ax[2].axvline(0.0, ls="dashed", color='k',linewidth=1.5)
-	ax[2].axhline(0.0, ls="dashed", color='k',linewidth=1.5)
-
-	ax[2].xaxis.set_major_locator(MaxNLocator(5))
-	ax[2].yaxis.set_major_locator(MaxNLocator(6))
-
-	ax[3].errorbar(true_slope,ha_ratio,yerr=ha_ratio_err,fmt='o',alpha=0.8,color='#1C86EE')
-	ax[3].set_xlabel(r'sf_tanslope [true]')
-	ax[3].set_ylabel(r'log(H$\alpha_{\mathrm{true}}$/H$\alpha_{\mathrm{fit}}$) [flux]')
-	ax[3].set_ylim(rbounds)
-
-	ax[3].axhline(0.0, ls="dashed", color='k',linewidth=1.5)
-
-	ax[3].xaxis.set_major_locator(MaxNLocator(5))
-	ax[3].yaxis.set_major_locator(MaxNLocator(6))
-
-	ax[4].errorbar(ha_ext,ha_ratio,xerr=ha_ext_err,yerr=ha_ratio_err,fmt='o',alpha=0.8,color='#1C86EE')
-	ax[4].set_xlabel(r'log(true attenuation/fit attenuation) [6563 $\AA$]')
-	ax[4].set_ylabel(r'log(H$\alpha_{\mathrm{extinction}}$/H$\alpha_{\mathrm{fit}}$) [flux]')
-	ax[4].set_ylim(rbounds)
-	ax[4].set_xlim(-0.3,0.3)
-
-
-	ax[4].axhline(0.0, ls="dashed", color='k',linewidth=1.5)
-	ax[4].axvline(0.0, ls="dashed", color='k',linewidth=1.5)
-
-	ax[4].xaxis.set_major_locator(MaxNLocator(5))
-	ax[4].yaxis.set_major_locator(MaxNLocator(6))
-
-	ax[6].errorbar(sfr10_ratio,sfr100_ratio,xerr=sfr10_ratio_err,yerr=sfr100_ratio_err,fmt='o',alpha=0.8,color='#1C86EE')
-	ax[6].set_xlabel(r'log(SFR$_{\mathrm{true}}$/SFR$_{\mathrm{fit}}$) [10 Myr]')
-	ax[6].set_ylabel(r'log(SFR$_{\mathrm{true}}$/SFR$_{\mathrm{fit}}$) [100 Myr]')
-	ax[6].set_ylim(rbounds)
-	ax[6].set_xlim(rbounds)
-
-	ax[6].axvline(0.0, ls="dashed", color='k',linewidth=1.5)
-	ax[6].axhline(0.0, ls="dashed", color='k',linewidth=1.5)
-
-	ax[6].xaxis.set_major_locator(MaxNLocator(5))
-	ax[6].yaxis.set_major_locator(MaxNLocator(6))
-
-	ax[7].errorbar(true_slope,sfr100_ratio,yerr=sfr100_ratio_err,fmt='o',alpha=0.8,color='#1C86EE')
-	ax[7].set_xlabel(r'sf_tanslope [true]')
-	ax[7].set_ylabel(r'log(SFR$_{\mathrm{true}}$/SFR$_{\mathrm{fit}}$) [100 Myr]')
-	ax[7].set_ylim(rbounds)
-
-	ax[7].axhline(0.0, ls="dashed", color='k',linewidth=1.5)
-
-	ax[7].xaxis.set_major_locator(MaxNLocator(5))
-	ax[7].yaxis.set_major_locator(MaxNLocator(6))
-
-	plt.savefig(outfolder+'sfh_variability.png',dpi=150)
-	plt.close()
-
-	fig, ax = plt.subplots(1, 1, figsize = (8,8))
-
-	ax.errorbar(true_slope,ha_ratio,yerr=ha_ratio_err,fmt='o',alpha=0.8,color='#1C86EE')
-	ax.set_xlabel(r'sf_tanslope [true]')
-	ax.set_ylabel(r'log(H$\alpha_{\mathrm{true}}$/H$\alpha_{\mathrm{fit}}$) [flux]')
-	ax.set_ylim(rbounds)
-
-	ax.axhline(0.0, ls="dashed", color='k',linewidth=1.5)
-
-	ax.xaxis.set_major_locator(MaxNLocator(5))
-	ax.yaxis.set_major_locator(MaxNLocator(6))
-
-	plt.savefig(outfolder+'ha_slope.png',dpi=150)
+	plt.savefig(outfolder+'spectral_parameter_recovery.png',dpi=dpi)
 	plt.close()
 
 def plot_mass_resid(alldata,outfolder=None):
@@ -872,7 +707,7 @@ def plot_mass_resid(alldata,outfolder=None):
 	ax.xaxis.set_major_locator(MaxNLocator(5))
 	ax.yaxis.set_major_locator(MaxNLocator(5))
 
-	plt.savefig(outfolder+'mass_residual.png',dpi=150)
+	plt.savefig(outfolder+'mass_residual.png',dpi=dpi)
 	plt.close()
 
 def plot_likelihood(alldata,outfolder=None):
@@ -889,7 +724,7 @@ def plot_likelihood(alldata,outfolder=None):
 	ax.set_xlabel('true ln(prob) - best-fit ln(prob)')
 	ax.set_ylabel('N')
 
-	plt.savefig(outfolder+'likelihood_ratio.png',dpi=150)
+	plt.savefig(outfolder+'likelihood_ratio.png',dpi=dpi)
 	plt.close()
 
 if __name__ == "__main__":

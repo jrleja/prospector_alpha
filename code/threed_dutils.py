@@ -521,7 +521,7 @@ def generate_basenames(runname):
 			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+basename+'_'+ids[jj])
 			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
 
-	elif runname == 'brownseds_nohersch':
+	elif 'nohersch' in runname:
 
 		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/herschel_names.txt"
 		ids = np.loadtxt(id_list, dtype='|S20')
@@ -548,19 +548,6 @@ def generate_basenames(runname):
 
 		for jj in xrange(ngals):
 			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+basename+'_'+ids[jj])
-			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
-
-	elif 'simha' in runname:
-
-		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/testsed_simha.ids"
-		ids = np.loadtxt(id_list, dtype='|S20')
-		ngals = len(ids)
-
-		parm_basename = runname+"_params"
-		ancilname=None
-
-		for jj in xrange(ngals):
-			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+runname+'_'+ids[jj])
 			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
 
 	elif 'virgo' in runname:
