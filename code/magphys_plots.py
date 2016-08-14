@@ -17,7 +17,7 @@ dpi = 150
 #### set up colors and plot style
 prosp_color = '#1974D2'
 median_err_color = '0.75'
-obs_color = '#63605c'
+obs_color = '#FF420E'
 magphys_color = '#e60000'
 
 class jLogFormatter(mpl.ticker.LogFormatter):
@@ -438,30 +438,39 @@ def plot_obs_spec(obs_spec, phot, spec_res, alpha,
 	obslam = obs_spec['obs_lam'][mask]/1e4
 	if np.sum(mask) > 0:
 
-		phot.plot(obslam, 
-			      obs_spec['flux'][mask],
-			      alpha=0.9,
-			      color=color,
-			      zorder=-32
-			      )
-
 		##### smooth 
 		# consider only passing relevant wavelengths
 		# if speed becomes an issue
-		modspec_smooth = threed_dutils.smooth_spectrum(modlam/(1+z),
+		modspec_smooth = threed_dutils.smooth_spectrum(modlam,
 		                                        modspec,sigsmooth)
 		magspec_smooth = threed_dutils.smooth_spectrum(maglam/(1+z),
 		                                        magspec,sigsmooth)
 
 		# interpolate fsps spectra onto observational wavelength grid
-		pro_flux_interp = interp1d(modlam,
+		pro_flux_interp = interp1d(modlam*(1+z),
 			                       modspec_smooth, 
 			                       bounds_error = False, fill_value = 0)
 
 		prospector_resid = np.log10(obs_spec['flux'][mask]) - np.log10(pro_flux_interp(obslam))
+		'''
 		spec_res.plot(obslam, 
 			          prospector_resid,
 			          color=obs_color,
+			          alpha=alpha,
+			          linestyle='-')
+		'''
+
+		obs_spec_plot = np.log10(obs_spec['flux'][mask])
+		prosp_spec_plot = np.log10(pro_flux_interp(obslam))
+
+		spec_res.plot(obslam, 
+			          obs_spec_plot,
+			          color=obs_color,
+			          alpha=alpha,
+			          linestyle='-')
+		spec_res.plot(obslam, 
+			          prosp_spec_plot,
+			          color=prosp_color,
 			          alpha=alpha,
 			          linestyle='-')
 
@@ -481,7 +490,7 @@ def plot_obs_spec(obs_spec, phot, spec_res, alpha,
 		#### write text, add lines
 		spec_res.text(0.98,0.05, 'RMS='+"{:.2f}".format(prospector_rms)+' dex',
 			          transform = spec_res.transAxes,ha='right',
-			          color=obs_color,fontsize=14)
+			          color='black',fontsize=14)
 		spec_res.text(0.015,0.05, label,
 			          transform = spec_res.transAxes)
 		spec_res.axhline(0, linestyle=':', color='grey')
@@ -491,8 +500,14 @@ def plot_obs_spec(obs_spec, phot, spec_res, alpha,
 			spec_res.set_xlim(min(obslam)*0.98,max(obslam)*1.02)
 
 		#### axis scale
+		'''
 		plt_lim = np.nanmax(np.abs(prospector_resid))
 		spec_res.set_ylim(-1.1*plt_lim,1.1*plt_lim)
+		'''
+		plt_max=np.array([np.nanmax(np.abs(obs_spec_plot)),np.nanmax(np.abs(prosp_spec_plot))]).max()
+		plt_min=np.array([np.nanmin(np.abs(obs_spec_plot)),np.nanmin(np.abs(prosp_spec_plot))]).min()
+		spec_res.set_ylim(plt_min-0.1,plt_max+0.1)
+
 		spec_res.set_xscale('log',nonposx='clip', subsx=(1,2,3,4,5,6,7,8,9))
 		spec_res.xaxis.set_minor_formatter(minorFormatter)
 		spec_res.xaxis.set_major_formatter(majorFormatter)
@@ -571,7 +586,7 @@ def sed_comp_figure(sample_results, sps, model, magphys,
 	# models have deltav = 1000 km/s in IR, add in quadrature?
 	sigsmooth = [450.0, 1000.0, 3000.0]
 	ms = 8
-	alpha = 0.8
+	alpha = 0.65
 
 	#### setup output
 	residuals={}
@@ -579,9 +594,7 @@ def sed_comp_figure(sample_results, sps, model, magphys,
 	##### Prospector maximum probability model ######
 	# plot the spectrum, photometry, and chi values
 	try:
-		wave_eff, obsmags, obsmags_unc, modmags, chi, frac_prosp, modspec, modlam = \
-		return_sedplot_vars(sample_results['bfit']['spec'], sample_results['bfit']['mags'],
-			                sample_results['obs'], sps)
+		wave_eff, obsmags, obsmags_unc, modmags, chi, frac_prosp, modspec, modlam = return_sedplot_vars(sample_results['bfit']['spec'], sample_results['bfit']['mags'], sample_results['obs'], sps)
 	except KeyError as e:
 		print e
 		print "You must run post-processing on the Prospector " + \
@@ -662,11 +675,13 @@ def sed_comp_figure(sample_results, sps, model, magphys,
 		                                     ii+1, color=obs_color, label=label[ii],sigsmooth=sigsmooth[ii])
 
 	#### set all residual y-limits to be the same
+	'''
 	pltlim = 0.0
 	for plot in resplots: 
 		if plot.axis() != (0.0, 1.0, 0.0, 1.0): # if the axis is not turned off...
 			pltlim = np.max((pltlim,np.abs(plot.get_ylim())[0],np.abs(plot.get_ylim())[1]))
 	for plot in resplots: plot.set_ylim(-pltlim,pltlim)
+	'''
 
 	# diagnostic text
 	textx = 0.98
@@ -731,7 +746,7 @@ def sed_comp_figure(sample_results, sps, model, magphys,
 			    
     # set labels
 	res.set_ylabel( r'$\chi$')
-	for plot in resplots: plot.set_ylabel(r'log(f$_{\mathrm{obs}}/$f$_{\mathrm{mod}}$)')
+	for plot in resplots: plot.set_ylabel(r'log($\nu$f$_{\nu}$)')
 	phot.set_ylabel(r'$\nu f_{\nu}$')
 	spec_res_spit.set_xlabel(r'$\lambda_{obs}$ [$\mathrm{\mu}$m]')
 	res.set_xlabel(r'$\lambda_{obs}$ [$\mathrm{\mu}$m]')

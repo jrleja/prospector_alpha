@@ -325,10 +325,10 @@ def plot_fit_parameters(alldata,outfolder=None, cdf=False):
 		ax[ii].xaxis.set_major_locator(MaxNLocator(5))
 		ax[ii].yaxis.set_major_locator(MaxNLocator(5))
 
-		if cdf:
-			##### gather the PDF
-			pdf_dist = np.array([dat['pdf_dist'][ii] for dat in alldata])
+		##### gather the PDF
+		pdf_dist = np.array([dat['pdf_dist'][ii] for dat in alldata])
 
+		if cdf:
 			##### plot histogram
 			nbins_hist = 25
 
@@ -397,8 +397,12 @@ def plot_fit_parameters(alldata,outfolder=None, cdf=False):
 			ax_err[ii].text(0.06,0.8,'truth',transform=ax_err[ii].transAxes,color=obscolor,fontsize=fs)
 
 			### from the summed histogram
-			onesig_perc = pdf_stats((bins[1:] + bins[:-1])/2.,obs_dist,model_dist,0.16,0.84)/0.68
-			twosig_perc = pdf_stats((bins[1:] + bins[:-1])/2.,obs_dist,model_dist,0.025,0.975)/0.95
+			#onesig_perc = pdf_stats((bins[1:] + bins[:-1])/2.,obs_dist,model_dist,0.16,0.84)/0.68
+			#twosig_perc = pdf_stats((bins[1:] + bins[:-1])/2.,obs_dist,model_dist,0.025,0.975)/0.95
+
+			### from individual measurements
+			onesig_perc = ((pdf_dist >= 0.16) & (pdf_dist <= 0.84)).sum()/float(pdf_dist.shape[0]) / 0.68
+			twosig_perc = ((pdf_dist >= 0.025) & (pdf_dist <= 0.975)).sum()/float(pdf_dist.shape[0]) / 0.95
 
 			ax_err[ii].text(0.06,0.7,r'$\frac{1\sigma_{\mathrm{mock}}}{1\sigma_{\mathrm{true}}}$:'+"{:.2f}".format(onesig_perc),transform=ax_err[ii].transAxes,fontsize=fs)
 			ax_err[ii].text(0.06,0.58,r'$\frac{2\sigma_{\mathrm{mock}}}{2\sigma_{\mathrm{true}}}$:'+"{:.2f}".format(twosig_perc),transform=ax_err[ii].transAxes,fontsize=fs)
@@ -477,9 +481,10 @@ def plot_derived_parameters(alldata,outfolder=None, cdf=False):
 		ax[ii].xaxis.set_major_locator(MaxNLocator(5))
 		ax[ii].yaxis.set_major_locator(MaxNLocator(5))
 
+		##### gather the PDF
+		pdf_dist = np.array([dat['epdf_dist'][idx] for dat in alldata])
+
 		if cdf:
-			##### gather the PDF
-			pdf_dist = np.array([dat['epdf_dist'][idx] for dat in alldata])
 
 			##### plot histogram
 			nbins_hist = 25
@@ -552,8 +557,12 @@ def plot_derived_parameters(alldata,outfolder=None, cdf=False):
 			ax_err[ii].text(0.06,0.8,'truth',transform=ax_err[ii].transAxes,color=obscolor,fontsize=fs)
 
 			### from the summed histogram
-			onesig_perc = pdf_stats((bins[1:] + bins[:-1])/2.,obs_dist,model_dist,0.16,0.84)/0.68
-			twosig_perc = pdf_stats((bins[1:] + bins[:-1])/2.,obs_dist,model_dist,0.025,0.975)/0.95
+			# onesig_perc = pdf_stats((bins[1:] + bins[:-1])/2.,obs_dist,model_dist,0.16,0.84)/0.68
+			# twosig_perc = pdf_stats((bins[1:] + bins[:-1])/2.,obs_dist,model_dist,0.025,0.975)/0.95
+
+			onesig_perc = ((pdf_dist >= 0.16) & (pdf_dist <= 0.84)).sum()/float(pdf_dist.shape[0]) / 0.68
+			twosig_perc = ((pdf_dist >= 0.025) & (pdf_dist <= 0.975)).sum()/float(pdf_dist.shape[0]) / 0.95
+
 
 			ax_err[ii].text(0.06,0.7,r'$\frac{1\sigma_{\mathrm{mock}}}{1\sigma_{\mathrm{true}}}$:'+"{:.2f}".format(onesig_perc),transform=ax_err[ii].transAxes,fontsize=fs)
 			ax_err[ii].text(0.06,0.58,r'$\frac{2\sigma_{\mathrm{mock}}}{2\sigma_{\mathrm{true}}}$:'+"{:.2f}".format(twosig_perc),transform=ax_err[ii].transAxes,fontsize=fs)

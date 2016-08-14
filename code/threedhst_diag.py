@@ -8,6 +8,7 @@ from astropy.cosmology import WMAP9
 import fsps
 from matplotlib.ticker import MaxNLocator
 from prospect.models import model_setup
+import copy
 
 plt.ioff() # don't pop up a window for each plot
 
@@ -613,7 +614,7 @@ def return_sedplot_vars(thetas, sample_results, sps, nufnu=True):
 	obs_maggies_unc = sample_results['obs']['maggies_unc'][mask]
 
 	# model information
-	spec = sample_results['bfit']['spec']
+	spec = copy.copy(sample_results['bfit']['spec'])
 	mu = sample_results['bfit']['mags'][mask]
 	#spec, mu ,_ = sample_results['model'].mean_model(thetas, sample_results['obs'], sps=sps)
 	#mu = mu[mask]

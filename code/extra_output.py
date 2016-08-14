@@ -177,7 +177,6 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 			absflux_elines_on = np.empty(shape=(ncalc,nabs))
 			abseqw_elines_on = np.empty(shape=(ncalc,nabs))
 
-
 		absflux_elines_on[jj,:] = np.array([modelout['abslines_elines_on'][line]['flux'] for line in absnames])
 		abseqw_elines_on[jj,:] = np.array([modelout['abslines_elines_on'][line]['eqw'] for line in absnames])
 		absflux[jj,:]  = np.array([modelout['abslines'][line]['flux'] for line in absnames])

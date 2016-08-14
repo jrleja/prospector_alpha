@@ -85,6 +85,8 @@ def pdf_stats(bins,pdf):
 
 	return median,onesig_range
 
+
+
 def pdf_distance(chain,truth,truth_chain,bins,delta_functions=False,center_obs=False):
 
 	#### chain properties
@@ -116,8 +118,9 @@ def pdf_distance(chain,truth,truth_chain,bins,delta_functions=False,center_obs=F
 		ransamps = np.clip(ransamps,bmin,bmax)
 		obs_pdf,_ = np.histogram(ransamps,bins=bins,density=True)
 
+	pdf_loc = (chain > truth).sum()/float(chain.shape[0])
 
-	return model_pdf, obs_pdf
+	return model_pdf, obs_pdf, pdf_loc
 
 def specpar_pdf_distance(pinfo,alldata, delta_functions=True, center_obs=True):
 
@@ -174,6 +177,7 @@ def specpar_pdf_distance(pinfo,alldata, delta_functions=True, center_obs=True):
 
 		modpdf = np.zeros(bins.shape[0]-1)
 		obspdf = np.zeros(bins.shape[0]-1)
+		pdf_loc = []
 
 		for kk, dat in enumerate(alldata):
 
@@ -216,13 +220,15 @@ def specpar_pdf_distance(pinfo,alldata, delta_functions=True, center_obs=True):
 				truth_chain = np.log10(np.clip(pinfo['obs']['hdel_eqw_chain'][kk],0.01,np.inf))
 
 
-			tmodpdf, tobspdf = pdf_distance(chain,truth,truth_chain,bins,delta_functions=delta_functions,center_obs=center_obs)
+			tmodpdf, tobspdf, tpdf_loc = pdf_distance(chain,truth,truth_chain,bins,delta_functions=delta_functions,center_obs=center_obs)
 			modpdf += tmodpdf
 			obspdf += tobspdf
+			pdf_loc.append(tpdf_loc)
 
 		outtemp = {}
 		outtemp['model_pdf'] = modpdf
 		outtemp['obs_pdf'] = obspdf
+		outtemp['pdf_loc'] = np.array(pdf_loc)
 		outtemp['bins'] = bins
 		outtemp['plot_bins'] = (bins[:-1] + bins[1:])/2.
 		outtemp['N'] = np.sum(keep_idx)
@@ -281,8 +287,14 @@ def specpar_pdf_plot(pdf,outname=None):
 		ax[i].text(0.04,0.88,'observations',transform=ax[i].transAxes,color=obscolor)
 		ax[i].text(0.04,0.83,'N='+str(pdf[key]['N']),transform=ax[i].transAxes)
 
-		onesig_perc = pdf_quantiles(pdf[key]['plot_bins'],pdf[key]['obs_pdf'],pdf[key]['model_pdf'],0.16,0.84)/0.68
-		twosig_perc = pdf_quantiles(pdf[key]['plot_bins'],pdf[key]['obs_pdf'],pdf[key]['model_pdf'],0.025,0.975)/0.95
+		### from the ensemble
+		#onesig_perc = pdf_quantiles(pdf[key]['plot_bins'],pdf[key]['obs_pdf'],pdf[key]['model_pdf'],0.16,0.84)/0.68
+		#twosig_perc = pdf_quantiles(pdf[key]['plot_bins'],pdf[key]['obs_pdf'],pdf[key]['model_pdf'],0.025,0.975)/0.95
+
+		### the right way
+		pdf_dist = pdf[key]['pdf_loc']
+		onesig_perc = ((pdf_dist >= 0.16) & (pdf_dist <= 0.84)).sum()/float(pdf_dist.shape[0]) / 0.68
+		twosig_perc = ((pdf_dist >= 0.025) & (pdf_dist <= 0.975)).sum()/float(pdf_dist.shape[0]) / 0.95
 
 		ax[i].text(0.05,0.76,r'$\frac{1\sigma_{\mathrm{obs}}}{1\sigma_{\mathrm{true}}}$:'+"{:.2f}".format(onesig_perc),transform=ax[i].transAxes)
 		ax[i].text(0.05,0.69,r'$\frac{2\sigma_{\mathrm{obs}}}{2\sigma_{\mathrm{true}}}$:'+"{:.2f}".format(twosig_perc),transform=ax[i].transAxes)
@@ -855,7 +867,8 @@ def fmt_emline_info(alldata,add_abs_err = True):
 	# also record emline fill-in
 	# which index should we use; wide or narrow?
 	hd_lum_prosp_marg,hd_eqw_prosp_marg, \
-	hd_lum_obs, hd_eqw_obs = [np.zeros(shape=(ngals,3)) for i in xrange(4)]
+	hd_lum_eline_prosp_marg, hd_eqw_eline_prosp_marg, \
+	hd_lum_obs, hd_eqw_obs = [np.zeros(shape=(ngals,3)) for i in xrange(6)]
 	hd_eqw_obs_chain = np.zeros(shape=(ngals,100))
 
 	hd_lum_prosp, hd_eqw_prosp, \
@@ -875,6 +888,13 @@ def fmt_emline_info(alldata,add_abs_err = True):
 		hd_eqw_prosp_marg[kk,:] = [dat['spec_info']['eqw']['q50'][anames == hdelta_ind],
 								   dat['spec_info']['eqw']['q84'][anames == hdelta_ind],
 								   dat['spec_info']['eqw']['q16'][anames == hdelta_ind]]
+		hd_lum_eline_prosp_marg[kk,:] = [dat['spec_info']['flux_elines_on']['q50'][anames == hdelta_ind],
+									     dat['spec_info']['flux_elines_on']['q84'][anames == hdelta_ind],
+									     dat['spec_info']['flux_elines_on']['q16'][anames == hdelta_ind]]
+		hd_eqw_eline_prosp_marg[kk,:] = [dat['spec_info']['eqw_elines_on']['q50'][anames == hdelta_ind],
+								         dat['spec_info']['eqw_elines_on']['q84'][anames == hdelta_ind],
+								         dat['spec_info']['eqw_elines_on']['q16'][anames == hdelta_ind]]
+
 
 		#### are there useful spectra?
 		if dat['residuals']['emlines'] is None:
@@ -897,6 +917,8 @@ def fmt_emline_info(alldata,add_abs_err = True):
 	prosp['hdel_eqw'] = hd_eqw_prosp
 	prosp['hdel_abs_marg'] = hd_lum_prosp_marg
 	prosp['hdel_eqw_marg'] = hd_eqw_prosp_marg
+	prosp['hdel_abs_elineon_marg'] = hd_lum_eline_prosp_marg
+	prosp['hdel_eqw_elineon_marg'] = hd_eqw_eline_prosp_marg
 	prosp['hdel_abs_addem'] = hd_lum_eline_prosp
 	prosp['hdel_eqw_addem'] = hd_eqw_eline_prosp
 
@@ -1835,7 +1857,7 @@ def obs_vs_prosp_balmlines(e_pinfo,hflag,outname='test.png',outname_resid='test.
 
 	return norm_errs, norm_flag
 
-def obs_vs_model_hdelta(e_pinfo,hflag,outname=None,outname_dnplt=None,eqw=False):
+def obs_vs_model_hdelta(e_pinfo,hflag,outname=None,outname2=None,outname_dnplt=None,eqw=False):
 
 	'''
 	THESE ARE MY OPTIONS FOR HDELTA
@@ -1861,12 +1883,10 @@ def obs_vs_model_hdelta(e_pinfo,hflag,outname=None,outname_dnplt=None,eqw=False)
 		plotlim = (min,max,min,max)
 
 		hdel_obs = e_pinfo['obs']['hdel_eqw'][good_idx]
-
 		hdel_prosp_marg = e_pinfo['prosp']['hdel_eqw_marg'][good_idx]
-
-		hdel_prosp_em = np.clip(e_pinfo['prosp']['hdel_eqw_addem'][good_idx],0.2,np.inf)
-
+		hdel_prosp_em = e_pinfo['prosp']['hdel_eqw_elineon_marg'][good_idx]
 		hdel_prosp = np.log10(e_pinfo['prosp']['hdel_eqw'][good_idx])
+
 		xtit = [r'observed log(H$_{\delta}$ EQW)', 
 		        r'observed log(H$_{\delta}$ EQW)',
 		        r'observed log(H$_{\delta}$ EQW)']
@@ -1882,15 +1902,11 @@ def obs_vs_model_hdelta(e_pinfo,hflag,outname=None,outname_dnplt=None,eqw=False)
 		max = 8.0
 		plotlim = (min,max,min,max)
 
-		hdel_obs = e_pinfo['obs']['hdel'][good_idx]
-		#hdel_plot_errs = threed_dutils.asym_errors(e_pinfo['obs']['hdel'][good_idx,0], e_pinfo['obs']['hdel'][good_idx,1], e_pinfo['obs']['hdel'][good_idx,2], log=True)
-		
-		hdel_prosp_marg = e_pinfo['prosp']['hdel_abs_marg'][good_idx]
-		#hdel_prosp_marg_errs = threed_dutils.asym_errors(e_pinfo['prosp']['hdel_abs_marg'][good_idx,0], e_pinfo['prosp']['hdel_abs_marg'][good_idx,1], e_pinfo['prosp']['hdel_abs_marg'][good_idx,2], log=True)
-		
-		hdel_prosp_em = e_pinfo['prosp']['hdel_abs_addem'][good_idx]
-
+		hdel_obs = e_pinfo['obs']['hdel'][good_idx]		
+		hdel_prosp_marg = e_pinfo['prosp']['hdel_abs_marg'][good_idx]		
+		hdel_prosp_em = e_pinfo['prosp']['hdel_abs_elineon_marg'][good_idx]
 		hdel_prosp = np.log10(e_pinfo['prosp']['hdel_abs'][good_idx])
+
 		xtit = [r'observed log(-H$_{\delta}$)', 
 		        r'observed log(-H$_{\delta}$)',
 		        r'observed log(-H$_{\delta}$)']
@@ -1907,12 +1923,13 @@ def obs_vs_model_hdelta(e_pinfo,hflag,outname=None,outname_dnplt=None,eqw=False)
 
 	### Hdelta plot
 	# fig, ax = plt.subplots(2,2, figsize = (12,12))
-	#fig, ax = plt.subplots(1,2, figsize = (12,6))
+	fig3, ax3 = plt.subplots(1,1, figsize = (6,6))
 	fig, ax = plt.subplots(1,1, figsize = (6,6))
 	norm_errs = []
 	norm_flag = []
 
 	ax = np.ravel(ax)
+	ax3 = np.ravel(ax3)
 	# loop and put points on plot
 	for ii in xrange(len(labels)):
 		for kk in xrange(len(hflag)):
@@ -1921,38 +1938,40 @@ def obs_vs_model_hdelta(e_pinfo,hflag,outname=None,outname_dnplt=None,eqw=False)
 			pdict = merge_dicts(herschdict[kk],bptdict[ii])
 			plt_idx = keys[ii] & hflag[kk]
 
-			### define quantities
-			pl_hdel_obs = hdel_obs[plt_idx,0]
-			pl_hdel_prosp = hdel_prosp_marg[plt_idx,0]
-			pl_hdel_prosp_bestfit = hdel_prosp[plt_idx]
-			pl_hdel_prosp_em = hdel_prosp_em[plt_idx]
-
 			### errors
 			errs_pro = threed_dutils.asym_errors(hdel_prosp_marg[plt_idx,0],
 				                                 hdel_prosp_marg[plt_idx,1],
 				                                 hdel_prosp_marg[plt_idx,2],log=True)
 
+			errs_pro_em = threed_dutils.asym_errors(hdel_prosp_em[plt_idx,0],
+				                                    hdel_prosp_em[plt_idx,1],
+				                                    hdel_prosp_em[plt_idx,2],log=True)
+
 			errs_obs = threed_dutils.asym_errors(hdel_obs[plt_idx,0],
 				                                 hdel_obs[plt_idx,1],
 				                                 hdel_obs[plt_idx,2],log=True)
 
+			#### old error plots
 			norm_errs.append(normalize_error(np.log10(pl_hdel_obs),errs_obs,
 				                             np.log10(pl_hdel_prosp),errs_pro))
 			norm_flag.append([labels[ii]]*np.sum(plt_idx))
 
-			# ax[0].errorbar(np.log10(pl_hdel_obs), np.log10(pl_hdel_prosp_em), xerr=errs_obs, linestyle=' ',  **pdict)
-			# ax[1].errorbar(np.log10(pl_hdel_obs), pl_hdel_prosp_bestfit, xerr=errs_obs, linestyle=' ', **pdict)
+			### define quantities
+			pl_hdel_obs = hdel_obs[plt_idx,0]
+			pl_hdel_prosp = hdel_prosp_marg[plt_idx,0]
+			pl_hdel_prosp_em = hdel_prosp_em[plt_idx,0]
+
+			#### plot
 			ax[0].errorbar(np.log10(pl_hdel_obs), np.log10(pl_hdel_prosp), xerr=errs_obs, yerr=errs_pro, linestyle=' ', **pdict)
-			'''
-			ax[1].errorbar(np.log10(pl_hdel_obs), np.log10(pl_hdel_prosp_em), xerr=errs_obs, linestyle=' ', **pdict)
-			'''
+			ax3[0].errorbar(np.log10(pl_hdel_obs), np.log10(pl_hdel_prosp_em), xerr=errs_obs, yerr=errs_pro_em, linestyle=' ', **pdict)
+
 			if eqw:
 				ax2[0].errorbar(np.log10(pl_hdel_obs), dn4000_obs[plt_idx], linestyle=' ',**pdict)
 				ax2[1].errorbar(np.log10(pl_hdel_prosp), dn4000_prosp[plt_idx], linestyle=' ',**pdict)
 
-	ax[0].text(0.04,0.92, r'S/N H$\delta$ > {0}'.format(int(e_pinfo['obs']['hdelta_sn_cut'])), transform = ax[0].transAxes,horizontalalignment='left')
-	#ax[0].text(0.04,0.92, r'EQW H$\delta$ < -{0} $\AA$'.format(int(e_pinfo['obs']['hdelta_eqw_cut'])), transform = ax[0].transAxes,horizontalalignment='left')
-	ax[0].text(0.04,0.87, r'N = '+str(int(np.sum(good_idx))), transform = ax[0].transAxes,horizontalalignment='left')
+	ax[0].text(0.04,0.92, r'N = '+str(int(np.sum(good_idx))), transform = ax[0].transAxes,horizontalalignment='left')
+	ax[0].text(0.04,0.87, r'S/N H$\delta$ > {0}'.format(int(e_pinfo['obs']['hdelta_sn_cut'])), transform = ax[0].transAxes,horizontalalignment='left')
+	ax[0].text(0.04,0.82, r'EQW H$\delta$ < -{0} $\AA$'.format(int(e_pinfo['obs']['hdelta_eqw_cut'])), transform = ax[0].transAxes,horizontalalignment='left')
 	ax[0].set_xlabel(xtit[2])
 	ax[0].set_ylabel(ytit[2])
 	off,scat = threed_dutils.offset_and_scatter(np.log10(hdel_obs[:,0]), np.log10(hdel_prosp_marg[:,0]),biweight=True)
@@ -1961,15 +1980,16 @@ def obs_vs_model_hdelta(e_pinfo,hflag,outname=None,outname_dnplt=None,eqw=False)
 	ax[0].axis(plotlim)
 	ax[0].plot([min,max],[min,max],linestyle='--',color='0.1',alpha=0.8)
 
-	'''
-	ax[1].set_xlabel(xtit[0])
-	ax[1].set_ylabel(ytit[0])
-	off,scat = threed_dutils.offset_and_scatter(np.log10(hdel_obs[:,0]), np.log10(hdel_prosp_em),biweight=True)
-	ax[1].text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat) + ' dex', transform = ax[1].transAxes,horizontalalignment='right')
-	ax[1].text(0.96,0.1, 'mean offset='+"{:.2f}".format(off) + ' dex', transform = ax[1].transAxes,horizontalalignment='right')
-	ax[1].axis(plotlim)
-	ax[1].plot([min,max],[min,max],linestyle='--',color='0.1',alpha=0.8)
-	'''
+	ax3[0].text(0.04,0.92, r'N = '+str(int(np.sum(good_idx))), transform = ax3[0].transAxes,horizontalalignment='left')
+	ax3[0].text(0.04,0.87, r'S/N H$\delta$ > {0}'.format(int(e_pinfo['obs']['hdelta_sn_cut'])), transform = ax3[0].transAxes,horizontalalignment='left')
+	ax3[0].text(0.04,0.82, r'EQW H$\delta$ < -{0} $\AA$'.format(int(e_pinfo['obs']['hdelta_eqw_cut'])), transform = ax3[0].transAxes,horizontalalignment='left')
+	ax3[0].set_xlabel(xtit[0])
+	ax3[0].set_ylabel(ytit[0])
+	off,scat = threed_dutils.offset_and_scatter(np.log10(hdel_obs[:,0]), np.log10(hdel_prosp_em[:,0]),biweight=True)
+	ax3[0].text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat) + ' dex', transform = ax3[0].transAxes,horizontalalignment='right')
+	ax3[0].text(0.96,0.1, 'mean offset='+"{:.2f}".format(off) + ' dex', transform = ax3[0].transAxes,horizontalalignment='right')
+	ax3[0].axis(plotlim)
+	ax3[0].plot([min,max],[min,max],linestyle='--',color='0.1',alpha=0.8)
 
 	### dn4000 plot options
 	if eqw:
@@ -1990,6 +2010,8 @@ def obs_vs_model_hdelta(e_pinfo,hflag,outname=None,outname_dnplt=None,eqw=False)
 
 	fig.tight_layout()
 	fig.savefig(outname, dpi=dpi)
+	fig3.tight_layout()
+	fig3.savefig(outname2,dpi=dpi)
 	plt.close()
 
 	return norm_errs, norm_flag
@@ -2860,10 +2882,12 @@ def plot_emline_comp(alldata,outfolder,hflag):
 		                                      outname=outfolder+'dn4000_comp.png')
 	hdelta_errs,hdelta_flag = obs_vs_model_hdelta(e_pinfo, hflag, 
 		                      outname=outfolder+'hdelta_comp_eqw.png',
+		                      outname2=outfolder+'hdelta_comp_eline_eqw.png',
 		                      outname_dnplt=outfolder+'hdelta_dn_comp.png',
 		                      eqw=True)
 	_,_ = obs_vs_model_hdelta(e_pinfo, hflag, 
 		                      outname=outfolder+'hdelta_comp_flux.png',
+		                      outname2=outfolder+'hdelta_comp_eline_flux.png',
 		                      eqw=False)
 
 	# model versus observations, Halpha + Hbeta
