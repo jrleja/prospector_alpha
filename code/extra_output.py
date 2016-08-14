@@ -174,7 +174,12 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 			nabs = len(absnames)
 			absflux = np.empty(shape=(ncalc,nabs))
 			abseqw = np.empty(shape=(ncalc,nabs))
+			absflux_elines_on = np.empty(shape=(ncalc,nabs))
+			abseqw_elines_on = np.empty(shape=(ncalc,nabs))
 
+
+		absflux_elines_on[jj,:] = np.array([modelout['abslines_elines_on'][line]['flux'] for line in absnames])
+		abseqw_elines_on[jj,:] = np.array([modelout['abslines_elines_on'][line]['eqw'] for line in absnames])
 		absflux[jj,:]  = np.array([modelout['abslines'][line]['flux'] for line in absnames])
 		abseqw[jj,:]  = np.array([modelout['abslines'][line]['eqw'] for line in absnames])
 		emflux[jj,:] = np.array([modelout['emlines'][line]['flux'] for line in emnames])
@@ -212,7 +217,10 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 	sample_results['model_emline'] = emline_info
 
 	##### SPECTRAL QUANTITIES
-	q_16flux, q_50flux, q_84flux, q_16eqw, q_50eqw, q_84eqw = (np.zeros(nabs)+np.nan for i in range(6))
+	q_16flux, q_50flux, q_84flux, q_16eqw, q_50eqw, q_84eqw, \
+	q_16eflux, q_50eflux, q_84eflux, q_16eeqw, q_50eeqw, q_84eeqw = (np.zeros(nabs)+np.nan for i in range(12))
+	for kk in xrange(nabs): q_16eflux[kk], q_50eflux[kk], q_84eflux[kk] = corner.quantile(absflux_elines_on[:,kk], [0.16, 0.5, 0.84])
+	for kk in xrange(nabs): q_16eeqw[kk], q_50eeqw[kk], q_84eeqw[kk] = corner.quantile(abseqw_elines_on[:,kk], [0.16, 0.5, 0.84])
 	for kk in xrange(nabs): q_16flux[kk], q_50flux[kk], q_84flux[kk] = corner.quantile(absflux[:,kk], [0.16, 0.5, 0.84])
 	for kk in xrange(nabs): q_16eqw[kk], q_50eqw[kk], q_84eqw[kk] = corner.quantile(abseqw[:,kk], [0.16, 0.5, 0.84])
 	q_16dn, q_50dn, q_84dn = corner.quantile(dn4000, [0.16, 0.5, 0.84])
@@ -222,6 +230,14 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 						   'q16':q_16dn,
 						   'q50':q_50dn,
 						   'q84':q_84dn}
+	spec_info['eqw_elines_on'] = {'chain':abseqw_elines_on,
+						'q16':q_16eeqw,
+						'q50':q_50eeqw,
+						'q84':q_84eeqw}
+	spec_info['flux_elines_on'] = {'chain':absflux_elines_on,
+						'q16':q_16eflux,
+						'q50':q_50eflux,
+						'q84':q_84eflux}
 	spec_info['eqw'] = {'chain':abseqw,
 						'q16':q_16eqw,
 						'q50':q_50eqw,

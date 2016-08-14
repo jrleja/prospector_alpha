@@ -1429,6 +1429,12 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None,
 		smooth_spec = smooth_spectrum(w,spec_neboff_flam,200.0,minlam=3e3,maxlam=8e3)
 		out['abslines'] = measure_abslines(w,smooth_spec) # comes out in Lsun and rest-frame EQW
 
+	##### measure absorption lines with emission on!
+	out['dn4000'] = measure_Dn4000(w,spec_nebon_flam)
+	if abslines:
+		smooth_spec = smooth_spectrum(w,spec_nebon_flam,200.0,minlam=3e3,maxlam=8e3)
+		out['abslines_elines_on'] = measure_abslines(w,smooth_spec) # comes out in Lsun and rest-frame EQW
+
 	##### measure emission lines
 	# smooth_spec is only used to identify continuum
 	out['emlines'] = measure_emlines(w,spec_nebonly_flam,smooth_spec,savestr=savestr)

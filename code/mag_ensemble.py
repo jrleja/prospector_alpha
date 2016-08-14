@@ -39,6 +39,10 @@ minsfr = 1e-3
 ha_flux_lim = (3.5,10.0)
 ha_eqw_lim = (-1.3,3.5)
 
+### lambda for extinction curve delta 
+lam1_extdiff = 5450.
+lam2_extdiff = 5550.
+
 def minlog(x,axis=None):
 	'''
 	Given a numpy array, take the base-10 logarithm
@@ -705,14 +709,14 @@ def fmt_emline_info(alldata,add_abs_err = True):
 		                             ret_inf(alldata,'lum_errdown',model='obs',name='H$\\alpha$')]) / constants.L_sun.cgs.value
 	obslines['err_ha'] = (obslines['f_ha'][:,1] - obslines['f_ha'][:,2])/2.
 	idx = emline_names == 'H$\\alpha$'
-	obslines['pdf_ha'] = np.array([np.squeeze(f['residuals']['emlines']['obs']['flux_chain'][:,idx] / constants.L_sun.cgs.value) if f['residuals']['emlines'] is not None else fillvalue for f in alldata])
+	obslines['pdf_ha'] = np.array([np.squeeze(f['residuals']['emlines']['obs']['lum_chain'][:,idx] / constants.L_sun.cgs.value) if f['residuals']['emlines'] is not None else fillvalue for f in alldata])
 
 	obslines['f_hb'] = np.transpose([ret_inf(alldata,'lum',model='obs',name='H$\\beta$'),
 		                             ret_inf(alldata,'lum_errup',model='obs',name='H$\\beta$'),
 		                             ret_inf(alldata,'lum_errdown',model='obs',name='H$\\beta$')]) / constants.L_sun.cgs.value
 	obslines['err_hb'] = (obslines['f_hb'][:,1] - obslines['f_hb'][:,2])/2.
 	idx = emline_names == 'H$\\beta$'
-	obslines['pdf_hb'] = np.array([np.squeeze(f['residuals']['emlines']['obs']['flux_chain'][:,idx] / constants.L_sun.cgs.value) if f['residuals']['emlines'] is not None else fillvalue for f in alldata])
+	obslines['pdf_hb'] = np.array([np.squeeze(f['residuals']['emlines']['obs']['lum_chain'][:,idx] / constants.L_sun.cgs.value) if f['residuals']['emlines'] is not None else fillvalue for f in alldata])
 
 	obslines['f_hd'] = np.transpose([ret_inf(alldata,'lum',model='obs',name='H$\\delta$'),
 		                             ret_inf(alldata,'lum_errup',model='obs',name='H$\\delta$'),
@@ -966,7 +970,7 @@ def fmt_emline_info(alldata,add_abs_err = True):
 	cloudy_nii, cloudy_oiii, ha_emp, pmet, ha_ratio, oiii_hb, \
 	nii_ha, dn4000, d1, d2, didx,sfr_10,sfr_100,ha_ext,sfr_100_mag_marginalized,\
 	cloudy_ha_eqw, cloudy_hb_eqw, cloudy_oiii_eqw, cloudy_nii_eqw, \
-	cloudy_hd_eqw, d1_d2,mass = [np.zeros(shape=(ngals,3)) for i in xrange(27)]
+	cloudy_hd_eqw, d1_d2,mass, dtau_dlam_prosp = [np.zeros(shape=(ngals,3)) for i in xrange(28)]
 	for ii,dat in enumerate(np.array(alldata)):
 
 		####### BALMER DECREMENTS
@@ -1110,6 +1114,13 @@ def fmt_emline_info(alldata,add_abs_err = True):
 		ha_ext_chain = threed_dutils.charlot_and_fall_extinction(6563.0,d1_chain,d2_chain,-1.0,didx_chain,kriek=False)
 		ha_ext[ii,:] = corner.quantile(ha_ext_chain, [0.5, 0.84, 0.16])
 
+		#### calculate dtau / dlambda (tau_0) (lambda = 5500 angstroms)
+		tau1 = -np.log(threed_dutils.charlot_and_fall_extinction(lam1_extdiff,np.zeros_like(d2_chain),d2_chain,np.zeros_like(d2_chain),didx_chain, kriek=True,nobc=True))
+		tau2 = -np.log(threed_dutils.charlot_and_fall_extinction(lam2_extdiff,np.zeros_like(d2_chain),d2_chain,np.zeros_like(d2_chain),didx_chain, kriek=True,nobc=True))
+		dtau_dlam_chain = ((tau2-tau1) / (lam2_extdiff-lam1_extdiff)) / d2_chain
+		dtau_dlam_prosp[ii,:] = corner.quantile(dtau_dlam_chain, [0.5, 0.84, 0.16])
+
+
 	prosp['bdec_cloudy_bfit'] = bdec_cloudy_bfit
 	prosp['bdec_calc_bfit'] = bdec_calc_bfit
 	prosp['bdec_cloudy_marg'] = bdec_cloudy_marg
@@ -1139,6 +1150,7 @@ def fmt_emline_info(alldata,add_abs_err = True):
 	prosp['sfr_100'] = sfr_100
 	prosp['ha_ext'] = ha_ext
 	prosp['mass'] = mass
+	prosp['dtau_dlam'] = dtau_dlam_prosp
 
 	mag['bdec'] = bdec_magphys
 	mag['ha'] = ha_magphys
@@ -2639,24 +2651,28 @@ def residual_plots(e_pinfo,hflag,outfolder):
 	#### dust2_index vs dust2
 	fig, ax = plt.subplots(1,1, figsize = (6,6))
 
-	#### calculate dtau / dlambda (tau_0) (lambda = 5500 angstroms)
-	lam1 = 5450.
-	lam2 = 5550.
-	dust2_prosp = e_pinfo['prosp']['d2'][:,0]
-	dust2_index_prosp = e_pinfo['prosp']['didx'][:,0]
-	tau1 = -np.log(threed_dutils.charlot_and_fall_extinction(lam1,np.zeros_like(dust2_prosp),dust2_prosp,np.zeros_like(dust2_prosp),dust2_index_prosp, kriek=True,nobc=True))
-	tau2 = -np.log(threed_dutils.charlot_and_fall_extinction(lam2,np.zeros_like(dust2_prosp),dust2_prosp,np.zeros_like(dust2_prosp),dust2_index_prosp, kriek=True,nobc=True))
-	dtau_dlam_prosp = ((tau2-tau1) / (lam2-lam1)) / dust2_prosp
+	dtau_dlam_prosp = e_pinfo['prosp']['dtau_dlam']
+	dust2_prosp = e_pinfo['prosp']['d2']
 
 	#### now calculate it for the chevallard+13 extinction curve
 	modtau = np.linspace(0.0,2.0,100)
-	tau1 = threed_dutils.chev_extinction(modtau, lam1,ebars=True)
-	tau2 = threed_dutils.chev_extinction(modtau, lam2,ebars=True)
-	dtau_dlam_chev = ((tau2-tau1) / (lam2-lam1)) / modtau
+	tau1 = threed_dutils.chev_extinction(modtau, lam1_extdiff,ebars=True)
+	tau2 = threed_dutils.chev_extinction(modtau, lam2_extdiff,ebars=True)
+	dtau_dlam_chev = ((tau2-tau1) / (lam2_extdiff-lam1_extdiff)) / modtau
 
 	sfingn, compositen, agnn = return_agn_str(np.ones_like(keep_idx))
 	nkeys = [sfingn, compositen, agnn]
-	for ii in xrange(len(labels)): ax.errorbar(dust2_prosp[nkeys[ii]], dtau_dlam_prosp[nkeys[ii]], linestyle=' ', **merge_dicts(herschdict[0],bptdict[ii]))
+	for ii in xrange(len(labels)): 
+		dtau_dlam_prosp_errors = threed_dutils.asym_errors(dtau_dlam_prosp[nkeys[ii],0],
+			                                               dtau_dlam_prosp[nkeys[ii],1],
+			                                               dtau_dlam_prosp[nkeys[ii],2],
+			                                               log=False)
+		dust2_errors = threed_dutils.asym_errors(dust2_prosp[nkeys[ii],0],
+			                                     dust2_prosp[nkeys[ii],1],
+			                                     dust2_prosp[nkeys[ii],2],
+			                                     log=False)
+		ax.errorbar(dust2_prosp[nkeys[ii],0], dtau_dlam_prosp[nkeys[ii],0], xerr=dust2_errors,yerr=dtau_dlam_prosp_errors, 
+			        linestyle=' ', **merge_dicts(herschdict[0],bptdict[ii]))
 
 	lw=2
  	ax.plot(modtau,dtau_dlam_chev[0,:],color='k',lw=lw)

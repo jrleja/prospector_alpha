@@ -563,7 +563,6 @@ def plot_derived_parameters(alldata,outfolder=None, cdf=False):
 	fig_err.savefig(outfolder+'derived_parameter_PDF.png',dpi=dpi)
 
 	plt.close()
-	print 1/0
 
 def plot_spectral_parameters(alldata,outfolder=None):
 
