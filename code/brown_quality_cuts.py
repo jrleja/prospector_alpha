@@ -1,13 +1,18 @@
 import numpy as np
 from threed_dutils import asym_errors
 
-def halpha_cuts(e_pinfo):
+def halpha_cuts(e_pinfo,sn=False):
 
 	sn_ha = np.abs(e_pinfo['obs']['f_ha'][:,0] / e_pinfo['obs']['err_ha'])
 	sn_hb = np.abs(e_pinfo['obs']['f_hb'][:,0] / e_pinfo['obs']['err_hb'])
 
-	keep_idx = np.squeeze((sn_ha > e_pinfo['obs']['sn_cut']) & \
-		                  (sn_hb > e_pinfo['obs']['sn_cut']) & \
+	if sn:
+		sn_cut = sn
+	else:
+		sn_cut = e_pinfo['obs']['sn_cut']
+
+	keep_idx = np.squeeze((sn_ha > sn_cut) & \
+		                  (sn_hb > sn_cut) & \
 		                  (e_pinfo['obs']['eqw_ha'][:,0] > e_pinfo['obs']['eqw_cut']) & \
 		                  (e_pinfo['obs']['eqw_hb'][:,0] > e_pinfo['obs']['eqw_cut']) & \
 		                  (e_pinfo['obs']['f_ha'][:,0] > 0) & \
@@ -15,14 +20,19 @@ def halpha_cuts(e_pinfo):
 		                  (e_pinfo['prosp']['cloudy_ha'][:,0] > 0))
 	return keep_idx
 
-def hdelta_cuts(e_pinfo):
+def hdelta_cuts(e_pinfo, eqw=False):
 
-	hdel_sn = np.abs((e_pinfo['obs']['hdel'][:,0]/ e_pinfo['obs']['hdel_err']))
+	if eqw:
+		hdel_sn = np.abs((e_pinfo['obs']['hdel_eqw'][:,0]/ e_pinfo['obs']['hdel_eqw_err']))
+	else:
+		hdel_sn = np.abs((e_pinfo['obs']['hdel'][:,0]/ e_pinfo['obs']['hdel_err']))
 
 	### define limits
-	good_idx = (hdel_sn > e_pinfo['obs']['hdelta_sn_cut']) & \
+	# need this for stupid reasons in pdf_dist
+	good_idx = (hdel_sn > 4) & \
 			   (e_pinfo['obs']['hdel_eqw'][:,0] > e_pinfo['obs']['hdelta_eqw_cut']) & \
 	           (e_pinfo['obs']['hdel'][:,0] > 0)
+
 	return good_idx
 
 def dn4000_cuts(e_pinfo):

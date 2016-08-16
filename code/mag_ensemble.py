@@ -1209,7 +1209,7 @@ def atlas_3d_met(e_pinfo,hflag,outfolder=''):
 
 	prosp_met, prosp_met_err, a3d_met, a3d_met_err, a3d_alpha, obj_idx = brown_quality_cuts.load_atlas3d(e_pinfo)
 
-	fig, ax = plt.subplots(1,1,figsize=(7,7))
+	fig, ax = plt.subplots(1,1,figsize=(6,6))
 	fig.subplots_adjust(left=0.15,bottom=0.1,top=0.95,right=0.95)
 	ax.errorbar(a3d_met,prosp_met,xerr=a3d_met_err,yerr=prosp_met_err, color='#1C86EE',alpha=0.9,fmt='o')
 	ax.set_xlabel('log(Z$_{\mathrm{ATLAS-3D}}$/Z$_{\odot}$)')
@@ -1477,7 +1477,6 @@ def obs_vs_kennicutt_ha(e_pinfo,hflag,outname_prosp='test.png',outname_mag='test
 			sfr10_err = threed_dutils.asym_errors(sfr10[plt_idx,0], sfr10[plt_idx,1], sfr10[plt_idx,2],log=False)
 			sfr100_err = threed_dutils.asym_errors(sfr100[plt_idx,0], sfr100[plt_idx,1], sfr100[plt_idx,2],log=False)
 			msfr100_err = threed_dutils.asym_errors(msfr100_marginalized[plt_idx,1], msfr100_marginalized[plt_idx,0], msfr100_marginalized[plt_idx,2],log=False)
-
 
 			ax1.errorbar(pl_ha_obs[plt_idx,0], pl_ha_emp[plt_idx,0], xerr=obs_err, yerr=prosp_emp_err,
 				           linestyle=' ',**pdict)
@@ -1871,16 +1870,12 @@ def obs_vs_model_hdelta(e_pinfo,hflag,outname=None,outname2=None,outname_dnplt=N
 
 	'''
 
-	good_idx = brown_quality_cuts.hdelta_cuts(e_pinfo)
-
-	##### for dn4000 plots, if necessary
-	dn4000_obs = e_pinfo['obs']['dn4000'][good_idx]
-	dn4000_prosp = e_pinfo['prosp']['dn4000'][good_idx,0]
-
 	if eqw:
-		min = 0.2
-		max = 1.0
+		min = 0.0
+		max = 1.1
 		plotlim = (min,max,min,max)
+
+		good_idx = brown_quality_cuts.hdelta_cuts(e_pinfo,eqw=True)
 
 		hdel_obs = e_pinfo['obs']['hdel_eqw'][good_idx]
 		hdel_prosp_marg = e_pinfo['prosp']['hdel_eqw_marg'][good_idx]
@@ -1902,6 +1897,8 @@ def obs_vs_model_hdelta(e_pinfo,hflag,outname=None,outname2=None,outname_dnplt=N
 		max = 8.0
 		plotlim = (min,max,min,max)
 
+		good_idx = brown_quality_cuts.hdelta_cuts(e_pinfo)
+
 		hdel_obs = e_pinfo['obs']['hdel'][good_idx]		
 		hdel_prosp_marg = e_pinfo['prosp']['hdel_abs_marg'][good_idx]		
 		hdel_prosp_em = e_pinfo['prosp']['hdel_abs_elineon_marg'][good_idx]
@@ -1913,6 +1910,11 @@ def obs_vs_model_hdelta(e_pinfo,hflag,outname=None,outname2=None,outname_dnplt=N
 		ytit = [r'model log(-H$_{\delta}$) [absorption + emission]',
 		        r'model log(-H$_{\delta}$) [best-fit]',
 		        r'model log(-H$_{\delta}$) [marginalized]']
+
+
+	##### for dn4000 plots, if necessary
+	dn4000_obs = e_pinfo['obs']['dn4000'][good_idx]
+	dn4000_prosp = e_pinfo['prosp']['dn4000'][good_idx,0]
 
 	##### AGN identifiers
 	sfing, composite, agn = return_agn_str(good_idx)
@@ -1951,15 +1953,16 @@ def obs_vs_model_hdelta(e_pinfo,hflag,outname=None,outname2=None,outname_dnplt=N
 				                                 hdel_obs[plt_idx,1],
 				                                 hdel_obs[plt_idx,2],log=True)
 
+			### define quantities
+			pl_hdel_obs = hdel_obs[plt_idx,0]
+			pl_hdel_prosp = hdel_prosp_marg[plt_idx,0]
+			pl_hdel_prosp_em = hdel_prosp_em[plt_idx,0]
+
 			#### old error plots
 			norm_errs.append(normalize_error(np.log10(pl_hdel_obs),errs_obs,
 				                             np.log10(pl_hdel_prosp),errs_pro))
 			norm_flag.append([labels[ii]]*np.sum(plt_idx))
 
-			### define quantities
-			pl_hdel_obs = hdel_obs[plt_idx,0]
-			pl_hdel_prosp = hdel_prosp_marg[plt_idx,0]
-			pl_hdel_prosp_em = hdel_prosp_em[plt_idx,0]
 
 			#### plot
 			ax[0].errorbar(np.log10(pl_hdel_obs), np.log10(pl_hdel_prosp), xerr=errs_obs, yerr=errs_pro, linestyle=' ', **pdict)
@@ -1971,7 +1974,7 @@ def obs_vs_model_hdelta(e_pinfo,hflag,outname=None,outname2=None,outname_dnplt=N
 
 	ax[0].text(0.04,0.92, r'N = '+str(int(np.sum(good_idx))), transform = ax[0].transAxes,horizontalalignment='left')
 	ax[0].text(0.04,0.87, r'S/N H$\delta$ > {0}'.format(int(e_pinfo['obs']['hdelta_sn_cut'])), transform = ax[0].transAxes,horizontalalignment='left')
-	ax[0].text(0.04,0.82, r'EQW H$\delta$ < -{0} $\AA$'.format(int(e_pinfo['obs']['hdelta_eqw_cut'])), transform = ax[0].transAxes,horizontalalignment='left')
+	#ax[0].text(0.04,0.82, r'EQW H$\delta$ < -{0} $\AA$'.format(int(e_pinfo['obs']['hdelta_eqw_cut'])), transform = ax[0].transAxes,horizontalalignment='left')
 	ax[0].set_xlabel(xtit[2])
 	ax[0].set_ylabel(ytit[2])
 	off,scat = threed_dutils.offset_and_scatter(np.log10(hdel_obs[:,0]), np.log10(hdel_prosp_marg[:,0]),biweight=True)
@@ -1980,14 +1983,14 @@ def obs_vs_model_hdelta(e_pinfo,hflag,outname=None,outname2=None,outname_dnplt=N
 	ax[0].axis(plotlim)
 	ax[0].plot([min,max],[min,max],linestyle='--',color='0.1',alpha=0.8)
 
-	ax3[0].text(0.04,0.92, r'N = '+str(int(np.sum(good_idx))), transform = ax3[0].transAxes,horizontalalignment='left')
-	ax3[0].text(0.04,0.87, r'S/N H$\delta$ > {0}'.format(int(e_pinfo['obs']['hdelta_sn_cut'])), transform = ax3[0].transAxes,horizontalalignment='left')
-	ax3[0].text(0.04,0.82, r'EQW H$\delta$ < -{0} $\AA$'.format(int(e_pinfo['obs']['hdelta_eqw_cut'])), transform = ax3[0].transAxes,horizontalalignment='left')
+	ax3[0].text(0.04,0.82, r'N = '+str(int(np.sum(good_idx))), transform = ax3[0].transAxes,horizontalalignment='left')
+	ax3[0].text(0.04,0.77, r'S/N H$\delta$ > {0}'.format(int(e_pinfo['obs']['hdelta_sn_cut'])), transform = ax3[0].transAxes,horizontalalignment='left')
+	#ax3[0].text(0.04,0.82, r'EQW H$\delta$ < -{0} $\AA$'.format(int(e_pinfo['obs']['hdelta_eqw_cut'])), transform = ax3[0].transAxes,horizontalalignment='left')
 	ax3[0].set_xlabel(xtit[0])
 	ax3[0].set_ylabel(ytit[0])
 	off,scat = threed_dutils.offset_and_scatter(np.log10(hdel_obs[:,0]), np.log10(hdel_prosp_em[:,0]),biweight=True)
-	ax3[0].text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat) + ' dex', transform = ax3[0].transAxes,horizontalalignment='right')
-	ax3[0].text(0.96,0.1, 'mean offset='+"{:.2f}".format(off) + ' dex', transform = ax3[0].transAxes,horizontalalignment='right')
+	ax3[0].text(0.04,0.92, 'biweight scatter='+"{:.2f}".format(scat) + ' dex', transform = ax3[0].transAxes)
+	ax3[0].text(0.04,0.87, 'mean offset='+"{:.2f}".format(off) + ' dex', transform = ax3[0].transAxes)
 	ax3[0].axis(plotlim)
 	ax3[0].plot([min,max],[min,max],linestyle='--',color='0.1',alpha=0.8)
 
@@ -3268,8 +3271,8 @@ def plot_comparison(alldata,outfolder):
 	sfr = plt.Subplot(fig, gs1[1])
 	met = plt.Subplot(fig, gs1[2])
 	ext_diff = plt.Subplot(fig,gs1[3])
-	balm = plt.Subplot(fig,gs1[4])
-	ext_tot = plt.Subplot(fig,gs1[5])
+	ext_tot = plt.Subplot(fig,gs1[4])
+	balm = plt.Subplot(fig,gs1[5])
 
 	fig.add_subplot(mass)
 	fig.add_subplot(sfr)
@@ -3278,7 +3281,7 @@ def plot_comparison(alldata,outfolder):
 	fig.add_subplot(ext_tot)
 	fig.add_subplot(ext_diff)
 
-	color = '0.6'
+	color = '#1C86EE'
 	mew = 1.5
 	alpha = 0.6
 	fmt = 'o'
@@ -3293,6 +3296,9 @@ def plot_comparison(alldata,outfolder):
 
 	eparnames = alldata[0]['pextras']['parnames']
 	idx_sfr = eparnames == 'sfr_100'
+	bcalc_idx = eparnames == 'bdec_calc'
+	total_ext_idx = eparnames == 'total_ext5500'
+
 
 	##### find magphys indexes
 	mparnames = alldata[0]['model']['parnames']
@@ -3322,8 +3328,8 @@ def plot_comparison(alldata,outfolder):
 			      mew=mew)
 
 	# labels
-	mass.set_xlabel(r'log(M$_*$) [Prospector, 100 Myr]',labelpad=13)
-	mass.set_ylabel(r'log(M$_*$) [MAGPHYS, 100 Myr]')
+	mass.set_xlabel(r'log(M$_*$) [Prospector]',labelpad=13)
+	mass.set_ylabel(r'log(M$_*$) [MAGPHYS]')
 	mass = threed_dutils.equalize_axes(mass,promass[:,1],magmass[:,1])
 
 	# text
@@ -3354,8 +3360,8 @@ def plot_comparison(alldata,outfolder):
 			      mew=mew)
 
 	# labels
-	sfr.set_xlabel(r'log(SFR) [Prospector]')
-	sfr.set_ylabel(r'log(SFR) [MAGPHYS]')
+	sfr.set_xlabel(r'log(SFR$_{100 \mathrm{Myr}}$) [Prospector]')
+	sfr.set_ylabel(r'log(SFR$_{100 \mathrm{Myr}}$) [MAGPHYS]')
 	sfr = threed_dutils.equalize_axes(sfr,prosfr[:,1],magsfr[:,1])
 
 	# text
@@ -3385,7 +3391,7 @@ def plot_comparison(alldata,outfolder):
 
 	# labels
 	met.set_xlabel(r'log(Z/Z$_{\odot}$) [Prospector]',labelpad=13)
-	met.set_ylabel(r'log(Z/Z$_{\odot}$) [best-fit MAGPHYS]')
+	met.set_ylabel(r'log(Z/Z$_{\odot}$) [MAGPHYS]')
 	met = threed_dutils.equalize_axes(met,promet[:,1],magmet)
 
 	# text
@@ -3397,85 +3403,104 @@ def plot_comparison(alldata,outfolder):
 	
 
 	#### Balmer decrement
-	bdec_magphys, bdec_prospector = [],[]
+	bdec_magphys = []
+	bdec_prospector = np.empty(shape=(len(alldata),3))
 	for ii,dat in enumerate(alldata):
-		tau1 = dat['bfit']['maxprob_params'][dust1_idx][0]
-		tau2 = dat['bfit']['maxprob_params'][dust2_idx][0]
-		dindex = dat['bfit']['maxprob_params'][dinx_idx][0]
-		bdec = threed_dutils.calc_balmer_dec(tau1, tau2, -1.0, dindex,kriek=True)
-		bdec_prospector.append(bdec)
+		
+		bdec_prospector[ii,0] = dat['pextras']['q50'][bcalc_idx]
+		bdec_prospector[ii,1] = dat['pextras']['q84'][bcalc_idx]
+		bdec_prospector[ii,2] = dat['pextras']['q16'][bcalc_idx]
 		
 		tau1 = (1-dat['model']['parameters'][mu_idx][0])*dat['model']['parameters'][tauv_idx][0]
 		tau2 = dat['model']['parameters'][mu_idx][0]*dat['model']['parameters'][tauv_idx][0]
 		bdec = threed_dutils.calc_balmer_dec(tau1, tau2, -1.3, -0.7)
 		bdec_magphys.append(np.squeeze(bdec))
 	
-	bdec_magphys = np.array(bdec_magphys)
-	bdec_prospector = np.array(bdec_prospector)
+	bdec_magphys = bdec_to_ext(np.array(bdec_magphys))
+	bdec_prospector = bdec_to_ext(bdec_prospector)
+	bdec_prospector_errs = threed_dutils.asym_errors(bdec_prospector[:,0], 
+		                                             bdec_prospector[:,1],
+		                                             bdec_prospector[:,2])
 
-	balm.errorbar(bdec_prospector,bdec_magphys,
+	balm.errorbar(bdec_prospector[:,0],bdec_magphys,xerr=bdec_prospector_errs,
 		          fmt=fmt, alpha=alpha, color=color,mew=mew)
 
 	# labels
-	balm.set_xlabel(r'Prospector H$_{\alpha}$/H$_{\beta}$',labelpad=13)
-	balm.set_ylabel(r'MAGPHYS H$_{\alpha}$/H$_{\beta}$')
-	balm = threed_dutils.equalize_axes(balm,bdec_prospector,bdec_magphys)
+	balm.set_xlabel(r'A$_{\mathrm{H}\beta}$ - A$_{\mathrm{H}\alpha}$ [Prospector]',labelpad=13)
+	balm.set_ylabel(r'A$_{\mathrm{H}\beta}$ - A$_{\mathrm{H}\alpha}$ [MAGPHYS]')
+	balm = threed_dutils.equalize_axes(balm,bdec_prospector[:,0],bdec_magphys)
 
 	# text
-	off,scat = threed_dutils.offset_and_scatter(bdec_prospector,bdec_magphys,biweight=True)
-	balm.text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat),
+	off,scat = threed_dutils.offset_and_scatter(bdec_prospector[:,0],bdec_magphys,biweight=True)
+	balm.text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat)+' mags',
 			  transform = balm.transAxes,horizontalalignment='right')
-	balm.text(0.96,0.1, 'mean offset='+"{:.2f}".format(off),
+	balm.text(0.96,0.1, 'mean offset='+"{:.2f}".format(off)+' mags',
 		      transform = balm.transAxes,horizontalalignment='right')
 
 	#### Extinction
-	tautot_magphys,tautot_prospector,taudiff_magphys,taudiff_prospector = [],[], [], []
+	tautot_magphys,taudiff_magphys = [],[]
+	tautot_prospector, taudiff_prospector = np.empty(shape=(len(alldata),3)),np.empty(shape=(len(alldata),3))
 	for ii,dat in enumerate(alldata):
-		tau1 = dat['bfit']['maxprob_params'][dust1_idx][0]
-		tau2 = dat['bfit']['maxprob_params'][dust2_idx][0]
-		dindex = dat['bfit']['maxprob_params'][dinx_idx][0]
 
+		taudiff_prospector[ii,0] = dat['pquantiles']['q50'][dust2_idx]
+		taudiff_prospector[ii,1] = dat['pquantiles']['q84'][dust2_idx]
+		taudiff_prospector[ii,2] = dat['pquantiles']['q16'][dust2_idx]
+
+		tautot_prospector[ii,0] = dat['pextras']['q50'][total_ext_idx]
+		tautot_prospector[ii,1] = dat['pextras']['q84'][total_ext_idx]
+		tautot_prospector[ii,2] = dat['pextras']['q16'][total_ext_idx]
+
+		'''
 		dust2 = threed_dutils.charlot_and_fall_extinction(5500.,tau1,tau2,-1.0,dindex, kriek=True, nobc=True)
 		dusttot = threed_dutils.charlot_and_fall_extinction(5500.,tau1,tau2,-1.0,dindex, kriek=True)
 		taudiff_prospector.append(-np.log(dust2))
 		tautot_prospector.append(-np.log10(dusttot))
+		'''
 		
 		tau1 = (1-dat['model']['parameters'][mu_idx][0])*dat['model']['parameters'][tauv_idx][0]
 		tau2 = dat['model']['parameters'][mu_idx][0]*dat['model']['parameters'][tauv_idx][0]
 		taudiff_magphys.append(tau2)
 		tautot_magphys.append(tau1+tau2)
 	
-	taudiff_prospector = np.array(taudiff_prospector)
 	taudiff_magphys = np.array(taudiff_magphys)
 	tautot_magphys = np.array(tautot_magphys)
-	tautot_prospector = np.array(tautot_prospector)
 
-	ext_tot.errorbar(tautot_prospector,tautot_magphys,
+	tautot_prospector_errs = threed_dutils.asym_errors(tautot_prospector[:,0], 
+		                                               tautot_prospector[:,1],
+		                                               tautot_prospector[:,2])
+
+	taudiff_prospector_errs = threed_dutils.asym_errors(taudiff_prospector[:,0], 
+		                                                taudiff_prospector[:,1],
+		                                                taudiff_prospector[:,2])
+
+	#### TOTAL EXTINCTION PLOT
+	ext_tot.errorbar(tautot_prospector[:,0],tautot_magphys,xerr=tautot_prospector_errs,
 		          fmt=fmt, alpha=alpha, color=color,mew=mew)
 
 	# labels
-	ext_tot.set_xlabel(r'Prospector diffuse+birth-cloud $\tau_{5500}$',labelpad=13)
-	ext_tot.set_ylabel(r'MAGPHYS diffuse+birth-cloud $\tau_{5500}$')
-	ext_tot = threed_dutils.equalize_axes(ext_tot,tautot_prospector,tautot_magphys)
+	ext_tot.set_xlabel(r'total 5500 $\AA$ optical depth [Prospector]',labelpad=13)
+	ext_tot.set_ylabel(r'total 5500 $\AA$ optical depth [MAGPHYS]')
+	ext_tot = threed_dutils.equalize_axes(ext_tot,tautot_prospector[:,0],tautot_magphys)
 
 	# text
-	off,scat = threed_dutils.offset_and_scatter(tautot_prospector,tautot_magphys,biweight=True)
+	off,scat = threed_dutils.offset_and_scatter(tautot_prospector[:,0],tautot_magphys,biweight=True)
 	ext_tot.text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat),
 			  transform = ext_tot.transAxes,horizontalalignment='right')
 	ext_tot.text(0.96,0.1, 'mean offset='+"{:.2f}".format(off),
 		      transform = ext_tot.transAxes,horizontalalignment='right',)
 
-	ext_diff.errorbar(taudiff_prospector,taudiff_magphys,
-		          fmt=fmt, alpha=alpha, color='0.4',
+	##### DIFFUSE EXTINCTION PLOT
+	ext_diff.errorbar(taudiff_prospector[:,0],taudiff_magphys, xerr=taudiff_prospector_errs,
+		          fmt=fmt, alpha=alpha, color=color,
 		          mew=mew)
 
 	# labels
-	ext_diff.set_xlabel(r'Prospector diffuse $\tau_{5500}$',labelpad=13)
-	ext_diff.set_ylabel(r'MAGPHYS diffuse $\tau_{5500}$')
-	ext_diff = threed_dutils.equalize_axes(ext_diff,taudiff_prospector,taudiff_magphys)
+	ext_diff.set_xlabel(r'diffuse 5500 $\AA$ optical depth [Prospector]',labelpad=13)
+	ext_diff.set_ylabel(r'diffuse 5500 $\AA$ optical depth [MAGPHYS]')
+	ext_diff = threed_dutils.equalize_axes(ext_diff,taudiff_prospector[:,0],taudiff_magphys)
 
 	# text
-	off,scat = threed_dutils.offset_and_scatter(taudiff_prospector,taudiff_magphys,biweight=True)
+	off,scat = threed_dutils.offset_and_scatter(taudiff_prospector[:,0],taudiff_magphys,biweight=True)
 	ext_diff.text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat),
 			  transform = ext_diff.transAxes,horizontalalignment='right')
 	ext_diff.text(0.96,0.1, 'mean offset='+"{:.2f}".format(off),

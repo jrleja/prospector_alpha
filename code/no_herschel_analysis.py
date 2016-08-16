@@ -9,6 +9,49 @@ from astropy import constants
 import brown_io
 from matplotlib.ticker import MaxNLocator
 from extra_output import post_processing
+import matplotlib as mpl
+import math
+
+dpi = 120
+
+hcolor = '#FF3D0D' #red
+nhcolor = '#1C86EE' #blue
+
+global_fs = 12
+color = '0.4'
+
+
+class jLogFormatter(mpl.ticker.LogFormatter):
+	'''
+	this changes the format from exponential to floating point.
+	'''
+
+	def __call__(self, x, pos=None):
+		"""Return the format for tick val *x* at position *pos*"""
+		vmin, vmax = self.axis.get_view_interval()
+		d = abs(vmax - vmin)
+		b = self._base
+		if x == 0.0:
+			return '0'
+		sign = np.sign(x)
+		# only label the decades
+		fx = math.log(abs(x)) / math.log(b)
+		isDecade = mpl.ticker.is_close_to_int(fx)
+		if not isDecade and self.labelOnlyBase:
+			s = ''
+		elif x > 10000:
+			s = '{0:.3g}'.format(x)
+		elif x < 1:
+			s = '{0:.3g}'.format(x)
+		else:
+			s = self.pprint_val(x, d)
+		if sign == -1:
+			s = '-%s' % s
+		return self.fix_minus(s)
+
+#### format those log plots! 
+minorFormatter = jLogFormatter(base=10, labelOnlyBase=False)
+majorFormatter = jLogFormatter(base=10, labelOnlyBase=True)
 
 def bdec_to_ext(bdec):
 	'''
@@ -29,7 +72,16 @@ def make_plots(runname_nh='brownseds_np_nohersch',runname_h='brownseds_np', reco
 	if not os.path.exists(outfolder):
 		os.makedirs(outfolder)
 
-	plot_lir(alldata,outfolder=outfolder)
+
+	fig, axes = plt.subplots(2, 2, figsize = (10,10))
+	ax = np.ravel(axes)
+	plot_hfluxes(alldata,ax=ax[0])
+	plot_lir(alldata,ax=ax[1],ax2=ax[2])
+	plot_totalext(alldata,ax=ax[3])
+	fig.tight_layout()
+	fig.savefig(outfolder+'herschel_comparison.png',dpi=dpi)
+	plt.close()
+
 	plot_halpha(alldata,outfolder=outfolder)
 	plot_bdec(alldata,outfolder=outfolder)
 	plot_dustpars(alldata,outfolder=outfolder)
@@ -89,18 +141,39 @@ def collate_data(runname_nh=None, runname_h=None,outpickle=None):
 		outdat_h['ha_q84'] = sample_results_h['model_emline']['flux']['q84'][ha_em]
 		outdat_h['ha_q16'] = sample_results_h['model_emline']['flux']['q16'][ha_em]
 
-		### save model Balmer decrement
+		### save Herschel fluxes
+		mask = sample_results_h['obs']['phot_mask']
+		filtnames = np.array(sample_results_h['obs']['filternames'])[mask]
+		hersch_idx = np.array([True if 'herschel' in filter_name else False for filter_name in filtnames],dtype=bool)
+		outdat_h['filtnames'] = filtnames[hersch_idx]
+		outdat_h['wave_effective'] = sample_results_h['obs']['wave_effective'][mask][hersch_idx]
+		outdat_h['model_fluxes'] = np.median(sample_results_h['observables']['mags'][mask][hersch_idx],axis=1)
+		outdat_h['obs_fluxes'] = sample_results_h['obs']['maggies'][mask][hersch_idx]
+
+		outdat_nh['model_fluxes'] = np.median(sample_results_nh['observables']['mags'][mask][hersch_idx],axis=1)
+
+		### save model Balmer decrement & total extinction
 		epars = sample_results_nh['extras']['parnames']
 		bdec_idx = epars == 'bdec_cloudy'
+		text_idx = epars == 'total_ext5500'
 		outdat_nh['bdec_q50'] = sample_results_nh['extras']['q50'][bdec_idx]
 		outdat_nh['bdec_q84'] = sample_results_nh['extras']['q84'][bdec_idx]
 		outdat_nh['bdec_q16'] = sample_results_nh['extras']['q16'][bdec_idx]
 
+		outdat_nh['text_q50'] = sample_results_nh['extras']['q50'][text_idx]
+		outdat_nh['text_q84'] = sample_results_nh['extras']['q84'][text_idx]
+		outdat_nh['text_q16'] = sample_results_nh['extras']['q16'][text_idx]
+
 		epars = sample_results_h['extras']['parnames']
 		bdec_idx = epars == 'bdec_cloudy'
+		text_idx = epars == 'total_ext5500'
 		outdat_h['bdec_q50'] = sample_results_h['extras']['q50'][bdec_idx]
 		outdat_h['bdec_q84'] = sample_results_h['extras']['q84'][bdec_idx]
 		outdat_h['bdec_q16'] = sample_results_h['extras']['q16'][bdec_idx]
+
+		outdat_h['text_q50'] = sample_results_h['extras']['q50'][text_idx]
+		outdat_h['text_q84'] = sample_results_h['extras']['q84'][text_idx]
+		outdat_h['text_q16'] = sample_results_h['extras']['q16'][text_idx]
 
 		### save SFRs
 		epars = sample_results_nh['extras']['parnames']
@@ -166,7 +239,103 @@ def collate_data(runname_nh=None, runname_h=None,outpickle=None):
 	pickle.dump(out,open(outpickle, "wb"))
 	return out
 
-def plot_lir(alldata,outfolder=None):
+def plot_hfluxes(alldata,ax=None):
+
+
+	##### fluxes
+	fnames_all = alldata[0]['hersch']['filtnames'] # this has all of them...
+	nfilter = fnames_all.shape[0]
+	nh_flux, h_flux, obs_flux = [np.zeros(shape=(nfilter,len(alldata)))+np.nan for i in xrange(3)]
+	for ii, dat in enumerate(alldata):
+		fname = dat['hersch']['filtnames']
+		for kk, name in enumerate(fname):
+
+			match = name == fnames_all
+
+			nh_flux[match,ii] = dat['nohersch']['model_fluxes'][kk]
+			h_flux[match,ii] = dat['hersch']['model_fluxes'][kk]
+			obs_flux[match,ii] = dat['hersch']['obs_fluxes'][kk]
+
+	#### offsets and 1 sigma
+	flux_offset_h, flux_offset_nh = [np.zeros(shape=(nfilter,3)) for i in xrange(2)]
+	for nn in xrange(nfilter):
+		flux_offset_h[nn,:] = quantile(np.log10(h_flux[nn,:]/obs_flux[nn,:]),[0.5,0.84,0.16])
+		flux_offset_nh[nn,:] = quantile(np.log10(nh_flux[nn,:]/obs_flux[nn,:]),[0.5,0.84,0.16])
+
+	h_err = threed_dutils.asym_errors(flux_offset_h[:,0],
+		                              flux_offset_h[:,1],
+		                              flux_offset_h[:,2],log=False)
+
+	nh_err = threed_dutils.asym_errors(flux_offset_nh[:,0],
+		                               flux_offset_nh[:,1],
+		                               flux_offset_nh[:,2],log=False)
+
+	##### wavelength array
+	# temporary fix here
+	try:
+		wave_effective = alldata[0]['hersch']['wave_effective'] # this has all of them...
+	except:
+		wave_effective = np.array([  700164.875,   996012.25 ,  1585789.875,  2461271.   , 3455036.75 ,  4931476.5  ])/1e4
+
+	### LIR
+	ax.errorbar(wave_effective,flux_offset_h[:,0],yerr=h_err,fmt='o',alpha=0.8,color=hcolor)
+	ax.errorbar(wave_effective,flux_offset_nh[:,0],yerr=nh_err,fmt='o',alpha=0.8,color=nhcolor)
+
+	ax.set_xlabel(r'observed wavelength [$\mu$m]')
+	ax.set_ylabel(r'log(f$_{\mathrm{model}}$/f$_{\mathrm{obs}}$)')
+
+	ax.set_xscale('log',nonposx='clip',subsx=(1,2,4))
+	ax.xaxis.set_minor_formatter(minorFormatter)
+	ax.xaxis.set_major_formatter(majorFormatter)
+
+	### add line
+	ax.set_xlim(41,800)
+	ax.set_ylim(-0.8,0.8)
+	ax.plot(ax.get_xlim(),[0.0,0.0],linestyle='--',lw=2,color='black')
+
+	### add text
+	fs = 14
+	ax.text(0.05,0.92,'fit to Herschel data',color=hcolor,transform=ax.transAxes,fontsize=fs)
+	ax.text(0.05,0.86,'fit without Herschel data',color=nhcolor,transform=ax.transAxes,fontsize=fs)
+
+def plot_totalext(alldata,ax=None):
+
+	'''
+	LIR measurements are FUCKED UP
+	fix before this plot becomes useful
+	'''
+
+
+	##### total extinction
+	hersch_totalext = np.array([dat['hersch']['text_q50'] for dat in alldata])
+	hersch_totalext_errup = np.array([dat['hersch']['text_q84'] for dat in alldata])
+	hersch_totalext_errdo = np.array([dat['hersch']['text_q16'] for dat in alldata])
+	hersch_totalext_err = threed_dutils.asym_errors(hersch_totalext,
+		                                            hersch_totalext_errup,
+		                                            hersch_totalext_errdo,log=False)
+
+	nohersch_totalext = np.array([dat['nohersch']['text_q50'] for dat in alldata])
+	nohersch_totalext_errup = np.array([dat['nohersch']['text_q84'] for dat in alldata])
+	nohersch_totalext_errdo = np.array([dat['nohersch']['text_q16'] for dat in alldata])
+	nohersch_totalext_err = threed_dutils.asym_errors(nohersch_totalext,
+		                                              nohersch_totalext_errup,
+		                                              nohersch_totalext_errdo,log=False)
+
+	ax.errorbar(hersch_totalext,nohersch_totalext,xerr=hersch_totalext_err,yerr=nohersch_totalext_err,fmt='o',alpha=0.8,color=color)
+	ax.set_xlabel(r'total 5500 $\AA$ optical depth [fit with Herschel]')
+	ax.set_ylabel(r'total 5500 $\AA$ optical depth [no Herschel]')
+
+	ax.xaxis.set_major_locator(MaxNLocator(5))
+	ax.yaxis.set_major_locator(MaxNLocator(5))
+
+	off,scat = threed_dutils.offset_and_scatter(hersch_totalext,nohersch_totalext,biweight=True)
+	ax.text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat)+ ' dex',
+			  transform = ax.transAxes,horizontalalignment='right',fontsize=global_fs)
+	ax.text(0.96,0.10, 'mean offset='+"{:.2f}".format(off) + ' dex',
+			      transform = ax.transAxes,horizontalalignment='right',fontsize=global_fs)
+	ax = threed_dutils.equalize_axes(ax, hersch_totalext,nohersch_totalext)
+
+def plot_lir(alldata,ax=None,ax2=None):
 
 	'''
 	LIR measurements are FUCKED UP
@@ -199,48 +368,37 @@ def plot_lir(alldata,outfolder=None):
 	h_sfr100_do = np.log10(np.clip(np.squeeze([dat['hersch']['sfr100_q16'] for dat in alldata]),minsfr,np.inf))
 	h_sfr100_err = threed_dutils.asym_errors(h_sfr100,h_sfr100_up,h_sfr100_do,log=False)
 
-	##### PLOTS
-	fig, axes = plt.subplots(1, 2, figsize = (12.5,6))
-	ax = np.ravel(axes)
-
 	### LIR
-	ax[0].errorbar(hersch_lir,nohersch_lir,xerr=hersch_lir_err,yerr=nohersch_lir_err,fmt='o',alpha=0.8,color='#1C86EE')
-	ax[0].set_xlabel('log(L$_{\mathrm{IR}}$ fit) [Herschel]')
-	ax[0].set_ylabel('log(L$_{\mathrm{IR}}$ fit) [no Herschel]')
+	ax.errorbar(hersch_lir,nohersch_lir,xerr=hersch_lir_err,yerr=nohersch_lir_err,fmt='o',alpha=0.8,color=color)
+	ax.set_xlabel('log(model L$_{\mathrm{IR}}$) [fit with Herschel]')
+	ax.set_ylabel('log(model L$_{\mathrm{IR}}$) [no Herschel]')
 
-	ax[0].xaxis.set_major_locator(MaxNLocator(5))
-	ax[0].yaxis.set_major_locator(MaxNLocator(5))
+	ax.xaxis.set_major_locator(MaxNLocator(5))
+	ax.yaxis.set_major_locator(MaxNLocator(5))
 
 	off,scat = threed_dutils.offset_and_scatter(hersch_lir,nohersch_lir,biweight=True)
-	ax[0].text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat)+ ' dex',
-			  transform = ax[0].transAxes,horizontalalignment='right')
-	ax[0].text(0.96,0.10, 'mean offset='+"{:.2f}".format(off) + ' dex',
-			      transform = ax[0].transAxes,horizontalalignment='right')
-	ax[0] = threed_dutils.equalize_axes(ax[0], hersch_lir,nohersch_lir)
+	ax.text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat)+ ' dex',
+			  transform = ax.transAxes,horizontalalignment='right',fontsize=global_fs)
+	ax.text(0.96,0.10, 'mean offset='+"{:.2f}".format(off) + ' dex',
+			      transform = ax.transAxes,horizontalalignment='right',fontsize=global_fs)
+	ax = threed_dutils.equalize_axes(ax, hersch_lir,nohersch_lir)
 
-	### SFR10
-	ax[1].errorbar(h_sfr100,nh_sfr100,xerr=h_sfr100_err,yerr=nh_sfr100_err,fmt='o',alpha=0.8,color='#1C86EE')
-	ax[1].set_xlabel('log(SFR$_{100 \mathrm{Myr}}$) [Herschel]')
-	ax[1].set_ylabel('log(SFR$_{100 \mathrm{Myr}}$)  [no Herschel]')
+	### SFR 100
+	ax2.errorbar(h_sfr100,nh_sfr100,xerr=h_sfr100_err,yerr=nh_sfr100_err,fmt='o',alpha=0.8,color=color)
+	ax2.set_xlabel('log(SFR$_{100 \mathrm{Myr}}$) [fit with Herschel]')
+	ax2.set_ylabel('log(SFR$_{100 \mathrm{Myr}}$) [no Herschel]')
 
-	ax[1].xaxis.set_major_locator(MaxNLocator(5))
-	ax[1].yaxis.set_major_locator(MaxNLocator(5))
+	ax2.xaxis.set_major_locator(MaxNLocator(5))
+	ax2.yaxis.set_major_locator(MaxNLocator(5))
 
 	off,scat = threed_dutils.offset_and_scatter(h_sfr100,nh_sfr100,biweight=True)
-	ax[1].text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat)+ ' dex',
-			  transform = ax[1].transAxes,horizontalalignment='right')
-	ax[1].text(0.96,0.10, 'mean offset='+"{:.2f}".format(off) + ' dex',
-			      transform = ax[1].transAxes,horizontalalignment='right')
-	ax[1] = threed_dutils.equalize_axes(ax[1], h_sfr100,nh_sfr100)
-
-	plt.tight_layout()
-	plt.savefig(outfolder+'lir_comparison.png',dpi=150)
-	plt.close()
+	ax2.text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat)+ ' dex',
+			  transform = ax2.transAxes,horizontalalignment='right',fontsize=global_fs)
+	ax2.text(0.96,0.10, 'mean offset='+"{:.2f}".format(off) + ' dex',
+			      transform = ax2.transAxes,horizontalalignment='right',fontsize=global_fs)
+	ax2 = threed_dutils.equalize_axes(ax2, h_sfr100,nh_sfr100)
 
 def plot_halpha(alldata,outfolder=None):
-
-	hcolor = '#FF3D0D' #red
-	nhcolor = '#1C86EE' #blue
 
 	#### observations
 	ha_lum = np.array([dat['obs']['ha'] for dat in alldata])

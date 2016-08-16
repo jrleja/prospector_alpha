@@ -18,6 +18,9 @@ modcolor = '#375E97'
 
 dpi = 120
 
+def bdec_to_ext(bdec):
+	return 2.5*np.log10(bdec/2.86)
+
 def norm_resid(fit,truth):
 	
 	# define output
@@ -581,6 +584,7 @@ def plot_spectral_parameters(alldata,outfolder=None):
 	fig, axes = plt.subplots(2, 2, figsize = (12,12))
 	ax = np.ravel(axes)
 	to_plot = ['Halpha','Hbeta']
+	plot_names = [r'log(H$_{\alpha}$ flux)',r'log(H$_{\beta}$ flux)']
 	emnames = alldata[0]['truths']['emnames']
 	for ii,par in enumerate(to_plot):
 
@@ -604,12 +608,11 @@ def plot_spectral_parameters(alldata,outfolder=None):
 		yerr = threed_dutils.asym_errors(y,yup,ydown,log=True)
 		y = np.log10(y)
 		x = np.log10(x)
-		par = 'log('+par+' flux)'
 
 		#### plot
 		ax[ii].errorbar(x,y,yerr,fmt='o',alpha=0.8,color='#1C86EE')
-		ax[ii].set_xlabel('true '+par)
-		ax[ii].set_ylabel('fit '+par)
+		ax[ii].set_xlabel('true '+plot_names[ii])
+		ax[ii].set_ylabel('fit '+plot_names[ii])
 
 		ax[ii] = threed_dutils.equalize_axes(ax[ii], x, y)
 		mean_offset,scat = threed_dutils.offset_and_scatter(x,y)
@@ -627,8 +630,8 @@ def plot_spectral_parameters(alldata,outfolder=None):
 	x = np.array([dat['truths']['dn4000'] for dat in alldata])
 
 	ax[ii+1].errorbar(x,y,yerr,fmt='o',alpha=0.8,color='#1C86EE')
-	ax[ii+1].set_xlabel('true dn4000')
-	ax[ii+1].set_ylabel('fit dn4000')
+	ax[ii+1].set_xlabel(r'true D$_n$(4000)')
+	ax[ii+1].set_ylabel(r'fit D$_n$(4000)')
 
 	ax[ii+1] = threed_dutils.equalize_axes(ax[ii+1], x, y)
 	mean_offset,scat = threed_dutils.offset_and_scatter(x,y)
@@ -651,21 +654,20 @@ def plot_spectral_parameters(alldata,outfolder=None):
 	# ALSO remove true galaxies where balmer decrement is less than 2.8
 	# not sure what's going on here? limit of cloudy?
 	good = (~np.isnan(y)) & (x > 2.8)
-	x = x[good]
-	y = y[good]
-	yup = np.array([dat['eq84'][idx] for dat in alldata])[good]
-	ydown = np.array([dat['eq16'][idx] for dat in alldata])[good]
+	x = bdec_to_ext(x[good])
+	y = bdec_to_ext(y[good])
+	yup = bdec_to_ext(np.array([dat['eq84'][idx] for dat in alldata])[good])
+	ydown = bdec_to_ext(np.array([dat['eq16'][idx] for dat in alldata])[good])
 	yerr = threed_dutils.asym_errors(y,yup,ydown,log=False)
 
 	ax[ii+2].errorbar(x,y,yerr,fmt='o',alpha=0.8,color='#1C86EE')
-	ax[ii+2].set_xlabel('true Balmer decrement')
-	ax[ii+2].set_ylabel('fit Balmer decrement')
+	ax[ii+2].set_xlabel(r'true A$_{\mathrm{H}\beta}$ - A$_{\mathrm{H}\alpha}$ [magnitudes]')
+	ax[ii+2].set_ylabel(r'fit A$_{\mathrm{H}\beta}$ - A$_{\mathrm{H}\alpha}$ [magnitudes]')
 
 	ax[ii+2] = threed_dutils.equalize_axes(ax[ii+2], x, y)
 	mean_offset,scat = threed_dutils.offset_and_scatter(x,y)
-	ax[ii+2].text(0.96,0.12, 'scatter='+"{:.2f}".format(scat),transform = ax[ii+2].transAxes,ha='right')
-	ax[ii+2].text(0.96,0.05, 'mean offset='+"{:.2f}".format(mean_offset), transform = ax[ii+2].transAxes,ha='right')
-	#ax[ii+2].axis((2.86,6,2.86,6))
+	ax[ii+2].text(0.96,0.12, 'scatter='+"{:.2f}".format(scat)+' mags',transform = ax[ii+2].transAxes,ha='right')
+	ax[ii+2].text(0.96,0.05, 'mean offset='+"{:.2f}".format(mean_offset)+' mags', transform = ax[ii+2].transAxes,ha='right')
 
 	ax[ii+2].xaxis.set_major_locator(MaxNLocator(5))
 	ax[ii+2].yaxis.set_major_locator(MaxNLocator(5))

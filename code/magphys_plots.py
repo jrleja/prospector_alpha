@@ -418,7 +418,6 @@ def mask_emission_lines(lam,z):
 
 def calc_rms(lam, z, resid):
 
-
 	mask = mask_emission_lines(lam,z)
 	rms = (np.sum((resid[mask]-resid[mask].mean())**2)/np.sum(mask))**0.5
 
@@ -436,98 +435,92 @@ def plot_obs_spec(obs_spec, phot, spec_res, alpha,
 
 	mask = obs_spec['source'] == source
 	obslam = obs_spec['obs_lam'][mask]/1e4
-	if np.sum(mask) > 0:
 
-		##### smooth 
-		# consider only passing relevant wavelengths
-		# if speed becomes an issue
-		modspec_smooth = threed_dutils.smooth_spectrum(modlam,
-		                                        modspec,sigsmooth)
-		magspec_smooth = threed_dutils.smooth_spectrum(maglam/(1+z),
-		                                        magspec,sigsmooth)
+	##### smooth 
+	# consider only passing relevant wavelengths
+	# if speed becomes an issue
+	modspec_smooth = threed_dutils.smooth_spectrum(modlam,
+	                                        modspec,sigsmooth)
+	magspec_smooth = threed_dutils.smooth_spectrum(maglam/(1+z),
+	                                        magspec,sigsmooth)
 
-		# interpolate fsps spectra onto observational wavelength grid
-		pro_flux_interp = interp1d(modlam*(1+z),
-			                       modspec_smooth, 
-			                       bounds_error = False, fill_value = 0)
+	# interpolate fsps spectra onto observational wavelength grid
+	pro_flux_interp = interp1d(modlam*(1+z),
+		                       modspec_smooth, 
+		                       bounds_error = False, fill_value = 0)
 
-		prospector_resid = np.log10(obs_spec['flux'][mask]) - np.log10(pro_flux_interp(obslam))
-		'''
-		spec_res.plot(obslam, 
-			          prospector_resid,
-			          color=obs_color,
-			          alpha=alpha,
-			          linestyle='-')
-		'''
+	prospector_resid = np.log10(obs_spec['flux'][mask]) - np.log10(pro_flux_interp(obslam))
+	'''
+	spec_res.plot(obslam, 
+		          prospector_resid,
+		          color=obs_color,
+		          alpha=alpha,
+		          linestyle='-')
+	'''
 
-		obs_spec_plot = np.log10(obs_spec['flux'][mask])
-		prosp_spec_plot = np.log10(pro_flux_interp(obslam))
+	obs_spec_plot = np.log10(obs_spec['flux'][mask])
+	prosp_spec_plot = np.log10(pro_flux_interp(obslam))
 
-		spec_res.plot(obslam, 
-			          obs_spec_plot,
-			          color=obs_color,
-			          alpha=alpha,
-			          linestyle='-')
-		spec_res.plot(obslam, 
-			          prosp_spec_plot,
-			          color=prosp_color,
-			          alpha=alpha,
-			          linestyle='-')
+	spec_res.plot(obslam, 
+		          obs_spec_plot,
+		          color=obs_color,
+		          alpha=alpha,
+		          linestyle='-')
+	spec_res.plot(obslam, 
+		          prosp_spec_plot,
+		          color=prosp_color,
+		          alpha=alpha,
+		          linestyle='-')
 
-		# interpolate magphys onto fsps grid
-		mag_flux_interp = interp1d(maglam, magspec_smooth,
-		                           bounds_error=False, fill_value=0)
-		magphys_resid = np.log10(obs_spec['flux'][mask]) - np.log10(mag_flux_interp(obslam))
-		nolines = mask_emission_lines(obslam,z)
-		temp_yplot = magphys_resid
-		temp_yplot[~nolines] = np.nan
+	# interpolate magphys onto fsps grid
+	mag_flux_interp = interp1d(maglam, magspec_smooth,
+	                           bounds_error=False, fill_value=0)
+	magphys_resid = np.log10(obs_spec['flux'][mask]) - np.log10(mag_flux_interp(obslam))
+	nolines = mask_emission_lines(obslam,z)
+	temp_yplot = magphys_resid
+	temp_yplot[~nolines] = np.nan
 
-		#### calculate rms
-		# mask emission lines
-		magphys_rms = calc_rms(obslam, z, magphys_resid)
-		prospector_rms = calc_rms(obslam, z, prospector_resid)
+	#### calculate rms
+	# mask emission lines
+	magphys_rms = calc_rms(obslam, z, magphys_resid)
+	prospector_rms = calc_rms(obslam, z, prospector_resid)
 
-		#### write text, add lines
-		spec_res.text(0.98,0.05, 'RMS='+"{:.2f}".format(prospector_rms)+' dex',
-			          transform = spec_res.transAxes,ha='right',
-			          color='black',fontsize=14)
-		spec_res.text(0.015,0.05, label,
-			          transform = spec_res.transAxes)
-		spec_res.axhline(0, linestyle=':', color='grey')
-		spec_res.set_xlim(min(obslam)*0.85,max(obslam)*1.15)
-		if label == 'Optical':
-			spec_res.set_ylim(-np.std(magphys_resid)*5,np.std(magphys_resid)*5)
-			spec_res.set_xlim(min(obslam)*0.98,max(obslam)*1.02)
+	#### write text, add lines
+	spec_res.text(0.98,0.05, 'RMS='+"{:.2f}".format(prospector_rms)+' dex',
+		          transform = spec_res.transAxes,ha='right',
+		          color='black',fontsize=14)
+	spec_res.text(0.015,0.05, label,
+		          transform = spec_res.transAxes)
+	spec_res.axhline(0, linestyle=':', color='grey')
+	spec_res.set_xlim(min(obslam)*0.85,max(obslam)*1.15)
+	if label == 'Optical':
+		spec_res.set_ylim(-np.std(magphys_resid)*5,np.std(magphys_resid)*5)
+		spec_res.set_xlim(min(obslam)*0.98,max(obslam)*1.02)
 
-		#### axis scale
-		'''
-		plt_lim = np.nanmax(np.abs(prospector_resid))
-		spec_res.set_ylim(-1.1*plt_lim,1.1*plt_lim)
-		'''
-		plt_max=np.array([np.nanmax(np.abs(obs_spec_plot)),np.nanmax(np.abs(prosp_spec_plot))]).max()
-		plt_min=np.array([np.nanmin(np.abs(obs_spec_plot)),np.nanmin(np.abs(prosp_spec_plot))]).min()
-		spec_res.set_ylim(plt_min-0.1,plt_max+0.1)
+	#### axis scale
+	'''
+	plt_lim = np.nanmax(np.abs(prospector_resid))
+	spec_res.set_ylim(-1.1*plt_lim,1.1*plt_lim)
+	'''
+	plt_max=np.array([np.nanmax(np.abs(obs_spec_plot)),np.nanmax(np.abs(prosp_spec_plot))]).max()
+	plt_min=np.array([np.nanmin(np.abs(obs_spec_plot)),np.nanmin(np.abs(prosp_spec_plot))]).min()
+	spec_res.set_ylim(plt_min-0.1,plt_max+0.1)
 
-		spec_res.set_xscale('log',nonposx='clip', subsx=(1,2,3,4,5,6,7,8,9))
-		spec_res.xaxis.set_minor_formatter(minorFormatter)
-		spec_res.xaxis.set_major_formatter(majorFormatter)
+	spec_res.set_xscale('log',nonposx='clip', subsx=(1,2,3,4,5,6,7,8,9))
+	spec_res.xaxis.set_minor_formatter(minorFormatter)
+	spec_res.xaxis.set_major_formatter(majorFormatter)
 
-		# output rest-frame wavelengths + residuals
-		out = {
-			   'obs_restlam': obslam/(1+z),
-			   'magphys_resid': magphys_resid,
-			   'magphys_rms': magphys_rms,
-			   'obs_obslam': obslam,
-			   'prospector_resid': prospector_resid,
-			   'prospector_rms': prospector_rms
-			   }
+	# output rest-frame wavelengths + residuals
+	out = {
+		   'obs_restlam': obslam/(1+z),
+		   'magphys_resid': magphys_resid,
+		   'magphys_rms': magphys_rms,
+		   'obs_obslam': obslam,
+		   'prospector_resid': prospector_resid,
+		   'prospector_rms': prospector_rms
+		   }
 
-		return out
-
-	else:
-
-		# remove axis
-		spec_res.axis('off')
+	return out
 
 def update_model_info(alldata, sample_results, magphys):
 
@@ -660,6 +653,7 @@ def sed_comp_figure(sample_results, sps, model, magphys,
 	label = ['Optical','Akari', 'Spitzer IRS']
 	resplots = [spec_res_opt, spec_res_akari, spec_res_spit]
 
+	nplot = 0
 	for ii in xrange(3):
 		
 		if label[ii] == 'Optical':
@@ -669,10 +663,18 @@ def sed_comp_figure(sample_results, sps, model, magphys,
 			else:
 				sigsmooth[ii] = 450.0
 
-		residuals[label[ii]] = plot_obs_spec(obs_spec, phot, resplots[ii], alpha, modlam/1e4, modspec,
-					                         magphys['model']['lam']/1e4, magphys['model']['spec']*spec_fac,
-					                         magphys['metadata']['redshift'], sample_results['run_params']['objname'],
-		                                     ii+1, color=obs_color, label=label[ii],sigsmooth=sigsmooth[ii])
+		source = ii+1
+		mask = obs_spec['source'] == source
+		if np.sum(mask) > 0:
+			residuals[label[ii]] = plot_obs_spec(obs_spec, phot, resplots[nplot], alpha, modlam/1e4, modspec,
+						                         magphys['model']['lam']/1e4, magphys['model']['spec']*spec_fac,
+						                         magphys['metadata']['redshift'], sample_results['run_params']['objname'],
+			                                     source, color=obs_color, label=label[ii],sigsmooth=sigsmooth[ii])
+			nplot += 1
+
+	for kk in xrange(nplot,3): resplots[kk].axis('off')
+
+
 
 	#### set all residual y-limits to be the same
 	'''
@@ -873,10 +875,9 @@ def plt_all(runname=None,startup=True,**extras):
 			print 'iteration '+str(jj) 
 
 			'''
-			if filebase[jj].split('_')[-1] != 'NGC 5992':
+			if filebase[jj].split('_')[-1] != 'NGC 4125':
 				continue
 			'''
-
 			dictionary = collate_data(filebase=filebase[jj],\
 			                           outfolder=outfolder,
 			                           **extras)
