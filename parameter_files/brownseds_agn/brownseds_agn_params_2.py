@@ -477,6 +477,15 @@ model_params.append({'name': 'fagn', 'N': 1,
                         'prior_function': tophat,
                         'prior_args': {'mini':0.0, 'maxi':5.0}})
 
+model_params.append({'name': 'agn_tau', 'N': 1,
+                        'isfree': True,
+                        'init': 10.0,
+                        'init_disp': 5,
+                        'disp_floor': 2,
+                        'units': '',
+                        'prior_function': tophat,
+                        'prior_args': {'mini':0.0, 'maxi':50.0}})
+
 ####### Calibration ##########
 model_params.append({'name': 'phot_jitter', 'N': 1,
                         'isfree': False,
