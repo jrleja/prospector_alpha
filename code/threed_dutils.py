@@ -507,18 +507,17 @@ def generate_basenames(runname):
 	parm=[]
 	ancilname='COSMOS_testsamp.dat'
 
-	if runname == 'brownseds':
+	if runname == 'brownseds_agn':
 
-		id_list = os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/namelist.txt'
+		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/"+runname+".ids"
 		ids = np.loadtxt(id_list, dtype='|S20',delimiter=',')
 		ngals = len(ids)
 
-		basename = "brownseds"
-		parm_basename = basename+"_params"
+		parm_basename = runname+"_params"
 		ancilname=None
 
 		for jj in xrange(ngals):
-			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+basename+'_'+ids[jj])
+			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+runname+'_'+ids[jj])
 			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
 
 	elif 'nohersch' in runname:
