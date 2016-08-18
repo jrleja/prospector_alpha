@@ -484,7 +484,7 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 	for kk in xrange(nabs): mod_abs_lamcont[kk,1] = out.get(abslines[kk],{}).get('lam',0.0)
 
 	#######################
-	##### Dn(4000) ########
+	##### Dn4000 ########
 	#######################
 	dn4000_mod = threed_dutils.measure_Dn4000(model_lam,flux_smooth,ax=out['ax'][5])
 

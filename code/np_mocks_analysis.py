@@ -630,8 +630,8 @@ def plot_spectral_parameters(alldata,outfolder=None):
 	x = np.array([dat['truths']['dn4000'] for dat in alldata])
 
 	ax[ii+1].errorbar(x,y,yerr,fmt='o',alpha=0.8,color='#1C86EE')
-	ax[ii+1].set_xlabel(r'true D$_n$(4000)')
-	ax[ii+1].set_ylabel(r'fit D$_n$(4000)')
+	ax[ii+1].set_xlabel(r'true D$_n$4000')
+	ax[ii+1].set_ylabel(r'fit D$_n$4000')
 
 	ax[ii+1] = threed_dutils.equalize_axes(ax[ii+1], x, y)
 	mean_offset,scat = threed_dutils.offset_and_scatter(x,y)

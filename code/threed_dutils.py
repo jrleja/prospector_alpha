@@ -1466,7 +1466,7 @@ def measure_Dn4000(lam,flux,ax=None):
 		ax.plot(lam[blue],flux[blue],color='blue',drawstyle='steps-mid')
 		ax.plot(lam[red],flux[red],color='red',drawstyle='steps-mid')
 
-		ax.text(0.96,0.05, 'D$_{n}$(4000)='+"{:.2f}".format(dn4000), transform = ax.transAxes,horizontalalignment='right')
+		ax.text(0.96,0.05, 'D$_{n}$4000='+"{:.2f}".format(dn4000), transform = ax.transAxes,horizontalalignment='right')
 
 		ax.set_xlim(3800,4150)
 		plt_lam_idx = (lam > 3800) & (lam < 4150)

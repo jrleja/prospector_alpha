@@ -81,6 +81,7 @@ def main(coarse_bins=False):
 
 	ssp_spectra = np.vstack([ssp_spectra[0,:], ssp_spectra])
 	weights = sps._bin_weights # dimension of [NBIN, NSPEC]
+	print 1/0
 
 	fig, ax = plt.subplots(1,1, figsize=(8,8))
 	for ii in xrange(weights.shape[0]):

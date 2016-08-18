@@ -1707,8 +1707,8 @@ def paper_summary_plot(e_pinfo, hflag, outname='test.png'):
 
 		ax[1].errorbar(pl_dn4000_obs, pl_dn4000_prosp, yerr=errs_pro, linestyle=' ', **pdict)
 
-	ax[1].set_xlabel(r'D$_n$(4000) from observed spectrum')
-	ax[1].set_ylabel(r'D$_n$(4000) from fit to photometry')
+	ax[1].set_xlabel(r'D$_n$4000 from observed spectrum')
+	ax[1].set_ylabel(r'D$_n$4000 from fit to photometry')
 
 	off,scat = threed_dutils.offset_and_scatter(dn4000_obs,dn4000_prosp,biweight=True)
 	ax[1].text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat),
@@ -1999,8 +1999,8 @@ def obs_vs_model_hdelta(e_pinfo,hflag,outname=None,outname2=None,outname_dnplt=N
 		ax2[0].set_xlabel('observed log(H$_{\delta}$ EQW)')
 		ax2[1].set_xlabel('Prospector log(H$_{\delta}$ EQW)')
 
-		ax2[0].set_ylabel('observed Dn(4000)')
-		ax2[1].set_ylabel('Prospector Dn(4000)')
+		ax2[0].set_ylabel('observed Dn4000')
+		ax2[1].set_ylabel('Prospector Dn4000')
 
 		axlims = (0.3,1.0,0.9,1.5)
 		ax2[0].axis(axlims)
@@ -2064,8 +2064,8 @@ def obs_vs_model_dn(e_pinfo,hflag,outname=None):
 
 			ax.errorbar(pl_dn4000_obs, pl_dn4000_prosp, yerr=errs_pro, linestyle=' ', **pdict)
 
-	ax.set_xlabel(r'observed D$_n$(4000)')
-	ax.set_ylabel(r'Prospector D$_n$(4000)')
+	ax.set_xlabel(r'observed D$_n$4000')
+	ax.set_ylabel(r'Prospector D$_n$4000')
 	ax = threed_dutils.equalize_axes(ax, dn4000_obs, dn4000_prosp)
 	off,scat = threed_dutils.offset_and_scatter(dn4000_obs, dn4000_prosp,biweight=True)
 	ax.text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat), transform = ax.transAxes,horizontalalignment='right')
@@ -2120,7 +2120,7 @@ def onesig_error_plot(bdec_errs,bdec_flag,dn4000_errs,dn4000_flag,hdelta_errs,hd
 	     np.array([item for sublist in hdelta_errs for item in sublist]),
 	     np.array([item for sublist in ha_errs for item in sublist])]
 	tits = [r'(obs - model) / 1$\sigma$ error [A$_{H\beta}$-A$_{H\alpha}$]',
-	        r'(obs - model) / 1$\sigma$ error [D$_n$(4000)]',
+	        r'(obs - model) / 1$\sigma$ error [D$_n$4000]',
 	        r'(obs - model) / 1$\sigma$ error [H$\delta$ EQW]',
 	        r'(obs - model) / 1$\sigma$ error [H$_{\alpha}$ luminosity]']
 	pltname = ['bdec','dn4000','hdelta_eqw','halpha_lum']
