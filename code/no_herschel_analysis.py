@@ -144,13 +144,14 @@ def collate_data(runname_nh=None, runname_h=None,outpickle=None):
 		### save Herschel fluxes
 		mask = sample_results_h['obs']['phot_mask']
 		filtnames = np.array(sample_results_h['obs']['filternames'])[mask]
-		hersch_idx = np.array([True if 'herschel' in filter_name else False for filter_name in filtnames],dtype=bool)
-		outdat_h['filtnames'] = filtnames[hersch_idx]
-		outdat_h['wave_effective'] = sample_results_h['obs']['wave_effective'][mask][hersch_idx]
-		outdat_h['model_fluxes'] = np.median(sample_results_h['observables']['mags'][mask][hersch_idx],axis=1)
-		outdat_h['obs_fluxes'] = sample_results_h['obs']['maggies'][mask][hersch_idx]
+		print 1/0
+		# hersch_idx = np.array([True if 'herschel' in filter_name else False for filter_name in filtnames],dtype=bool)
+		outdat_h['filtnames'] = filtnames
+		outdat_h['wave_effective'] = sample_results_h['obs']['wave_effective'][mask]
+		outdat_h['model_fluxes'] = np.median(sample_results_h['observables']['mags'][mask],axis=1)
+		outdat_h['obs_fluxes'] = sample_results_h['obs']['maggies'][mask]
 
-		outdat_nh['model_fluxes'] = np.median(sample_results_nh['observables']['mags'][mask][hersch_idx],axis=1)
+		outdat_nh['model_fluxes'] = np.median(sample_results_nh['observables']['mags'][mask],axis=1)
 
 		### save model Balmer decrement & total extinction
 		epars = sample_results_nh['extras']['parnames']

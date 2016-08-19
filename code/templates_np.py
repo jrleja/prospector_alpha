@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
-import np_mocks_smooth_params as nparams
+import np_mocks_params as nparams
 import magphys_plot_pref
 from prospect.models import model_setup
 import os
@@ -36,30 +36,21 @@ class jLogFormatter(mpl.ticker.LogFormatter):
 			s = '-%s' % s
 		return self.fix_minus(s)
 
-def main(coarse_bins=False):
+#### format those log plots! 
+minorFormatter = jLogFormatter(base=10, labelOnlyBase=False)
+majorFormatter = jLogFormatter(base=10, labelOnlyBase=True)
 
-	#### format those log plots! 
-	minorFormatter = jLogFormatter(base=10, labelOnlyBase=False)
-	majorFormatter = jLogFormatter(base=10, labelOnlyBase=True)
+def main():
 
-	if coarse_bins:
-		param_file = '/Users/joel/code/python/threedhst_bsfh/parameter_files/np_mocks_smooth/np_mocks_smooth_params.py'
-		labels = ['0-100 Myr','100 Myr-300 Myr', '300 Myr-1 Gyr','1 Gyr-3 Gyr','3 Gyr-13.6 Gyr']
-		y_offsets = [0.5,0.1,-0.2,-0.35,-0.9]
-		x_offsets = [-.03,-0.02,-.05,-.09,.5]
-		idx = 480
-		colors = ['#31A9B8','#375E97','#3F681C','#FFBB00','#FB6542']
-		outfig = '/Users/joel/my_papers/prospector_brown/figures/nonparametric_templates.png'
-		ylim = 	(0,7)
-	else: 
-		param_file = '/Users/joel/code/python/threedhst_bsfh/parameter_files/np_mocks/np_mocks_params.py'
-		labels = ['0 Myr-100 Myr','100 Myr-300 Myr', '300 Myr-1 Gyr','1 Gyr-3 Gyr','3 Gyr-6 Gyr','6 Gyr-13.6 Gyr']
-		y_offsets = [0.68,0.1,-0.2,-0.35,-1.1,-1.45]
-		x_offsets = [-.03,-0.02,-.05,-.09,.3,0.2]
-		idx = 480
-		colors = ['#9400D3','#31A9B8','#375E97','#3F681C','#FF9100','#FF420E']
-		outfig = '/Users/joel/my_papers/prospector_brown/figures/nonparametric_templates.png'
-		ylim = (0,7.5)
+	#### information
+	param_file = '/Users/joel/code/python/threedhst_bsfh/parameter_files/np_mocks/np_mocks_params.py'
+	labels = ['0 Myr-100 Myr','100 Myr-300 Myr', '300 Myr-1 Gyr','1 Gyr-3 Gyr','3 Gyr-6 Gyr','6 Gyr-13.6 Gyr']
+	y_offsets = [0.68,0.1,-0.2,-0.35,-1.1,-1.45]
+	x_offsets = [-.03,-0.02,-.05,-.09,.3,0.2]
+	idx = 480
+	colors = ['#9400D3','#31A9B8','#375E97','#3F681C','#FF9100','#FF420E']
+	outfig = '/Users/joel/my_papers/prospector_brown/figures/nonparametric_templates.png'
+	ylim = (0,7.5)
 
 
 	#### LOAD SPS
@@ -81,7 +72,6 @@ def main(coarse_bins=False):
 
 	ssp_spectra = np.vstack([ssp_spectra[0,:], ssp_spectra])
 	weights = sps._bin_weights # dimension of [NBIN, NSPEC]
-	print 1/0
 
 	fig, ax = plt.subplots(1,1, figsize=(8,8))
 	for ii in xrange(weights.shape[0]):

@@ -243,7 +243,7 @@ def plot_all_residuals(alldata,runname):
 		res_prosp_sf, rms_pro_sf, obs_restlam_sf = [np.array([]) for nn in range(6)]
 		for kk,data in enumerate(alldata):
 			if data:
-				if data['residuals'][label[i]]:
+				if [label[i]] in data['residuals'].keys():
 
 					xplot_prosp = data['residuals'][label[i]]['obs_restlam']
 					yplot_prosp = data['residuals'][label[i]]['prospector_resid']
@@ -288,17 +288,20 @@ def plot_all_residuals(alldata,runname):
 		except ValueError:
 			pass
 
-		probins_sf, promedian_sf = threed_dutils.running_median(obs_restlam_sf,res_prosp_sf,nbins=nbins[i])
-		plot.plot(probins_sf, 
-			      promedian_sf,
-			      color='black',
-			      lw=lw_major*1.1
-			      )
-		plot.plot(probins_sf, 
-			      promedian_sf,
-			      color=sfcolor,
-			      lw=lw_major
-			      )
+		try:
+			probins_sf, promedian_sf = threed_dutils.running_median(obs_restlam_sf,res_prosp_sf,nbins=nbins[i])
+			plot.plot(probins_sf, 
+				      promedian_sf,
+				      color='black',
+				      lw=lw_major*1.1
+				      )
+			plot.plot(probins_sf, 
+				      promedian_sf,
+				      color=sfcolor,
+				      lw=lw_major
+				      )
+		except ValueError:
+			pass
 
 		plt_ylim = np.max((np.abs(pmin*0.8),np.abs(pmax*1.2)))
 		plt_xlim_lo = np.min(np.concatenate((obs_restlam_sf,obs_restlam_qu)))*0.99

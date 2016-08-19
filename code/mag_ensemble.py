@@ -1816,6 +1816,11 @@ def obs_vs_prosp_balmlines(e_pinfo,hflag,outname='test.png',outname_resid='test.
 					           linestyle=' ',**pdict)
 				ax[1].errorbar(xplot_hb[plt_idx,0], yplot_hb[plt_idx,0], yerr=yerr_hb, xerr=xerr_hb,
 		                       linestyle=' ',**pdict)
+
+				bad = np.abs(xplot_ha[plt_idx,0] - yplot_ha[plt_idx,0]) > 0.5
+				if bad.sum():
+					print e_pinfo['objnames'][keep_idx][plt_idx][bad]
+
 				if jj == 0:
 					ax2.errorbar(yplot_ha[plt_idx,0] - xplot_ha[plt_idx,0],yplot_hb[plt_idx,0] - xplot_hb[plt_idx,0],
 							     linestyle=' ',**pdict)
@@ -2914,6 +2919,7 @@ def plot_emline_comp(alldata,outfolder,hflag):
 	ha_errs,ha_flag = obs_vs_prosp_balmlines(e_pinfo,hflag,
 								 outname=outfolder+'balmer_line_comp.png',
 								 outname_resid=outfolder+'balmer_line_resid.png')
+	print 1/0
 
 	# model SFR versus observed SFR(Ha) corrected for dust attenuation
 	obs_vs_prosp_sfr(e_pinfo,hflag,outname=outfolder+'obs_sfr_comp.png')

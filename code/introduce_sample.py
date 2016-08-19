@@ -35,16 +35,7 @@ def make_plot(runname='brownseds_np'):
 	fig = add_mass_sfr_plot(alldata,fig)
 
 	### galaxies we want
-	# limit 51
-	# NEW LIMIT 20
-	in_list = ['NGC 0337', 'NGC 0474', 'NGC 0660', 'NGC 4594', 'NGC 1275', 'NGC 2403', 'NGC 2623', 'NGC 2798', \
-	           'NGC 3079', 'NGC 3198', 'NGC 3190', 'NGC 3310', 'NGC 3351', 'NGC 3379', 'NGC 3521', 'NGC 3627', \
-	           'NGC 3938', 'NGC 4088', 'NGC 4168', 'NGC 4254', 'NGC 4321', 'NGC 4365', 'NGC 4450', 'NGC 4486', \
-	           'NGC 4559', 'NGC 4569', 'NGC 4579', 'NGC 4594', 'NGC 4631', 'NGC 4676 A', 'NGC 4725', 'NGC 4826',\
-	           'NGC 5033', 'NGC 5194', 'NGC 5195', 'NGC 5258', 'NGC 5866', 'NGC 7331', 'NGC 7585', 'NGC 7714',\
-	           'UGCA 219', 'UGC 06850', 'UGC 09618 N', 'UGC 12150', 'Arp 118', 'Arp 256 N', 'Arp 256 S', 'IC 0691',\
-	           'II Zw 096', 'Mrk 0930', 'IRAS 17208-0014', 'Mrk 0331']
-
+	# limit 20
 	in_list = ['NGC 0337', 'NGC 0474', 'NGC 0660', 'NGC 7331', 'NGC 1275', 'NGC 2403', 'UGC 06850', 'NGC 2798', \
 	           'NGC 3079', 'NGC 3198', 'NGC 3190', 'NGC 3310', 'NGC 3351', 'Arp 256 N', 'NGC 3521', 'NGC 3627', \
 	           'NGC 3938', 'NGC 4594', 'NGC 4168', 'NGC 4254']
@@ -139,7 +130,8 @@ def add_mass_sfr_plot(alldata,fig):
 
 	ax.set_ylim(-4.5,2)
 
-	ax.text(0.05,0.05,'Salim+07',transform=ax.transAxes,color='green',fontsize=13)
+	ax.legend(loc=3, prop={'size':12},
+				     frameon=False)
 
 	return fig
 
