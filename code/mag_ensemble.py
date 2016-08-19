@@ -1209,7 +1209,7 @@ def atlas_3d_met(e_pinfo,hflag,outfolder=''):
 
 	prosp_met, prosp_met_err, a3d_met, a3d_met_err, a3d_alpha, obj_idx = brown_quality_cuts.load_atlas3d(e_pinfo)
 
-	fig, ax = plt.subplots(1,1,figsize=(6,6))
+	fig, ax = plt.subplots(1,1,figsize=(7,7))
 	fig.subplots_adjust(left=0.15,bottom=0.1,top=0.95,right=0.95)
 	ax.errorbar(a3d_met,prosp_met,xerr=a3d_met_err,yerr=prosp_met_err, color='#1C86EE',alpha=0.9,fmt='o')
 	ax.set_xlabel('log(Z$_{\mathrm{ATLAS-3D}}$/Z$_{\odot}$)')
@@ -1681,9 +1681,6 @@ def paper_summary_plot(e_pinfo, hflag, outname='test.png'):
 	ax[0].text(0.96,0.1, 'mean offset='+"{:.2f}".format(off)+' dex',
 			      transform = ax[0].transAxes,horizontalalignment='right')
 	ax[0] = threed_dutils.equalize_axes(ax[0], xplot_ha, yplot_ha)
-	ax[0].text(px,py, 'test of model \n star formation rate',
-			   transform = ax[0].transAxes,ha='left',fontsize=pfontsize,weight=pweight,multialignment='center')
-
 
 	#### dn4000
 	dn_idx = brown_quality_cuts.dn4000_cuts(e_pinfo)
@@ -1716,9 +1713,6 @@ def paper_summary_plot(e_pinfo, hflag, outname='test.png'):
 	ax[1].text(0.96,0.1, 'mean offset='+"{:.2f}".format(off),
 			      transform = ax[1].transAxes,horizontalalignment='right')
 	ax[1] = threed_dutils.equalize_axes(ax[1], dn4000_obs, dn4000_prosp)
-
-	ax[1].text(px,py, 'test of model \n star formation history',
-			   transform = ax[1].transAxes,ha='left',fontsize=pfontsize,weight=pweight,multialignment='center')
 
 	#### close and save
 	fig.tight_layout()

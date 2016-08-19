@@ -93,14 +93,17 @@ def make_ticklabels_invisible(ax,showx=False):
 	    for tl in ax.get_xticklabels() + ax.get_yticklabels():
 	        tl.set_visible(False)
 
-def add_label(ax,label,par=None,par_idx=None,fmt=None,txtlabel=None,fontsize=None,secondary_text=None):
+def add_label(ax,label,par=None,par_idx=None,fmt=None,txtlabel=None,fontsize=None,secondary_text=None,init=None):
 
 	tx = -0.65
 	ty = 0.5
 	dy = 0.1
 
 	#### sandwich 'regular' spectra in between examples
-	par = [par[0],model.initial_theta[par_idx],par[1]]
+	if par_idx is not None:
+		par = [par[0],model.initial_theta[par_idx],par[1]]
+	else:
+		par = [par[0],init,par[1]]
 
 	if secondary_text is None:
 		ax.text(tx, ty, label, transform = ax.transAxes,ha='center',weight='bold',fontsize=60)
@@ -111,6 +114,8 @@ def add_label(ax,label,par=None,par_idx=None,fmt=None,txtlabel=None,fontsize=Non
 	#### text
 	for ii,p in enumerate(par): ax.text(tx,ty-dy*(ii+1)-dy*0.3,txtlabel+'='+fmt.format(p),ha='center',weight='bold',transform=ax.transAxes,color=colors[ii])
 
+	if init is not None:
+		ax.text(tx,ty-dy*(ii+2)-dy*0.3,'not a free parameter',ha='center',weight='bold',transform=ax.transAxes,color=colors[ii])
 
 def mass_xplot(ax,par,idx):
 
@@ -206,10 +211,14 @@ def met_triangular_kernel(logzsol):
 
 	return met,mdf
 
-def sfh_xplot(ax,par,par_idx):
+def sfh_xplot(ax,par,par_idx,init=None):
 
 	#### sandwich 'regular' spectra in between examples
-	par = [par[0],model.initial_theta[par_idx],par[1]]
+	# if we're setting the implicit one...
+	if par_idx is not None:
+		par = [par[0],model.initial_theta[par_idx],par[1]]
+	else:
+		par = [par[0],init,par[1]]
 
 	#### calculate time array
 	in_years = 10**model.params['agebins']/1e9
@@ -230,7 +239,9 @@ def sfh_xplot(ax,par,par_idx):
 	for ii,p in enumerate(par):
 
 		theta[indices] = itheta[indices] * (1-p) / (1-par[1])
-		theta[par_idx] = p
+		if par_idx is not None:
+			theta[par_idx] = p
+
 		sfh_pars = threed_dutils.find_sfh_params(model,theta,obs,sps)
 		sfh = threed_dutils.return_full_sfh(t, sfh_pars)
 
@@ -238,7 +249,7 @@ def sfh_xplot(ax,par,par_idx):
 
 	#### limits and labels
 	#ax.set_xlim(3.3,6.6)
-	ax.set_ylim(-1.5,0.4)
+	ax.set_ylim(-1.5,0.8)
 	ax.set_xlabel(r'log(lookback time [Gyr])')
 	ax.set_ylabel(r'log(SFR [M$_{\odot}$/yr])')
 	ax.set_xlim(13,0.04)
@@ -510,10 +521,13 @@ def qpah_xplot(ax, par, par_idx):
 	make_ticklabels_invisible(ax,showx=True)
 	ax.set_xlabel(r'grain radius [$\AA$]')
 
-def plot_sed(ax,ax_res,par_idx,par=None,txtlabel=None,fmt="{:.2e}"):
+def plot_sed(ax,ax_res,par_idx,par=None,txtlabel=None,fmt="{:.2e}",init=None):
 
 	#### sandwich 'regular' spectra in between examples
-	par = [par[0],itheta[par_idx],par[1]]
+	if par_idx is not None:
+		par = [par[0],itheta[par_idx],par[1]]
+	else:
+		par = [par[0],init,par[1]]
 
 	#### loop, plot first plot
 	theta = copy.deepcopy(itheta)
@@ -524,9 +538,10 @@ def plot_sed(ax,ax_res,par_idx,par=None,txtlabel=None,fmt="{:.2e}"):
 
 		sps.ssp.params.dirtiness = 1
 		# sfr fraction? 
-		if par_idx in sfr_indices:
+		if (par_idx in sfr_indices) or (par_idx == None):
 			theta[sfr_indices] = itheta[sfr_indices] * (1-p) / (1-par[1])
-		theta[par_idx] = p
+		if par_idx is not None:
+			theta[par_idx] = p
 		spec,mags,_ = model.mean_model(theta, obs, sps=sps)
 		spec *= c/sps.wavelengths
 
@@ -567,10 +582,10 @@ def main_plot():
 	#### open figures
 	fig1 = plt.figure(figsize = (37.5,37.5))
 
-	gs1 = gridspec.GridSpec(6, 2)
+	gs1 = gridspec.GridSpec(7, 2)
 	gs1.update(left=0.28, right=0.985, wspace=0.15, top=0.98,bottom=0.05)
-	gs2 = gridspec.GridSpec(6, 1)
-	gs2.update(left=0.14, right=0.27, top=0.98,bottom=0.05)
+	gs2 = gridspec.GridSpec(7, 1)
+	gs2.update(left=0.14, right=0.265, top=0.98,bottom=0.05)
 
 	#### PLOT 1 MASS
 	idx = labels.index('logmass')
@@ -593,7 +608,7 @@ def main_plot():
 	#### PLOT 3 SFR2
 	a4 = plt.subplot(gs2[2])
 	idx = labels.index('sfr_fraction_2')
-	par = [0.02,0.2]
+	par = [0.05,0.2]
 	add_label(a4,r'SFH',par=par,par_idx=idx, txtlabel=r'fraction', fmt="{:.2f}",secondary_text='100-300 Myr')
 	sfh_xplot(a4,par,idx)
 	plot_sed(plt.subplot(gs1[2,0]),plt.subplot(gs1[2,1]),idx,
@@ -602,7 +617,7 @@ def main_plot():
 	#### PLOT 4 SFR3
 	a5 = plt.subplot(gs2[3])
 	idx = labels.index('sfr_fraction_3')
-	par = [0.02,0.3]
+	par = [0.075,0.3]
 	add_label(a5,r'SFH',par=par,par_idx=idx, txtlabel=r'fraction', fmt="{:.2f}",secondary_text='300 Myr-1 Gyr')
 	sfh_xplot(a5,par,idx)
 	plot_sed(plt.subplot(gs1[3,0]),plt.subplot(gs1[3,1]),idx,
@@ -611,7 +626,7 @@ def main_plot():
 	#### PLOT 5 SFR4
 	a6 = plt.subplot(gs2[4])
 	idx = labels.index('sfr_fraction_4')
-	par = [0.1,0.3]
+	par = [0.1,0.4]
 	add_label(a6,r'SFH',par=par,par_idx=idx, txtlabel=r'fraction', fmt="{:.2f}",secondary_text='1-3 Gyr')
 	sfh_xplot(a6,par,idx)
 	plot_sed(plt.subplot(gs1[4,0]),plt.subplot(gs1[4,1]), idx,
@@ -620,11 +635,21 @@ def main_plot():
 	#### PLOT 6 SFR5
 	a6 = plt.subplot(gs2[5])
 	idx = labels.index('sfr_fraction_5')
-	par = [0.15,0.35]
-	add_label(a6,r'SFH',par=par,par_idx=idx, txtlabel=r'fraction', fmt="{:.2f}",secondary_text='3-6 Gyr')
+	par = [0.125,0.5]
+	add_label(a6,r'SFH',par=par, par_idx=idx, txtlabel=r'fraction', fmt="{:.2f}",secondary_text='3-6 Gyr')
 	sfh_xplot(a6,par,idx)
 	plot_sed(plt.subplot(gs1[5,0]),plt.subplot(gs1[5,1]), idx,
 						 par=par)
+
+	#### PLOT 7 SFR6
+	a7 = plt.subplot(gs2[6])
+	temp_init = 0.28
+	par = [0.14,0.56]
+	add_label(a7,r'SFH',par=par,par_idx=None, txtlabel=r'fraction', fmt="{:.2f}",secondary_text='6-13.6 Gyr',init=temp_init)
+	sfh_xplot(a7,par,None,init=temp_init)
+	plot_sed(plt.subplot(gs1[6,0]),plt.subplot(gs1[6,1]), idx,
+						 par=par,init=temp_init)
+
 
 	plt.savefig(out1,dpi=dpi)
 	plt.close()
