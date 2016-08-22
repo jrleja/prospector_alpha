@@ -1729,7 +1729,6 @@ def obs_vs_prosp_balmlines(e_pinfo,hflag,outname='test.png',outname_resid='test.
 	#################
 	keep_idx = brown_quality_cuts.halpha_cuts(e_pinfo)
 
-	'''
 	##### test to see if AGN runs improve the Halpha model--obs comparison
 	objnames = e_pinfo['objnames'][keep_idx]
 	filebase, parm_basename, ancilname=threed_dutils.generate_basenames('brownseds_agn')
@@ -1744,7 +1743,8 @@ def obs_vs_prosp_balmlines(e_pinfo,hflag,outname='test.png',outname_resid='test.
 			obs_flux = e_pinfo['obs']['f_ha'][keep_idx,0][objnames == objname]
 
 			print objname + ': old is {0}, new is {1}'.format(old_flux[0]/obs_flux[0],agn_flux[0]/obs_flux[0])
-	'''
+
+	print 1/0
 
 	##### AGN identifiers
 	sfing, composite, agn = return_agn_str(keep_idx)

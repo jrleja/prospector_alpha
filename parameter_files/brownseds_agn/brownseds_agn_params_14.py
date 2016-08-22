@@ -21,8 +21,8 @@ run_params = {'verbose':True,
               'ftol':0.5e-5, 
               'maxfev':5000,
               # MCMC params
-              'nwalkers':620,
-              'nburn':[150,200,400], 
+              'nwalkers':930,
+              'nburn':[150,200,400,600], 
               'niter': 3000,
               # Model info
               'zcontinuous': 2,
@@ -35,7 +35,7 @@ run_params = {'verbose':True,
               'photname':os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/table3.fits',
               'extinctname':os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/table4.fits',
               'herschname':os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/kingfish.brownapertures.flux.fits',
-              'objname':'NGC 0337',
+              'objname':'NGC 1068',
               }
 run_params['outfile'] = run_params['outfile']+'_'+run_params['objname']
 
