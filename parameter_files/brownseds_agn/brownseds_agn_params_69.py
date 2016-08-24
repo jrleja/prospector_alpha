@@ -155,6 +155,8 @@ def load_obs(photname='', extinctname='', herschname='', objname='', **extras):
     # extract fluxes for particular object
     mag = np.array([np.squeeze(hdulist[1].data[f][idx]) for f in mag_fields])
     magunc  = np.array([np.squeeze(hdulist[1].data[f][idx]) for f in magunc_fields])
+
+    hdulist.close()
     '''
     with open(photname, 'r') as f:
         hdr = f.readline().split()
@@ -164,7 +166,7 @@ def load_obs(photname='', extinctname='', herschname='', objname='', **extras):
     obj_ind = np.where(dat['id'] == objname)[0][0]
 
     # extract fluxes+uncertainties for all objects and all filters
-    mag_fields = [f for f in dat.dtype.names if f[0:2] == 'f_']
+    mag_fields = [f for f in dat.dtype.names if f[0:2] != 'e_' and (f != 'id')]
     magunc_fields = [f for f in dat.dtype.names if f[0:2] == 'e_']
 
     # extract fluxes for particular object, converting from record array to numpy array
@@ -173,7 +175,7 @@ def load_obs(photname='', extinctname='', herschname='', objname='', **extras):
 
     # extinctions
     extinct = fits.open(extinctname)
-    extinctions = np.array([np.squeeze(extinct[1].data[f][idx]) for f in extinct[1].columns.names if f != 'Name'])
+    extinctions = np.array([np.squeeze(extinct[1].data[f][obj_ind]) for f in extinct[1].columns.names if f != 'Name'])
 
     # adjust fluxes for extinction
     mag_adj = mag - extinctions
@@ -252,7 +254,6 @@ def load_obs(photname='', extinctname='', herschname='', objname='', **extras):
         obs['names'] = hdulist[1].data['Name']
 
     # tidy up
-    hdulist.close()
     extinct.close()
     herschel.close()
     return obs
