@@ -940,15 +940,19 @@ def make_all_plots(filebase=None,
 	except KeyError:
 		truths=None
 
-	# define nice plotting quantities
-	sample_results = create_plotquant(sample_results, truths=truths)
-	sample_results['extents'] = return_extent(sample_results)
     # chain plot (ONLY WORKS IF WE STILL HAVE CHAIN)
 	if plt_chain and sample_results['chain'] is not None: 
 		print 'MAKING CHAIN PLOT'
+
+		# define nice plotting quantities
+		sample_results = create_plotquant(sample_results, truths=truths)
+		sample_results['extents'] = return_extent(sample_results)
+
 		show_chain(sample_results,
 	               outname=outfolder+objname+'.chain.png',
 			       alpha=0.3,truths=truths)
+	if sample_results['plotchain'] is not None:
+		sample_results['plotchain'] = None # dump this if we have it!
 
 	# corner plot
 	if plt_corner: 

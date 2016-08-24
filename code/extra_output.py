@@ -334,7 +334,7 @@ def post_processing(param_name, add_extra=True, **extras):
 
 	try:
  		sample_results, powell_results, model = threed_dutils.load_prospector_data(outname)
- 	except:
+ 	except AttributeError:
  		print 'failed to load '+param_name
  		return
 
