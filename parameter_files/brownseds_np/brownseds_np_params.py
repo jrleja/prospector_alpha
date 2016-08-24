@@ -127,7 +127,7 @@ def translate_filters(bfilters, full_list = False):
     }
 
     if full_list:
-        return translate.values()
+        return translate_pfsps.values()
     else:
         return np.array([translate[f] for f in bfilters]), np.array([translate_pfsps[f] for f in bfilters])
 

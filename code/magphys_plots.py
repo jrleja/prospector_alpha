@@ -10,6 +10,7 @@ import mag_ensemble
 import matplotlib as mpl
 from prospect.models import model_setup
 from astropy import constants
+from allpar_plot import allpar_plot
 
 c = 3e18   # angstroms per second
 dpi = 150
@@ -57,9 +58,10 @@ def median_by_band(x,y,avg=False):
 	##### get filter effective wavelengths for sorting
 	delz = 0.06
 	from brownseds_np_params import translate_filters
-	from translate_filter import calc_lameff_for_fsps
+	from sedpy import observate
 	filtnames = np.array(translate_filters(0,full_list=True))
-	wave_effective = calc_lameff_for_fsps(filtnames[filtnames != 'nan'])/1e4
+	filts = observate.load_filters(filtnames[filtnames != 'nan'])
+	wave_effective = np.array([filt.wave_effective for filt in filts])/1e4
 	wave_effective.sort()
 
 	avglam = np.array([])
@@ -130,7 +132,7 @@ def plot_all_residuals(alldata,runname):
 			chi_prosp = np.append(chi_prosp,data['residuals']['phot']['chi_prosp'])
 
 			#### save fractional difference
-			frac_magphys = np.append(frac_magphys,data['residuals']['phot']['frac_magphys'])
+			frac_magphys = np.append(frac_magphys,np.log10(1./(1-data['residuals']['phot']['frac_prosp'])))
 
 			#### save goodness of fit
 			chisq_magphys = np.append(chisq_magphys,data['residuals']['phot']['chisq_magphys'])
@@ -143,18 +145,18 @@ def plot_all_residuals(alldata,runname):
 			if ssfr_100[-1] > ssfr_limit:
 				pcolor = sfcolor
 				lam_rest_sf = np.append(lam_rest_sf,data['residuals']['phot']['lam_obs']/(1+data['residuals']['phot']['z'])/1e4)
-				frac_prosp_sf = np.append(frac_prosp_sf,data['residuals']['phot']['frac_prosp'])
+				frac_prosp_sf = np.append(frac_prosp_sf,np.log10(1./(1-data['residuals']['phot']['frac_prosp'])))
 				chisq_prosp_sf = np.append(chisq_prosp_sf,data['residuals']['phot']['chisq_prosp'])
 			else:
 				pcolor = qucolor
 				lam_rest_qu = np.append(lam_rest_qu,data['residuals']['phot']['lam_obs']/(1+data['residuals']['phot']['z'])/1e4)
-				frac_prosp_qu = np.append(frac_prosp_qu,data['residuals']['phot']['frac_prosp'])
+				frac_prosp_qu = np.append(frac_prosp_qu,np.log10(1./(1-data['residuals']['phot']['frac_prosp'])))
 				chisq_prosp_qu = np.append(chisq_prosp_qu,data['residuals']['phot']['chisq_prosp'])
 
 
 			#### plot
 			phot.plot(data['residuals']['phot']['lam_obs']/(1+data['residuals']['phot']['z'])/1e4, 
-				      data['residuals']['phot']['frac_prosp'],
+				      np.log10(1./(1-data['residuals']['phot']['frac_prosp'])),
 				      alpha=alpha_minor,
 				      color=pcolor,
 				      lw=lw_minor
@@ -199,12 +201,13 @@ def plot_all_residuals(alldata,runname):
 	phot.text(0.98,0.05, 'photometry',
 			  transform = phot.transAxes,horizontalalignment='right')
 	phot.set_xlabel(r'$\lambda_{\mathrm{rest}}$ [$\mu$m]')
-	phot.set_ylabel(r'(f$_{\mathrm{obs}}$ - f$_{\mathrm{model}}$) / f$_{\mathrm{obs}}$)')
+	phot.set_ylabel(r'log(f$_{\mathrm{obs}}/$f$_{\mathrm{mod}}$)')
 	phot.axhline(0, linestyle=':', color='grey')
 	phot.set_xscale('log',nonposx='clip',subsx=(2,4,7))
 	phot.xaxis.set_minor_formatter(minorFormatter)
 	phot.xaxis.set_major_formatter(majorFormatter)
 	phot.set_xlim(0.12,600)
+	phot.set_ylim(-0.4,0.4)
 
 	##### histogram of chisq values
 	nbins = 10
@@ -243,7 +246,7 @@ def plot_all_residuals(alldata,runname):
 		res_prosp_sf, rms_pro_sf, obs_restlam_sf = [np.array([]) for nn in range(6)]
 		for kk,data in enumerate(alldata):
 			if data:
-				if [label[i]] in data['residuals'].keys():
+				if label[i] in data['residuals'].keys():
 
 					xplot_prosp = data['residuals'][label[i]]['obs_restlam']
 					yplot_prosp = data['residuals'][label[i]]['prospector_resid']
@@ -307,7 +310,7 @@ def plot_all_residuals(alldata,runname):
 		plt_xlim_lo = np.min(np.concatenate((obs_restlam_sf,obs_restlam_qu)))*0.99
 		plt_xlim_up = np.max(np.concatenate((obs_restlam_sf,obs_restlam_qu)))*1.01
 
-		plot.set_ylim(-plt_ylim,plt_ylim)
+		plot.set_ylim(-0.8,0.8)
 		plot.set_xlim(plt_xlim_lo,plt_xlim_up)
 		if i == 2:
 			plot.set_xscale('log',nonposx='clip',subsx=(1,2,3,4,5,6,7,8,9))
@@ -468,12 +471,14 @@ def plot_obs_spec(obs_spec, phot, spec_res, alpha,
 		          obs_spec_plot,
 		          color=obs_color,
 		          alpha=alpha,
-		          linestyle='-')
+		          linestyle='-',
+		          label='observed')
 	spec_res.plot(obslam, 
 		          prosp_spec_plot,
 		          color=prosp_color,
 		          alpha=alpha,
-		          linestyle='-')
+		          linestyle='-',
+		          label='Prospector')
 
 	# interpolate magphys onto fsps grid
 	mag_flux_interp = interp1d(maglam, magspec_smooth,
@@ -512,6 +517,14 @@ def plot_obs_spec(obs_spec, phot, spec_res, alpha,
 	spec_res.set_xscale('log',nonposx='clip', subsx=(1,2,3,4,5,6,7,8,9))
 	spec_res.xaxis.set_minor_formatter(minorFormatter)
 	spec_res.xaxis.set_major_formatter(majorFormatter)
+
+	if label == 'Optical':
+		from collections import OrderedDict
+		handles, labels = spec_res.get_legend_handles_labels()
+		by_label = OrderedDict(zip(labels, handles))
+		spec_res.legend(by_label.values(), by_label.keys(), 
+					    loc=2, prop={'size':12},
+				        frameon=False)
 
 	# output rest-frame wavelengths + residuals
 	out = {
@@ -876,11 +889,11 @@ def plt_all(runname=None,startup=True,**extras):
 
 		for jj in xrange(len(filebase)):
 			print 'iteration '+str(jj) 
-
 			'''
 			if filebase[jj].split('_')[-1] != 'NGC 4125':
 				continue
 			'''
+
 			dictionary = collate_data(filebase=filebase[jj],\
 			                           outfolder=outfolder,
 			                           **extras)
@@ -892,8 +905,9 @@ def plt_all(runname=None,startup=True,**extras):
 	#### herschel flag
 	hflag = np.array([True if np.sum(dat['residuals']['phot']['lam_obs'] > 5e5) else False for dat in alldata])
 	
-	mag_ensemble.plot_emline_comp(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/magphys/emlines_comp/',hflag)
+	allpar_plot(alldata,hflag,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/pcomp/')
 	plot_all_residuals(alldata,runname)
+	mag_ensemble.plot_emline_comp(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/magphys/emlines_comp/',hflag)
 	mag_ensemble.prospector_comparison(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/pcomp/',hflag)
 	mag_ensemble.plot_relationships(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/magphys/')
 	mag_ensemble.plot_comparison(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/magphys/')

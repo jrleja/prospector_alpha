@@ -115,7 +115,7 @@ def add_label(ax,label,par=None,par_idx=None,fmt=None,txtlabel=None,fontsize=Non
 	for ii,p in enumerate(par): ax.text(tx,ty-dy*(ii+1)-dy*0.3,txtlabel+'='+fmt.format(p),ha='center',weight='bold',transform=ax.transAxes,color=colors[ii])
 
 	if init is not None:
-		ax.text(tx,ty-dy*(ii+2)-dy*0.3,'not a free parameter',ha='center',weight='bold',transform=ax.transAxes,color=colors[ii])
+		ax.text(tx,ty-dy*(ii+2.1)-dy*0.3,'not a free parameter',ha='center',weight='bold',transform=ax.transAxes,fontsize=36)
 
 def mass_xplot(ax,par,idx):
 
@@ -257,7 +257,7 @@ def sfh_xplot(ax,par,par_idx,init=None):
 	ax.xaxis.set_minor_formatter(minorFormatter)
 	ax.xaxis.set_major_formatter(majorFormatter)
 
-def attn_xplot(ax,par,par_idx,label):
+def attn_xplot(ax,par,par_idx,label,short_ylim=False):
 
 	#### sandwich 'regular' spectra in between examples
 	par = [par[0],model.initial_theta[par_idx],par[1]]
@@ -292,6 +292,8 @@ def attn_xplot(ax,par,par_idx,label):
 	#### limits and labels
 	ax.set_xlim(10**-1,10**-0.2)
 	ax.set_ylim(-0.1,6)
+	if short_ylim:
+		ax.set_ylim(-0.1,2)
 	ax.set_xlabel(r'wavelength [microns]')
 	ax.set_ylabel(label + r' optical depth')
 
@@ -540,7 +542,7 @@ def plot_sed(ax,ax_res,par_idx,par=None,txtlabel=None,fmt="{:.2e}",init=None):
 		# sfr fraction? 
 		if (par_idx in sfr_indices) or (par_idx == None):
 			theta[sfr_indices] = itheta[sfr_indices] * (1-p) / (1-par[1])
-		if par_idx is not None:
+		if par_idx is not None: # if we're changing a parameter (NOT TRUE FOR IMPLICIT PARAMETER)
 			theta[par_idx] = p
 		spec,mags,_ = model.mean_model(theta, obs, sps=sps)
 		spec *= c/sps.wavelengths
@@ -694,7 +696,7 @@ def main_plot():
 	idx = labels.index('dust_index')
 	par = [-0.3,0.3]
 	add_label(a9,r'diffuse' '\n' r'dust index',par=par,par_idx=idx, txtlabel=r'$n_{\mathbf{diff}}$', fmt="{:.1f}")
-	attn_xplot(a9,par,idx, 'diffuse')
+	attn_xplot(a9,par,idx, 'diffuse', short_ylim=True)
 	plot_sed(plt.subplot(gs1[3,0]),plt.subplot(gs1[3,1]), idx,
 						 par=par)
 

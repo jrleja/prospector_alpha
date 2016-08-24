@@ -11,6 +11,8 @@ from matplotlib.ticker import MaxNLocator
 from extra_output import post_processing
 import matplotlib as mpl
 import math
+import matplotlib.cm as cmx
+import matplotlib.colors as colors
 
 dpi = 120
 
@@ -53,6 +55,15 @@ class jLogFormatter(mpl.ticker.LogFormatter):
 minorFormatter = jLogFormatter(base=10, labelOnlyBase=False)
 majorFormatter = jLogFormatter(base=10, labelOnlyBase=True)
 
+def get_cmap(N):
+    '''Returns a function that maps each index in 0, 1, ... N-1 to a distinct 
+    RGB color.'''
+    color_norm  = colors.Normalize(vmin=0, vmax=N-1)
+    scalar_map = cmx.ScalarMappable(norm=color_norm, cmap='hsv') 
+    def map_index_to_rgb_color(index):
+        return scalar_map.to_rgba(index)
+    return map_index_to_rgb_color
+
 def bdec_to_ext(bdec):
 	'''
 	shamelessly ripped from mag_ensemble
@@ -75,16 +86,19 @@ def make_plots(runname_nh='brownseds_np_nohersch',runname_h='brownseds_np', reco
 
 	fig, axes = plt.subplots(2, 2, figsize = (10,10))
 	ax = np.ravel(axes)
-	plot_hfluxes(alldata,ax=ax[0])
+	plot_hfluxes(alldata,outfolder,ax=ax[0])
 	plot_lir(alldata,ax=ax[1],ax2=ax[2])
 	plot_totalext(alldata,ax=ax[3])
 	fig.tight_layout()
 	fig.savefig(outfolder+'herschel_comparison.png',dpi=dpi)
 	plt.close()
 
-	plot_halpha(alldata,outfolder=outfolder)
-	plot_bdec(alldata,outfolder=outfolder)
 	plot_dustpars(alldata,outfolder=outfolder)
+
+	# if we're not doing this to mocks...
+	if 'mock' not in runname_h:
+		plot_halpha(alldata,outfolder=outfolder)
+		plot_bdec(alldata,outfolder=outfolder)
 
 def ha_extinction(sample_results):
 	parnames = np.array(sample_results['quantiles']['parnames'])
@@ -102,8 +116,14 @@ def collate_data(runname_nh=None, runname_h=None,outpickle=None):
 
 	filebase_nh, parm_basename_nh, ancilname_nh=threed_dutils.generate_basenames(runname_nh)
 	filebase_h, parm_basename_h, ancilname_h=threed_dutils.generate_basenames(runname_h)
-	alldata = brown_io.load_alldata(runname=runname_h) # for observed Halpha
-	objname = [dat['objname'] for dat in alldata]
+	
+	# if we're doing mocks...
+	try:
+		alldata = brown_io.load_alldata(runname=runname_h) # for observed Halpha
+		mock_flag = False
+	except:
+		mock_flag = True
+	objname = np.array([base.split('_')[-1] for base in filebase_nh])
 
 	out = []
 	for jj in xrange(len(filebase_nh)):
@@ -144,14 +164,15 @@ def collate_data(runname_nh=None, runname_h=None,outpickle=None):
 		### save Herschel fluxes
 		mask = sample_results_h['obs']['phot_mask']
 		filtnames = np.array(sample_results_h['obs']['filternames'])[mask]
-		print 1/0
+
 		# hersch_idx = np.array([True if 'herschel' in filter_name else False for filter_name in filtnames],dtype=bool)
 		outdat_h['filtnames'] = filtnames
 		outdat_h['wave_effective'] = sample_results_h['obs']['wave_effective'][mask]
-		outdat_h['model_fluxes'] = np.median(sample_results_h['observables']['mags'][mask],axis=1)
+		outdat_h['model_fluxes'] = sample_results_h['bfit']['mags'][mask]
 		outdat_h['obs_fluxes'] = sample_results_h['obs']['maggies'][mask]
+		outdat_h['obs_errs'] = sample_results_h['obs']['maggies_unc'][mask]
 
-		outdat_nh['model_fluxes'] = np.median(sample_results_nh['observables']['mags'][mask],axis=1)
+		outdat_nh['model_fluxes'] = sample_results_nh['bfit']['mags'][mask]
 
 		### save model Balmer decrement & total extinction
 		epars = sample_results_nh['extras']['parnames']
@@ -219,16 +240,20 @@ def collate_data(runname_nh=None, runname_h=None,outpickle=None):
 		### save observed Halpha + Balmer decrement
 		match = [i for i, s in enumerate(objname) if name in s][0]
 
-		emline_names = alldata[match]['residuals']['emlines']['em_name']
-		idx = emline_names == 'H$\\alpha$'
-		obs['ha'] = alldata[match]['residuals']['emlines']['obs']['lum'][idx][0] / constants.L_sun.cgs.value
-		obs['ha_up'] = alldata[match]['residuals']['emlines']['obs']['lum_errup'][idx][0] / constants.L_sun.cgs.value
-		obs['ha_down'] = alldata[match]['residuals']['emlines']['obs']['lum_errdown'][idx][0] / constants.L_sun.cgs.value
+		if mock_flag is False:
+			try: # somehow, the emission line information for ONE GALAXY got deleted? what the actual fuck.
+				emline_names = alldata[match]['residuals']['emlines']['em_name']
+				idx = emline_names == 'H$\\alpha$'
+				obs['ha'] = alldata[match]['residuals']['emlines']['obs']['lum'][idx][0] / constants.L_sun.cgs.value
+				obs['ha_up'] = alldata[match]['residuals']['emlines']['obs']['lum_errup'][idx][0] / constants.L_sun.cgs.value
+				obs['ha_down'] = alldata[match]['residuals']['emlines']['obs']['lum_errdown'][idx][0] / constants.L_sun.cgs.value
 
-		idx = emline_names == 'H$\\beta$'
-		obs['hb'] = alldata[match]['residuals']['emlines']['obs']['lum'][idx][0] / constants.L_sun.cgs.value
-		obs['hb_up'] = alldata[match]['residuals']['emlines']['obs']['lum_errup'][idx][0] / constants.L_sun.cgs.value
-		obs['hb_down'] = alldata[match]['residuals']['emlines']['obs']['lum_errdown'][idx][0] / constants.L_sun.cgs.value
+				idx = emline_names == 'H$\\beta$'
+				obs['hb'] = alldata[match]['residuals']['emlines']['obs']['lum'][idx][0] / constants.L_sun.cgs.value
+				obs['hb_up'] = alldata[match]['residuals']['emlines']['obs']['lum_errup'][idx][0] / constants.L_sun.cgs.value
+				obs['hb_down'] = alldata[match]['residuals']['emlines']['obs']['lum_errdown'][idx][0] / constants.L_sun.cgs.value
+			except TypeError:
+				pass
 
 		### save both L_IRs
 		outdat_h['lir'] = sample_results_h['observables']['L_IR']
@@ -240,64 +265,127 @@ def collate_data(runname_nh=None, runname_h=None,outpickle=None):
 	pickle.dump(out,open(outpickle, "wb"))
 	return out
 
-def plot_hfluxes(alldata,ax=None):
-
+def plot_hfluxes(alldata,outfolder,ax=None):
 
 	##### fluxes
-	fnames_all = alldata[0]['hersch']['filtnames'] # this has all of them...
+	fnames_all = alldata[0]['hersch']['filtnames'] # this has all of them, nothing is masked!
 	nfilter = fnames_all.shape[0]
-	nh_flux, h_flux, obs_flux = [np.zeros(shape=(nfilter,len(alldata)))+np.nan for i in xrange(3)]
+	nh_flux, h_flux, obs_flux,obs_errs = [np.zeros(shape=(nfilter,len(alldata)))+np.nan for i in xrange(4)]
 	for ii, dat in enumerate(alldata):
 		fname = dat['hersch']['filtnames']
 		for kk, name in enumerate(fname):
-
 			match = name == fnames_all
-
-			nh_flux[match,ii] = dat['nohersch']['model_fluxes'][kk]
-			h_flux[match,ii] = dat['hersch']['model_fluxes'][kk]
-			obs_flux[match,ii] = dat['hersch']['obs_fluxes'][kk]
+			if match.sum() != 0:
+				nh_flux[match,ii] = dat['nohersch']['model_fluxes'][kk]
+				h_flux[match,ii] = dat['hersch']['model_fluxes'][kk]
+				obs_flux[match,ii] = dat['hersch']['obs_fluxes'][kk]
+				obs_errs[match,ii] = dat['hersch']['obs_errs'][kk]
 
 	#### offsets and 1 sigma
 	flux_offset_h, flux_offset_nh = [np.zeros(shape=(nfilter,3)) for i in xrange(2)]
+	chi_h, chi_nh = [np.zeros(shape=(nfilter,3)) for i in xrange(2)]
+	chi_all_h, chi_all_nh = [], []
 	for nn in xrange(nfilter):
-		flux_offset_h[nn,:] = quantile(np.log10(h_flux[nn,:]/obs_flux[nn,:]),[0.5,0.84,0.16])
-		flux_offset_nh[nn,:] = quantile(np.log10(nh_flux[nn,:]/obs_flux[nn,:]),[0.5,0.84,0.16])
+		idx = np.isfinite(h_flux[nn,:]) # only include galaxies if they're observed in that band
+		flux_offset_h[nn,:] = quantile(np.log10(h_flux[nn,idx]/obs_flux[nn,idx]),[0.5,0.84,0.16])
+		flux_offset_nh[nn,:] = quantile(np.log10(nh_flux[nn,idx]/obs_flux[nn,idx]),[0.5,0.84,0.16])
 
-	h_err = threed_dutils.asym_errors(flux_offset_h[:,0],
+		chi_h_temp = (h_flux[nn,idx]-obs_flux[nn,idx])/obs_errs[nn,idx]
+		chi_nh_temp = (nh_flux[nn,idx]-obs_flux[nn,idx])/obs_errs[nn,idx]
+		chi_h[nn,:] = quantile(chi_h_temp,[0.5,0.84,0.16])
+		chi_nh[nn,:] = quantile(chi_nh_temp,[0.5,0.84,0.16])
+		chi_all_h.append(chi_h_temp)
+		chi_all_nh.append(chi_nh_temp)
+
+	h_flux_err = threed_dutils.asym_errors(flux_offset_h[:,0],
 		                              flux_offset_h[:,1],
 		                              flux_offset_h[:,2],log=False)
 
-	nh_err = threed_dutils.asym_errors(flux_offset_nh[:,0],
+	nh_flux_err = threed_dutils.asym_errors(flux_offset_nh[:,0],
 		                               flux_offset_nh[:,1],
 		                               flux_offset_nh[:,2],log=False)
 
+	h_chi_err = threed_dutils.asym_errors(chi_h[:,0],
+		                              chi_h[:,1],
+		                              chi_h[:,2],log=False)
+
+	nh_chi_err = threed_dutils.asym_errors(chi_nh[:,0],
+		                               chi_nh[:,1],
+		                               chi_nh[:,2],log=False)
+
 	##### wavelength array
-	# temporary fix here
-	try:
-		wave_effective = alldata[0]['hersch']['wave_effective'] # this has all of them...
-	except:
-		wave_effective = np.array([  700164.875,   996012.25 ,  1585789.875,  2461271.   , 3455036.75 ,  4931476.5  ])/1e4
+	wave_effective = alldata[0]['hersch']['wave_effective']/1e4 # again, this has all of them!
 
 	### LIR
-	ax.errorbar(wave_effective,flux_offset_h[:,0],yerr=h_err,fmt='o',alpha=0.8,color=hcolor)
-	ax.errorbar(wave_effective,flux_offset_nh[:,0],yerr=nh_err,fmt='o',alpha=0.8,color=nhcolor)
+	ax.errorbar(wave_effective,chi_h[:,0],yerr=h_chi_err,fmt='o',alpha=0.8,color=hcolor)
+	ax.errorbar(wave_effective,chi_nh[:,0],yerr=nh_chi_err,fmt='o',alpha=0.8,color=nhcolor)
 
 	ax.set_xlabel(r'observed wavelength [$\mu$m]')
-	ax.set_ylabel(r'log(f$_{\mathrm{model}}$/f$_{\mathrm{obs}}$)')
+	ax.set_ylabel(r'$\chi$')
 
-	ax.set_xscale('log',nonposx='clip',subsx=(1,2,4))
+	ax.set_xscale('log',nonposx='clip',subsx=(np.atleast_1d(1)))
 	ax.xaxis.set_minor_formatter(minorFormatter)
 	ax.xaxis.set_major_formatter(majorFormatter)
 
 	### add line
-	ax.set_xlim(41,800)
-	ax.set_ylim(-0.8,0.8)
+	ax.set_xlim(0.1,800)
+	ax.set_ylim(-2.5,2.5)
 	ax.plot(ax.get_xlim(),[0.0,0.0],linestyle='--',lw=2,color='black')
 
 	### add text
 	fs = 14
 	ax.text(0.05,0.92,'fit to Herschel data',color=hcolor,transform=ax.transAxes,fontsize=fs)
 	ax.text(0.05,0.86,'fit without Herschel data',color=nhcolor,transform=ax.transAxes,fontsize=fs)
+
+	### UV-MIR CHISQ
+	idx = np.array([False if 'herschel' in filter_name else True for filter_name in fnames_all],dtype=bool)
+	chisq_h = (chi_h[idx,0]**2).sum()
+	chisq_nh = (chi_nh[idx,0]**2).sum()
+	ax.text(0.05,0.12,r'UV-MIR $\Sigma \chi^2$='+"{:.2f}".format(chisq_h),color=hcolor,transform=ax.transAxes,fontsize=fs)
+	ax.text(0.05,0.06,r'UV-MIR $\Sigma \chi^2$='+"{:.2f}".format(chisq_nh),color=nhcolor,transform=ax.transAxes,fontsize=fs)
+
+
+	#### DELTA CHI SQUARED PLOT
+	fig, ax1 = plt.subplots(1, 1, figsize = (8,8))
+	cmap = get_cmap(idx.sum())
+	xt, yt = 0.03, 0.95
+	for nn in xrange(idx.sum()):
+
+		chisq_nh = chi_all_nh[nn]**2
+		chisq_h = chi_all_h[nn]**2
+		delta_chisq = chisq_nh-chisq_h
+		ax1.plot(np.repeat(wave_effective[nn],delta_chisq.shape[0]),delta_chisq,'o',linestyle=' ',color=cmap(nn),alpha=0.2,mew=0)
+		ax1.plot(wave_effective[nn], np.median(delta_chisq),'o',linestyle=' ',color=cmap(nn),alpha=0.8,mew=2,ms=16)
+
+		ax1.text(xt,yt,fnames_all[nn],transform=ax1.transAxes,color=cmap(nn),fontsize=10,weight='bold')
+
+		# text positioning
+		if (nn+1) % 8 == 0:
+			xt += 0.2
+			yt = 0.95
+		else:
+			yt -= 0.03
+
+	ax1.plot(ax1.get_xlim(),[0.0,0.0],linestyle='--',color='0.6',lw=2,alpha=0.5)
+
+	ax1.set_xlabel(r'observed wavelength [$\mu$m]',labelpad=8)
+	ax1.set_ylabel(r'$\chi^2_{\mathrm{no Herschel}}$-$\chi^2_{\mathrm{Herschel}}$')
+
+	ax1.set_xscale('log',nonposx='clip',subsx=(1,2,4))
+	ax1.xaxis.set_minor_formatter(minorFormatter)
+	ax1.xaxis.set_major_formatter(majorFormatter)
+
+	ax1.set_xlim(0.1,30)
+	ax1.set_ylim(-2,2)
+
+	fig.savefig(outfolder+'delta_chisq.png',dpi=150)
+
+	'''
+	rms_h = np.sqrt((flux_offset_h[idx,0]**2).sum())
+	rms_nh = np.sqrt((flux_offset_nh[idx,0]**2).sum())
+	ax.text(0.05,0.12,'UV-MIR RMS '+"{:.3f}".format(rms_h)+' dex',color=hcolor,transform=ax.transAxes,fontsize=fs)
+	ax.text(0.05,0.06,'UV-MIR RMS '+"{:.3f}".format(rms_nh)+' dex',color=nhcolor,transform=ax.transAxes,fontsize=fs)
+	'''
 
 def plot_totalext(alldata,ax=None):
 

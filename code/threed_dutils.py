@@ -520,6 +520,19 @@ def generate_basenames(runname):
 			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+runname+'_'+ids[jj])
 			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
 
+	elif 'np_mocks' in runname:
+
+		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/np_mocks.ids"
+		ids = np.loadtxt(id_list, dtype='|S20')
+		ngals = len(ids)
+
+		parm_basename = runname+"_params"
+		ancilname=None
+
+		for jj in xrange(ngals):
+			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+runname+'_'+ids[jj])
+			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
+
 	elif 'nohersch' in runname:
 
 		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/herschel_names.txt"
@@ -561,7 +574,6 @@ def generate_basenames(runname):
 		for jj in xrange(ngals):
 			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+runname+'_'+ids[jj])
 			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
-
 
 	else:
 

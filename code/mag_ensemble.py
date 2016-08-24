@@ -1729,6 +1729,7 @@ def obs_vs_prosp_balmlines(e_pinfo,hflag,outname='test.png',outname_resid='test.
 	#################
 	keep_idx = brown_quality_cuts.halpha_cuts(e_pinfo)
 
+	'''
 	##### test to see if AGN runs improve the Halpha model--obs comparison
 	objnames = e_pinfo['objnames'][keep_idx]
 	filebase, parm_basename, ancilname=threed_dutils.generate_basenames('brownseds_agn')
@@ -1744,7 +1745,7 @@ def obs_vs_prosp_balmlines(e_pinfo,hflag,outname='test.png',outname_resid='test.
 
 			print objname + ': old is {0}, new is {1}'.format(old_flux[0]/obs_flux[0],agn_flux[0]/obs_flux[0])
 
-	print 1/0
+	'''
 
 	##### AGN identifiers
 	sfing, composite, agn = return_agn_str(keep_idx)
@@ -1850,16 +1851,17 @@ def obs_vs_prosp_balmlines(e_pinfo,hflag,outname='test.png',outname_resid='test.
 			ax2.set_xlabel(r'log(model/obs) H$_{\beta}$)')
 			max = np.max([np.abs(ax2.get_ylim()).max(),np.abs(ax2.get_xlim()).max()])
 			max = 0.8
-			ax2.plot([0.0,0.0],[-max,max],linestyle='--',alpha=1.0,color='0.4')
-			ax2.plot([-max,max],[0.0,0.0],linestyle='--',alpha=1.0,color='0.4')
+			ax2.plot([0.0,0.0],[-max,max],linestyle=':',alpha=1.0,color='0.5')
+			ax2.plot([-max,max],[0.0,0.0],linestyle=':',alpha=1.0,color='0.5')
+			ax2.plot([-max,max],[-max,max],linestyle='--',alpha=1.0,color='0.3')
 			ax2.axis((-max,max,-max,max))
 
 			### annotate directions
 			ax2.arrow(0.722, 0.15, 0.04, 0.04, head_width=0.02, head_length=0.03, fc='k', ec='k',width=0.002,transform = ax2.transAxes)
 			ax2.arrow(0.722, 0.15,-0.04, 0.04, head_width=0.02, head_length=0.03, fc='k', ec='k',width=0.002,transform = ax2.transAxes)
 
-			ax2.text(0.757, 0.12, 'normalization \n error',transform = ax2.transAxes,horizontalalignment='left',fontsize=10,multialignment='center',weight='semibold')
-			ax2.text(0.687, 0.12, 'reddening \n error',transform = ax2.transAxes,horizontalalignment='right',fontsize=10,multialignment='center',weight='semibold')
+			ax2.text(0.744, 0.12, 'model \n normalization \n error',transform = ax2.transAxes,horizontalalignment='left',fontsize=10,multialignment='center',weight='semibold')
+			ax2.text(0.694, 0.12, 'model \n reddening \n error',transform = ax2.transAxes,horizontalalignment='right',fontsize=10,multialignment='center',weight='semibold')
 
 			threed_dutils.return_n_outliers(np.log10(f_ha[:,0]),np.log10(model_ha[:,0]),e_pinfo['objnames'][keep_idx],10,cp_files='halpha')
 
@@ -2913,7 +2915,6 @@ def plot_emline_comp(alldata,outfolder,hflag):
 	ha_errs,ha_flag = obs_vs_prosp_balmlines(e_pinfo,hflag,
 								 outname=outfolder+'balmer_line_comp.png',
 								 outname_resid=outfolder+'balmer_line_resid.png')
-	print 1/0
 
 	# model SFR versus observed SFR(Ha) corrected for dust attenuation
 	obs_vs_prosp_sfr(e_pinfo,hflag,outname=outfolder+'obs_sfr_comp.png')
