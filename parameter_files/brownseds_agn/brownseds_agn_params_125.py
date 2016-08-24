@@ -32,7 +32,7 @@ run_params = {'verbose':True,
               'agelims': [0.0,8.0,8.5,9.0,9.5,9.8,10.0],
               # Data info
               'datname':os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/table1.fits',
-              'photname':os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/table3.fits',
+              'photname':os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/table3.txt',
               'extinctname':os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/table4.fits',
               'herschname':os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/kingfish.brownapertures.flux.fits',
               'objname':'NGC 7679',
@@ -138,6 +138,7 @@ def load_obs(photname='', extinctname='', herschname='', objname='', **extras):
     """
     obs ={}
 
+    '''
     # load photometry
     hdulist = fits.open(photname)
 
@@ -154,6 +155,21 @@ def load_obs(photname='', extinctname='', herschname='', objname='', **extras):
     # extract fluxes for particular object
     mag = np.array([np.squeeze(hdulist[1].data[f][idx]) for f in mag_fields])
     magunc  = np.array([np.squeeze(hdulist[1].data[f][idx]) for f in magunc_fields])
+    '''
+    with open(photname, 'r') as f:
+        hdr = f.readline().split()
+    dtype = np.dtype([(hdr[1],'S20')] + [(n, np.float) for n in hdr[2:]])
+    dat = np.loadtxt(photname, comments = '#', delimiter='\t',
+                     dtype = dtype)
+    obj_ind = np.where(dat['id'] == objname)[0][0]
+
+    # extract fluxes+uncertainties for all objects and all filters
+    mag_fields = [f for f in dat.dtype.names if f[0:2] == 'f_']
+    magunc_fields = [f for f in dat.dtype.names if f[0:2] == 'e_']
+
+    # extract fluxes for particular object, converting from record array to numpy array
+    mag = dat[mag_fields].view(float).reshape(len(dat),-1)[obj_ind]
+    magunc  = dat[magunc_fields].view(float).reshape(len(dat),-1)[obj_ind]
 
     # extinctions
     extinct = fits.open(extinctname)
