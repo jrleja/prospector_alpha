@@ -26,15 +26,15 @@ def calc_emp_ha(mass,sfr,dust1,dust2,dustindex,ncomp=1):
 def maxprob_model(sample_results,sps):
 
 	# grab maximum probability, plus the thetas that gave it
-	maxprob = np.max(sample_results['lnprobability'])
-	probind = sample_results['lnprobability'] == maxprob
-	thetas = sample_results['chain'][probind,:]
+	chopped_prob = threed_dutils.chop_chain(sample_results['lnprobability'])
+	maxprob = chopped_prob.max()
+	probind = chopped_prob == maxprob
+	thetas = sample_results['flatchain'][probind]
 	if type(thetas[0]) != np.dtype('float64'):
 		thetas = thetas[0]
 
 	# ensure that maxprob stored is the same as calculated now
 	current_maxprob = threed_dutils.test_likelihood(sps,sample_results['model'],sample_results['obs'],thetas,sample_results['run_params']['param_file'])
-	#current_maxprob = threed_dutils.test_likelihood(None,None,None,thetas,sample_results['run_params']['param_file'])
 	print current_maxprob
 	print maxprob
 
@@ -108,16 +108,18 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 	mags = np.zeros(shape=(len(sample_results['obs']['filters']),ncalc))
 	spec = np.zeros(shape=(len(sps.wavelengths),ncalc))
 
+	sample_flatchain = flatchain[:ncalc,:]
+
 	######## posterior sampling #########
 	for jj in xrange(ncalc):
 		
 		##### model call, to set parameters
-		thetas = flatchain[jj,:]
+		thetas = sample_flatchain[jj,:]
 		spec[:,jj],mags[:,jj],sm = sample_results['model'].mean_model(thetas, sample_results['obs'], sps=sps)
 
 		##### extract sfh parameters
 		# pass stellar mass to avoid extra model call
-		sfh_params = threed_dutils.find_sfh_params(sample_results['model'],flatchain[jj,:],
+		sfh_params = threed_dutils.find_sfh_params(sample_results['model'],sample_flatchain[jj,:],
 			                                       sample_results['obs'],sps,sm=sm)
 
 		##### calculate SFH
@@ -139,13 +141,13 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 		ssfr_100[jj] = sfr_100[jj] / totmass[jj]
 
 		##### empirical halpha
-		emp_ha[jj] = threed_dutils.synthetic_halpha(sfr_10[jj],flatchain[jj,d1_idx],
+		emp_ha[jj] = threed_dutils.synthetic_halpha(sfr_10[jj],sample_flatchain[jj,d1_idx],
 			                          flatchain[jj,d2_idx],-1.0,
 			                          flatchain[jj,didx],
 			                          kriek = (sample_results['model'].params['dust_type'] == 4)[0])
 
 		##### dust extinction at 5500 angstroms
-		ext_5500[jj] = flatchain[jj,d1_idx] + flatchain[jj,d2_idx]
+		ext_5500[jj] = sample_flatchain[jj,d1_idx] + sample_flatchain[jj,d2_idx]
 
 		##### spectral quantities (emission line flux, Balmer decrement, Hdelta absorption, Dn4000)
 		##### and magnitudes (LIR, LUV)
@@ -160,8 +162,8 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 
 		##### Balmer decrements
 		bdec_cloudy[jj] = modelout['emlines']['Halpha']['flux'] / modelout['emlines']['Hbeta']['flux']
-		bdec_calc[jj] = threed_dutils.calc_balmer_dec(flatchain[jj,d1_idx], flatchain[jj,d2_idx], -1.0, 
-			                                          flatchain[jj,didx],
+		bdec_calc[jj] = threed_dutils.calc_balmer_dec(sample_flatchain[jj,d1_idx], sample_flatchain[jj,d2_idx], -1.0, 
+			                                          sample_flatchain[jj,didx],
 			                                          kriek = (sample_results['model'].params['dust_type'] == 4)[0])
 		
 		if jj == 0:
@@ -186,7 +188,7 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 
 		lir[jj]        = modelout['lir']
 		luv[jj]        = modelout['luv']
-		dn4000[jj] = modelout['dn4000']
+		dn4000[jj]     = modelout['dn4000']
 
 	##### CALCULATE Q16,Q50,Q84 FOR VARIABLE PARAMETERS
 	ntheta = len(sample_results['initial_theta'])
@@ -267,7 +269,8 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 	sample_results['observables'] = observables
 
 	#### QUANTILE OUTPUTS #
-	quantiles = {'parnames': parnames,
+	quantiles = {'sample_flatchain': sample_flatchain,
+				 'parnames': parnames,
 				 'q16':q_16,
 				 'q50':q_50,
 				 'q84':q_84}
@@ -337,7 +340,10 @@ def post_processing(param_name, add_extra=True, **extras):
 
 	if add_extra:
 		print 'ADDING EXTRA OUTPUT FOR ' + sample_results['run_params']['objname'] + ' in ' + outfolder
-		sample_results['flatchain'] = threed_dutils.chop_chain(sample_results['chain'])
+
+		# if we're not doing it again...
+		if 'flatchain' not in sample_results.keys():
+			sample_results['flatchain'] = threed_dutils.chop_chain(sample_results['chain'])
 		sample_results = calc_extra_quantities(sample_results,**extras)
 
 		### MAKE PLOTS HERE

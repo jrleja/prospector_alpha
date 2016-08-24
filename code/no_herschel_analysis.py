@@ -23,6 +23,8 @@ nhcolor = '#1C86EE' #blue
 global_fs = 12
 color = '0.4'
 
+obscolor = '#FF420E'
+modcolor = '#375E97'
 
 class jLogFormatter(mpl.ticker.LogFormatter):
 	'''
@@ -86,6 +88,8 @@ def make_plots(runname_nh='brownseds_np_nohersch',runname_h='brownseds_np', reco
 
 
 	fig, axes = plt.subplots(2, 2, figsize = (10,10))
+	plot_lir_pdf(alldata,outfolder)
+	plot_hflux_pdf(alldata,outfolder)
 	ax = np.ravel(axes)
 	plot_hfluxes(alldata,outfolder,ax=ax[0])
 	plot_lir(alldata,ax=ax[1],ax2=ax[2])
@@ -101,6 +105,147 @@ def make_plots(runname_nh='brownseds_np_nohersch',runname_h='brownseds_np', reco
 		plot_halpha(alldata,outfolder=outfolder)
 		plot_bdec(alldata,outfolder=outfolder)
 
+def plot_lir_pdf(alldata,outfolder):
+		
+
+	#### check parameter space
+	par = r'L$_{\mathrm{IR}}$' 
+
+	#### generate figure
+	fig, ax = plt.subplots(1,1, figsize = (7,7))
+
+	##### gather the PDF
+	pdf_dist = np.array([dat['nohersch']['lir_pdf']['pdf_dist'] for dat in alldata])
+
+	bins = alldata[0]['nohersch']['lir_pdf']['bins'][0]
+	nbins = len(bins)
+	model_dist, obs_dist = np.zeros(nbins-1),np.zeros(nbins-1)
+	for kk, dat in enumerate(alldata):
+		model_dist += dat['nohersch']['lir_pdf']['parameter_unit_pdfs']['model_pdf']['L_IR']
+		obs_dist += dat['nohersch']['lir_pdf']['parameter_unit_pdfs']['obs_pdf']['L_IR']
+
+	#### create step function
+	plotx = np.empty((nbins*2,), dtype=float)
+	plotx[0::2] = bins
+	plotx[1::2] = bins
+
+	ploty_mod, ploty_obs = [np.empty((model_dist.size*2,), dtype=model_dist.dtype) for X in xrange(2)]
+	ploty_mod[0::2] = model_dist
+	ploty_mod[1::2] = model_dist
+	ploty_mod = np.concatenate((np.atleast_1d(0.0),ploty_mod,np.atleast_1d(0.0)))
+	ploty_obs[0::2] = obs_dist
+	ploty_obs[1::2] = obs_dist
+	ploty_obs = np.concatenate((np.atleast_1d(0.0),ploty_obs,np.atleast_1d(0.0)))
+
+	ax.plot(plotx,ploty_obs,alpha=0.8,lw=2,color=obscolor)
+	ax.plot(plotx,ploty_mod,alpha=0.8,lw=2,color=modcolor)
+
+	ax.fill_between(plotx, np.zeros_like(ploty_obs), ploty_obs, 
+					   color=obscolor,
+					   alpha=0.3)
+	ax.fill_between(plotx, np.zeros_like(ploty_mod), ploty_mod, 
+					   color=modcolor,
+					   alpha=0.3)
+
+	xunit = ' [dex]'
+
+	ax.set_xlabel(r'$\Delta$(prediction)'+xunit)
+	for tl in ax.get_yticklabels():tl.set_visible(False) # no tick labels
+	ax.set_ylabel('density')
+	ax.xaxis.set_major_locator(MaxNLocator(4)) # only label up to x tickmarks
+	for tick in ax.xaxis.get_major_ticks(): tick.label.set_fontsize(12) 
+	ax.set_title('log('+par+')')
+	ax.set_ylim(0.0,ax.get_ylim()[1]*1.125)
+	ax.set_xlim(bins.min(),bins.max())
+
+	fs = 12
+	ax.text(0.06,0.88,r'$\Sigma$ (model posteriors)',transform=ax.transAxes,color=modcolor,fontsize=fs)
+	ax.text(0.06,0.8,'truth',transform=ax.transAxes,color=obscolor,fontsize=fs)
+
+	### from individual measurements
+	onesig_perc = ((pdf_dist >= 0.16) & (pdf_dist <= 0.84)).sum()/float(pdf_dist.shape[0]) / 0.68
+	twosig_perc = ((pdf_dist >= 0.025) & (pdf_dist <= 0.975)).sum()/float(pdf_dist.shape[0]) / 0.95
+	threesig_perc = ((pdf_dist >= 0.0015) & (pdf_dist <= 0.9985)).sum()/float(pdf_dist.shape[0]) / 0.997
+
+	ax.text(0.06,0.7,r'$\frac{1\sigma_{\mathrm{mock}}}{1\sigma_{\mathrm{true}}}$:'+"{:.2f}".format(onesig_perc),transform=ax.transAxes,fontsize=fs)
+	ax.text(0.06,0.58,r'$\frac{2\sigma_{\mathrm{mock}}}{2\sigma_{\mathrm{true}}}$:'+"{:.2f}".format(twosig_perc),transform=ax.transAxes,fontsize=fs)
+	ax.text(0.06,0.46,r'$\frac{3\sigma_{\mathrm{mock}}}{3\sigma_{\mathrm{true}}}$:'+"{:.2f}".format(threesig_perc),transform=ax.transAxes,fontsize=fs)
+
+	fig.savefig(outfolder+'LIR_pdf.png',dpi=100)
+	plt.close()		
+
+def plot_hflux_pdf(alldata,outfolder):
+
+	#### check parameter space
+	pars = alldata[0]['nohersch']['pdf']['names']
+
+	#### generate figure
+	fig, axes = plt.subplots(2,3, figsize = (15,10))
+	plt.subplots_adjust(wspace=0.3,hspace=0.3)
+	ax_err = np.ravel(axes)
+
+	for ii, par in enumerate(pars):
+
+		##### gather the PDF
+		pdf_dist = np.array([dat['nohersch']['pdf']['pdf_dist'][ii] for dat in alldata])
+
+		bins = alldata[0]['nohersch']['pdf']['bins'][ii]
+		nbins = len(bins)
+		model_dist, obs_dist = np.zeros(nbins-1),np.zeros(nbins-1)
+		for kk, dat in enumerate(alldata):
+			model_dist += dat['nohersch']['pdf']['parameter_unit_pdfs']['model_pdf'][par]
+			obs_dist += dat['nohersch']['pdf']['parameter_unit_pdfs']['obs_pdf'][par]
+
+		#### create step function
+		plotx = np.empty((nbins*2,), dtype=float)
+		plotx[0::2] = bins
+		plotx[1::2] = bins
+
+		ploty_mod, ploty_obs = [np.empty((model_dist.size*2,), dtype=model_dist.dtype) for X in xrange(2)]
+		ploty_mod[0::2] = model_dist
+		ploty_mod[1::2] = model_dist
+		ploty_mod = np.concatenate((np.atleast_1d(0.0),ploty_mod,np.atleast_1d(0.0)))
+		ploty_obs[0::2] = obs_dist
+		ploty_obs[1::2] = obs_dist
+		ploty_obs = np.concatenate((np.atleast_1d(0.0),ploty_obs,np.atleast_1d(0.0)))
+
+		ax_err[ii].plot(plotx,ploty_obs,alpha=0.8,lw=2,color=obscolor)
+		ax_err[ii].plot(plotx,ploty_mod,alpha=0.8,lw=2,color=modcolor)
+
+		ax_err[ii].fill_between(plotx, np.zeros_like(ploty_obs), ploty_obs, 
+						   color=obscolor,
+						   alpha=0.3)
+		ax_err[ii].fill_between(plotx, np.zeros_like(ploty_mod), ploty_mod, 
+						   color=modcolor,
+						   alpha=0.3)
+
+		xunit = ' [dex]'
+
+		ax_err[ii].set_xlabel(r'$\Delta$(prediction)'+xunit)
+		for tl in ax_err[ii].get_yticklabels():tl.set_visible(False) # no tick labels
+		ax_err[ii].set_ylabel('density')
+		ax_err[ii].xaxis.set_major_locator(MaxNLocator(4)) # only label up to x tickmarks
+		for tick in ax_err[ii].xaxis.get_major_ticks(): tick.label.set_fontsize(12) 
+		ax_err[ii].set_title('log('+par+')')
+		ax_err[ii].set_ylim(0.0,ax_err[ii].get_ylim()[1]*1.125)
+		ax_err[ii].set_xlim(bins.min(),bins.max())
+
+		fs = 12
+		ax_err[ii].text(0.06,0.88,r'$\Sigma$ (model posteriors)',transform=ax_err[ii].transAxes,color=modcolor,fontsize=fs)
+		ax_err[ii].text(0.06,0.8,'truth',transform=ax_err[ii].transAxes,color=obscolor,fontsize=fs)
+
+		### from individual measurements
+		onesig_perc = ((pdf_dist >= 0.16) & (pdf_dist <= 0.84)).sum()/float(pdf_dist.shape[0]) / 0.68
+		twosig_perc = ((pdf_dist >= 0.025) & (pdf_dist <= 0.975)).sum()/float(pdf_dist.shape[0]) / 0.95
+		threesig_perc = ((pdf_dist >= 0.0015) & (pdf_dist <= 0.9985)).sum()/float(pdf_dist.shape[0]) / 0.997
+
+		ax_err[ii].text(0.06,0.7,r'$\frac{1\sigma_{\mathrm{mock}}}{1\sigma_{\mathrm{true}}}$:'+"{:.2f}".format(onesig_perc),transform=ax_err[ii].transAxes,fontsize=fs)
+		ax_err[ii].text(0.06,0.58,r'$\frac{2\sigma_{\mathrm{mock}}}{2\sigma_{\mathrm{true}}}$:'+"{:.2f}".format(twosig_perc),transform=ax_err[ii].transAxes,fontsize=fs)
+		ax_err[ii].text(0.06,0.46,r'$\frac{3\sigma_{\mathrm{mock}}}{3\sigma_{\mathrm{true}}}$:'+"{:.2f}".format(threesig_perc),transform=ax_err[ii].transAxes,fontsize=fs)
+
+	fig.savefig(outfolder+'herschel_flux_pdf.png',dpi=100)
+	plt.close()
+		
 def ha_extinction(sample_results):
 	parnames = np.array(sample_results['quantiles']['parnames'])
 
@@ -113,7 +258,17 @@ def ha_extinction(sample_results):
 
 	return quantile(ha_ext, [0.16, 0.5, 0.84])
 
-def collate_data(runname_nh=None, runname_h=None,outpickle=None):
+def redraw_chain(weighted_chain, draw_chain, parameter_chain):
+	'''
+	reweights the 2D chain by a 2D probability function from weighted_chain
+	propagate effects through parameter_chain
+	returns weighed parameter chain, of same size as input
+	'''	
+
+	#### generate 2D probability
+	print 1/0
+
+def collate_data(runname_nh=None, runname_h=None,outpickle=None,weighted_lir=True):
 
 	filebase_nh, parm_basename_nh, ancilname_nh=threed_dutils.generate_basenames(runname_nh)
 	filebase_h, parm_basename_h, ancilname_h=threed_dutils.generate_basenames(runname_h)
@@ -166,6 +321,35 @@ def collate_data(runname_nh=None, runname_h=None,outpickle=None):
 		mask = sample_results_h['obs']['phot_mask']
 		filtnames = np.array(sample_results_h['obs']['filternames'])[mask]
 
+		if weighted_lir:
+
+			### where are things?
+			parnames = np.array(sample_results_h['quantiles']['parnames'])
+			gamma_idx = parnames=='duste_gamma'
+			umin_idx = parnames=='duste_umin'
+
+			### generate weighting chain
+			gamma_chain = sample_results_h['flatchain'][:,gamma_idx]
+			umin_chain = sample_results_h['flatchain'][:,umin_idx]
+			lir_par_chain = np.concatenate((gamma_chain,umin_chain),axis=1)
+
+			### generate chain to draw in
+			# this is hard, must reconstruct from extra_output
+			# first maxprob_thetas
+			maxprob = np.max(sample_results['lnprobability'])
+			probind = sample_results['lnprobability'] == maxprob
+			thetas = sample_results['chain'][probind,:]
+			if type(thetas[0]) != np.dtype('float64'):
+				thetas = thetas[0]
+
+			gamma_chain = sample_results_nh['flatchain'][:,gamma_idx]
+			umin_chain = sample_results_nh['flatchain'][:,umin_idx]
+			lir_par_chain = np.concatenate((gamma_chain,umin_chain),axis=1)
+
+			### test parameter of interest...
+			par_chain = sample_results_nh['observables']['L_IR']
+
+
 		# 
 		outdat_h['filtnames'] = filtnames
 		outdat_h['wave_effective'] = sample_results_h['obs']['wave_effective'][mask]
@@ -193,14 +377,13 @@ def collate_data(runname_nh=None, runname_h=None,outpickle=None):
 
 		# pdf distances
 		nbins = 10
-		one_bin = np.linspace(-1,1,nbins)
-		bins = [one_bin] * n
+		one_bin = np.linspace(-1.5,1.5,nbins)
+		bins = [one_bin] * nfilts
 
-		pdf_dict['pdf_dist'] = pdf_distance(model_flux_chain,obs_flux)
-		pdf_dict['parameter_unit_pdfs'] = pdf_distance_unitized(model_flux_chain, obs_flux, pdf_dict['names'], bins)
+		pdf_dict['pdf_dist'] = pdf_distance(np.swapaxes(model_flux_chain,0,1),obs_flux)
+		pdf_dict['parameter_unit_pdfs'] = pdf_distance_unitized(np.swapaxes(model_flux_chain,0,1), obs_flux, pdf_dict['names'], bins)
 		pdf_dict['bins'] = bins
-		outdat_nh['pdf'] = pdf_dict
-		print 1/0
+		outdat_nh['pdf'] = pdf_dict		
 
 		### save model Balmer decrement & total extinction
 		epars = sample_results_nh['extras']['parnames']
@@ -286,6 +469,21 @@ def collate_data(runname_nh=None, runname_h=None,outpickle=None):
 		### save both L_IRs
 		outdat_h['lir'] = sample_results_h['observables']['L_IR']
 		outdat_nh['lir'] = sample_results_nh['observables']['L_IR']
+
+		### now save the PDF outputs. assume here that median(Hersch) is truth.
+		# define fluxes in the log
+		model_chain = np.swapaxes(np.atleast_2d(np.log10(sample_results_nh['observables']['L_IR'])),0,1)
+		truth = np.atleast_1d(np.log10(np.median(sample_results_h['observables']['L_IR'])))
+
+		# pdf distances
+		nbins = 10
+		bins = [np.linspace(-0.75,0.75,nbins)]
+
+		pdf_dict = {}
+		pdf_dict['pdf_dist'] = pdf_distance(model_chain,truth)
+		pdf_dict['parameter_unit_pdfs'] = pdf_distance_unitized(model_chain, truth, ['L_IR'], bins)
+		pdf_dict['bins'] = bins
+		outdat_nh['lir_pdf'] = pdf_dict		
 
 		outtemp = {'nohersch':outdat_nh,'hersch':outdat_h,'obs':obs}
 		out.append(outtemp)

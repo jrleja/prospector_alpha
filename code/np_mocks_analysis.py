@@ -74,7 +74,6 @@ def pdf_distance_unitized(chain,truth,parnames,bins, truthnames=None):
 	obs_dict = {}
 	for ii,p in enumerate(parnames):
 
-		print p
 		tempchain = chain[:,ii]
 
 		# we're in extra_truths, do some sorting
@@ -152,8 +151,6 @@ def pdf_distance(chain, truths, chainnames=None, truthnames=None):
 			if 'sfr' in truthnames[i]:
 				temptruths = 10**truths[i]
 			pdf_dist[i] = (chain[:,match] > temptruths).sum()/nsamp
-
-			print truthnames[i],pdf_dist[i]
 
 	return pdf_dist
 
