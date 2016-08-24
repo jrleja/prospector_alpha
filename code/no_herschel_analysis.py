@@ -13,6 +13,7 @@ import matplotlib as mpl
 import math
 import matplotlib.cm as cmx
 import matplotlib.colors as colors
+from np_mocks_analysis import pdf_distance_unitized, pdf_stats, pdf_distance
 
 dpi = 120
 
@@ -161,11 +162,11 @@ def collate_data(runname_nh=None, runname_h=None,outpickle=None):
 		outdat_h['ha_q84'] = sample_results_h['model_emline']['flux']['q84'][ha_em]
 		outdat_h['ha_q16'] = sample_results_h['model_emline']['flux']['q16'][ha_em]
 
-		### save Herschel fluxes
+		### save fluxes
 		mask = sample_results_h['obs']['phot_mask']
 		filtnames = np.array(sample_results_h['obs']['filternames'])[mask]
 
-		# hersch_idx = np.array([True if 'herschel' in filter_name else False for filter_name in filtnames],dtype=bool)
+		# 
 		outdat_h['filtnames'] = filtnames
 		outdat_h['wave_effective'] = sample_results_h['obs']['wave_effective'][mask]
 		outdat_h['model_fluxes'] = sample_results_h['bfit']['mags'][mask]
@@ -173,6 +174,33 @@ def collate_data(runname_nh=None, runname_h=None,outpickle=None):
 		outdat_h['obs_errs'] = sample_results_h['obs']['maggies_unc'][mask]
 
 		outdat_nh['model_fluxes'] = sample_results_nh['bfit']['mags'][mask]
+
+		### are herschel fluxes in the posterior?
+		# open dictionary, find filter names
+		pdf_dict = {}
+		hersch_idx = np.array([True if 'herschel' in filter_name else False for filter_name in filtnames],dtype=bool)
+		pdf_dict['names'] = filtnames[hersch_idx]
+
+		# define fluxes in the log
+		model_flux_chain = np.log10(sample_results_nh['observables']['mags'][hersch_idx])
+		obs_flux = np.log10(outdat_h['obs_fluxes'][hersch_idx])
+
+		# generate q50, q84, q16 for the model
+		nfilts = hersch_idx.sum()
+		q50, q84, q16 = [np.zeros(shape=nfilts) for i in range(3)]
+		for i in xrange(nfilts): q50[i], q84[i], q16[i] = quantile(model_flux_chain[i],[0.5,0.84,0.16])
+		pdf_dict['q50'], pdf_dict['q16'], pdf_dict['q84'] = q50, q84, q16
+
+		# pdf distances
+		nbins = 10
+		one_bin = np.linspace(-1,1,nbins)
+		bins = [one_bin] * n
+
+		pdf_dict['pdf_dist'] = pdf_distance(model_flux_chain,obs_flux)
+		pdf_dict['parameter_unit_pdfs'] = pdf_distance_unitized(model_flux_chain, obs_flux, pdf_dict['names'], bins)
+		pdf_dict['bins'] = bins
+		outdat_nh['pdf'] = pdf_dict
+		print 1/0
 
 		### save model Balmer decrement & total extinction
 		epars = sample_results_nh['extras']['parnames']
