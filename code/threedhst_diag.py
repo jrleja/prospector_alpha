@@ -951,8 +951,6 @@ def make_all_plots(filebase=None,
 		show_chain(sample_results,
 	               outname=outfolder+objname+'.chain.png',
 			       alpha=0.3,truths=truths)
-	if sample_results['plotchain'] is not None:
-		sample_results['plotchain'] = None # dump this if we have it!
 
 	# corner plot
 	if plt_corner: 
