@@ -15,7 +15,7 @@ dirichlet = priors.inverse_dirichlet
 
 run_params = {'verbose':True,
               'debug': False,
-              'outfile': os.getenv('APPS')+'/threedhst_bsfh/results/brownseds_np_dp_nohersch/brownseds_np_dp_nohersch',
+              'outfile': os.getenv('APPS')+'/threedhst_bsfh/results/brownseds_np_dp/brownseds_np_dp',
               'nofork': True,
               # Optimizer params
               'ftol':0.5e-5, 
@@ -35,7 +35,7 @@ run_params = {'verbose':True,
               'photname':os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/table3.txt',
               'extinctname':os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/table4.fits',
               'herschname':os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/kingfish.brownapertures.flux.fits',
-              'objname':'Arp 256 N',
+              'objname':'NGC 3351',
               }
 run_params['outfile'] = run_params['outfile']+'_'+run_params['objname']
 
@@ -222,7 +222,7 @@ def load_obs(photname='', extinctname='', herschname='', objname='', **extras):
 
     # phot mask
     phot_mask_brown = mag != 0
-    phot_mask_hersch = hflux != 0
+    phot_mask_hersch = np.zeros_like(hflux,dtype=bool)
     phot_mask = np.concatenate((phot_mask_brown,phot_mask_hersch))
 
     # map brown filters to FSPS filters
