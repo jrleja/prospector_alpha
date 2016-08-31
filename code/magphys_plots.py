@@ -910,8 +910,8 @@ def plt_all(runname=None,startup=True,**extras):
 	#### herschel flag
 	hflag = np.array([True if np.sum(dat['residuals']['phot']['lam_obs'] > 5e5) else False for dat in alldata])
 	
-	brown_io.write_results(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/pcomp/')
 	plot_stacked_sfh(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/pcomp/')
+	brown_io.write_results(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/pcomp/')
 	allpar_plot(alldata,hflag,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/pcomp/')
 	plot_all_residuals(alldata,runname)
 	mag_ensemble.plot_emline_comp(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/magphys/emlines_comp/',hflag)
