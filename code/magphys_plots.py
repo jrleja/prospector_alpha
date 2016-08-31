@@ -11,6 +11,7 @@ import matplotlib as mpl
 from prospect.models import model_setup
 from astropy import constants
 from allpar_plot import allpar_plot
+from stack_sfh import plot_stacked_sfh
 
 c = 3e18   # angstroms per second
 dpi = 150
@@ -442,20 +443,24 @@ def plot_obs_spec(obs_spec, phot, spec_res, alpha,
 	mask = obs_spec['source'] == source
 	obslam = obs_spec['obs_lam'][mask]/1e4
 
-	##### smooth 
-	# consider only passing relevant wavelengths
-	# if speed becomes an issue
-	modspec_smooth = threed_dutils.smooth_spectrum(modlam,
-	                                        modspec,sigsmooth)
-	magspec_smooth = threed_dutils.smooth_spectrum(maglam/(1+z),
-	                                        magspec,sigsmooth)
+	##### smooth the model, or the observations
+	if label != 'Spitzer IRS':
+		modspec_smooth = threed_dutils.smooth_spectrum(modlam,
+		                                        modspec,sigsmooth)
+		magspec_smooth = threed_dutils.smooth_spectrum(maglam/(1+z),
+		                                        magspec,sigsmooth)
+		obs_flux = obs_spec['flux'][mask]
+	else: # observations!
+		modspec_smooth = modspec
+		magspec_smooth = magspec
+		obs_flux = threed_dutils.smooth_spectrum(obslam, obs_spec['flux'][mask], 2500)
 
 	# interpolate fsps spectra onto observational wavelength grid
 	pro_flux_interp = interp1d(modlam*(1+z),
 		                       modspec_smooth, 
 		                       bounds_error = False, fill_value = 0)
 
-	prospector_resid = np.log10(obs_spec['flux'][mask]) - np.log10(pro_flux_interp(obslam))
+	prospector_resid = np.log10(obs_flux) - np.log10(pro_flux_interp(obslam))
 	'''
 	spec_res.plot(obslam, 
 		          prospector_resid,
@@ -464,7 +469,7 @@ def plot_obs_spec(obs_spec, phot, spec_res, alpha,
 		          linestyle='-')
 	'''
 
-	obs_spec_plot = np.log10(obs_spec['flux'][mask])
+	obs_spec_plot = np.log10(obs_flux)
 	prosp_spec_plot = np.log10(pro_flux_interp(obslam))
 
 	spec_res.plot(obslam, 
@@ -483,7 +488,7 @@ def plot_obs_spec(obs_spec, phot, spec_res, alpha,
 	# interpolate magphys onto fsps grid
 	mag_flux_interp = interp1d(maglam, magspec_smooth,
 	                           bounds_error=False, fill_value=0)
-	magphys_resid = np.log10(obs_spec['flux'][mask]) - np.log10(mag_flux_interp(obslam))
+	magphys_resid = np.log10(obs_flux) - np.log10(mag_flux_interp(obslam))
 	nolines = mask_emission_lines(obslam,z)
 	temp_yplot = magphys_resid
 	temp_yplot[~nolines] = np.nan
@@ -593,7 +598,7 @@ def sed_comp_figure(sample_results, sps, model, magphys,
 
 	# R = 650, 300, 100
 	# models have deltav = 1000 km/s in IR, add in quadrature?
-	sigsmooth = [450.0, 1000.0, 3000.0]
+	sigsmooth = [450.0, 1000.0, 1.0]
 	ms = 8
 	alpha = 0.65
 
@@ -674,7 +679,7 @@ def sed_comp_figure(sample_results, sps, model, magphys,
 		
 		if label[ii] == 'Optical':
 			residuals['emlines'] = measure_emline_lum.measure(sample_results, obs_spec, magphys,sps)
-			if residuals['emlines'] is not None:
+			if residuals.get('emlines',None) is not None:
 				sigsmooth[ii] = residuals['emlines']['sigsmooth']
 			else:
 				sigsmooth[ii] = 450.0
@@ -905,6 +910,8 @@ def plt_all(runname=None,startup=True,**extras):
 	#### herschel flag
 	hflag = np.array([True if np.sum(dat['residuals']['phot']['lam_obs'] > 5e5) else False for dat in alldata])
 	
+	brown_io.write_results(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/pcomp/')
+	plot_stacked_sfh(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/pcomp/')
 	allpar_plot(alldata,hflag,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/pcomp/')
 	plot_all_residuals(alldata,runname)
 	mag_ensemble.plot_emline_comp(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/magphys/emlines_comp/',hflag)

@@ -2098,7 +2098,8 @@ def obs_vs_model_dn(e_pinfo,hflag,outname=None):
 	return norm_errs, norm_flag
 
 def bdec_to_ext(bdec):
-	return 2.5*np.log10(bdec/2.86)
+	return np.log10(bdec/2.86)
+	# return 2.5*np.log10(bdec/2.86)
 
 def normalize_error(obs,obserr,mod,moderr):
 	
@@ -2333,7 +2334,7 @@ def obs_vs_model_bdec(e_pinfo,hflag,outname1='test.png',outname2='test.png'):
 	#### create plots
 	fig1, ax1 = plt.subplots(1,1, figsize = (6,6))
 	fig2, ax2 = plt.subplots(1,3, figsize = (18.75,6))
-	axlims = (-0.1,1.0)
+	axlims = (-0.1,0.5)
 	norm_errs = []
 	norm_flag = []
 
@@ -2373,30 +2374,30 @@ def obs_vs_model_bdec(e_pinfo,hflag,outname1='test.png',outname2='test.png'):
 	ax1.text(0.04,0.92, r'S/N (H$\alpha$,H$\beta$) > {0}'.format(int(e_pinfo['obs']['sn_cut'])), transform = ax1.transAxes,horizontalalignment='left')
 	#ax1.text(0.04,0.92, r'EQW (H$\alpha$,H$\beta$) > {0} $\AA$'.format(int(e_pinfo['obs']['eqw_cut'])), transform = ax1.transAxes,horizontalalignment='left')
 	ax1.text(0.04,0.87, r'N = '+str(int(np.sum(keep_idx))), transform = ax1.transAxes,horizontalalignment='left')
-	ax1.set_xlabel(r'observed A$_{\mathrm{H}\beta}$ - A$_{\mathrm{H}\alpha}$')
-	ax1.set_ylabel(r'Prospector A$_{\mathrm{H}\beta}$ - A$_{\mathrm{H}\alpha}$')
+	ax1.set_xlabel(r'observed log(F/F$_0$)$_{\mathrm{H}\alpha}$ - log(F/F$_0$)$_{\mathrm{H}\beta}$')
+	ax1.set_ylabel(r'Prospector log(F/F$_0$)$_{\mathrm{H}\alpha}$ - log(F/F$_0$)$_{\mathrm{H}\beta}$')
 	ax1 = threed_dutils.equalize_axes(ax1, pl_bdec_measured,pl_bdec_cloudy_marg[:,0],axlims=axlims)
 	off,scat = threed_dutils.offset_and_scatter(pl_bdec_measured,pl_bdec_cloudy_marg[:,0],biweight=True)
-	ax1.text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat), transform = ax1.transAxes,horizontalalignment='right')
-	ax1.text(0.96,0.1, 'mean offset='+"{:.2f}".format(off), transform = ax1.transAxes,horizontalalignment='right')
+	ax1.text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat)+' dex', transform = ax1.transAxes,horizontalalignment='right')
+	ax1.text(0.96,0.1, 'mean offset='+"{:.2f}".format(off)+' dex', transform = ax1.transAxes,horizontalalignment='right')
 
 	#### SECONDARY FIGURE ERRATA
-	ax2[0].set_xlabel(r'observed A$_{\mathrm{H}\beta}$ - A$_{\mathrm{H}\alpha}$')
-	ax2[0].set_ylabel(r'Prospector calc marginalized A$_{\mathrm{H}\beta}$ - A$_{\mathrm{H}\alpha}$')
+	ax2[0].set_xlabel(r'observed log(F/F$_0$)$_{\mathrm{H}\alpha}$ - log(F/F$_0$)$_{\mathrm{H}\beta}$')
+	ax2[0].set_ylabel(r'Prospector calc marginalized log(F/F$_0$)$_{\mathrm{H}\alpha}$ - log(F/F$_0$)$_{\mathrm{H}\beta}$')
 	ax2[0] = threed_dutils.equalize_axes(ax2[0], pl_bdec_measured,pl_bdec_calc_marg[:,0],axlims=axlims)
 	off,scat = threed_dutils.offset_and_scatter(pl_bdec_measured,pl_bdec_calc_marg[:,0],biweight=True)
 	ax2[0].text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat), transform = ax2[0].transAxes,horizontalalignment='right')
 	ax2[0].text(0.96,0.1, 'mean offset='+"{:.2f}".format(off), transform = ax2[0].transAxes,horizontalalignment='right')
 
-	ax2[1].set_xlabel(r'observed A$_{\mathrm{H}\beta}$ - A$_{\mathrm{H}\alpha}$')
-	ax2[1].set_ylabel(r'Prospector calc best-fit A$_{\mathrm{H}\beta}$ - A$_{\mathrm{H}\alpha}$')
+	ax2[1].set_xlabel(r'observed log(F/F$_0$)$_{\mathrm{H}\alpha}$ - log(F/F$_0$)$_{\mathrm{H}\beta}$')
+	ax2[1].set_ylabel(r'Prospector calc best-fit log(F/F$_0$)$_{\mathrm{H}\alpha}$ - log(F/F$_0$)$_{\mathrm{H}\beta}$')
 	ax2[1] = threed_dutils.equalize_axes(ax2[1], pl_bdec_measured,pl_bdec_calc_bfit,axlims=axlims)
 	off,scat = threed_dutils.offset_and_scatter(pl_bdec_measured,pl_bdec_calc_bfit,biweight=True)
 	ax2[1].text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat), transform = ax2[1].transAxes,horizontalalignment='right')
 	ax2[1].text(0.96,0.1, 'mean offset='+"{:.2f}".format(off), transform = ax2[1].transAxes,horizontalalignment='right')
 
-	ax2[2].set_xlabel(r'observed A$_{\mathrm{H}\beta}$ - A$_{\mathrm{H}\alpha}$')
-	ax2[2].set_ylabel(r'Prospector CLOUDY best-fit A$_{\mathrm{H}\beta}$ - A$_{\mathrm{H}\alpha}$')
+	ax2[2].set_xlabel(r'observed log(F/F$_0$)$_{\mathrm{H}\alpha}$ - log(F/F$_0$)$_{\mathrm{H}\beta}$')
+	ax2[2].set_ylabel(r'Prospector CLOUDY best-fit log(F/F$_0$)$_{\mathrm{H}\alpha}$ - log(F/F$_0$)$_{\mathrm{H}\beta}$')
 	ax2[2] = threed_dutils.equalize_axes(ax2[2], pl_bdec_measured,pl_bdec_cloudy_bfit,axlims=axlims)
 	off,scat = threed_dutils.offset_and_scatter(pl_bdec_measured,pl_bdec_cloudy_bfit,biweight=True)
 	ax2[2].text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat), transform = ax2[2].transAxes,horizontalalignment='right')
@@ -2566,7 +2567,7 @@ def residual_plots(e_pinfo,hflag,outfolder):
 	yplot = bdec_resid
 	for ii in xrange(len(labels)): ax.errorbar(xplot[keys[ii]], yplot[keys[ii]], fmt='o',alpha=0.6,linestyle=' ',color=colors[ii],label=labels[ii])
 	ax.set_xlabel(r'log(observed/model) [H$_{\alpha}$]')
-	ax.set_ylabel(r'A$_{\mathrm{H}\beta}$ - A$_{\mathrm{H}\alpha}$ [model - observed]')
+	ax.set_ylabel(r'log(F/F$_0$)$_{\mathrm{H}\alpha}$ - log(F/F$_0$)$_{\mathrm{H}\beta}$ [model - observed]')
 	ax.axis((-0.8,0.8,-1.0,1.0))
 	ax.axhline(0, linestyle=':', color='grey')
 	ax.axvline(0, linestyle=':', color='grey')
@@ -2583,7 +2584,7 @@ def residual_plots(e_pinfo,hflag,outfolder):
 	ax[0].axhline(0, linestyle=':', color='grey')
 	ax[0].set_ylim(-np.max(np.abs(yplot)),np.max(np.abs(yplot)))
 	ax[0].set_xlabel(r'dust1/dust2')
-	ax[0].set_ylabel(r'A$_{\mathrm{H}\beta}$ - A$_{\mathrm{H}\alpha}$ [model - observed]')
+	ax[0].set_ylabel(r'log(F/F$_0$)$_{\mathrm{H}\alpha}$ - log(F/F$_0$)$_{\mathrm{H}\beta}$ [model - observed]')
 
 	yplot = ha_resid
 	for ii in xrange(len(labels)):
@@ -2605,7 +2606,7 @@ def residual_plots(e_pinfo,hflag,outfolder):
 	for ii in xrange(len(labels)):
 		ax[0].errorbar(xplot[keys[ii]], yplot[keys[ii]], fmt='o',alpha=0.6,linestyle=' ',color=colors[ii],label=labels[ii])
 	ax[0].set_xlabel(r'diffuse dust index')
-	ax[0].set_ylabel(r'A$_{\mathrm{H}\beta}$ - A$_{\mathrm{H}\alpha}$ [model - observed]')
+	ax[0].set_ylabel(r'log(F/F$_0$)$_{\mathrm{H}\alpha}$ - log(F/F$_0$)$_{\mathrm{H}\beta}$ [model - observed]')
 	ax[0].axhline(0, linestyle=':', color='grey')
 	ax[0].set_ylim(-np.max(np.abs(yplot)),np.max(np.abs(yplot)))
 
@@ -2633,7 +2634,7 @@ def residual_plots(e_pinfo,hflag,outfolder):
 	for ii in xrange(len(labels)):
 		ax[1].errorbar(mass[keys[ii]], bdec_resid[keys[ii]], fmt='o',alpha=0.6,linestyle=' ',color=colors[ii],label=labels[ii])
 	ax[1].set_xlabel(r'log(M)')
-	ax[1].set_ylabel(r'A$_{\mathrm{H}\beta}$ - A$_{\mathrm{H}\alpha}$ [model - measured]')
+	ax[1].set_ylabel(r'log(F/F$_0$)$_{\mathrm{H}\alpha}$ - log(F/F$_0$)$_{\mathrm{H}\beta}$ [model - measured]')
 	ax[1].axhline(0, linestyle=':', color='grey')
 	ax[1].set_ylim(-np.max(np.abs(bdec_resid)*1.05),np.max(np.abs(bdec_resid)*1.05))
 	
@@ -2651,7 +2652,7 @@ def residual_plots(e_pinfo,hflag,outfolder):
 	for ii in xrange(len(labels)):
 		ax[0].errorbar(xplot[keys[ii]], yplot[keys[ii]], fmt='o',alpha=0.6,linestyle=' ',color=colors[ii],label=labels[ii])
 	ax[0].set_xlabel(r'total attenuation [5500 $\AA$]')
-	ax[0].set_ylabel(r'A$_{\mathrm{H}\beta}$ - A$_{\mathrm{H}\alpha}$ [model - measured]')
+	ax[0].set_ylabel(r'log(F/F$_0$)$_{\mathrm{H}\alpha}$ - log(F/F$_0$)$_{\mathrm{H}\beta}$ [model - measured]')
 	ax[0].legend(loc=4)
 	ax[0].axhline(0, linestyle=':', color='grey')
 	ax[0].set_ylim(-np.max(np.abs(yplot)),np.max(np.abs(yplot)))
@@ -2675,7 +2676,7 @@ def residual_plots(e_pinfo,hflag,outfolder):
 	for ii in xrange(len(labels)):
 		ax[0].errorbar(xplot[keys[ii]], yplot[keys[ii]], fmt='o',alpha=0.6,linestyle=' ',color=colors[ii],label=labels[ii])
 	ax[0].set_xlabel(r'SFR$_{100 \mathrm{ Myr}}$ [M$_{\odot}$/yr]')
-	ax[0].set_ylabel(r'A$_{\mathrm{H}\beta}$ - A$_{\mathrm{H}\alpha}$ [model - measured]')
+	ax[0].set_ylabel(r'log(F/F$_0$)$_{\mathrm{H}\alpha}$ - log(F/F$_0$)$_{\mathrm{H}\beta}$ [model - measured]')
 	ax[0].legend(loc=3)
 	ax[0].axhline(0, linestyle=':', color='grey')
 	ax[0].set_ylim(-np.max(np.abs(yplot)),np.max(np.abs(yplot)))
@@ -2744,7 +2745,7 @@ def residual_plots(e_pinfo,hflag,outfolder):
 	for ii in xrange(len(labels)): ax.errorbar(xplot[keys[ii]], yplot[keys[ii]], fmt='o',alpha=0.6,linestyle=' ',color=colors[ii],label=labels[ii])
 	ax.axhline(0, linestyle=':', color='grey')
 	ax.set_xlabel(r'inclination [degrees]')
-	ax.set_ylabel(r'A$_{\mathrm{H}\beta}$ - A$_{\mathrm{H}\alpha}$ [model - measured]')
+	ax.set_ylabel(r'log(F/F$_0$)$_{\mathrm{H}\alpha}$ - log(F/F$_0$)$_{\mathrm{H}\beta}$ [model - measured]')
 	ax.set_ylim(-0.6,0.6)
 	ax.set_xlim(-5,95)
 
@@ -2829,7 +2830,7 @@ def residual_plots(e_pinfo,hflag,outfolder):
 	for ii in xrange(len(labels)): ax[5].errorbar(xplot[keys[ii]], yplot[keys[ii]], fmt='o',alpha=0.6,linestyle=' ',color=colors[ii],label=labels[ii])
 	ax[5].axhline(0, linestyle=':', color='grey')
 	ax[5].set_xlabel(r'inclination[degrees]')
-	ax[5].set_ylabel(r'A$_{\mathrm{H}\beta}$ - A$_{\mathrm{H}\alpha}$ [model - measured]')
+	ax[5].set_ylabel(r'log(F/F$_0$)$_{\mathrm{H}\alpha}$ - log(F/F$_0$)$_{\mathrm{H}\beta}$ [model - measured]')
 	ax[5].set_ylim(-0.5,0.5)
 
 	#plt.tight_layout()
@@ -3444,15 +3445,15 @@ def plot_comparison(alldata,outfolder):
 		          fmt=fmt, alpha=alpha, color=color,mew=mew)
 
 	# labels
-	balm.set_xlabel(r'A$_{\mathrm{H}\beta}$ - A$_{\mathrm{H}\alpha}$ [Prospector]',labelpad=13)
-	balm.set_ylabel(r'A$_{\mathrm{H}\beta}$ - A$_{\mathrm{H}\alpha}$ [MAGPHYS]')
+	balm.set_xlabel(r'log(F/F$_0$)$_{\mathrm{H}\alpha}$ - log(F/F$_0$)$_{\mathrm{H}\beta}$ [Prospector]',labelpad=13)
+	balm.set_ylabel(r'log(F/F$_0$)$_{\mathrm{H}\alpha}$ - log(F/F$_0$)$_{\mathrm{H}\beta}$ [MAGPHYS]')
 	balm = threed_dutils.equalize_axes(balm,bdec_prospector[:,0],bdec_magphys)
 
 	# text
 	off,scat = threed_dutils.offset_and_scatter(bdec_prospector[:,0],bdec_magphys,biweight=True)
-	balm.text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat)+' mags',
+	balm.text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat)+' dex',
 			  transform = balm.transAxes,horizontalalignment='right')
-	balm.text(0.96,0.1, 'mean offset='+"{:.2f}".format(off)+' mags',
+	balm.text(0.96,0.1, 'mean offset='+"{:.2f}".format(off)+' dex',
 		      transform = balm.transAxes,horizontalalignment='right')
 
 	#### Extinction

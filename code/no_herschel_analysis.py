@@ -26,6 +26,10 @@ color = '0.4'
 obscolor = '#FF420E'
 modcolor = '#375E97'
 
+hcolor = '#FF4E50'
+nhcolor = '#FC913A'
+nhweightedcolor = '#45ADA8'
+
 class jLogFormatter(mpl.ticker.LogFormatter):
 	'''
 	this changes the format from exponential to floating point.
@@ -73,11 +77,11 @@ def bdec_to_ext(bdec):
 	'''
 	return 2.5*np.log10(bdec/2.86)
 
-def make_plots(runname_nh='brownseds_np_nohersch',runname_h='brownseds_np', recollate_data = False):
+def make_plots(runname_nh='brownseds_np_nohersch',runname_h='brownseds_np', runname_nh_weighted=None,recollate_data = False):
 
 	outpickle = '/Users/joel/code/python/threedhst_bsfh/data/'+runname_nh+'_extradat.pickle'
 	if not os.path.isfile(outpickle) or recollate_data == True:
-		alldata = collate_data(runname_nh=runname_nh,runname_h=runname_h,outpickle=outpickle)
+		alldata = collate_data(runname_nh=runname_nh,runname_h=runname_h,outpickle=outpickle,runname_nh_weighted=runname_nh_weighted)
 	else:
 		with open(outpickle, "rb") as f:
 			alldata=pickle.load(f)
@@ -88,8 +92,8 @@ def make_plots(runname_nh='brownseds_np_nohersch',runname_h='brownseds_np', reco
 
 
 	fig, axes = plt.subplots(2, 2, figsize = (10,10))
-	plot_lir_pdf(alldata,outfolder)
-	plot_hflux_pdf(alldata,outfolder)
+
+	#### STILL USED
 	ax = np.ravel(axes)
 	plot_hfluxes(alldata,outfolder,ax=ax[0])
 	plot_lir(alldata,ax=ax[1],ax2=ax[2])
@@ -97,7 +101,12 @@ def make_plots(runname_nh='brownseds_np_nohersch',runname_h='brownseds_np', reco
 	fig.tight_layout()
 	fig.savefig(outfolder+'herschel_comparison.png',dpi=dpi)
 	plt.close()
+	plot_draine_li_posteriors(alldata,outfolder)
 
+
+	#### LEGACY
+	plot_lir_pdf(alldata,outfolder)
+	plot_hflux_pdf(alldata,outfolder)
 	plot_dustpars(alldata,outfolder=outfolder)
 
 	# if we're not doing this to mocks...
@@ -105,9 +114,100 @@ def make_plots(runname_nh='brownseds_np_nohersch',runname_h='brownseds_np', reco
 		plot_halpha(alldata,outfolder=outfolder)
 		plot_bdec(alldata,outfolder=outfolder)
 
+def create_step(x,add_edges=False):
+
+	step = np.empty((x.size*2,), dtype=x.dtype)
+	step[0::2] = x
+	step[1::2] = x
+
+	if add_edges:
+		 step = np.concatenate((np.atleast_1d(0.0),step,np.atleast_1d(0.0)))
+
+	return step
+
+def plot_draine_li_posteriors(alldata,outfolder):
+
+	### load data
+	dl_pars = np.loadtxt(os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/draine+07_table4.txt',comments='#', dtype = {'names':('qpah','umin','gamma'),'formats':(np.float,np.float,np.float)})
+	xname = [r'dust emission Q$_{\mathrm{PAH}}$',r'dust emission U$_{\mathrm{min}}$',r'dust emission $\gamma$']
+
+	### plot options
+	alpha = 0.9 # histogram edges
+	halpha = 0.15 # histogram filling
+	lw = 3 # thickness of histogram edges
+
+	### stack and plot data
+	fig, ax = plt.subplots(1,3, figsize = (18,6))
+	plt.subplots_adjust(hspace=0.12,left=0.1,right=0.95)
+	nbins = [10,10,10]
+	for i,name in enumerate(dl_pars.dtype.names):
+
+		### define bins
+		brown,brown_nh,brown_nh_weighted = np.array([]),np.array([]),np.array([])
+		for dat in alldata: 
+			brown = np.concatenate((brown,dat['hersch'][name+'_chain']))
+			brown_nh = np.concatenate((brown_nh,dat['nohersch'][name+'_chain']))
+			brown_nh_weighted = np.concatenate((brown_nh_weighted,dat['noherschweighted'][name+'_chain']))
+
+		'''
+		dl = dl_pars[name]
+		if name == 'gamma': # units...
+			dl /= 100 
+		'''
+
+		bmin = np.min([brown_nh_weighted.min(),brown.min(),brown_nh.min()])
+		bmax = np.max([brown_nh_weighted.max(),brown.max(),brown_nh.max()])
+		if name == 'gamma': # so concentrated
+			bmax = 0.3
+
+		bins = np.linspace(bmin*0.999,bmax*1.001,nbins[i])
+		
+		### generate PDFs
+		brown_nh_weighted_pdf,_ = np.histogram(brown_nh_weighted,bins=bins,density=True)
+		brown_pdf,_ = np.histogram(brown,bins=bins,density=True)
+		brown_nh_pdf,_ = np.histogram(brown_nh,bins=bins,density=True)
+
+		#### plot PDFs
+		# create step function
+		plotx = create_step(bins)
+		ploty_brown_nh_weighted = create_step(brown_nh_weighted_pdf,add_edges=True)
+		ploty_brown = create_step(brown_pdf,add_edges=True)
+		ploty_brown_nh = create_step(brown_nh_pdf,add_edges=True)
+
+		ax[i].plot(plotx,ploty_brown_nh,alpha=alpha,lw=lw,color=nhcolor)
+		ax[i].plot(plotx,ploty_brown,alpha=alpha,lw=lw,color=hcolor)
+		ax[i].plot(plotx,ploty_brown_nh_weighted,alpha=alpha,lw=lw,color=nhweightedcolor)
+
+		ax[i].fill_between(plotx, np.zeros_like(ploty_brown), ploty_brown, 
+						   color=hcolor,
+						   alpha=halpha)
+		ax[i].fill_between(plotx, np.zeros_like(ploty_brown_nh_weighted), ploty_brown_nh_weighted, 
+						   color=nhweightedcolor,
+						   alpha=halpha)
+		ax[i].fill_between(plotx, np.zeros_like(ploty_brown_nh), ploty_brown_nh, 
+						   color=nhcolor,
+						   alpha=halpha)
+
+		ax[i].set_xlabel(xname[i])
+		ax[i].set_ylabel('density')
+		ax[i].set_ylim(0.0,ax[i].get_ylim()[1]*1.125)
+		ax[i].set_xlim(bins.min(),bins.max())
+
+		'''
+		ax[i].text(0.96,0.93,r'Draine et al. 2007',transform=ax[i].transAxes,color=dlcolor,ha='right')
+		ax[i].text(0.96,0.88,'Prospector fit [Herschel]',transform=ax[i].transAxes,color=browncolor,ha='right')
+		ax[i].text(0.96,0.83,'Prospector fit [no Herschel]',transform=ax[i].transAxes,color=brownnhcolor,ha='right')
+		'''
+		ax[i].text(0.96,0.93,'fit to Herschel',transform=ax[i].transAxes,color=hcolor,ha='right')
+		ax[i].text(0.96,0.88,'no Herschel, wide priors',transform=ax[i].transAxes,color=nhcolor,ha='right')
+		ax[i].text(0.96,0.83,'no Herschel, constrained priors',transform=ax[i].transAxes,color=nhweightedcolor,ha='right')
+
+	plt.savefig(outfolder+'stacked_duste_posteriors.png',dpi=150)
+	plt.close()
+	os.system('open '+outfolder+'stacked_duste_posteriors.png')
+
 def plot_lir_pdf(alldata,outfolder):
 		
-
 	#### check parameter space
 	par = r'L$_{\mathrm{IR}}$' 
 
@@ -258,22 +358,12 @@ def ha_extinction(sample_results):
 
 	return quantile(ha_ext, [0.16, 0.5, 0.84])
 
-def redraw_chain(weighted_chain, draw_chain, parameter_chain):
-	'''
-	reweights the 2D chain by a 2D probability function from weighted_chain
-	propagate effects through parameter_chain
-	returns weighed parameter chain, of same size as input
-	'''	
-
-	#### generate 2D probability
-	print 1/0
-
-def collate_data(runname_nh=None, runname_h=None,outpickle=None,weighted_lir=True):
+def collate_data(runname_nh=None, runname_h=None, runname_nh_weighted=None,outpickle=None,weighted_lir=True):
 
 	filebase_nh, parm_basename_nh, ancilname_nh=threed_dutils.generate_basenames(runname_nh)
 	filebase_h, parm_basename_h, ancilname_h=threed_dutils.generate_basenames(runname_h)
 	
-	# if we're doing mocks...
+	#### if we're doing mocks...
 	try:
 		alldata = brown_io.load_alldata(runname=runname_h) # for observed Halpha
 		mock_flag = False
@@ -281,18 +371,36 @@ def collate_data(runname_nh=None, runname_h=None,outpickle=None,weighted_lir=Tru
 		mock_flag = True
 	objname = np.array([base.split('_')[-1] for base in filebase_nh])
 
+	### do that loop!
+	runnames = [runname_nh,runname_h]
+	filebase = [filebase_nh,filebase_h]
+
+	#### do we have weighted versions?
+	if runname_nh_weighted is not None:
+		index = filebase_nh[0].find(runname_nh)
+		filebase_nh_weighted = [line[:index] + runname_nh_weighted + line[index+len(runname_nh):] for line in filebase_nh]
+
 	out = []
 	for jj in xrange(len(filebase_nh)):
 
 		### load both 
 		outdat_nh = {}
+		outdat_nh_weighted = {}
 		outdat_h = {}
 		obs = {}
+
+		#### load no herschel runs
 		try:
 			sample_results_nh, powell_results_nh, model_nh = threed_dutils.load_prospector_data(filebase_nh[jj])
 		except:
 			print 'failed to load number ' + str(int(jj))
 			continue
+		try:
+			sample_results_nh_weighted, powell_results_nh_weighted, model_nh_weighted = threed_dutils.load_prospector_data(filebase_nh_weighted[jj])
+		except:
+			print 'failed to load number ' + str(int(jj))
+			continue
+
 
 		### match to filebase_nh
 		name = filebase_nh[jj].split('_')[-1]
@@ -300,7 +408,6 @@ def collate_data(runname_nh=None, runname_h=None,outpickle=None,weighted_lir=Tru
 		sample_results_h, powell_results_h, model_h = threed_dutils.load_prospector_data(match)
 
 		### save CLOUDY-marginalized Halpha
-
 		try: 
 			linenames = sample_results_nh['model_emline']['emnames']
 		except KeyError:
@@ -321,43 +428,15 @@ def collate_data(runname_nh=None, runname_h=None,outpickle=None,weighted_lir=Tru
 		mask = sample_results_h['obs']['phot_mask']
 		filtnames = np.array(sample_results_h['obs']['filternames'])[mask]
 
-		if weighted_lir:
-
-			### where are things?
-			parnames = np.array(sample_results_h['quantiles']['parnames'])
-			gamma_idx = parnames=='duste_gamma'
-			umin_idx = parnames=='duste_umin'
-
-			### generate weighting chain
-			gamma_chain = sample_results_h['flatchain'][:,gamma_idx]
-			umin_chain = sample_results_h['flatchain'][:,umin_idx]
-			lir_par_chain = np.concatenate((gamma_chain,umin_chain),axis=1)
-
-			### generate chain to draw in
-			# this is hard, must reconstruct from extra_output
-			# first maxprob_thetas
-			maxprob = np.max(sample_results['lnprobability'])
-			probind = sample_results['lnprobability'] == maxprob
-			thetas = sample_results['chain'][probind,:]
-			if type(thetas[0]) != np.dtype('float64'):
-				thetas = thetas[0]
-
-			gamma_chain = sample_results_nh['flatchain'][:,gamma_idx]
-			umin_chain = sample_results_nh['flatchain'][:,umin_idx]
-			lir_par_chain = np.concatenate((gamma_chain,umin_chain),axis=1)
-
-			### test parameter of interest...
-			par_chain = sample_results_nh['observables']['L_IR']
-
-
-		# 
+		# Fluxes
 		outdat_h['filtnames'] = filtnames
 		outdat_h['wave_effective'] = sample_results_h['obs']['wave_effective'][mask]
-		outdat_h['model_fluxes'] = sample_results_h['bfit']['mags'][mask]
+		outdat_h['model_fluxes'] = np.median(sample_results_h['observables']['mags'][mask],axis=1)
 		outdat_h['obs_fluxes'] = sample_results_h['obs']['maggies'][mask]
 		outdat_h['obs_errs'] = sample_results_h['obs']['maggies_unc'][mask]
 
-		outdat_nh['model_fluxes'] = sample_results_nh['bfit']['mags'][mask]
+		outdat_nh['model_fluxes'] = np.median(sample_results_nh['observables']['mags'][mask],axis=1)
+		outdat_nh_weighted['model_fluxes'] = np.median(sample_results_nh_weighted['observables']['mags'][mask],axis=1)
 
 		### are herschel fluxes in the posterior?
 		# open dictionary, find filter names
@@ -385,6 +464,20 @@ def collate_data(runname_nh=None, runname_h=None,outpickle=None,weighted_lir=Tru
 		pdf_dict['bins'] = bins
 		outdat_nh['pdf'] = pdf_dict		
 
+		### save PDF for gamma + umin parameters
+		parnames = np.array(sample_results_h['quantiles']['parnames'])
+		outdat_h['gamma_chain'] = sample_results_h['flatchain'][:,parnames=='duste_gamma'][:,0]
+		outdat_h['umin_chain'] = sample_results_h['flatchain'][:,parnames=='duste_umin'][:,0]
+		outdat_h['qpah_chain'] = sample_results_h['flatchain'][:,parnames=='duste_qpah'][:,0]
+
+		outdat_nh['gamma_chain'] = sample_results_nh['flatchain'][:,parnames=='duste_gamma'][:,0]
+		outdat_nh['umin_chain'] = sample_results_nh['flatchain'][:,parnames=='duste_umin'][:,0]
+		outdat_nh['qpah_chain'] = sample_results_nh['flatchain'][:,parnames=='duste_qpah'][:,0]
+
+		outdat_nh_weighted['gamma_chain'] = sample_results_nh_weighted['quantiles']['sample_flatchain'][:,parnames=='duste_gamma'][:,0]
+		outdat_nh_weighted['umin_chain'] = sample_results_nh_weighted['quantiles']['sample_flatchain'][:,parnames=='duste_umin'][:,0]
+		outdat_nh_weighted['qpah_chain'] = sample_results_nh_weighted['quantiles']['sample_flatchain'][:,parnames=='duste_qpah'][:,0]
+
 		### save model Balmer decrement & total extinction
 		epars = sample_results_nh['extras']['parnames']
 		bdec_idx = epars == 'bdec_cloudy'
@@ -396,6 +489,10 @@ def collate_data(runname_nh=None, runname_h=None,outpickle=None,weighted_lir=Tru
 		outdat_nh['text_q50'] = sample_results_nh['extras']['q50'][text_idx]
 		outdat_nh['text_q84'] = sample_results_nh['extras']['q84'][text_idx]
 		outdat_nh['text_q16'] = sample_results_nh['extras']['q16'][text_idx]
+
+		outdat_nh_weighted['text_q50'] = sample_results_nh_weighted['extras']['q50'][text_idx]
+		outdat_nh_weighted['text_q84'] = sample_results_nh_weighted['extras']['q84'][text_idx]
+		outdat_nh_weighted['text_q16'] = sample_results_nh_weighted['extras']['q16'][text_idx]
 
 		epars = sample_results_h['extras']['parnames']
 		bdec_idx = epars == 'bdec_cloudy'
@@ -411,6 +508,10 @@ def collate_data(runname_nh=None, runname_h=None,outpickle=None,weighted_lir=Tru
 		### save SFRs
 		epars = sample_results_nh['extras']['parnames']
 		idx = epars == 'sfr_100'
+		outdat_nh_weighted['sfr100_q50'] = sample_results_nh_weighted['extras']['q50'][idx]
+		outdat_nh_weighted['sfr100_q84'] = sample_results_nh_weighted['extras']['q84'][idx]
+		outdat_nh_weighted['sfr100_q16'] = sample_results_nh_weighted['extras']['q16'][idx]
+
 		outdat_nh['sfr100_q50'] = sample_results_nh['extras']['q50'][idx]
 		outdat_nh['sfr100_q84'] = sample_results_nh['extras']['q84'][idx]
 		outdat_nh['sfr100_q16'] = sample_results_nh['extras']['q16'][idx]
@@ -469,6 +570,7 @@ def collate_data(runname_nh=None, runname_h=None,outpickle=None,weighted_lir=Tru
 		### save both L_IRs
 		outdat_h['lir'] = sample_results_h['observables']['L_IR']
 		outdat_nh['lir'] = sample_results_nh['observables']['L_IR']
+		outdat_nh_weighted['lir'] = sample_results_nh_weighted['observables']['L_IR']
 
 		### now save the PDF outputs. assume here that median(Hersch) is truth.
 		# define fluxes in the log
@@ -485,7 +587,7 @@ def collate_data(runname_nh=None, runname_h=None,outpickle=None,weighted_lir=Tru
 		pdf_dict['bins'] = bins
 		outdat_nh['lir_pdf'] = pdf_dict		
 
-		outtemp = {'nohersch':outdat_nh,'hersch':outdat_h,'obs':obs}
+		outtemp = {'nohersch':outdat_nh,'hersch':outdat_h,'noherschweighted':outdat_nh_weighted,'obs':obs}
 		out.append(outtemp)
 		
 	pickle.dump(out,open(outpickle, "wb"))
@@ -496,40 +598,53 @@ def plot_hfluxes(alldata,outfolder,ax=None):
 	##### fluxes
 	fnames_all = alldata[0]['hersch']['filtnames'] # this has all of them, nothing is masked!
 	nfilter = fnames_all.shape[0]
-	nh_flux, h_flux, obs_flux,obs_errs = [np.zeros(shape=(nfilter,len(alldata)))+np.nan for i in xrange(4)]
+	nh_weighted_flux, nh_flux, h_flux, obs_flux, obs_errs = [np.zeros(shape=(nfilter,len(alldata)))+np.nan for i in xrange(5)]
 	for ii, dat in enumerate(alldata):
 		fname = dat['hersch']['filtnames']
 		for kk, name in enumerate(fname):
 			match = name == fnames_all
 			if match.sum() != 0:
 				nh_flux[match,ii] = dat['nohersch']['model_fluxes'][kk]
+				nh_weighted_flux[match,ii] = dat['noherschweighted']['model_fluxes'][kk]
 				h_flux[match,ii] = dat['hersch']['model_fluxes'][kk]
 				obs_flux[match,ii] = dat['hersch']['obs_fluxes'][kk]
 				obs_errs[match,ii] = dat['hersch']['obs_errs'][kk]
 
 	#### offsets and 1 sigma
-	flux_offset_h, flux_offset_nh = [np.zeros(shape=(nfilter,3)) for i in xrange(2)]
-	chi_h, chi_nh = [np.zeros(shape=(nfilter,3)) for i in xrange(2)]
-	chi_all_h, chi_all_nh = [], []
+	flux_offset_h, flux_offset_nh, flux_offset_nh_weighted = [np.zeros(shape=(nfilter,3)) for i in xrange(3)]
+	chi_h, chi_nh, chi_nh_weighted = [np.zeros(shape=(nfilter,3)) for i in xrange(3)]
+	chi_all_h, chi_all_nh, chi_all_nh_weighted = [], [], []
 	for nn in xrange(nfilter):
 		idx = np.isfinite(h_flux[nn,:]) # only include galaxies if they're observed in that band
+
+		### calculate offset from the observed fluxes
 		flux_offset_h[nn,:] = quantile(np.log10(h_flux[nn,idx]/obs_flux[nn,idx]),[0.5,0.84,0.16])
 		flux_offset_nh[nn,:] = quantile(np.log10(nh_flux[nn,idx]/obs_flux[nn,idx]),[0.5,0.84,0.16])
+		flux_offset_nh_weighted[nn,:] = quantile(np.log10(nh_weighted_flux[nn,idx]/obs_flux[nn,idx]),[0.5,0.84,0.16])
 
 		chi_h_temp = (h_flux[nn,idx]-obs_flux[nn,idx])/obs_errs[nn,idx]
 		chi_nh_temp = (nh_flux[nn,idx]-obs_flux[nn,idx])/obs_errs[nn,idx]
+		chi_nh_weighted_temp = (nh_weighted_flux[nn,idx]-obs_flux[nn,idx])/obs_errs[nn,idx]
+
 		chi_h[nn,:] = quantile(chi_h_temp,[0.5,0.84,0.16])
 		chi_nh[nn,:] = quantile(chi_nh_temp,[0.5,0.84,0.16])
+		chi_nh_weighted[nn,:] = quantile(chi_nh_weighted_temp,[0.5,0.84,0.16])
+
 		chi_all_h.append(chi_h_temp)
 		chi_all_nh.append(chi_nh_temp)
+		chi_all_nh_weighted.append(chi_nh_weighted_temp)
 
 	h_flux_err = threed_dutils.asym_errors(flux_offset_h[:,0],
-		                              flux_offset_h[:,1],
-		                              flux_offset_h[:,2],log=False)
+		                                   flux_offset_h[:,1],
+		                                   flux_offset_h[:,2],log=False)
 
 	nh_flux_err = threed_dutils.asym_errors(flux_offset_nh[:,0],
-		                               flux_offset_nh[:,1],
-		                               flux_offset_nh[:,2],log=False)
+		                                    flux_offset_nh[:,1],
+		                                    flux_offset_nh[:,2],log=False)
+
+	nh_weighted_flux_err = threed_dutils.asym_errors(flux_offset_nh_weighted[:,0],
+		                                             flux_offset_nh_weighted[:,1],
+		                                             flux_offset_nh_weighted[:,2],log=False)
 
 	h_chi_err = threed_dutils.asym_errors(chi_h[:,0],
 		                              chi_h[:,1],
@@ -538,16 +653,19 @@ def plot_hfluxes(alldata,outfolder,ax=None):
 	nh_chi_err = threed_dutils.asym_errors(chi_nh[:,0],
 		                               chi_nh[:,1],
 		                               chi_nh[:,2],log=False)
+	nh_weighted_chi_err = threed_dutils.asym_errors(chi_nh_weighted[:,0],
+		                               chi_nh_weighted[:,1],
+		                               chi_nh_weighted[:,2],log=False)
 
 	##### wavelength array
 	wave_effective = alldata[0]['hersch']['wave_effective']/1e4 # again, this has all of them!
 
 	### LIR
-	ax.errorbar(wave_effective,chi_h[:,0],yerr=h_chi_err,fmt='o',alpha=0.8,color=hcolor)
-	ax.errorbar(wave_effective,chi_nh[:,0],yerr=nh_chi_err,fmt='o',alpha=0.8,color=nhcolor)
+	ax.errorbar(wave_effective,chi_h[:,0]-chi_nh[:,0],yerr=nh_chi_err,fmt='o',alpha=0.8,color=nhcolor)
+	ax.errorbar(wave_effective,chi_h[:,0]-chi_nh_weighted[:,0],yerr=nh_weighted_chi_err,fmt='o',alpha=0.8,color=nhweightedcolor)
 
 	ax.set_xlabel(r'observed wavelength [$\mu$m]')
-	ax.set_ylabel(r'$\chi$')
+	ax.set_ylabel(r'$\chi_{\mathrm{Herschel}}$ - $\chi_{\mathrm{no-Herschel}}$ ')
 
 	ax.set_xscale('log',nonposx='clip',subsx=(np.atleast_1d(1)))
 	ax.xaxis.set_minor_formatter(minorFormatter)
@@ -555,21 +673,20 @@ def plot_hfluxes(alldata,outfolder,ax=None):
 
 	### add line
 	ax.set_xlim(0.1,800)
-	ax.set_ylim(-2.5,2.5)
+	ax.set_ylim(-25,25)
 	ax.plot(ax.get_xlim(),[0.0,0.0],linestyle='--',lw=2,color='black')
 
 	### add text
 	fs = 14
-	ax.text(0.05,0.92,'fit to Herschel data',color=hcolor,transform=ax.transAxes,fontsize=fs)
-	ax.text(0.05,0.86,'fit without Herschel data',color=nhcolor,transform=ax.transAxes,fontsize=fs)
+	ax.text(0.05,0.92,'wide IR priors',transform=ax.transAxes,color=nhcolor,ha='left')
+	ax.text(0.05,0.87,'constrained IR priors',transform=ax.transAxes,color=nhweightedcolor,ha='left')
 
 	### UV-MIR CHISQ
 	idx = np.array([False if 'herschel' in filter_name else True for filter_name in fnames_all],dtype=bool)
-	chisq_h = (chi_h[idx,0]**2).sum()
 	chisq_nh = (chi_nh[idx,0]**2).sum()
-	ax.text(0.05,0.12,r'UV-MIR $\Sigma \chi^2$='+"{:.2f}".format(chisq_h),color=hcolor,transform=ax.transAxes,fontsize=fs)
-	ax.text(0.05,0.06,r'UV-MIR $\Sigma \chi^2$='+"{:.2f}".format(chisq_nh),color=nhcolor,transform=ax.transAxes,fontsize=fs)
-
+	chisq_nh_weighted = (chi_nh_weighted[idx,0]**2).sum()
+	ax.text(0.05,0.12,r'UV-MIR $\Sigma \chi^2$='+"{:.1f}".format(chisq_nh),color=nhcolor,transform=ax.transAxes,fontsize=fs)
+	ax.text(0.05,0.06,r'UV-MIR $\Sigma \chi^2$='+"{:.1f}".format(chisq_nh),color=nhweightedcolor,transform=ax.transAxes,fontsize=fs)
 
 	#### DELTA CHI SQUARED PLOT
 	fig, ax1 = plt.subplots(1, 1, figsize = (8,8))
@@ -636,19 +753,37 @@ def plot_totalext(alldata,ax=None):
 		                                              nohersch_totalext_errup,
 		                                              nohersch_totalext_errdo,log=False)
 
-	ax.errorbar(hersch_totalext,nohersch_totalext,xerr=hersch_totalext_err,yerr=nohersch_totalext_err,fmt='o',alpha=0.8,color=color)
-	ax.set_xlabel(r'total 5500 $\AA$ optical depth [fit with Herschel]')
-	ax.set_ylabel(r'total 5500 $\AA$ optical depth [no Herschel]')
+	nohersch_weighted_totalext = np.array([dat['noherschweighted']['text_q50'] for dat in alldata])
+	nohersch_weighted_totalext_errup = np.array([dat['noherschweighted']['text_q84'] for dat in alldata])
+	nohersch_weighted_totalext_errdo = np.array([dat['noherschweighted']['text_q16'] for dat in alldata])
+	nohersch_weighted_totalext_err = threed_dutils.asym_errors(nohersch_weighted_totalext,
+		                                              nohersch_weighted_totalext_errup,
+		                                              nohersch_weighted_totalext_errdo,log=False)
+
+
+	ax.errorbar(hersch_totalext,hersch_totalext-nohersch_totalext,xerr=hersch_totalext_err,yerr=nohersch_totalext_err,fmt='o',alpha=0.8,color=nhcolor)
+	ax.errorbar(hersch_totalext,hersch_totalext-nohersch_weighted_totalext,xerr=hersch_totalext_err,yerr=nohersch_weighted_totalext_err,fmt='o',alpha=0.8,color=nhweightedcolor)
+
+	ax.set_xlabel(r'$\tau_{5500,\mathrm{Herschel}}$')
+	ax.set_ylabel(r'$\tau_{5500,\mathrm{Herschel}}$ - $\tau_{5500,\mathrm{no-Herschel}}$')
 
 	ax.xaxis.set_major_locator(MaxNLocator(5))
 	ax.yaxis.set_major_locator(MaxNLocator(5))
 
 	off,scat = threed_dutils.offset_and_scatter(hersch_totalext,nohersch_totalext,biweight=True)
-	ax.text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat)+ ' dex',
-			  transform = ax.transAxes,horizontalalignment='right',fontsize=global_fs)
-	ax.text(0.96,0.10, 'mean offset='+"{:.2f}".format(off) + ' dex',
-			      transform = ax.transAxes,horizontalalignment='right',fontsize=global_fs)
-	ax = threed_dutils.equalize_axes(ax, hersch_totalext,nohersch_totalext)
+	ax.text(0.96,0.05, 'mean offset='+"{:.2f}".format(off) + ' dex',
+			      transform = ax.transAxes,horizontalalignment='right',color=nhcolor)
+	off,scat = threed_dutils.offset_and_scatter(hersch_totalext,nohersch_weighted_totalext,biweight=True)
+	ax.text(0.96,0.11, 'mean offset='+"{:.2f}".format(off) + ' dex',
+			      transform = ax.transAxes,horizontalalignment='right',color=nhweightedcolor)
+
+	ax.text(0.05,0.92,'wide IR priors',transform=ax.transAxes,color=nhcolor,ha='left')
+	ax.text(0.05,0.86,'constrained IR priors',transform=ax.transAxes,color=nhweightedcolor,ha='left')
+
+	ax.plot(ax.get_xlim(),[0.0,0.0],linestyle='--',lw=2,color='black')
+
+	ylim = np.max(np.abs(ax.get_ylim()))+0.2
+	ax.set_ylim(-ylim,ylim)
 
 def plot_lir(alldata,ax=None,ax2=None):
 
@@ -672,7 +807,17 @@ def plot_lir(alldata,ax=None,ax2=None):
 	nohersch_lir_do = np.log10([quantile(dat['nohersch']['lir'],[0.16])[0] for dat in alldata])[good]
 	nohersch_lir_err = threed_dutils.asym_errors(nohersch_lir,nohersch_lir_up,nohersch_lir_do,log=False)
 
+	noherschweighted_lir = np.log10([quantile(dat['noherschweighted']['lir'],[0.5])[0] for dat in alldata])[good]
+	noherschweighted_lir_up = np.log10([quantile(dat['noherschweighted']['lir'],[0.84])[0] for dat in alldata])[good]
+	noherschweighted_lir_do = np.log10([quantile(dat['noherschweighted']['lir'],[0.16])[0] for dat in alldata])[good]
+	noherschweighted_lir_err = threed_dutils.asym_errors(noherschweighted_lir,noherschweighted_lir_up,noherschweighted_lir_do,log=False)
+
 	##### SFRs
+	nhweighted_sfr100 = np.log10(np.clip(np.squeeze([dat['noherschweighted']['sfr100_q50'] for dat in alldata]),minsfr,np.inf))
+	nhweighted_sfr100_up = np.log10(np.clip(np.squeeze([dat['noherschweighted']['sfr100_q84'] for dat in alldata]),minsfr,np.inf))
+	nhweighted_sfr100_do = np.log10(np.clip(np.squeeze([dat['noherschweighted']['sfr100_q16'] for dat in alldata]),minsfr,np.inf))
+	nhweighted_sfr100_err = threed_dutils.asym_errors(nhweighted_sfr100,nhweighted_sfr100_up,nhweighted_sfr100_do,log=False)
+
 	nh_sfr100 = np.log10(np.clip(np.squeeze([dat['nohersch']['sfr100_q50'] for dat in alldata]),minsfr,np.inf))
 	nh_sfr100_up = np.log10(np.clip(np.squeeze([dat['nohersch']['sfr100_q84'] for dat in alldata]),minsfr,np.inf))
 	nh_sfr100_do = np.log10(np.clip(np.squeeze([dat['nohersch']['sfr100_q16'] for dat in alldata]),minsfr,np.inf))
@@ -684,34 +829,56 @@ def plot_lir(alldata,ax=None,ax2=None):
 	h_sfr100_err = threed_dutils.asym_errors(h_sfr100,h_sfr100_up,h_sfr100_do,log=False)
 
 	### LIR
-	ax.errorbar(hersch_lir,nohersch_lir,xerr=hersch_lir_err,yerr=nohersch_lir_err,fmt='o',alpha=0.8,color=color)
-	ax.set_xlabel('log(model L$_{\mathrm{IR}}$) [fit with Herschel]')
-	ax.set_ylabel('log(model L$_{\mathrm{IR}}$) [no Herschel]')
+	ax.errorbar(hersch_lir,hersch_lir-nohersch_lir,xerr=hersch_lir_err,yerr=nohersch_lir_err,fmt='o',alpha=0.8,color=nhcolor)
+	ax.errorbar(hersch_lir,hersch_lir-noherschweighted_lir,xerr=hersch_lir_err,yerr=noherschweighted_lir_err,fmt='o',alpha=0.8,color=nhweightedcolor)
+	ax.set_xlabel(r'log(L$_{\mathrm{IR,Herschel}}$)')
+	ax.set_ylabel(r'log(L$_{\mathrm{IR,Herschel}}$) - log(L$_{\mathrm{IR,no-Herschel}}$)')
 
 	ax.xaxis.set_major_locator(MaxNLocator(5))
 	ax.yaxis.set_major_locator(MaxNLocator(5))
 
+	ax.text(0.05,0.92,'wide IR priors',transform=ax.transAxes,color=nhcolor,ha='left')
+	ax.text(0.05,0.87,'constrained IR priors',transform=ax.transAxes,color=nhweightedcolor,ha='left')
+
 	off,scat = threed_dutils.offset_and_scatter(hersch_lir,nohersch_lir,biweight=True)
-	ax.text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat)+ ' dex',
-			  transform = ax.transAxes,horizontalalignment='right',fontsize=global_fs)
-	ax.text(0.96,0.10, 'mean offset='+"{:.2f}".format(off) + ' dex',
-			      transform = ax.transAxes,horizontalalignment='right',fontsize=global_fs)
-	ax = threed_dutils.equalize_axes(ax, hersch_lir,nohersch_lir)
+	ax.text(0.96,0.05, 'mean offset='+"{:.2f}".format(off) + ' dex',
+			      transform = ax.transAxes,horizontalalignment='right',color=nhcolor)
+	off,scat = threed_dutils.offset_and_scatter(hersch_lir,noherschweighted_lir,biweight=True)
+	ax.text(0.96,0.11, 'mean offset='+"{:.2f}".format(off) + ' dex',
+			      transform = ax.transAxes,horizontalalignment='right',color=nhweightedcolor)
+
+	xlim = ax.get_xlim()
+	ax.plot(ax.get_xlim(),[0.0,0.0],linestyle='--',lw=2,color='black')
+	ax.set_xlim(xlim)
+
+	ylim = np.max(np.abs(ax.get_ylim()))+0.2
+	ax.set_ylim(-ylim,ylim)
 
 	### SFR 100
-	ax2.errorbar(h_sfr100,nh_sfr100,xerr=h_sfr100_err,yerr=nh_sfr100_err,fmt='o',alpha=0.8,color=color)
-	ax2.set_xlabel('log(SFR$_{100 \mathrm{Myr}}$) [fit with Herschel]')
-	ax2.set_ylabel('log(SFR$_{100 \mathrm{Myr}}$) [no Herschel]')
+	ax2.errorbar(h_sfr100,h_sfr100-nh_sfr100,xerr=h_sfr100_err,yerr=nh_sfr100_err,fmt='o',alpha=0.8,color=nhcolor)
+	ax2.errorbar(h_sfr100,h_sfr100-nhweighted_sfr100,xerr=h_sfr100_err,yerr=nhweighted_sfr100_err,fmt='o',alpha=0.8,color=nhweightedcolor)
+	ax2.set_xlabel(r'log(SFR$_{\mathrm{Herschel}}$)')
+	ax2.set_ylabel(r'log(SFR$_{\mathrm{Herschel}}$) - log(SFR$_{\mathrm{no-Herschel}}$)')
 
 	ax2.xaxis.set_major_locator(MaxNLocator(5))
 	ax2.yaxis.set_major_locator(MaxNLocator(5))
 
 	off,scat = threed_dutils.offset_and_scatter(h_sfr100,nh_sfr100,biweight=True)
-	ax2.text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat)+ ' dex',
-			  transform = ax2.transAxes,horizontalalignment='right',fontsize=global_fs)
-	ax2.text(0.96,0.10, 'mean offset='+"{:.2f}".format(off) + ' dex',
-			      transform = ax2.transAxes,horizontalalignment='right',fontsize=global_fs)
-	ax2 = threed_dutils.equalize_axes(ax2, h_sfr100,nh_sfr100)
+	ax2.text(0.96,0.05, 'mean offset='+"{:.2f}".format(off) + ' dex',
+			      transform = ax2.transAxes,horizontalalignment='right',color=nhcolor)
+	off,scat = threed_dutils.offset_and_scatter(h_sfr100,nhweighted_sfr100,biweight=True)
+	ax2.text(0.96,0.11, 'mean offset='+"{:.2f}".format(off) + ' dex',
+			      transform = ax2.transAxes,horizontalalignment='right',color=nhweightedcolor)
+
+	ax2.text(0.05,0.92,'wide IR priors',transform=ax2.transAxes,color=nhcolor,ha='left')
+	ax2.text(0.05,0.87,'constrained IR priors',transform=ax2.transAxes,color=nhweightedcolor,ha='left')
+
+	xlim = ax2.get_xlim()
+	ax2.plot(ax2.get_xlim(),[0.0,0.0],linestyle='--',lw=2,color='black')
+	ax2.set_xlim(xlim)
+
+	ylim = np.max(np.abs(ax2.get_ylim()))+0.2
+	ax2.set_ylim(-ylim,ylim)
 
 def plot_halpha(alldata,outfolder=None):
 

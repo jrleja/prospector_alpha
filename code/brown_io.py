@@ -1,4 +1,5 @@
 import pickle
+import numpy as np
 
 #### where do alldata pickle files go?
 outpickle = '/Users/joel/code/magphys/data/pickles'
@@ -23,3 +24,56 @@ def save_alldata(alldata,runname='brownseds'):
 
 	output = outpickle+'/'+runname+'_alldata.pickle'
 	pickle.dump(alldata,open(output, "wb"))
+
+def write_results(alldata,outfolder):
+	'''
+	create table, write out in AASTeX format
+	'''
+
+	data, errup, errdown, names, fmts, objnames = [], [], [], [], [], []
+	objnames = [dat['objname'] for dat in alldata]
+
+	#### gather regular parameters
+	par_to_write = ['logmass','dust2','logzsol']
+	theta_names = alldata[0]['pquantiles']['parnames']
+	names.extend([r'log(M/M$_{\odot}$)',r'$\tau_{\mathrm{diffuse}}$',r'log(Z/Z$_{\odot}$)'])
+	fmts.extend(["{:.2f}","{:.2f}","{:.2f}"])
+	for p in par_to_write: 
+		idx = theta_names == p
+		data.append([dat['pquantiles']['q50'][idx][0] for dat in alldata])
+		errup.append([dat['pquantiles']['q84'][idx][0]-dat['pquantiles']['q50'][idx][0] for dat in alldata])
+		errdown.append([dat['pquantiles']['q50'][idx][0]-dat['pquantiles']['q16'][idx][0] for dat in alldata])
+
+	#### gather error parameters
+	epar_to_write = ['sfr_100','ssfr_100','half_time']
+	theta_names = alldata[0]['pextras']['parnames']
+	names.extend([r'log(SFR)',r'log(sSFR)',r'log(t$_{\mathrm{half}}$)'])
+	fmts.extend(["{:.2f}","{:.2f}","{:.2f}"])
+	for p in epar_to_write: 
+		idx = theta_names == p
+		data.append([np.log10(dat['pextras']['q50'][idx][0]) for dat in alldata])
+		errup.append([np.log10(dat['pextras']['q84'][idx][0]) - np.log10(dat['pextras']['q50'][idx][0]) for dat in alldata])
+		errdown.append([np.log10(dat['pextras']['q50'][idx][0])-np.log10(dat['pextras']['q16'][idx][0]) for dat in alldata])
+
+	#### write formatted data (for putting into the above)
+	nobj = len(objnames)
+	ncols = len(data)
+	with open(outfolder+'results.dat', 'w') as f:
+		for i in xrange(nobj):
+			f.write(objnames[i])
+			for j in xrange(ncols):
+				string = ' & $'+fmts[j].format(data[j][i])+'^{+'+fmts[j].format(errup[j][i])+'}_{-'+fmts[j].format(errdown[j][i])+'}$'
+				f.write(string)
+			f.write(' \\\ \n')
+
+
+
+
+
+
+
+
+
+
+
+

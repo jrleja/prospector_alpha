@@ -43,7 +43,7 @@ def maxprob_model(sample_results,sps):
 	return thetas, maxprob
 
 
-def calc_extra_quantities(sample_results, ncalc=2000):
+def calc_extra_quantities(sample_results, ncalc=2000, ir_priors=False):
 
 	'''' 
 	CALCULATED QUANTITIES
@@ -83,6 +83,19 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 	in_priors = np.isfinite(threed_dutils.chop_chain(sample_results['lnprobability'])) == True
 	flatchain = copy(sample_results['flatchain'][in_priors])
 	np.random.shuffle(flatchain)
+
+	### cut in IR priors
+	if ir_priors == True:
+		gamma_idx = np.array(parnames) == 'duste_gamma'
+		umin_idx = np.array(parnames) == 'duste_umin'
+		qpah_idx = np.array(parnames) == 'duste_qpah'
+		gamma_prior = 0.15
+		umin_prior = 15
+		qpah_prior = 7
+		good = (flatchain[:,gamma_idx] < gamma_prior) & \
+		       (flatchain[:,umin_idx] < umin_prior) & \
+		       (flatchain[:,qpah_idx] < qpah_prior)
+		flatchain = flatchain[np.squeeze(good),:]
 	flatchain[0,:] = maxthetas
 
 	##### set up time vector for full SFHs
@@ -193,7 +206,7 @@ def calc_extra_quantities(sample_results, ncalc=2000):
 	##### CALCULATE Q16,Q50,Q84 FOR VARIABLE PARAMETERS
 	ntheta = len(sample_results['initial_theta'])
 	q_16, q_50, q_84 = (np.zeros(ntheta)+np.nan for i in range(3))
-	for kk in xrange(ntheta): q_16[kk], q_50[kk], q_84[kk] = corner.quantile(sample_results['flatchain'][:,kk], [0.16, 0.5, 0.84])
+	for kk in xrange(ntheta): q_16[kk], q_50[kk], q_84[kk] = corner.quantile(sample_flatchain[:,kk], [0.16, 0.5, 0.84])
 	
 	##### CALCULATE Q16,Q50,Q84 FOR EXTRA PARAMETERS
 	extra_flatchain = np.dstack((half_time, sfr_10, sfr_100, sfr_1000, ssfr_10, ssfr_100, totmass, emp_ha, bdec_cloudy,bdec_calc, ext_5500))[0]

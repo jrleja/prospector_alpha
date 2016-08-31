@@ -19,7 +19,7 @@ modcolor = '#375E97'
 dpi = 120
 
 def bdec_to_ext(bdec):
-	return 2.5*np.log10(bdec/2.86)
+	return np.log10(bdec/2.86)
 
 def norm_resid(fit,truth):
 	
@@ -658,13 +658,13 @@ def plot_spectral_parameters(alldata,outfolder=None):
 	yerr = threed_dutils.asym_errors(y,yup,ydown,log=False)
 
 	ax[ii+2].errorbar(x,y,yerr,fmt='o',alpha=0.8,color='#1C86EE')
-	ax[ii+2].set_xlabel(r'true A$_{\mathrm{H}\beta}$ - A$_{\mathrm{H}\alpha}$ [magnitudes]')
-	ax[ii+2].set_ylabel(r'fit A$_{\mathrm{H}\beta}$ - A$_{\mathrm{H}\alpha}$ [magnitudes]')
+	ax[ii+2].set_xlabel(r'true log(F/F$_0$)$_{\mathrm{H}\alpha}$ - log(F/F$_0$)$_{\mathrm{H}\beta}$')
+	ax[ii+2].set_ylabel(r'fit log(F/F$_0$)$_{\mathrm{H}\alpha}$ - log(F/F$_0$)$_{\mathrm{H}\beta}$')
 
 	ax[ii+2] = threed_dutils.equalize_axes(ax[ii+2], x, y)
 	mean_offset,scat = threed_dutils.offset_and_scatter(x,y)
-	ax[ii+2].text(0.96,0.12, 'scatter='+"{:.2f}".format(scat)+' mags',transform = ax[ii+2].transAxes,ha='right')
-	ax[ii+2].text(0.96,0.05, 'mean offset='+"{:.2f}".format(mean_offset)+' mags', transform = ax[ii+2].transAxes,ha='right')
+	ax[ii+2].text(0.96,0.12, 'scatter='+"{:.2f}".format(scat)+' dex',transform = ax[ii+2].transAxes,ha='right')
+	ax[ii+2].text(0.96,0.05, 'mean offset='+"{:.2f}".format(mean_offset)+' dex', transform = ax[ii+2].transAxes,ha='right')
 
 	ax[ii+2].xaxis.set_major_locator(MaxNLocator(5))
 	ax[ii+2].yaxis.set_major_locator(MaxNLocator(5))
