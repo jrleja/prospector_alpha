@@ -200,7 +200,7 @@ def find_sfh_params(model,theta,obs,sps,sm=None):
 	# create mass fractions
 	if out['sfr_fraction'].shape[0] != 0:
 		out['sfr_fraction_full'] = np.concatenate((out['sfr_fraction'],np.atleast_1d(1-out['sfr_fraction'].sum())))
-		out['mass_fraction'] = out['sfr_fraction_full']*sps._time_per_bin
+		out['mass_fraction'] = out['sfr_fraction_full']*sps._time_per_bin / sps.bin_mass_fraction
 		out['mass_fraction'] /= out['mass_fraction'].sum()
 
 	# Need this because mass is 
@@ -781,15 +781,7 @@ def gas_met(nii_ha,oiii_hb):
 	#### find solutions
 	c1 = [-0.7732 - np.log10(nii_ha), 1.2357, -0.2811, -0.7201, -0.3330]
 	c2 = [0.1549 - np.log10(oiii_hb), -1.5031, -0.9790, -0.0297]
-	'''
-	solutions = np.polynomial.polynomial.polyroots(coeffs)
 
-	### only keep reasonable solutions
-	keep = (np.real(solutions) > -2.0) & (np.real(solutions) < 0.4)
-	answer = np.unique(np.real(solutions[keep]))
-	if np.unique(np.real(solutions[keep])).shape[0] != 1:
-		print 1/0 # we have an unreasonable solution, or multiple solutions
-	'''
 	#### dummy metallicity array, NII / Ha
 	# used to determine where to look with OIII + Hb
 	# since that is double-valued

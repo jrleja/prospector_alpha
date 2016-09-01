@@ -9,6 +9,10 @@ from corner import quantile
 import math
 import os
 
+### time per bin
+# must recalculate if the bins change!
+time_per_bin = np.array([1e+08,2.16227766e+08,6.83772234e+08,2.16227766e+09,3.14729578e+09,7.45932607e+09])
+
 mpl.rcParams.update({'font.size': 18})
 mpl.rcParams.update({'font.weight': 500})
 mpl.rcParams.update({'axes.labelweight': 500})
@@ -55,13 +59,26 @@ def salim_mainsequence(mass,ssfr=False,**junk):
 	salim_sfr = np.log10(10**ssfr_salim*10**mass)
 	return salim_sfr
 
+def calculate_mean(frac, ndraw=5e5):
+	'''
+	given list of N PDFs
+	calculate the mean by sampling from the PDFs
+	'''
+	nobj = len(frac)
+	mean_array = np.zeros(shape=(ndraw,nobj))
+	for i,f in enumerate(frac): mean_array[:,i] = np.random.choice(f,size=ndraw)
+	mean_pdf = mean_array.mean(axis=1)
+	mean, errup, errdown = quantile(mean_pdf, [0.5,0.84,0.16])
+
+	return mean, errup, errdown
+
 def stack_data(alldata,sigma_sf=None,nbins_horizontal=None,low_mass_cutoff=None,
                show_disp=None,nbins_vertical=None,**junk):
 
 	'''
 	stack in fraction for now
 	not quite sure what it means physically but it has a ~monotonic relationship with sSFR 
-	take the median so that you're not worried about the nonlinear scaling
+	take the mean
 	'''
 
 	### parameter names
@@ -111,36 +128,32 @@ def stack_data(alldata,sigma_sf=None,nbins_horizontal=None,low_mass_cutoff=None,
 
 	percentiles = [0.5,show_disp[1],show_disp[0]]
 
-	### for each bin
+	### for each main sequence bin
 	for j in xrange(nbins_horizontal):
 		tdict = {}
-		tdict['median'],tdict['err'],tdict['errup'],tdict['errdown'] = [],[],[],[]
+		tdict['mean'],tdict['err'],tdict['errup'],tdict['errdown'] = [],[],[],[]
 
 		### what's in the bin?
 		in_bin = (outdict['logm'][on_ms] >= sfr_frac['mass_bins'][j]) & (outdict['logm'][on_ms] <= sfr_frac['mass_bins'][j+1])
 		tdict['logm'],tdict['logsfr'] = outdict['logm'][on_ms][in_bin],outdict['logsfr'][on_ms][in_bin]
-		
-		### for each fraction
-		for par in frac_parnames:
 
-			### pull out fraction
-			frac = np.array([dat['pquantiles']['q50'][parnames==par] for dat in np.array(alldata)[on_ms][in_bin]])
+		### calculate sSFR chains (fn / sum(tn*fn))
+		outfrac = []
+		for dat in np.array(alldata)[on_ms][in_bin]:
+			frac = dat['pquantiles']['random_chain'][:,fracpars]
+			frac = np.concatenate((frac, (1-frac.sum(axis=1))[:,None]),axis=1)
+			norm = (frac * time_per_bin).sum(axis=1) ### sum(fn*tn)
+			outfrac.append(frac/norm[:,None])
 
-			### distribute array information
-			median,errup,errdown = quantile(frac, percentiles)
-			tdict['median'].append(median)
+		### calculate statistics for each SFR bin
+		for i in xrange(time_per_bin.shape[0]):
+			frac = [f[:,i] for f in outfrac]
+			mean,errup,errdown = calculate_mean(frac)
+			tdict['mean'].append(mean)
 			tdict['errup'].append(errup)
 			tdict['errdown'].append(errdown)
 
-		### pull last fraction from chain
-		last_frac = [1-dat['pquantiles']['random_chain'][:,fracpars].sum(axis=1) for dat in np.array(alldata)[on_ms][in_bin]]
-
-		median,errup,errdown = quantile(last_frac, percentiles)
-		tdict['median'].append(median)
-		tdict['errup'].append(errup)
-		tdict['errdown'].append(errdown)
-
-		tdict['err'] = threed_dutils.asym_errors(np.array(tdict['median']),
+		tdict['err'] = threed_dutils.asym_errors(np.array(tdict['mean']),
 			                                     np.array(tdict['errup']),
 			                                     np.array(tdict['errdown']))
 
@@ -149,12 +162,11 @@ def stack_data(alldata,sigma_sf=None,nbins_horizontal=None,low_mass_cutoff=None,
 
 	### stack vertical
 	sfr_vert = {}
-
 	### for each bin
 	for j in xrange(nbins_vertical):
 
 		tdict = {}
-		tdict['median'],tdict['err'],tdict['errup'],tdict['errdown'] = [],[],[],[]
+		tdict['mean'],tdict['err'],tdict['errup'],tdict['errdown'] = [],[],[],[]
 
 		### what's in the bin?
 		in_bin = (outdict['logm'] > low_mass_cutoff) & \
@@ -162,26 +174,23 @@ def stack_data(alldata,sigma_sf=None,nbins_horizontal=None,low_mass_cutoff=None,
 				 ((outdict['logsfr'] - outdict['logsfr_ms']) < sigma_sf*2*(j-1))
 		tdict['logm'],tdict['logsfr'] = outdict['logm'][in_bin],outdict['logsfr'][in_bin]
 
-		### for each fraction
-		for par in frac_parnames:
+		### calculate sSFR chains (fn / sum(tn*fn))
+		outfrac = []
+		for dat in np.array(alldata)[in_bin]:
+			frac = dat['pquantiles']['random_chain'][:,fracpars]
+			frac = np.concatenate((frac, (1-frac.sum(axis=1))[:,None]),axis=1)
+			norm = (frac * time_per_bin).sum(axis=1) ### sum(fn*tn)
+			outfrac.append(frac/norm[:,None])
 
-			### pull out fraction
-			frac = np.array([dat['pquantiles']['q50'][parnames==par] for dat in np.array(alldata)[in_bin]])
-
-			### distribute array information
-			median,errup,errdown = quantile(frac, percentiles)
-			tdict['median'].append(median)
+		### calculate statistics for each SFR bin
+		for i in xrange(time_per_bin.shape[0]):
+			frac = [f[:,i] for f in outfrac]
+			mean,errup,errdown = calculate_mean(frac)
+			tdict['mean'].append(mean)
 			tdict['errup'].append(errup)
 			tdict['errdown'].append(errdown)
 
-		### pull last fraction from chain
-		last_frac = [1-dat['pquantiles']['random_chain'][:,fracpars].sum(axis=1) for dat in np.array(alldata)[in_bin]]
-		median,errup,errdown = quantile(last_frac, percentiles)
-		tdict['median'].append(median)
-		tdict['errup'].append(errup)
-		tdict['errdown'].append(errdown)
-
-		tdict['err'] = threed_dutils.asym_errors(np.array(tdict['median']),
+		tdict['err'] = threed_dutils.asym_errors(np.array(tdict['mean']),
 			                                     np.array(tdict['errup']),
 			                                     np.array(tdict['errdown']))
 
@@ -298,7 +307,7 @@ def plot_stacked_sfh(alldata,outfolder,lowmet=True):
 			       **ms_plot_opts)
 
 		### plot SFH stacks
-		ax[1].errorbar(10**(agebins-0.04*(i-1)),dat[idx]['median'],
+		ax[1].errorbar(10**(agebins-0.04*(i-1)),dat[idx]['mean'],
 			            yerr=dat[idx]['err'],
 			            color=config['horizontal_bin_colors'][i],
 			            **stack_plot_opts)
@@ -311,8 +320,9 @@ def plot_stacked_sfh(alldata,outfolder,lowmet=True):
 
 	ax[1].set_xlim(10**(agebins.min()-0.3),10**(agebins.max()+0.3))
 	ax[1].set_xlabel(r'time [yr]')
-	ax[1].set_ylabel(r'SFR fraction')
+	ax[1].set_ylabel(r'SFR$_{\mathrm{bin}}$ / M$_{\mathrm{tot}}$ [yr$^{-1}$]')
 	ax[1].set_xscale('log',nonposx='clip',subsx=(1,2,4))
+	ax[1].set_yscale('log',nonposx='clip',subsx=(1,2,4))
 
 	#### plot mass ranges (AFTER YRANGE IS DETERMINED)
 	for i in xrange(config['nbins_horizontal']):
@@ -333,6 +343,7 @@ def plot_stacked_sfh(alldata,outfolder,lowmet=True):
 			       color=config['horizontal_bin_colors'][i],
 			       **ms_line_plot_opts)
 
+	plt.tight_layout()
 	plt.savefig(outname_ms_horizontal,dpi=150)
 	plt.close()
 
@@ -354,7 +365,7 @@ def plot_stacked_sfh(alldata,outfolder,lowmet=True):
 			       **ms_plot_opts)
 
 		### plot SFH stacks
-		ax[1].errorbar(10**(agebins-0.04*(i-1)),datvert[idx]['median'],
+		ax[1].errorbar(10**(agebins-0.04*(i-1)),datvert[idx]['mean'],
 			            yerr=datvert[idx]['err'],
 			            color=config['horizontal_bin_colors'][i],
 			            **stack_plot_opts)
@@ -377,8 +388,9 @@ def plot_stacked_sfh(alldata,outfolder,lowmet=True):
 
 	ax[1].set_xlim(10**(agebins.min()-0.3),10**(agebins.max()+0.3))
 	ax[1].set_xlabel(r'time [yr]')
-	ax[1].set_ylabel(r'SFR fraction')
+	ax[1].set_ylabel(r'SFR$_{\mathrm{bin}}$ / M$_{\mathrm{tot}}$ [yr$^{-1}$]')
 	ax[1].set_xscale('log',nonposx='clip',subsx=(1,2,4))
+	ax[1].set_yscale('log',nonposx='clip',subsx=(1,2,4))
 
 	#### plot mass ranges
 	ymid = np.array([salim_mainsequence(xlim[0]),salim_mainsequence(xlim[1])])
@@ -400,8 +412,12 @@ def plot_stacked_sfh(alldata,outfolder,lowmet=True):
 			       color=config['horizontal_bin_colors'][i],
 			       **ms_line_plot_opts)
 
+	plt.tight_layout()
 	plt.savefig(outname_ms_vertical,dpi=150)
 	plt.close()
+
+	os.system('open '+outname_ms_vertical)
+	os.system('open '+outname_ms_horizontal)
 
 	mpl.rcParams.update({'font.weight': 400})
 	mpl.rcParams.update({'axes.labelweight': 400})

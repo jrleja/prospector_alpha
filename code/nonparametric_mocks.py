@@ -4,7 +4,7 @@ from astropy.table import Table, vstack
 from astropy.io import ascii
 from astropy import units as u
 import threed_dutils
-import np_mocks_params as nonparam
+import np_mocks_dp_params as nonparam
 
 #### NONPARAMETRIC GLOBALS
 sps = nonparam.load_sps(**nonparam.run_params)
