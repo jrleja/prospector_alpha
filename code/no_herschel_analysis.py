@@ -771,10 +771,10 @@ def plot_totalext(alldata,ax=None):
 	ax.yaxis.set_major_locator(MaxNLocator(5))
 
 	off,scat = threed_dutils.offset_and_scatter(hersch_totalext,nohersch_totalext,biweight=True)
-	ax.text(0.96,0.05, 'mean offset='+"{:.2f}".format(off) + ' dex',
+	ax.text(0.96,0.05, 'mean offset='+"{:.2f}".format(off),
 			      transform = ax.transAxes,horizontalalignment='right',color=nhcolor)
 	off,scat = threed_dutils.offset_and_scatter(hersch_totalext,nohersch_weighted_totalext,biweight=True)
-	ax.text(0.96,0.11, 'mean offset='+"{:.2f}".format(off) + ' dex',
+	ax.text(0.96,0.11, 'mean offset='+"{:.2f}".format(off),
 			      transform = ax.transAxes,horizontalalignment='right',color=nhweightedcolor)
 
 	ax.text(0.05,0.92,'wide IR priors',transform=ax.transAxes,color=nhcolor,ha='left')

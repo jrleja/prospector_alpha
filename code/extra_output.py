@@ -43,7 +43,7 @@ def maxprob_model(sample_results,sps):
 	return thetas, maxprob
 
 
-def calc_extra_quantities(sample_results, ncalc=2000, ir_priors=False):
+def calc_extra_quantities(sample_results, ncalc=2000, ir_priors=True):
 
 	'''' 
 	CALCULATED QUANTITIES
