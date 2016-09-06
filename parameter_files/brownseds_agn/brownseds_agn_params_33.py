@@ -20,7 +20,7 @@ run_params = {'verbose':True,
               'ftol':0.5e-5, 
               'maxfev':5000,
               # MCMC params
-              'nwalkers':930,
+              'nwalkers':620,
               'nburn':[150,200,400,600], 
               'niter': 3000,
               # Model info
@@ -495,12 +495,12 @@ model_params.append({'name': 'fagn', 'N': 1,
 
 model_params.append({'name': 'agn_tau', 'N': 1,
                         'isfree': True,
-                        'init': 10.0,
+                        'init': 4.0,
                         'init_disp': 5,
                         'disp_floor': 2,
                         'units': '',
                         'prior_function': tophat,
-                        'prior_args': {'mini':0.0, 'maxi':50.0}})
+                        'prior_args': {'mini':0.0, 'maxi':40.0}})
 
 ####### Calibration ##########
 model_params.append({'name': 'phot_jitter', 'N': 1,
