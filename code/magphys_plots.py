@@ -625,31 +625,31 @@ def sed_comp_figure(sample_results, sps, model, magphys,
 		     ms=ms,alpha=alpha,markeredgewidth=0.7,**kwargs)
 	
 	nz = modspec > 0
-	phot.plot(modlam[nz]/1e4, modspec[nz], linestyle='-',
+	phot.plot(modlam[nz]/1e4, np.log10(modspec[nz]), linestyle='-',
               color=prosp_color, alpha=0.6,**kwargs)
 
 	###### spectra for q50 + 5th, 95th percentile
 	w = sample_results['observables']['lam_obs']
 	spec_pdf = np.zeros(shape=(len(w),3))
-	for jj in xrange(len(w)): spec_pdf[jj,:] = np.percentile(sample_results['observables']['spec'][jj,:],[5.0,50.0,95.0])
+	for jj in xrange(len(w)): spec_pdf[jj,:] = np.percentile(sample_results['observables']['spec'][jj,:],[16.0,50.0,84.0])
 	sfactor = 3e18/w 	# must convert to nu fnu
 
 	nz = spec_pdf[:,1] > 0
-	phot.fill_between(w/1e4, spec_pdf[:,0]*sfactor, 
-		                 spec_pdf[:,2]*sfactor,
+	phot.fill_between(w/1e4, np.log10(spec_pdf[:,0]*sfactor), 
+		                 np.log10(spec_pdf[:,2]*sfactor),
 		                 color=median_err_color,
 		                 zorder=-48)
 
 
 	##### photometric observations, errors ######
 	xplot = wave_eff/1e4
-	yplot = obsmags
-	phot.errorbar(xplot, yplot, yerr=obsmags_unc,
+	yplot = np.log10(obsmags)
+	phot.errorbar(xplot, yplot, yerr=np.log10(obsmags_unc+obsmags) - np.log10(obsmags),
                   color=obs_color, marker='o', label='observed', alpha=alpha, linestyle=' ',ms=ms)
 
 	# plot limits
 	phot.set_xlim(min(xplot)*0.4,max(xplot)*1.5)
-	phot.set_ylim(min(yplot[np.isfinite(yplot)])*0.2,max(yplot[np.isfinite(yplot)])*2.3)
+	phot.set_ylim(min(yplot[np.isfinite(yplot)])-0.3,max(yplot[np.isfinite(yplot)])+0.3)
 	res.set_xlim(min(xplot)*0.4,max(xplot)*1.5)
 	res.axhline(0, linestyle=':', color='grey')
 
@@ -678,7 +678,7 @@ def sed_comp_figure(sample_results, sps, model, magphys,
 	for ii in xrange(3):
 		
 		if label[ii] == 'Optical':
-			residuals['emlines'] = measure_emline_lum.measure(sample_results, obs_spec, magphys,sps)
+			#residuals['emlines'] = measure_emline_lum.measure(sample_results, obs_spec, magphys,sps)
 			if residuals.get('emlines',None) is not None:
 				sigsmooth[ii] = residuals['emlines']['sigsmooth']
 			else:
@@ -770,12 +770,11 @@ def sed_comp_figure(sample_results, sps, model, magphys,
     # set labels
 	res.set_ylabel( r'$\chi$')
 	for plot in resplots: plot.set_ylabel(r'log($\nu$f$_{\nu}$)')
-	phot.set_ylabel(r'$\nu f_{\nu}$')
+	phot.set_ylabel(r'log($\nu$f$_{\nu}$)')
 	spec_res_spit.set_xlabel(r'$\lambda_{obs}$ [$\mathrm{\mu}$m]')
 	res.set_xlabel(r'$\lambda_{obs}$ [$\mathrm{\mu}$m]')
 	
 	# set scales
-	phot.set_yscale('log',nonposx='clip')
 	phot.set_xscale('log',nonposx='clip')
 	res.set_xscale('log',nonposx='clip',subsx=(2,5))
 	res.xaxis.set_minor_formatter(minorFormatter)
@@ -894,15 +893,15 @@ def plt_all(runname=None,startup=True,**extras):
 
 		for jj in xrange(len(filebase)):
 			print 'iteration '+str(jj) 
-			'''
-			if filebase[jj].split('_')[-1] != 'NGC 4125':
+			if (filebase[jj].split('_')[-1] != 'NGC 4125') & \
+			   (filebase[jj].split('_')[-1] != 'NGC 6090'):
 				continue
-			'''
 
 			dictionary = collate_data(filebase=filebase[jj],\
 			                           outfolder=outfolder,
 			                           **extras)
 			alldata.append(dictionary)
+		print 1/0
 		brown_io.save_alldata(alldata,runname=runname)
 	else:
 		alldata = brown_io.load_alldata(runname=runname)

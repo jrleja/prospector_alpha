@@ -7,7 +7,6 @@ from astropy.cosmology import WMAP9
 from astropy.io import fits
 tophat = priors.tophat
 logarithmic = priors.logarithmic
-dirichlet = priors.inverse_dirichlet
 
 #############
 # RUN_PARAMS
@@ -352,7 +351,7 @@ model_params.append({'name': 'sfr_fraction', 'N': 1,
                         'isfree': True,
                         'init': [],
                         'units': 'Msun',
-                        'prior_function': priors.inverse_dirichlet,
+                        'prior_function': priors.tophat,
                         'prior_args':{'mini':0.0, 'maxi':1.0}})
 
 ########    IMF  ##############
@@ -650,7 +649,7 @@ def load_model(objname='',datname='', agelims=[], **extras):
     model_params[n.index('sfr_fraction')]['N'] = ncomp-1
     model_params[n.index('sfr_fraction')]['init'] = np.zeros(ncomp-1)+1./ncomp
     model_params[n.index('sfr_fraction')]['prior_args'] = {
-                                                           'maxi':np.full(ncomp-1,0.995), 
+                                                           'maxi':np.full(ncomp-1,1.0), 
                                                            'mini':np.full(ncomp-1,0.0),
                                                            # NOTE: ncomp instead of ncomp-1 makes the prior take into account the implicit Nth variable too
                                                           }
