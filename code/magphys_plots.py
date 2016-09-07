@@ -893,15 +893,16 @@ def plt_all(runname=None,startup=True,**extras):
 
 		for jj in xrange(len(filebase)):
 			print 'iteration '+str(jj) 
+			'''
 			if (filebase[jj].split('_')[-1] != 'NGC 4125') & \
 			   (filebase[jj].split('_')[-1] != 'NGC 6090'):
 				continue
+			'''
 
 			dictionary = collate_data(filebase=filebase[jj],\
 			                           outfolder=outfolder,
 			                           **extras)
 			alldata.append(dictionary)
-		print 1/0
 		brown_io.save_alldata(alldata,runname=runname)
 	else:
 		alldata = brown_io.load_alldata(runname=runname)
