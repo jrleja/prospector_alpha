@@ -169,7 +169,7 @@ def offset_and_scatter(x,y,biweight=True):
 
 def find_sfh_params(model,theta,obs,sps,sm=None):
 
-	str_sfh_parms = ['sfh','mass','tau','sf_start','tage','sf_trunc','sf_slope','agebins','sfr_fraction']
+	str_sfh_parms = ['sfh','mass','tau','sf_start','tage','sf_trunc','sf_slope','agebins','sfr_fraction','logsfr']
 	parnames = model.theta_labels()
 	sfh_out = []
 
@@ -203,9 +203,24 @@ def find_sfh_params(model,theta,obs,sps,sm=None):
 		out['mass_fraction'] = out['sfr_fraction_full']*sps._time_per_bin / sps.bin_mass_fraction
 		out['mass_fraction'] /= out['mass_fraction'].sum()
 
-	# Need this because mass is 
-	# current mass, not total mass formed!
-	out['mformed'] = out['mass'] / sm
+	### NEW, for log(M)
+	# this is in mformed
+	# this nomenclature is shit, but it conforms to previous nomenclature
+	if out['mass'].shape[0] > 1:
+		out['mformed_fraction'] = out['mass'] #/ sm
+		out['mass_fraction'] = out['mformed_fraction'] / out['mformed_fraction'].sum()
+
+	### NEW, for logSSFR_bin
+	# this nomenclature is shit, but it conforms to previous nomenclature
+	if out['logsfr'].shape[0] != 0:
+		out['mass_fraction'] = (10**out['logsfr']) * sps._time_per_bin  # this should be mformed(bin)
+		out['mass_fraction'] /= out['mass_fraction'].sum() # this is fractional
+		out['mformed'] = out['mass']
+		out['mass'] = out['mformed'] * sm
+	else:
+		# Need this because mass is 
+		# current mass, not total mass formed!
+		out['mformed'] = out['mass'] / sm
 	return out
 
 def test_likelihood(sps,model,obs,thetas,param_file):
@@ -1164,7 +1179,7 @@ def integrate_mag(spec_lam,spectra,filter, z=None, alt_file='/Users/joel/code/py
 	#print 'maggies: {0}'.format(10**(-0.4*mag)*1e10)
 	return mag, luminosity
 
-def return_full_sfh(t, sfh_params):
+def return_full_sfh(t, sfh_params,**kwargs):
 
 	'''
 	returns full SFH given a time vector [in Gyr] and a
@@ -1184,7 +1199,7 @@ def return_full_sfh(t, sfh_params):
 
 	intsfr = np.zeros(len(t))
 	for mm in xrange(len(tcalc)): 
-		intsfr[mm] = calculate_sfr(sfh_params, deltat, tcalc = tcalc[mm])
+		intsfr[mm] = calculate_sfr(sfh_params, deltat, tcalc = tcalc[mm], **kwargs)
 
 	return intsfr
 

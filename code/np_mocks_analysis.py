@@ -59,6 +59,7 @@ def make_plots(runname='nonparametric_mocks', recollate_data = False):
 	if not os.path.exists(outfolder):
 		os.makedirs(outfolder)
 
+	#plot_dn4000(alldata,outfolder=outfolder)
 	plot_fit_parameters(alldata,outfolder=outfolder,cdf=False)
 	plot_derived_parameters(alldata,outfolder=outfolder,cdf=False)
 	plot_spectral_parameters(alldata,outfolder=outfolder)
@@ -572,6 +573,39 @@ def plot_derived_parameters(alldata,outfolder=None, cdf=False):
 	fig_err.savefig(outfolder+'derived_parameter_PDF.png',dpi=dpi)
 
 	plt.close()
+
+def plot_dn4000(alldata,outfolder=None):
+
+	fig, axes = plt.subplots(1, 3, figsize = (18,6))
+
+	### true dn4000
+	dn4000 = np.array([dat['truths']['dn4000'] for dat in alldata])
+
+	### true half-mass time
+	epars_truth = alldata[0]['truths']['extra_parnames']
+	idx_true = epars_truth == 'half_time'
+	halfmass = np.log10(np.squeeze([dat['truths']['extra_truths'][idx_true] for dat in alldata]))
+
+	### true SFR_fraction + metallicity
+	pars_truth = alldata[0]['truths']['parnames']
+	idx_true = pars_truth == 'sfr_fraction_1'
+	sfr_fraction_1 = np.squeeze([dat['truths']['truths'][idx_true] for dat in alldata])
+	idx_true = pars_truth == 'logzsol'
+	logzsol = np.squeeze([dat['truths']['truths'][idx_true] for dat in alldata])
+
+	axes[0].plot(halfmass,dn4000,'o',alpha=0.7,color=obscolor)
+	axes[1].plot(sfr_fraction_1,dn4000,'o',alpha=0.7,color=obscolor)
+	axes[2].plot(logzsol,dn4000,'o',alpha=0.7,color=obscolor)
+
+	axes[0].set_xlabel('log(half-mass time) [Gyr]')
+	axes[1].set_xlabel('sfr_fraction_1')
+	axes[2].set_xlabel(r'log(Z/Z$_{\odot}$)')
+
+	axes[0].set_ylabel(r'D$_n$4000')
+	axes[1].set_ylabel(r'D$_n$4000')
+	axes[2].set_ylabel(r'D$_n$4000')
+
+	plt.show()
 
 def plot_spectral_parameters(alldata,outfolder=None):
 

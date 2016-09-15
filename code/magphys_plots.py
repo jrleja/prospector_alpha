@@ -442,6 +442,7 @@ def plot_obs_spec(obs_spec, phot, spec_res, alpha,
 
 	mask = obs_spec['source'] == source
 	obslam = obs_spec['obs_lam'][mask]/1e4
+	lw = 2.5
 
 	##### smooth the model, or the observations
 	if label != 'Spitzer IRS':
@@ -477,13 +478,16 @@ def plot_obs_spec(obs_spec, phot, spec_res, alpha,
 		          color=obs_color,
 		          alpha=alpha,
 		          linestyle='-',
-		          label='observed')
+		          label='observed',
+		          lw=lw)
+
 	spec_res.plot(obslam, 
 		          prosp_spec_plot,
 		          color=prosp_color,
 		          alpha=alpha,
 		          linestyle='-',
-		          label='Prospector')
+		          label='Prospector (predicted)',
+		          lw=lw)
 
 	# interpolate magphys onto fsps grid
 	mag_flux_interp = interp1d(maglam, magspec_smooth,
@@ -617,11 +621,11 @@ def sed_comp_figure(sample_results, sps, model, magphys,
 
 	phot.plot(wave_eff/1e4, modmags, 
 		      color=prosp_color, marker='o', ms=ms, 
-		      linestyle=' ', label='Prospector', alpha=alpha, 
+		      linestyle=' ', label='Prospector (fit)', alpha=alpha, 
 		      markeredgewidth=0.7,**kwargs)
 	
 	res.plot(wave_eff/1e4, chi, 
-		     color=prosp_color, marker='o', linestyle=' ', label='Prospector', 
+		     color=prosp_color, marker='o', linestyle=' ', label='Prospector (fit)', 
 		     ms=ms,alpha=alpha,markeredgewidth=0.7,**kwargs)
 	
 	nz = modspec > 0
@@ -893,16 +897,15 @@ def plt_all(runname=None,startup=True,**extras):
 
 		for jj in xrange(len(filebase)):
 			print 'iteration '+str(jj) 
-			'''
 			if (filebase[jj].split('_')[-1] != 'NGC 4125') & \
 			   (filebase[jj].split('_')[-1] != 'NGC 6090'):
 				continue
-			'''
 
 			dictionary = collate_data(filebase=filebase[jj],\
 			                           outfolder=outfolder,
 			                           **extras)
 			alldata.append(dictionary)
+		print 1/0
 		brown_io.save_alldata(alldata,runname=runname)
 	else:
 		alldata = brown_io.load_alldata(runname=runname)
@@ -910,14 +913,14 @@ def plt_all(runname=None,startup=True,**extras):
 	#### herschel flag
 	hflag = np.array([True if np.sum(dat['residuals']['phot']['lam_obs'] > 5e5) else False for dat in alldata])
 	
-	plot_stacked_sfh(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/pcomp/')
-	brown_io.write_results(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/pcomp/')
-	allpar_plot(alldata,hflag,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/pcomp/')
-	plot_all_residuals(alldata,runname)
 	mag_ensemble.plot_emline_comp(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/magphys/emlines_comp/',hflag)
 	mag_ensemble.prospector_comparison(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/pcomp/',hflag)
 	mag_ensemble.plot_relationships(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/magphys/')
 	mag_ensemble.plot_comparison(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/magphys/')
+	plot_stacked_sfh(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/pcomp/')
+	brown_io.write_results(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/pcomp/')
+	allpar_plot(alldata,hflag,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/pcomp/')
+	plot_all_residuals(alldata,runname)
 
 def perform_wavelength_cal(spec_dict, objname):
 	'''

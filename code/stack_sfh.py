@@ -416,9 +416,6 @@ def plot_stacked_sfh(alldata,outfolder,lowmet=True):
 	plt.savefig(outname_ms_vertical,dpi=150)
 	plt.close()
 
-	os.system('open '+outname_ms_vertical)
-	os.system('open '+outname_ms_horizontal)
-
 	mpl.rcParams.update({'font.weight': 400})
 	mpl.rcParams.update({'axes.labelweight': 400})
 

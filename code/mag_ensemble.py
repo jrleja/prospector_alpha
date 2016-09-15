@@ -173,7 +173,7 @@ def specpar_pdf_distance(pinfo,alldata, delta_functions=True, center_obs=True):
 			bins = np.linspace(-0.6,0.6,51) # dex
 			if delta_functions:
 				bins = np.linspace(-0.4,0.4,26) # dex
-			xunit = 'dex'
+			xunit = None
 
 		modpdf = np.zeros(bins.shape[0]-1)
 		obspdf = np.zeros(bins.shape[0]-1)
@@ -214,10 +214,10 @@ def specpar_pdf_distance(pinfo,alldata, delta_functions=True, center_obs=True):
 				flag = index_flags['flag'][match]
 				if flag == 1: hdelta_ind = 'hdelta_narrow'
 				if flag == 0: hdelta_ind = 'hdelta_wide'
-				chain = np.log10(np.squeeze(dat['spec_info']['eqw']['chain'][:,dat['spec_info']['absnames'] == hdelta_ind]))
+				chain = np.squeeze(dat['spec_info']['eqw']['chain'][:,dat['spec_info']['absnames'] == hdelta_ind])
 
-				truth = np.log10(pinfo['obs'][obs_names[ii]][kk,0])
-				truth_chain = np.log10(np.clip(pinfo['obs']['hdel_eqw_chain'][kk],0.01,np.inf))
+				truth = pinfo['obs'][obs_names[ii]][kk,0]
+				truth_chain = pinfo['obs']['hdel_eqw_chain'][kk]
 
 
 			tmodpdf, tobspdf, tpdf_loc = pdf_distance(chain,truth,truth_chain,bins,delta_functions=delta_functions,center_obs=center_obs)
@@ -758,7 +758,7 @@ def fmt_emline_info(alldata,add_abs_err = True):
 	obslines['sn_cut'] = 5.0
 	obslines['eqw_cut'] = 0.0
 	obslines['hdelta_sn_cut'] = 5.0
-	obslines['hdelta_eqw_cut'] = 1.0
+	obslines['hdelta_eqw_cut'] = -np.inf
 
 	####### Dn4000, obs + MAGPHYS
 	obslines['dn4000'] = ret_inf(alldata,'dn4000',model='obs')
@@ -1778,8 +1778,8 @@ def obs_vs_prosp_balmlines(e_pinfo,hflag,outname='test.png',outname_resid='test.
 			f_hb = e_pinfo['obs']['f_hb'][keep_idx,:]
 			model_ha = e_pinfo['prosp']['cloudy_ha'][keep_idx,:]
 			model_hb = e_pinfo['prosp']['cloudy_hb'][keep_idx,:]
-			ylabel = [r'log(H$_{\alpha}$ luminosity) [Prospector]', r'log(H$_{\beta}$ luminosity) [Prospector]']
-			xlabel = [r'log(H$_{\alpha}$ luminosity) [observed]', r'log(H$_{\beta}$ luminosity) [observed]']
+			ylabel = [r'log(L[H$_{\alpha}$]) from fit to photometry', r'log(L[H$_{\beta}$]) from fit to photometry']
+			xlabel = [r'log(L[H$_{\alpha}$]) from observed spectrum', r'log(L[H$_{\beta}$]) from observed spectrum']
 			ha_lim = ha_flux_lim
 
 		ax = ax1[jj,:]
@@ -1868,6 +1868,8 @@ def obs_vs_prosp_balmlines(e_pinfo,hflag,outname='test.png',outname_resid='test.
 	fig1.tight_layout()
 	fig1.savefig(outname,dpi=dpi)
 
+	ax2.xaxis.set_major_locator(MaxNLocator(5))
+	ax2.yaxis.set_major_locator(MaxNLocator(5))
 	fig2.tight_layout()
 	fig2.savefig(outname_resid,dpi=dpi)
 	plt.close()
@@ -1889,8 +1891,8 @@ def obs_vs_model_hdelta(e_pinfo,hflag,outname=None,outname2=None,outname_dnplt=N
 	'''
 
 	if eqw:
-		min = 0.0
-		max = 1.1
+		min = -3
+		max = 8
 		plotlim = (min,max,min,max)
 
 		good_idx = brown_quality_cuts.hdelta_cuts(e_pinfo,eqw=True)
@@ -1900,12 +1902,12 @@ def obs_vs_model_hdelta(e_pinfo,hflag,outname=None,outname2=None,outname_dnplt=N
 		hdel_prosp_em = e_pinfo['prosp']['hdel_eqw_elineon_marg'][good_idx]
 		hdel_prosp = np.log10(e_pinfo['prosp']['hdel_eqw'][good_idx])
 
-		xtit = [r'observed log(H$_{\delta}$ EQW)', 
-		        r'observed log(H$_{\delta}$ EQW)',
-		        r'observed log(H$_{\delta}$ EQW)']
-		ytit = [r'model log(H$_{\delta}$ EQW) [absorption + emission]',
-		        r'model log(H$_{\delta}$ EQW) [best-fit]',
-		        r'model log(H$_{\delta}$ EQW) [marginalized]']
+		xtit = [r'observed H$_{\delta}$ EQW', 
+		        r'observed H$_{\delta}$ EQW',
+		        r'observed H$_{\delta}$ EQW']
+		ytit = [r'model H$_{\delta}$ EQW [absorption+emission]',
+		        r'model H$_{\delta}$ EQW [best-fit]',
+		        r'model H$_{\delta}$ EQW [marginalized]']
 
 		# only make this plot in EQW
 		fig2, ax2 = plt.subplots(1,2, figsize=(12.5,6))
@@ -1925,7 +1927,7 @@ def obs_vs_model_hdelta(e_pinfo,hflag,outname=None,outname2=None,outname_dnplt=N
 		xtit = [r'observed log(-H$_{\delta}$)', 
 		        r'observed log(-H$_{\delta}$)',
 		        r'observed log(-H$_{\delta}$)']
-		ytit = [r'model log(-H$_{\delta}$) [absorption + emission]',
+		ytit = [r'model log(-H$_{\delta}$) [absorption+emission]',
 		        r'model log(-H$_{\delta}$) [best-fit]',
 		        r'model log(-H$_{\delta}$) [marginalized]']
 
@@ -1961,15 +1963,15 @@ def obs_vs_model_hdelta(e_pinfo,hflag,outname=None,outname2=None,outname_dnplt=N
 			### errors
 			errs_pro = threed_dutils.asym_errors(hdel_prosp_marg[plt_idx,0],
 				                                 hdel_prosp_marg[plt_idx,1],
-				                                 hdel_prosp_marg[plt_idx,2],log=True)
+				                                 hdel_prosp_marg[plt_idx,2],log=False)
 
 			errs_pro_em = threed_dutils.asym_errors(hdel_prosp_em[plt_idx,0],
 				                                    hdel_prosp_em[plt_idx,1],
-				                                    hdel_prosp_em[plt_idx,2],log=True)
+				                                    hdel_prosp_em[plt_idx,2],log=False)
 
 			errs_obs = threed_dutils.asym_errors(hdel_obs[plt_idx,0],
 				                                 hdel_obs[plt_idx,1],
-				                                 hdel_obs[plt_idx,2],log=True)
+				                                 hdel_obs[plt_idx,2],log=False)
 
 			### define quantities
 			pl_hdel_obs = hdel_obs[plt_idx,0]
@@ -1983,8 +1985,8 @@ def obs_vs_model_hdelta(e_pinfo,hflag,outname=None,outname2=None,outname_dnplt=N
 
 
 			#### plot
-			ax[0].errorbar(np.log10(pl_hdel_obs), np.log10(pl_hdel_prosp), xerr=errs_obs, yerr=errs_pro, linestyle=' ', **pdict)
-			ax3[0].errorbar(np.log10(pl_hdel_obs), np.log10(pl_hdel_prosp_em), xerr=errs_obs, yerr=errs_pro_em, linestyle=' ', **pdict)
+			ax[0].errorbar(pl_hdel_obs, pl_hdel_prosp, xerr=errs_obs, yerr=errs_pro, linestyle=' ', **pdict)
+			ax3[0].errorbar(pl_hdel_obs, pl_hdel_prosp_em, xerr=errs_obs, yerr=errs_pro_em, linestyle=' ', **pdict)
 
 			if eqw:
 				ax2[0].errorbar(np.log10(pl_hdel_obs), dn4000_obs[plt_idx], linestyle=' ',**pdict)
@@ -1995,9 +1997,9 @@ def obs_vs_model_hdelta(e_pinfo,hflag,outname=None,outname2=None,outname_dnplt=N
 	#ax[0].text(0.04,0.82, r'EQW H$\delta$ < -{0} $\AA$'.format(int(e_pinfo['obs']['hdelta_eqw_cut'])), transform = ax[0].transAxes,horizontalalignment='left')
 	ax[0].set_xlabel(xtit[2])
 	ax[0].set_ylabel(ytit[2])
-	off,scat = threed_dutils.offset_and_scatter(np.log10(hdel_obs[:,0]), np.log10(hdel_prosp_marg[:,0]),biweight=True)
-	ax[0].text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat) + ' dex', transform = ax[0].transAxes,horizontalalignment='right')
-	ax[0].text(0.96,0.1, 'mean offset='+"{:.2f}".format(off) + ' dex', transform = ax[0].transAxes,horizontalalignment='right')
+	off,scat = threed_dutils.offset_and_scatter(hdel_obs[:,0], hdel_prosp_marg[:,0],biweight=True)
+	ax[0].text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat), transform = ax[0].transAxes,horizontalalignment='right')
+	ax[0].text(0.96,0.1, 'mean offset='+"{:.2f}".format(off), transform = ax[0].transAxes,horizontalalignment='right')
 	ax[0].axis(plotlim)
 	ax[0].plot([min,max],[min,max],linestyle='--',color='0.1',alpha=0.8)
 
@@ -2006,9 +2008,9 @@ def obs_vs_model_hdelta(e_pinfo,hflag,outname=None,outname2=None,outname_dnplt=N
 	#ax3[0].text(0.04,0.82, r'EQW H$\delta$ < -{0} $\AA$'.format(int(e_pinfo['obs']['hdelta_eqw_cut'])), transform = ax3[0].transAxes,horizontalalignment='left')
 	ax3[0].set_xlabel(xtit[0])
 	ax3[0].set_ylabel(ytit[0])
-	off,scat = threed_dutils.offset_and_scatter(np.log10(hdel_obs[:,0]), np.log10(hdel_prosp_em[:,0]),biweight=True)
-	ax3[0].text(0.04,0.92, 'biweight scatter='+"{:.2f}".format(scat) + ' dex', transform = ax3[0].transAxes)
-	ax3[0].text(0.04,0.87, 'mean offset='+"{:.2f}".format(off) + ' dex', transform = ax3[0].transAxes)
+	off,scat = threed_dutils.offset_and_scatter(hdel_obs[:,0], hdel_prosp_em[:,0],biweight=True)
+	ax3[0].text(0.04,0.92, 'biweight scatter='+"{:.2f}".format(scat), transform = ax3[0].transAxes)
+	ax3[0].text(0.04,0.87, 'mean offset='+"{:.2f}".format(off), transform = ax3[0].transAxes)
 	ax3[0].axis(plotlim)
 	ax3[0].plot([min,max],[min,max],linestyle='--',color='0.1',alpha=0.8)
 
@@ -2036,6 +2038,7 @@ def obs_vs_model_hdelta(e_pinfo,hflag,outname=None,outname2=None,outname_dnplt=N
 	plt.close()
 
 	return norm_errs, norm_flag
+	print 1/0
 
 def obs_vs_model_dn(e_pinfo,hflag,outname=None):
 
@@ -2080,7 +2083,7 @@ def obs_vs_model_dn(e_pinfo,hflag,outname=None):
 				                             pl_dn4000_prosp,errs_pro))
 			norm_flag.append([labels[ii]]*np.sum(plt_idx))
 
-			ax.errorbar(pl_dn4000_obs, pl_dn4000_prosp, yerr=errs_pro, linestyle=' ', **pdict)
+			ax.errorbar(pl_dn4000_obs, pl_dn4000_prosp, yerr=errs_pro, xerr=[np.random.rand(pl_dn4000_obs.shape[0])*0.04+0.01,np.random.rand(pl_dn4000_obs.shape[0])*0.04+0.01], linestyle=' ', **pdict)
 
 	ax.set_xlabel(r'observed D$_n$4000')
 	ax.set_ylabel(r'Prospector D$_n$4000')
@@ -2715,6 +2718,7 @@ def residual_plots(e_pinfo,hflag,outfolder):
 			                                     dust2_prosp[nkeys[ii],1],
 			                                     dust2_prosp[nkeys[ii],2],
 			                                     log=False)
+
 		ax.errorbar(dust2_prosp[nkeys[ii],0], dtau_dlam_prosp[nkeys[ii],0], xerr=dust2_errors,yerr=dtau_dlam_prosp_errors, 
 			        linestyle=' ', **merge_dicts(herschdict[0],bptdict[ii]))
 
@@ -2728,6 +2732,7 @@ def residual_plots(e_pinfo,hflag,outfolder):
 
 	ax.set_xlim(-0.1,2.0)
 	ax.yaxis.get_major_formatter().set_powerlimits((0, 1))
+	ax.set_ylim(-6e-4,0)
 
 	ax.text(0.98,0.04, 'radiative transfer models \n from Chevallard+13', ha='right',va='bottom',multialignment='right',\
 		    transform=ax.transAxes,fontsize=15,weight='roman')

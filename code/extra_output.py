@@ -85,7 +85,7 @@ def calc_extra_quantities(sample_results, ncalc=2000, ir_priors=False):
 	np.random.shuffle(flatchain)
 
 	### cut in IR priors
-	if ir_priors == True:
+	if ir_priors:
 		gamma_idx = np.array(parnames) == 'duste_gamma'
 		umin_idx = np.array(parnames) == 'duste_umin'
 		qpah_idx = np.array(parnames) == 'duste_qpah'
