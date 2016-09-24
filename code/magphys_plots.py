@@ -12,6 +12,7 @@ from prospect.models import model_setup
 from astropy import constants
 from allpar_plot import allpar_plot
 from stack_sfh import plot_stacked_sfh
+import stack_irs_spectra
 
 c = 3e18   # angstroms per second
 dpi = 150
@@ -68,7 +69,7 @@ def median_by_band(x,y,avg=False):
 	avglam = np.array([])
 	outval = np.array([])
 	for lam in wave_effective:
-		in_bounds = (x < lam) & (x > lam/(1+delz))
+		in_bounds = (x <= lam) & (x > lam/(1+delz))
 		avglam = np.append(avglam, np.mean(x[in_bounds]))
 		if avg == False:
 			outval = np.append(outval, np.median(y[in_bounds]))
@@ -166,7 +167,6 @@ def plot_all_residuals(alldata,runname):
 	sfflag = ssfr_100 > ssfr_limit
 
 	##### calculate and plot running median
-	nfilters = 33 # calculate this more intelligently?
 	magbins, magmedian = median_by_band(lam_rest,frac_magphys)
 	pro_sf_bins, pro_sf_median = median_by_band(lam_rest_sf,frac_prosp_sf)
 	pro_qu_bins, pro_qu_median = median_by_band(lam_rest_qu,frac_prosp_qu)
@@ -354,37 +354,6 @@ def plot_all_residuals(alldata,runname):
 	
 	plt.savefig(outfolder+'median_residuals.png',dpi=dpi)
 	plt.close()
-
-def load_spectra(objname, nufnu=True):
-	
-	# flux is read in as ergs / s / cm^2 / Angstrom
-	# the source key is:
-	# 0 = model
-	# 1 = optical spectrum
-	# 2 = Akari
-	# 3 = Spitzer IRS
-
-	foldername = '/Users/joel/code/python/threedhst_bsfh/data/brownseds_data/spectra/'
-	rest_lam, flux, obs_lam, source = np.loadtxt(foldername+objname.replace(' ','_')+'_spec.dat',comments='#',unpack=True)
-
-	lsun = 3.846e33  # ergs/s
-	flux_lsun = flux / lsun
-
-	# convert to flam * lam
-	flux = flux * obs_lam
-
-	# convert to janskys, then maggies * Hz
-	flux = flux * 1e23 / 3631
-
-	out = {}
-	out['rest_lam'] = rest_lam
-	out['flux'] = flux
-	out['flux_lsun'] = flux_lsun
-	out['obs_lam'] = obs_lam
-	out['source'] = source
-
-	return out
-
 
 def return_sedplot_vars(spec, mu, obs, sps, nufnu=True):
 
@@ -601,7 +570,6 @@ def sed_comp_figure(sample_results, sps, model, magphys,
 	spec_res_opt,spec_res_akari,spec_res_spit = plt.subplot(gs2[0]),plt.subplot(gs2[1]),plt.subplot(gs2[2])
 
 	# R = 650, 300, 100
-	# models have deltav = 1000 km/s in IR, add in quadrature?
 	sigsmooth = [450.0, 1000.0, 1.0]
 	ms = 8
 	alpha = 0.65
@@ -619,7 +587,7 @@ def sed_comp_figure(sample_results, sps, model, magphys,
 			  "data for " + sample_results['run_params']['objname']
 		return None
 
-	phot.plot(wave_eff/1e4, modmags, 
+	phot.plot(wave_eff/1e4, np.log10(modmags), 
 		      color=prosp_color, marker='o', ms=ms, 
 		      linestyle=' ', label='Prospector (fit)', alpha=alpha, 
 		      markeredgewidth=0.7,**kwargs)
@@ -672,7 +640,7 @@ def sed_comp_figure(sample_results, sps, model, magphys,
 	nz = magphys['model']['spec'] > 0
 
 	##### observed spectra + residuals #####
-	obs_spec = load_spectra(sample_results['run_params']['objname'])
+	obs_spec = brown_io.load_spectra(sample_results['run_params']['objname'])
 	#obs_spec = perform_wavelength_cal(obs_spec,sample_results['run_params']['objname'])
 
 	label = ['Optical','Akari', 'Spitzer IRS']
@@ -746,7 +714,7 @@ def sed_comp_figure(sample_results, sps, model, magphys,
 	from threedhst_diag import add_sfh_plot
 	ax_loc = [0.38,0.68,0.13,0.13]
 	text_size = 1.5
-	ax_inset = add_sfh_plot(sample_results,fig,ax_loc,sps,text_size=text_size)
+	ax_inset = add_sfh_plot(sample_results,fig,sps,text_size=text_size,ax_loc=ax_loc)
 
 	##### add MAGPHYS SFH
 	magmass = magphys['model']['full_parameters'][[magphys['model']['full_parnames'] == 'M*/Msun']]
@@ -897,10 +865,11 @@ def plt_all(runname=None,startup=True,**extras):
 
 		for jj in xrange(len(filebase)):
 			print 'iteration '+str(jj) 
+			'''
 			if (filebase[jj].split('_')[-1] != 'NGC 4125') & \
 			   (filebase[jj].split('_')[-1] != 'NGC 6090'):
 				continue
-
+			'''
 			dictionary = collate_data(filebase=filebase[jj],\
 			                           outfolder=outfolder,
 			                           **extras)
@@ -921,6 +890,7 @@ def plt_all(runname=None,startup=True,**extras):
 	brown_io.write_results(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/pcomp/')
 	allpar_plot(alldata,hflag,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/pcomp/')
 	plot_all_residuals(alldata,runname)
+	stack_irs_spectra.plot_stacks(alldata=alldata,outfolder=os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/pcomp/')
 
 def perform_wavelength_cal(spec_dict, objname):
 	'''
@@ -985,7 +955,7 @@ def compute_specmags(runname=None, outfolder=None):
 		#### load up observed spec
 		# arrives in maggies * Hz
 		# change to maggies
-		spec_dict = load_spectra(dat['objname'])
+		spec_dict = brown_io.load_spectra(dat['objname'])
 		opt_idx = spec_dict['source'] == 1
 		obs_wav = spec_dict['obs_lam'][opt_idx]
 		obs_spec = spec_dict['flux'][opt_idx] / (3e18 / obs_wav)

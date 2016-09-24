@@ -269,9 +269,9 @@ def add_to_corner(fig, sample_results, sps, model,truths=None,maxprob=True,powel
 
     return fig
 
-def add_sfh_plot(sample_results,fig,ax_loc,sps,
+def add_sfh_plot(sample_results,fig,sps,ax_loc=None,
 	             truths=None,fast=None,text_size=1,
-	             no_legend=False):
+	             no_legend=False,ax_inset=None):
 	
 	'''
 	add a small SFH plot at ax_loc
@@ -288,11 +288,12 @@ def add_sfh_plot(sample_results,fig,ax_loc,sps,
 	axfontsize=4*text_size
 	
 	# set up plotting
-	if fig is not None:
-		ax_inset=fig.add_axes(ax_loc,zorder=32)
-	else:
-		ax_inset = ax_loc
-	
+	if ax_inset is None:
+		if fig is None:
+			ax_inset = ax_loc
+		else:
+			ax_inset = fig.add_axes(ax_loc,zorder=32)
+
 	# convert to log
 	# set minimum to be 1/10,000th of the average SFR over 10 Gyr
 	extra_parnames = sample_results['extras']['parnames']
@@ -748,7 +749,7 @@ def sed_figure(sample_results, sps, model,
 
 	# add SFH plot
 	ax_loc = [0.32,0.35,0.12,0.14]
-	ax_inset = add_sfh_plot(sample_results,fig,ax_loc,sps,truths=truths,fast=fast)
+	ax_inset = add_sfh_plot(sample_results,fig,sps,truths=truths,fast=fast,ax_loc=ax_loc)
 
 	# add RGB
 	try:

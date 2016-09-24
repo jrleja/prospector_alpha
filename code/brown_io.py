@@ -66,6 +66,35 @@ def write_results(alldata,outfolder):
 				f.write(string)
 			f.write(' \\\ \n')
 
+def load_spectra(objname, nufnu=True):
+	
+	# flux is read in as ergs / s / cm^2 / Angstrom
+	# the source key is:
+	# 0 = model
+	# 1 = optical spectrum
+	# 2 = Akari
+	# 3 = Spitzer IRS
+
+	foldername = '/Users/joel/code/python/threedhst_bsfh/data/brownseds_data/spectra/'
+	rest_lam, flux, obs_lam, source = np.loadtxt(foldername+objname.replace(' ','_')+'_spec.dat',comments='#',unpack=True)
+
+	lsun = 3.846e33  # ergs/s
+	flux_lsun = flux / lsun #
+
+	# convert to flam * lam
+	flux = flux * obs_lam
+
+	# convert to janskys, then maggies * Hz
+	flux = flux * 1e23 / 3631
+
+	out = {}
+	out['rest_lam'] = rest_lam
+	out['flux'] = flux
+	out['flux_lsun'] = flux_lsun
+	out['obs_lam'] = obs_lam
+	out['source'] = source
+
+	return out
 
 
 

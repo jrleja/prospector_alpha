@@ -43,6 +43,9 @@ ha_eqw_lim = (-1.3,3.5)
 lam1_extdiff = 5450.
 lam2_extdiff = 5550.
 
+minorFormatter = magphys_plot_pref.jLogFormatter(base=10, labelOnlyBase=False)
+majorFormatter = magphys_plot_pref.jLogFormatter(base=10, labelOnlyBase=True)
+
 def minlog(x,axis=None):
 	'''
 	Given a numpy array, take the base-10 logarithm
@@ -751,6 +754,13 @@ def fmt_emline_info(alldata,add_abs_err = True):
 	obslines['eqw_oiii'] = obslines['f_oiii'] / obslines['hb_obs_cont'][:,None]
 	obslines['eqw_err_oiii'] = obslines['err_oiii'] / obslines['hb_obs_cont'][:,None]
 
+	obslines['f_oii'] = np.transpose([ret_inf(alldata,'lum',model='obs',name='[OII] 3728'),
+		                             ret_inf(alldata,'lum_errup',model='obs',name='[OII] 3728'),
+		                             ret_inf(alldata,'lum_errdown',model='obs',name='[OII] 3728')])  / constants.L_sun.cgs.value
+	obslines['err_oii'] = (obslines['f_oii'][:,1] - obslines['f_oii'][:,2])/2.
+	obslines['eqw_oii'] = obslines['f_oii'] / obslines['hd_obs_cont'][:,None]
+	obslines['eqw_err_oii'] = obslines['err_oii'] / obslines['hd_obs_cont'][:,None]
+
 	##### SIGNAL TO NOISE AND EQW CUTS
 	# cuts
 	# obslines sncut is 1.0 for now, because otherwise NGC 4473 is in the sample, 
@@ -1225,8 +1235,91 @@ def atlas_3d_met(e_pinfo,hflag,outfolder=''):
 	plt.savefig(outfolder+'atlas3d_starmet.png',dpi=150)
 	plt.close()
 
+def ionization_parameter(e_pinfo, hflag, alldata, outfolder=''):
 
-def gas_phase_metallicity(e_pinfo, hflag, outfolder='',ssfr_cut=False):
+	### first do quality cuts
+	sn_oii = e_pinfo['obs']['f_oii'][:,0] / np.abs(e_pinfo['obs']['err_oii'])
+	sn_oiii = e_pinfo['obs']['f_oiii'][:,0] / np.abs(e_pinfo['obs']['err_oiii'])
+
+	sn_cut = 5
+	keep_idx = np.squeeze((sn_oiii > sn_cut) & (sn_oii > sn_cut))
+
+	sfing, composite, agn = return_agn_str(keep_idx)
+	keys = [sfing, composite, agn]
+
+	### now calculate intrinsic ratio
+	pnames = alldata[0]['pquantiles']['parnames']
+	d1_idx = pnames == 'dust1'
+	d2_idx = pnames == 'dust2'
+	didx_idx = pnames == 'dust_index'
+	ndraw = 1e4
+	oiii_oii,oiii_oii_edown,oiii_oii_eup = [],[],[]
+	for i,dat in enumerate(alldata):
+		if keep_idx[i] == False:
+			continue
+		out = []
+
+		#### draw dust choices
+		d1 = np.random.choice(dat['pquantiles']['random_chain'][:,d1_idx].squeeze(),size=ndraw)
+		d2 = np.random.choice(dat['pquantiles']['random_chain'][:,d2_idx].squeeze(),size=ndraw)
+		didx = np.random.choice(dat['pquantiles']['random_chain'][:,didx_idx].squeeze(),size=ndraw)
+
+		#### draw OII, OIII fluxes from a Gaussian
+		# OII is 3278, OIII is 5007. convert to total flux in [OII] and [OIII]
+		oii = np.random.normal(loc=e_pinfo['obs']['f_oii'][i,0], scale = e_pinfo['obs']['err_oii'][i],size=ndraw)*(1+1./0.35)
+		oiii = np.random.normal(loc=e_pinfo['obs']['f_oiii'][i,0], scale = e_pinfo['obs']['err_oiii'][i],size=ndraw)*(1+1./2.98)
+
+		#### de-dust
+		oii_dcor = oii/threed_dutils.charlot_and_fall_extinction(3727,d1,d2,-1.0,didx, kriek=True)
+		oiii_dcor = oiii/threed_dutils.charlot_and_fall_extinction(5000,d1,d2,-1.0,didx, kriek=True)
+		ratio = oiii_dcor/oii_dcor
+
+		quantiles = corner.quantile(ratio,[0.16,0.5,0.84])
+
+		oiii_oii.append(quantiles[1])
+		oiii_oii_edown.append(quantiles[0])
+		oiii_oii_eup.append(quantiles[2])
+
+	### qpah
+	qpah_idx = pnames == 'duste_qpah'
+
+	qpah = np.array([x['pquantiles']['q50'][qpah_idx][0] for x in alldata])[keep_idx]
+	qpah_errup = np.array([x['pquantiles']['q84'][qpah_idx][0] for x in alldata])[keep_idx]
+	qpah_errdo = np.array([x['pquantiles']['q16'][qpah_idx][0] for x in alldata])[keep_idx]
+	qpah_err = threed_dutils.asym_errors(qpah,qpah_errup,qpah_errdo,log=True)
+
+	### let's do it
+	fig, ax = plt.subplots(1,1,figsize=(7,7))
+	fig.subplots_adjust(left=0.15,bottom=0.1,top=0.95,right=0.95)
+	for ii,key in enumerate(keys): 
+
+		qpah_err = threed_dutils.asym_errors(qpah[key],qpah_errup[key],qpah_errdo[key],log=False)
+		oiii_oii_err = threed_dutils.asym_errors(np.array(oiii_oii)[key],np.array(oiii_oii_eup)[key],np.array(oiii_oii_edown)[key],log=False)
+
+		ax.errorbar(np.array(oiii_oii)[key],qpah[key],xerr=oiii_oii_err,yerr=qpah_err,fmt='o',linestyle=' ',**bptdict[ii])
+
+	ax.set_xlabel('[OIII] / [OII] (dust-corrected)')
+	ax.set_ylabel(r'Q$_{\mathrm{PAH}}$')
+
+	ax.text(0.03,0.12, r'S/N ([OII],[OIII]) > '+str(int(sn_cut)), transform = ax.transAxes,horizontalalignment='left')
+	ax.text(0.03,0.07, r'N = '+str(np.sum(keep_idx)), transform = ax.transAxes,horizontalalignment='left')
+
+	ax.set_xscale('log',nonposx='clip',subsx=(1,3))
+	ax.xaxis.set_minor_formatter(minorFormatter)
+	ax.xaxis.set_major_formatter(majorFormatter)
+
+	ax.set_yscale('log',nonposy='clip',subsy=(1,2,4))
+	ax.yaxis.set_minor_formatter(minorFormatter)
+	ax.yaxis.set_major_formatter(majorFormatter)
+
+	ax.set_xlim(0.03,10)
+	ax.set_ylim(0.01,8)
+
+	plt.savefig(outfolder+'o32_vs_qpah.png',dpi=150)
+	plt.close()
+	print 1/0
+
+def gas_phase_metallicity(e_pinfo, hflag, alldata, outfolder='',ssfr_cut=False):
 
 	#### cuts first
 	sn_ha = e_pinfo['obs']['f_ha'][:,0] / np.abs(e_pinfo['obs']['err_ha'])
@@ -1243,6 +1336,13 @@ def gas_phase_metallicity(e_pinfo, hflag, outfolder='',ssfr_cut=False):
 	else:
 		keep_idx = np.squeeze((sn_ha > sn_cut) & (sn_hb > sn_cut) & (sn_oiii > sn_cut) & (sn_nii > sn_cut))
 
+	#### get qpah
+	qpah_idx = alldata[0]['pquantiles']['parnames'] == 'duste_qpah'
+
+	qpah = np.array([x['pquantiles']['q50'][qpah_idx][0] for x in alldata])[keep_idx]
+	qpah_errup = np.array([x['pquantiles']['q84'][qpah_idx][0] for x in alldata])[keep_idx]
+	qpah_errdo = np.array([x['pquantiles']['q16'][qpah_idx][0] for x in alldata])[keep_idx]
+
 	#### get BPT status
 	sfing, composite, agn = return_agn_str(keep_idx)
 	keys = [sfing, composite, agn]
@@ -1256,6 +1356,7 @@ def gas_phase_metallicity(e_pinfo, hflag, outfolder='',ssfr_cut=False):
 	#### get stellar metallicity
 	logzsol = e_pinfo['prosp']['met'][keep_idx,0]
 
+	#### plot metallicity-metallicity
 	fig, ax = plt.subplots(1,1,figsize=(7,7))
 	fig.subplots_adjust(left=0.15,bottom=0.1,top=0.95,right=0.95)
 	for ii,key in enumerate(keys): ax.plot(logzgas[key],logzsol[key],'o',**bptdict[ii])
@@ -1272,7 +1373,32 @@ def gas_phase_metallicity(e_pinfo, hflag, outfolder='',ssfr_cut=False):
 		plt.savefig(outfolder+'gas_to_stellar_metallicity_highssfr.png',dpi=150)
 	else:
 		plt.savefig(outfolder+'gas_to_stellar_metallicity.png',dpi=150)
+	plt.close()
 
+	#### plot qpah-metallicity
+	fig, ax = plt.subplots(1,1,figsize=(7,7))
+	fig.subplots_adjust(left=0.15,bottom=0.1,top=0.95,right=0.95)
+	for ii,key in enumerate(keys):
+		qpah_err = threed_dutils.asym_errors(qpah[key],qpah_errup[key],qpah_errdo[key],log=False) 
+		ax.errorbar(10**logzgas[key],qpah[key],fmt='o',linestyle=' ',yerr=qpah_err,**bptdict[ii])
+	ax.set_xlabel(r'Z$_{\mathrm{gas}}$/Z$_{\odot}$')
+	ax.set_ylabel(r'Q$_{\mathrm{PAH}}$')
+
+	ax.text(0.03,0.93, r'S/N (H$\alpha$,H$\beta$,[OIII],[NII]) > '+str(int(sn_cut)), transform = ax.transAxes,horizontalalignment='left')
+	ax.text(0.03,0.87, r'N = '+str(np.sum(keep_idx)), transform = ax.transAxes,horizontalalignment='left')
+
+	ax.set_xscale('log',nonposx='clip',subsx=(1,3))
+	ax.xaxis.set_minor_formatter(minorFormatter)
+	ax.xaxis.set_major_formatter(majorFormatter)
+
+	ax.set_yscale('log',nonposy='clip',subsy=(1,2,4))
+	ax.yaxis.set_minor_formatter(minorFormatter)
+	ax.yaxis.set_major_formatter(majorFormatter)
+
+	ax.set_xlim(0.1,3)
+	ax.set_ylim(0.01,8)
+
+	plt.savefig(outfolder+'gasz_vs_qpah.png',dpi=150)
 	plt.close()
 
 def bpt_diagram(e_pinfo,hflag,outname=None):
@@ -2899,7 +3025,10 @@ def plot_emline_comp(alldata,outfolder,hflag):
 
 	# gas-phase versus stellar metallicity
 	atlas_3d_met(e_pinfo, hflag,outfolder=outfolder)
-	gas_phase_metallicity(e_pinfo, hflag, outfolder=outfolder)
+	gas_phase_metallicity(e_pinfo, hflag, alldata, outfolder=outfolder)
+
+	# ionization parameter + gas-phase metallicity versus QPAH
+	ionization_parameter(e_pinfo, hflag, alldata, outfolder=outfolder)
 
 	# model versus observations, Balmer decrement
 	bdec_errs,bdec_flag = obs_vs_model_bdec(e_pinfo, hflag, outname1=outfolder+'bdec_comparison.png',outname2=outfolder+'prospector_bdec_comparison.png')
@@ -3214,7 +3343,7 @@ def prospector_comparison(alldata,outfolder,hflag):
 	plt.close()
 
 	#### qpah plots
-	fig, ax = plt.subplots(1,2, figsize = (12.5,6))
+	fig, ax = plt.subplots(1,1, figsize = (7,7))
 	qpah_low = 0.001 # lower plot limit for qpah, must clip errors for presentation purposes
 
 	mass = np.array([x['pquantiles']['q50'][idx_mass][0] for x in alldata])
@@ -3247,17 +3376,18 @@ def prospector_comparison(alldata,outfolder,hflag):
 	lir_err = threed_dutils.asym_errors(lir,lir_up,lir_do,log=True)
 	lir = np.log10(lir)
 
-	ax[0].errorbar(mass,np.log10(qpah),xerr=mass_err,yerr=qpah_err, alpha=0.6, fmt='o', color='#1C86EE')
-	ax[0].set_xlabel(r'log(M/M$_{\odot}$)')
-	ax[0].set_ylabel(r'log(Q$_{\mathrm{PAH}}$)')
-	ax[0].set_ylim(np.log10(qpah_low),np.log10(11.0))
+	ax.errorbar(mass,np.log10(qpah),xerr=mass_err,yerr=qpah_err, alpha=0.6, fmt='o', color='#1C86EE')
+	ax.set_xlabel(r'log(M/M$_{\odot}$)')
+	ax.set_ylabel(r'log(Q$_{\mathrm{PAH}}$)')
+	ax.set_ylim(np.log10(qpah_low),np.log10(11.0))
 
+	'''
 	ax[1].errorbar(lir,np.log10(qpah),xerr=lir_err,yerr=qpah_err, alpha=0.6, fmt='o', color='#1C86EE')
 	ax[1].set_xlabel(r'log(L$_{\mathrm{IR}}$)')
 	ax[1].set_ylabel(r'log(Q$_{\mathrm{PAH}}$)')
 	ax[1].set_ylim(np.log10(0.001),np.log10(11.0))
 	ax[1].set_xlim(6.5,12.5)
-
+	'''
 	plt.tight_layout()
 	plt.savefig(outfolder+'qpah_comp.png', dpi=dpi)
 	plt.close()
