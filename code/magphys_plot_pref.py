@@ -6,8 +6,11 @@ import numpy as np
 mpl.rcParams.update({'font.size': 16})
 mpl.rcParams['xtick.major.size'] = 8
 mpl.rcParams['ytick.major.size'] = 8
-mpl.rcParams['xtick.major.width'] = 1
-mpl.rcParams['ytick.major.width'] = 1
+try:
+	mpl.rcParams['xtick.major.width'] = 1
+	mpl.rcParams['ytick.major.width'] = 1
+except KeyError:
+	pass
 mpl.rcParams['xtick.minor.size'] = 4
 mpl.rcParams['ytick.minor.size'] = 4
 mpl.rcParams['xtick.minor.width'] = 0.5
