@@ -19,17 +19,17 @@ magphys_color = '#1974D2'
 dpi = 150
 
 #### herschel / non-herschel
-nhargs = {'fmt':'o','alpha':0.7,'color':'0.2'}
-hargs = {'fmt':'o','alpha':0.7,'color':'0.2'}
+nhargs = {'fmt':'o','alpha':0.7}
+hargs = {'fmt':'o','alpha':0.7}
 herschdict = [copy.copy(hargs),copy.copy(nhargs)]
 
 #### AGN
 colors = ['blue', 'purple', 'red']
 labels = ['SF', 'SF/AGN', 'AGN']
 
-sfargs = {'color':'blue', 'label':'SF'}
-compargs = {'color': 'purple', 'label': 'SF/AGN'}
-agnargs = {'color': 'red', 'label': 'AGN','fillstyle':'none'}
+sfargs = {'color':'blue', 'label':'star-forming','alpha':0.7}
+compargs = {'color': 'purple', 'label': 'composite','alpha':0.7}
+agnargs = {'color': 'red', 'label': 'AGN','fillstyle':'none','alpha':0.7}
 bptdict = [copy.copy(sfargs),copy.copy(compargs),copy.copy(agnargs)]
 
 #### minimum SFR
@@ -288,7 +288,6 @@ def specpar_pdf_plot(pdf,outname=None):
 
 		ax[i].text(0.04,0.93,r'$\Sigma$ (model posteriors)',transform=ax[i].transAxes,color=modcolor)
 		ax[i].text(0.04,0.88,'observations',transform=ax[i].transAxes,color=obscolor)
-		ax[i].text(0.04,0.83,'N='+str(pdf[key]['N']),transform=ax[i].transAxes)
 
 		### from the ensemble
 		#onesig_perc = pdf_quantiles(pdf[key]['plot_bins'],pdf[key]['obs_pdf'],pdf[key]['model_pdf'],0.16,0.84)/0.68
@@ -299,8 +298,8 @@ def specpar_pdf_plot(pdf,outname=None):
 		onesig_perc = ((pdf_dist >= 0.16) & (pdf_dist <= 0.84)).sum()/float(pdf_dist.shape[0]) / 0.68
 		twosig_perc = ((pdf_dist >= 0.025) & (pdf_dist <= 0.975)).sum()/float(pdf_dist.shape[0]) / 0.95
 
-		ax[i].text(0.05,0.76,r'$\frac{1\sigma_{\mathrm{obs}}}{1\sigma_{\mathrm{true}}}$:'+"{:.2f}".format(onesig_perc),transform=ax[i].transAxes)
-		ax[i].text(0.05,0.69,r'$\frac{2\sigma_{\mathrm{obs}}}{2\sigma_{\mathrm{true}}}$:'+"{:.2f}".format(twosig_perc),transform=ax[i].transAxes)
+		ax[i].text(0.05,0.8,r'$\frac{1\sigma_{\mathrm{obs}}}{1\sigma_{\mathrm{true}}}$:'+"{:.2f}".format(onesig_perc),transform=ax[i].transAxes)
+		ax[i].text(0.05,0.73,r'$\frac{2\sigma_{\mathrm{obs}}}{2\sigma_{\mathrm{true}}}$:'+"{:.2f}".format(twosig_perc),transform=ax[i].transAxes)
 		
 	plt.tight_layout()
 	plt.savefig(outname,dpi=150)
@@ -1219,18 +1218,17 @@ def atlas_3d_met(e_pinfo,hflag,outfolder=''):
 
 	prosp_met, prosp_met_err, a3d_met, a3d_met_err, a3d_alpha, obj_idx = brown_quality_cuts.load_atlas3d(e_pinfo)
 
-	fig, ax = plt.subplots(1,1,figsize=(7,7))
+	fig, ax = plt.subplots(1,1,figsize=(7.5,7.5))
 	fig.subplots_adjust(left=0.15,bottom=0.1,top=0.95,right=0.95)
 	ax.errorbar(a3d_met,prosp_met,xerr=a3d_met_err,yerr=prosp_met_err, color='#1C86EE',alpha=0.9,fmt='o')
-	ax.set_xlabel('log(Z$_{\mathrm{ATLAS-3D}}$/Z$_{\odot}$)')
-	ax.set_ylabel('log(Z$_{\mathrm{Prosp}}$/Z$_{\odot}$)')
+	ax.set_xlabel('log(Z$_{\mathrm{ATLAS-3D}}$/Z$_{\odot}$)',fontsize=22)
+	ax.set_ylabel('log(Z$_{\mathrm{Prosp}}$/Z$_{\odot}$)',fontsize=22)
 
 	ax = threed_dutils.equalize_axes(ax,a3d_met+0.1,prosp_met-0.1, dynrange=0.1, line_of_equality=True, log=False)
 
 	off,scat = threed_dutils.offset_and_scatter(a3d_met,prosp_met, biweight=True)
-	ax.text(0.03,0.95, r'N = '+str(prosp_met.shape[0]), transform = ax.transAxes,horizontalalignment='left')
-	ax.text(0.03,0.9, 'biweight scatter='+"{:.2f}".format(scat) +' dex', transform = ax.transAxes,horizontalalignment='left')
-	ax.text(0.03,0.85, 'mean offset='+"{:.2f}".format(off)+ ' dex', transform = ax.transAxes,horizontalalignment='left')
+	ax.text(0.03,0.92, 'biweight scatter='+"{:.2f}".format(scat) +' dex', transform = ax.transAxes,horizontalalignment='left',fontsize=22)
+	ax.text(0.03,0.85, 'mean offset='+"{:.2f}".format(off)+ ' dex', transform = ax.transAxes,horizontalalignment='left',fontsize=22)
 
 	plt.savefig(outfolder+'atlas3d_starmet.png',dpi=150)
 	plt.close()
@@ -1317,7 +1315,6 @@ def ionization_parameter(e_pinfo, hflag, alldata, outfolder=''):
 
 	plt.savefig(outfolder+'o32_vs_qpah.png',dpi=150)
 	plt.close()
-	print 1/0
 
 def gas_phase_metallicity(e_pinfo, hflag, alldata, outfolder='',ssfr_cut=False):
 
@@ -1587,43 +1584,43 @@ def obs_vs_kennicutt_ha(e_pinfo,hflag,outname_prosp='test.png',outname_mag='test
 	fig4, ax4 = plt.subplots(1,2, figsize = (12.5,6))
 
 	for ii in xrange(len(labels)):
-		for kk in xrange(len(hflag)):
 
-			### update colors, define region
-			pdict = merge_dicts(herschdict[kk],bptdict[ii])
-			plt_idx = keys[ii] & hflag[kk]
+		### update colors, define region
+		pdict = bptdict[ii]
+		plt_idx = keys[ii]
 
-			### setup errors
-			prosp_emp_err = threed_dutils.asym_errors(pl_ha_emp[plt_idx,0],pl_ha_emp[plt_idx,1], pl_ha_emp[plt_idx,2],log=False)
-			prosp_cloud_err = threed_dutils.asym_errors(pl_ha_cloudy[plt_idx,0],pl_ha_cloudy[plt_idx,1], pl_ha_cloudy[plt_idx,2],log=False)
-			obs_err = threed_dutils.asym_errors(pl_ha_obs[plt_idx,0],pl_ha_obs[plt_idx,1], pl_ha_obs[plt_idx,2],log=False)
-			ratio_err = threed_dutils.asym_errors(pl_ha_ratio[plt_idx,0],pl_ha_ratio[plt_idx,1], pl_ha_ratio[plt_idx,2],log=False)
-			pmet_err = threed_dutils.asym_errors(pmet[plt_idx,0],pmet[plt_idx,1], pmet[plt_idx,2],log=False)
-			ha_ext_err = threed_dutils.asym_errors(ha_ext[plt_idx,0], ha_ext[plt_idx,1], ha_ext[plt_idx,2],log=False)
-			sfr10_err = threed_dutils.asym_errors(sfr10[plt_idx,0], sfr10[plt_idx,1], sfr10[plt_idx,2],log=False)
-			sfr100_err = threed_dutils.asym_errors(sfr100[plt_idx,0], sfr100[plt_idx,1], sfr100[plt_idx,2],log=False)
-			msfr100_err = threed_dutils.asym_errors(msfr100_marginalized[plt_idx,1], msfr100_marginalized[plt_idx,0], msfr100_marginalized[plt_idx,2],log=False)
+		### setup errors
+		prosp_emp_err = threed_dutils.asym_errors(pl_ha_emp[plt_idx,0],pl_ha_emp[plt_idx,1], pl_ha_emp[plt_idx,2],log=False)
+		prosp_cloud_err = threed_dutils.asym_errors(pl_ha_cloudy[plt_idx,0],pl_ha_cloudy[plt_idx,1], pl_ha_cloudy[plt_idx,2],log=False)
+		obs_err = threed_dutils.asym_errors(pl_ha_obs[plt_idx,0],pl_ha_obs[plt_idx,1], pl_ha_obs[plt_idx,2],log=False)
+		ratio_err = threed_dutils.asym_errors(pl_ha_ratio[plt_idx,0],pl_ha_ratio[plt_idx,1], pl_ha_ratio[plt_idx,2],log=False)
+		pmet_err = threed_dutils.asym_errors(pmet[plt_idx,0],pmet[plt_idx,1], pmet[plt_idx,2],log=False)
+		ha_ext_err = threed_dutils.asym_errors(ha_ext[plt_idx,0], ha_ext[plt_idx,1], ha_ext[plt_idx,2],log=False)
+		sfr10_err = threed_dutils.asym_errors(sfr10[plt_idx,0], sfr10[plt_idx,1], sfr10[plt_idx,2],log=False)
+		sfr100_err = threed_dutils.asym_errors(sfr100[plt_idx,0], sfr100[plt_idx,1], sfr100[plt_idx,2],log=False)
+		msfr100_err = threed_dutils.asym_errors(msfr100_marginalized[plt_idx,1], msfr100_marginalized[plt_idx,0], msfr100_marginalized[plt_idx,2],log=False)
 
-			ax1.errorbar(pl_ha_obs[plt_idx,0], pl_ha_emp[plt_idx,0], xerr=obs_err, yerr=prosp_emp_err,
-				           linestyle=' ',**pdict)
-			axmag.errorbar(pl_ha_obs[plt_idx,0], pl_ha_mag[plt_idx], xerr=obs_err,
-				           linestyle=' ',**pdict)
-			ax2.errorbar(pl_ha_ratio[plt_idx,0],pmet[plt_idx,0],
-				           linestyle=' ',**pdict)
+		ax1.errorbar(pl_ha_obs[plt_idx,0], pl_ha_emp[plt_idx,0], xerr=obs_err, yerr=prosp_emp_err,
+			           linestyle=' ',fmt='o',**pdict)
+		axmag.errorbar(pl_ha_obs[plt_idx,0], pl_ha_mag[plt_idx], xerr=obs_err,
+			           linestyle=' ',fmt='o',**pdict)
+		ax2.errorbar(pl_ha_ratio[plt_idx,0],pmet[plt_idx,0],
+			           linestyle=' ',fmt='o',**pdict)
 
-			ax3[0].errorbar(sfr10[plt_idx,0], msfr10[plt_idx], xerr=sfr10_err, 
-				           linestyle=' ',**pdict)
-			ax3[1].errorbar(ha_ext[plt_idx,0], mha_ext[plt_idx], xerr=ha_ext_err, 
-				           linestyle=' ',**pdict)
+		ax3[0].errorbar(sfr10[plt_idx,0], msfr10[plt_idx], xerr=sfr10_err, 
+			           linestyle=' ',fmt='o',**pdict)
+		ax3[1].errorbar(ha_ext[plt_idx,0], mha_ext[plt_idx], xerr=ha_ext_err, 
+			           linestyle=' ',fmt='o',**pdict)
 
-			ax4[0].errorbar(msfr100_marginalized[plt_idx,1], msfr100[plt_idx], xerr=msfr100_err, 
-	           linestyle=' ',**pdict)
-			ax4[1].errorbar(sfr100[plt_idx,0], msfr100_marginalized[plt_idx,1], xerr=sfr100_err, yerr=msfr100_err,
-	           linestyle=' ',**pdict)
-
-	ax1.text(0.04,0.92, r'S/N (H$\alpha$,H$\beta$) > {0}'.format(int(e_pinfo['obs']['sn_cut'])), transform = ax1.transAxes,horizontalalignment='left')
+		ax4[0].errorbar(msfr100_marginalized[plt_idx,1], msfr100[plt_idx], xerr=msfr100_err, 
+           linestyle=' ',fmt='o',**pdict)
+		ax4[1].errorbar(sfr100[plt_idx,0], msfr100_marginalized[plt_idx,1], xerr=sfr100_err, yerr=msfr100_err,
+           linestyle=' ',fmt='o',**pdict)
+	
+	bpt_legend(ax1,loc=2)
+	#ax1.text(0.04,0.92, r'S/N (H$\alpha$,H$\beta$) > {0}'.format(int(e_pinfo['obs']['sn_cut'])), transform = ax1.transAxes,horizontalalignment='left')
 	#ax1.text(0.04,0.92, r'EQW H$\alpha$ > {0} $\AA$'.format(int(e_pinfo['obs']['eqw_cut'])), transform = ax1.transAxes,horizontalalignment='left')
-	ax1.text(0.04,0.87, r'N = '+str(int(np.sum(keep_idx))), transform = ax1.transAxes,horizontalalignment='left')
+	#ax1.text(0.04,0.87, r'N = '+str(int(np.sum(keep_idx))), transform = ax1.transAxes,horizontalalignment='left')
 	ax1.set_xlabel(xlab_ha[0])
 	ax1.set_ylabel(ylab_ha[0])
 	if standardized_ha_axlim:
@@ -1635,9 +1632,9 @@ def obs_vs_kennicutt_ha(e_pinfo,hflag,outname_prosp='test.png',outname_mag='test
 	ax1.text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat) +' dex', transform = ax1.transAxes,horizontalalignment='right')
 	ax1.text(0.96,0.1, 'mean offset='+"{:.2f}".format(off)+ ' dex', transform = ax1.transAxes,horizontalalignment='right')
 
-	axmag.text(0.04,0.92, r'S/N (H$\alpha$,H$\beta$) > {0}'.format(int(e_pinfo['obs']['sn_cut'])), transform = axmag.transAxes,horizontalalignment='left')
+	#axmag.text(0.04,0.92, r'S/N (H$\alpha$,H$\beta$) > {0}'.format(int(e_pinfo['obs']['sn_cut'])), transform = axmag.transAxes,horizontalalignment='left')
 	#axmag.text(0.04,0.92, r'EQW H$\alpha$ > {0} $\AA$'.format(int(e_pinfo['obs']['eqw_cut'])), transform = axmag.transAxes,horizontalalignment='left')
-	axmag.text(0.04,0.87, r'N = '+str(int(np.sum(keep_idx))), transform = axmag.transAxes,horizontalalignment='left')
+	#axmag.text(0.04,0.87, r'N = '+str(int(np.sum(keep_idx))), transform = axmag.transAxes,horizontalalignment='left')
 	axmag.set_xlabel(xlab_ha[1])
 	axmag.set_ylabel(ylab_ha[1])
 	if standardized_ha_axlim:
@@ -1650,17 +1647,18 @@ def obs_vs_kennicutt_ha(e_pinfo,hflag,outname_prosp='test.png',outname_mag='test
 	axmag.text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat) +' dex', transform = axmag.transAxes,horizontalalignment='right')
 	axmag.text(0.96,0.1, 'mean offset='+"{:.2f}".format(off)+ ' dex', transform = axmag.transAxes,horizontalalignment='right')
 
-	ax2.text(0.97,0.92, r'S/N (H$\alpha$,H$\beta$) > {0}'.format(int(e_pinfo['obs']['sn_cut'])), transform = ax2.transAxes,horizontalalignment='right')
+	#ax2.text(0.97,0.92, r'S/N (H$\alpha$,H$\beta$) > {0}'.format(int(e_pinfo['obs']['sn_cut'])), transform = ax2.transAxes,horizontalalignment='right')
 	#ax2.text(0.97,0.92, r'EQW H$\alpha$ > {0} $\AA$'.format(int(e_pinfo['obs']['eqw_cut'])), transform = ax2.transAxes,horizontalalignment='right')
-	ax2.text(0.97,0.87, r'N = '+str(int(np.sum(keep_idx))), transform = ax2.transAxes,horizontalalignment='right')
+	#ax2.text(0.97,0.87, r'N = '+str(int(np.sum(keep_idx))), transform = ax2.transAxes,horizontalalignment='right')
 	ax2.set_ylabel(r'log(Z/Z$_{\odot}$) [Prospector]')
 	ax2.set_xlabel(r'log(H$_{\alpha}$ CLOUDY/Kennicutt) [Prospector]')
 	ax2.xaxis.set_major_locator(MaxNLocator(4))
 
 
-	ax3[0].text(0.04,0.92, r'S/N (H$\alpha$,H$\beta$) > {0}'.format(int(e_pinfo['obs']['sn_cut'])), transform = ax3[0].transAxes,horizontalalignment='left')
+	#ax3[0].text(0.04,0.92, r'S/N (H$\alpha$,H$\beta$) > {0}'.format(int(e_pinfo['obs']['sn_cut'])), transform = ax3[0].transAxes,horizontalalignment='left')
 	#ax3[0].text(0.04,0.92, r'EQW H$\alpha$ > {0} $\AA$'.format(int(e_pinfo['obs']['eqw_cut'])), transform = ax3[0].transAxes,horizontalalignment='left')
-	ax3[0].text(0.04,0.87, r'N = '+str(int(np.sum(keep_idx))), transform = ax3[0].transAxes,horizontalalignment='left')
+	#ax3[0].text(0.04,0.87, r'N = '+str(int(np.sum(keep_idx))), transform = ax3[0].transAxes,horizontalalignment='left')
+	bpt_legend(ax3[0],loc=2)
 	ax3[0].set_xlabel(r'log(SFR [10 Myr]) [marginalized, Prospector]')
 	ax3[0].set_ylabel(r'log(SFR [10 Myr]) [best-fit, MAGPHYS]')
 	ax3[0] = threed_dutils.equalize_axes(ax3[0], sfr10[:,0], msfr10)
@@ -1885,7 +1883,7 @@ def obs_vs_prosp_balmlines(e_pinfo,hflag,outname='test.png',outname_resid='test.
 
 	##### plot!
 	fig1, ax1 = plt.subplots(2,2, figsize = (12,12))
-	fig2, ax2 = plt.subplots(1,1, figsize = (6,6))
+	fig2, ax2 = plt.subplots(1,1, figsize = (6.5,6.5))
 
 	for jj in xrange(2):
 
@@ -1896,8 +1894,8 @@ def obs_vs_prosp_balmlines(e_pinfo,hflag,outname='test.png',outname_resid='test.
 			f_hb = e_pinfo['obs']['eqw_hb'][keep_idx,:]
 			model_ha = e_pinfo['prosp']['cloudy_ha_eqw'][keep_idx,:]
 			model_hb = e_pinfo['prosp']['cloudy_hb_eqw'][keep_idx,:]
-			ylabel = [r'log(H$_{\alpha}$ EQW) [Prospector]', r'log(H$_{\beta}$ EQW) [Prospector]']
-			xlabel = [r'log(H$_{\alpha}$ EQW) [observed]', r'log(H$_{\beta}$ EQW) [observed]']
+			ylabel = [r'log(H$_{\alpha}$ EW) [Prospector]', r'log(H$_{\beta}$ EW) [Prospector]']
+			xlabel = [r'log(H$_{\alpha}$ EW) [observed]', r'log(H$_{\beta}$ EW) [observed]']
 			ha_lim = ha_eqw_lim
 		else:
 			f_ha = e_pinfo['obs']['f_ha'][keep_idx,:]
@@ -1917,38 +1915,39 @@ def obs_vs_prosp_balmlines(e_pinfo,hflag,outname='test.png',outname_resid='test.
 		yplot_hb = minlog(model_hb,axis=0)
 
 		for ii in xrange(len(labels)):
-			for kk in xrange(len(hflag)):
 
-				### update colors, define region
-				pdict = merge_dicts(herschdict[kk],bptdict[ii])
-				plt_idx = keys[ii] & hflag[kk]
+			### update colors, define region
+			pdict = bptdict[ii]
+			plt_idx = keys[ii]
 
-				### setup errors
-				xerr_ha = threed_dutils.asym_errors(xplot_ha[plt_idx,0],xplot_ha[plt_idx,1], xplot_ha[plt_idx,2],log=False)
-				xerr_hb = threed_dutils.asym_errors(xplot_hb[plt_idx,0],xplot_hb[plt_idx,1], xplot_hb[plt_idx,2],log=False)
+			### setup errors
+			xerr_ha = threed_dutils.asym_errors(xplot_ha[plt_idx,0],xplot_ha[plt_idx,1], xplot_ha[plt_idx,2],log=False)
+			xerr_hb = threed_dutils.asym_errors(xplot_hb[plt_idx,0],xplot_hb[plt_idx,1], xplot_hb[plt_idx,2],log=False)
 
-				yerr_ha = threed_dutils.asym_errors(yplot_ha[plt_idx,0],yplot_ha[plt_idx,1], yplot_ha[plt_idx,2],log=False)
-				yerr_hb = threed_dutils.asym_errors(yplot_hb[plt_idx,0],yplot_hb[plt_idx,1], yplot_hb[plt_idx,2],log=False)
+			yerr_ha = threed_dutils.asym_errors(yplot_ha[plt_idx,0],yplot_ha[plt_idx,1], yplot_ha[plt_idx,2],log=False)
+			yerr_hb = threed_dutils.asym_errors(yplot_hb[plt_idx,0],yplot_hb[plt_idx,1], yplot_hb[plt_idx,2],log=False)
 
-				norm_errs.append(normalize_error(yplot_ha[plt_idx,0],yerr_ha,xplot_ha[plt_idx,0],xerr_ha))
-				norm_flag.append([labels[ii]]*np.sum(plt_idx))
+			norm_errs.append(normalize_error(yplot_ha[plt_idx,0],yerr_ha,xplot_ha[plt_idx,0],xerr_ha))
+			norm_flag.append([labels[ii]]*np.sum(plt_idx))
 
-				ax[0].errorbar(xplot_ha[plt_idx,0], yplot_ha[plt_idx,0], yerr=yerr_ha, xerr=xerr_ha, 
-					           linestyle=' ',**pdict)
-				ax[1].errorbar(xplot_hb[plt_idx,0], yplot_hb[plt_idx,0], yerr=yerr_hb, xerr=xerr_hb,
-		                       linestyle=' ',**pdict)
+			ax[0].errorbar(xplot_ha[plt_idx,0], yplot_ha[plt_idx,0], yerr=yerr_ha, xerr=xerr_ha, 
+				           linestyle=' ',fmt='o',**pdict)
+			ax[1].errorbar(xplot_hb[plt_idx,0], yplot_hb[plt_idx,0], yerr=yerr_hb, xerr=xerr_hb,
+	                       linestyle=' ',fmt='o',**pdict)
 
-				bad = np.abs(xplot_ha[plt_idx,0] - yplot_ha[plt_idx,0]) > 0.5
-				if bad.sum():
-					print e_pinfo['objnames'][keep_idx][plt_idx][bad]
+			bad = np.abs(xplot_ha[plt_idx,0] - yplot_ha[plt_idx,0]) > 0.5
+			if bad.sum():
+				print e_pinfo['objnames'][keep_idx][plt_idx][bad]
 
-				if jj == 0:
-					ax2.errorbar(yplot_ha[plt_idx,0] - xplot_ha[plt_idx,0],yplot_hb[plt_idx,0] - xplot_hb[plt_idx,0],
-							     linestyle=' ',**pdict)
+			if jj == 0:
+				ax2.errorbar(yplot_ha[plt_idx,0] - xplot_ha[plt_idx,0],yplot_hb[plt_idx,0] - xplot_hb[plt_idx,0],
+						     linestyle=' ',fmt='o',**pdict)
 
-		ax[0].text(0.04,0.92, r'S/N (H$\alpha$,H$\beta$) > {0}'.format(int(e_pinfo['obs']['sn_cut'])), transform = ax[0].transAxes,horizontalalignment='left')
+		#ax[0].text(0.04,0.92, r'S/N (H$\alpha$,H$\beta$) > {0}'.format(int(e_pinfo['obs']['sn_cut'])), transform = ax[0].transAxes,horizontalalignment='left')
 		#ax[0].text(0.04,0.92, r'EQW (H$\alpha$,H$\beta$) > {0} $\AA$'.format(int(e_pinfo['obs']['eqw_cut'])), transform = ax[0].transAxes,horizontalalignment='left')
-		ax[0].text(0.04,0.87, r'N = '+str(int(np.sum(keep_idx))), transform = ax[0].transAxes,horizontalalignment='left')
+		#ax[0].text(0.04,0.87, r'N = '+str(int(np.sum(keep_idx))), transform = ax[0].transAxes,horizontalalignment='left')
+		if jj == 0:
+			bpt_legend(ax[0],loc=2)
 		ax[0].set_ylabel(ylabel[0])
 		ax[0].set_xlabel(xlabel[0])
 		if standardized_ha_axlim:
@@ -1973,8 +1972,8 @@ def obs_vs_prosp_balmlines(e_pinfo,hflag,outname='test.png',outname_resid='test.
 				      transform = ax[1].transAxes,horizontalalignment='right')
 
 		if jj == 0:
-			ax2.set_ylabel(r'log(model/obs) H$_{\alpha}$)')
-			ax2.set_xlabel(r'log(model/obs) H$_{\beta}$)')
+			ax2.set_ylabel(r'log(model/observed) H$_{\alpha}$)')
+			ax2.set_xlabel(r'log(model/observed) H$_{\beta}$)')
 			max = np.max([np.abs(ax2.get_ylim()).max(),np.abs(ax2.get_xlim()).max()])
 			max = 0.8
 			ax2.plot([0.0,0.0],[-max,max],linestyle=':',alpha=1.0,color='0.5')
@@ -1987,7 +1986,8 @@ def obs_vs_prosp_balmlines(e_pinfo,hflag,outname='test.png',outname_resid='test.
 			ax2.arrow(0.722, 0.15,-0.04, 0.04, head_width=0.02, head_length=0.03, fc='k', ec='k',width=0.002,transform = ax2.transAxes)
 
 			ax2.text(0.744, 0.12, 'model \n normalization \n error',transform = ax2.transAxes,horizontalalignment='left',fontsize=10,multialignment='center',weight='semibold')
-			ax2.text(0.694, 0.12, 'model \n reddening \n error',transform = ax2.transAxes,horizontalalignment='right',fontsize=10,multialignment='center',weight='semibold')
+			ax2.text(0.693, 0.12, 'model \n reddening \n error',transform = ax2.transAxes,horizontalalignment='right',fontsize=10,multialignment='center',weight='semibold')
+			bpt_legend(ax2,loc=2)
 
 			threed_dutils.return_n_outliers(np.log10(f_ha[:,0]),np.log10(model_ha[:,0]),e_pinfo['objnames'][keep_idx],10,cp_files='halpha')
 
@@ -2028,12 +2028,12 @@ def obs_vs_model_hdelta(e_pinfo,hflag,outname=None,outname2=None,outname_dnplt=N
 		hdel_prosp_em = e_pinfo['prosp']['hdel_eqw_elineon_marg'][good_idx]
 		hdel_prosp = np.log10(e_pinfo['prosp']['hdel_eqw'][good_idx])
 
-		xtit = [r'observed H$_{\delta}$ EQW', 
-		        r'observed H$_{\delta}$ EQW',
-		        r'observed H$_{\delta}$ EQW']
-		ytit = [r'model H$_{\delta}$ EQW [absorption+emission]',
-		        r'model H$_{\delta}$ EQW [best-fit]',
-		        r'model H$_{\delta}$ EQW [marginalized]']
+		xtit = [r'observed H$_{\delta}$ EW', 
+		        r'observed H$_{\delta}$ EW',
+		        r'observed H$_{\delta}$ EW']
+		ytit = [r'model H$_{\delta}$ EW [absorption+emission]',
+		        r'model H$_{\delta}$ EW [best-fit]',
+		        r'model H$_{\delta}$ EW [marginalized]']
 
 		# only make this plot in EQW
 		fig2, ax2 = plt.subplots(1,2, figsize=(12.5,6))
@@ -2080,47 +2080,47 @@ def obs_vs_model_hdelta(e_pinfo,hflag,outname=None,outname2=None,outname_dnplt=N
 	ax3 = np.ravel(ax3)
 	# loop and put points on plot
 	for ii in xrange(len(labels)):
-		for kk in xrange(len(hflag)):
 
-			### update colors, define sample
-			pdict = merge_dicts(herschdict[kk],bptdict[ii])
-			plt_idx = keys[ii] & hflag[kk]
+		### update colors, define sample
+		pdict = bptdict[ii]
+		plt_idx = keys[ii]
 
-			### errors
-			errs_pro = threed_dutils.asym_errors(hdel_prosp_marg[plt_idx,0],
-				                                 hdel_prosp_marg[plt_idx,1],
-				                                 hdel_prosp_marg[plt_idx,2],log=False)
+		### errors
+		errs_pro = threed_dutils.asym_errors(hdel_prosp_marg[plt_idx,0],
+			                                 hdel_prosp_marg[plt_idx,1],
+			                                 hdel_prosp_marg[plt_idx,2],log=False)
 
-			errs_pro_em = threed_dutils.asym_errors(hdel_prosp_em[plt_idx,0],
-				                                    hdel_prosp_em[plt_idx,1],
-				                                    hdel_prosp_em[plt_idx,2],log=False)
+		errs_pro_em = threed_dutils.asym_errors(hdel_prosp_em[plt_idx,0],
+			                                    hdel_prosp_em[plt_idx,1],
+			                                    hdel_prosp_em[plt_idx,2],log=False)
 
-			errs_obs = threed_dutils.asym_errors(hdel_obs[plt_idx,0],
-				                                 hdel_obs[plt_idx,1],
-				                                 hdel_obs[plt_idx,2],log=False)
+		errs_obs = threed_dutils.asym_errors(hdel_obs[plt_idx,0],
+			                                 hdel_obs[plt_idx,1],
+			                                 hdel_obs[plt_idx,2],log=False)
 
-			### define quantities
-			pl_hdel_obs = hdel_obs[plt_idx,0]
-			pl_hdel_prosp = hdel_prosp_marg[plt_idx,0]
-			pl_hdel_prosp_em = hdel_prosp_em[plt_idx,0]
+		### define quantities
+		pl_hdel_obs = hdel_obs[plt_idx,0]
+		pl_hdel_prosp = hdel_prosp_marg[plt_idx,0]
+		pl_hdel_prosp_em = hdel_prosp_em[plt_idx,0]
 
-			#### old error plots
-			norm_errs.append(normalize_error(np.log10(pl_hdel_obs),errs_obs,
-				                             np.log10(pl_hdel_prosp),errs_pro))
-			norm_flag.append([labels[ii]]*np.sum(plt_idx))
+		#### old error plots
+		norm_errs.append(normalize_error(np.log10(pl_hdel_obs),errs_obs,
+			                             np.log10(pl_hdel_prosp),errs_pro))
+		norm_flag.append([labels[ii]]*np.sum(plt_idx))
 
 
-			#### plot
-			ax[0].errorbar(pl_hdel_obs, pl_hdel_prosp, xerr=errs_obs, yerr=errs_pro, linestyle=' ', **pdict)
-			ax3[0].errorbar(pl_hdel_obs, pl_hdel_prosp_em, xerr=errs_obs, yerr=errs_pro_em, linestyle=' ', **pdict)
+		#### plot
+		ax[0].errorbar(pl_hdel_obs, pl_hdel_prosp, fmt='o',xerr=errs_obs, yerr=errs_pro, linestyle=' ', **pdict)
+		ax3[0].errorbar(pl_hdel_obs, pl_hdel_prosp_em, fmt='o',xerr=errs_obs, yerr=errs_pro_em, linestyle=' ', **pdict)
 
-			if eqw:
-				ax2[0].errorbar(np.log10(pl_hdel_obs), dn4000_obs[plt_idx], linestyle=' ',**pdict)
-				ax2[1].errorbar(np.log10(pl_hdel_prosp), dn4000_prosp[plt_idx], linestyle=' ',**pdict)
+		if eqw:
+			ax2[0].errorbar(np.log10(pl_hdel_obs), dn4000_obs[plt_idx], fmt='o',linestyle=' ',**pdict)
+			ax2[1].errorbar(np.log10(pl_hdel_prosp), dn4000_prosp[plt_idx], fmt='o',linestyle=' ',**pdict)
 
-	ax[0].text(0.04,0.92, r'N = '+str(int(np.sum(good_idx))), transform = ax[0].transAxes,horizontalalignment='left')
-	ax[0].text(0.04,0.87, r'S/N H$\delta$ > {0}'.format(int(e_pinfo['obs']['hdelta_sn_cut'])), transform = ax[0].transAxes,horizontalalignment='left')
+	#ax[0].text(0.04,0.92, r'N = '+str(int(np.sum(good_idx))), transform = ax[0].transAxes,horizontalalignment='left')
+	#ax[0].text(0.04,0.87, r'S/N H$\delta$ > {0}'.format(int(e_pinfo['obs']['hdelta_sn_cut'])), transform = ax[0].transAxes,horizontalalignment='left')
 	#ax[0].text(0.04,0.82, r'EQW H$\delta$ < -{0} $\AA$'.format(int(e_pinfo['obs']['hdelta_eqw_cut'])), transform = ax[0].transAxes,horizontalalignment='left')
+	bpt_legend(ax[0],loc=2)
 	ax[0].set_xlabel(xtit[2])
 	ax[0].set_ylabel(ytit[2])
 	off,scat = threed_dutils.offset_and_scatter(hdel_obs[:,0], hdel_prosp_marg[:,0],biweight=True)
@@ -2129,14 +2129,15 @@ def obs_vs_model_hdelta(e_pinfo,hflag,outname=None,outname2=None,outname_dnplt=N
 	ax[0].axis(plotlim)
 	ax[0].plot([min,max],[min,max],linestyle='--',color='0.1',alpha=0.8)
 
-	ax3[0].text(0.04,0.82, r'N = '+str(int(np.sum(good_idx))), transform = ax3[0].transAxes,horizontalalignment='left')
-	ax3[0].text(0.04,0.77, r'S/N H$\delta$ > {0}'.format(int(e_pinfo['obs']['hdelta_sn_cut'])), transform = ax3[0].transAxes,horizontalalignment='left')
+	#ax3[0].text(0.04,0.82, r'N = '+str(int(np.sum(good_idx))), transform = ax3[0].transAxes,horizontalalignment='left')
+	#ax3[0].text(0.04,0.77, r'S/N H$\delta$ > {0}'.format(int(e_pinfo['obs']['hdelta_sn_cut'])), transform = ax3[0].transAxes,horizontalalignment='left')
 	#ax3[0].text(0.04,0.82, r'EQW H$\delta$ < -{0} $\AA$'.format(int(e_pinfo['obs']['hdelta_eqw_cut'])), transform = ax3[0].transAxes,horizontalalignment='left')
+	bpt_legend(ax3[0],loc=2,size=13)
 	ax3[0].set_xlabel(xtit[0])
 	ax3[0].set_ylabel(ytit[0])
 	off,scat = threed_dutils.offset_and_scatter(hdel_obs[:,0], hdel_prosp_em[:,0],biweight=True)
-	ax3[0].text(0.04,0.92, 'biweight scatter='+"{:.2f}".format(scat), transform = ax3[0].transAxes)
-	ax3[0].text(0.04,0.87, 'mean offset='+"{:.2f}".format(off), transform = ax3[0].transAxes)
+	ax3[0].text(0.98,0.11, 'biweight scatter='+"{:.2f}".format(scat), transform = ax3[0].transAxes,ha='right')
+	ax3[0].text(0.98,0.06, 'mean offset='+"{:.2f}".format(off), transform = ax3[0].transAxes,ha='right')
 	ax3[0].axis(plotlim)
 	ax3[0].plot([min,max],[min,max],linestyle='--',color='0.1',alpha=0.8)
 
@@ -2190,34 +2191,35 @@ def obs_vs_model_dn(e_pinfo,hflag,outname=None):
 
 	# loop and put points on plot
 	for ii in xrange(len(labels)):
-		for kk in xrange(len(hflag)):
 
-			### update colors, define sample
-			pdict = merge_dicts(herschdict[kk],bptdict[ii])
-			plt_idx = keys[ii] & hflag[kk]
+		### update colors, define sample
+		pdict = bptdict[ii]
+		plt_idx = keys[ii]
 
-			### define quantities
-			pl_dn4000_obs = dn4000_obs[plt_idx]
-			pl_dn4000_prosp = dn4000_prosp[plt_idx]
+		### define quantities
+		pl_dn4000_obs = dn4000_obs[plt_idx]
+		pl_dn4000_prosp = dn4000_prosp[plt_idx]
 
-			### Prospector errors
-			errs_pro = threed_dutils.asym_errors(e_pinfo['prosp']['dn4000'][dn_idx,0][plt_idx],
-				                                 e_pinfo['prosp']['dn4000'][dn_idx,1][plt_idx],
-				                                 e_pinfo['prosp']['dn4000'][dn_idx,2][plt_idx])
+		### Prospector errors
+		errs_pro = threed_dutils.asym_errors(e_pinfo['prosp']['dn4000'][dn_idx,0][plt_idx],
+			                                 e_pinfo['prosp']['dn4000'][dn_idx,1][plt_idx],
+			                                 e_pinfo['prosp']['dn4000'][dn_idx,2][plt_idx])
 
-			norm_errs.append(normalize_error(pl_dn4000_obs,[np.zeros_like(pl_dn4000_obs),np.zeros_like(pl_dn4000_obs)],
-				                             pl_dn4000_prosp,errs_pro))
-			norm_flag.append([labels[ii]]*np.sum(plt_idx))
+		norm_errs.append(normalize_error(pl_dn4000_obs,[np.zeros_like(pl_dn4000_obs),np.zeros_like(pl_dn4000_obs)],
+			                             pl_dn4000_prosp,errs_pro))
+		norm_flag.append([labels[ii]]*np.sum(plt_idx))
 
-			ax.errorbar(pl_dn4000_obs, pl_dn4000_prosp, yerr=errs_pro, xerr=[np.random.rand(pl_dn4000_obs.shape[0])*0.04+0.01,np.random.rand(pl_dn4000_obs.shape[0])*0.04+0.01], linestyle=' ', **pdict)
+		# xerr = [np.random.rand(pl_dn4000_obs.shape[0])*0.04+0.01,np.random.rand(pl_dn4000_obs.shape[0])*0.04+0.01]
+		ax.errorbar(pl_dn4000_obs, pl_dn4000_prosp, fmt='o',yerr=errs_pro, xerr=None, linestyle=' ', **pdict)
 
+	bpt_legend(ax,loc=2)
 	ax.set_xlabel(r'observed D$_n$4000')
 	ax.set_ylabel(r'Prospector D$_n$4000')
 	ax = threed_dutils.equalize_axes(ax, dn4000_obs, dn4000_prosp)
 	off,scat = threed_dutils.offset_and_scatter(dn4000_obs, dn4000_prosp,biweight=True)
 	ax.text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat), transform = ax.transAxes,horizontalalignment='right')
 	ax.text(0.96,0.1, 'mean offset='+"{:.2f}".format(off), transform = ax.transAxes,horizontalalignment='right')
-	ax.text(0.04,0.9, r'N = '+str(int(np.sum(dn_idx))), transform = ax.transAxes,horizontalalignment='left')
+	#ax.text(0.04,0.9, r'N = '+str(int(np.sum(dn_idx))), transform = ax.transAxes,horizontalalignment='left')
 
 	threed_dutils.return_n_outliers(dn4000_obs,dn4000_prosp,e_pinfo['objnames'][dn_idx],3,cp_files='dn4000')
 	plt.tight_layout()
@@ -2463,45 +2465,45 @@ def obs_vs_model_bdec(e_pinfo,hflag,outname1='test.png',outname2='test.png'):
 	#### create plots
 	fig1, ax1 = plt.subplots(1,1, figsize = (6,6))
 	fig2, ax2 = plt.subplots(1,3, figsize = (18.75,6))
-	axlims = (-0.1,0.5)
+	axlims = (-0.15,0.6)
 	norm_errs = []
 	norm_flag = []
 
 	# loop and put points on plot
 	for ii in xrange(len(labels)):
-		for kk in xrange(len(hflag)):
 
-			### update colors, define sample
-			pdict = merge_dicts(herschdict[kk],bptdict[ii])
-			plt_idx = keys[ii] & hflag[kk]
+		### update colors, define sample
+		pdict = bptdict[ii]
+		plt_idx = keys[ii]
 
-			### errors for this sample
-			errs_obs = threed_dutils.asym_errors(pl_bdec_measured[plt_idx], 
-		                                         bdec_to_ext(e_pinfo['obs']['bdec'][keep_idx][plt_idx]+e_pinfo['obs']['bdec_err'][keep_idx][plt_idx]),
-		                                         bdec_to_ext(e_pinfo['obs']['bdec'][keep_idx][plt_idx]-e_pinfo['obs']['bdec_err'][keep_idx][plt_idx]), log=False)
-			errs_cloudy_marg = threed_dutils.asym_errors(pl_bdec_cloudy_marg[plt_idx,0],
-				                                   pl_bdec_cloudy_marg[plt_idx,1], 
-				                                   pl_bdec_cloudy_marg[plt_idx,2],log=False)
-			errs_calc_marg = threed_dutils.asym_errors(pl_bdec_cloudy_marg[plt_idx,0],
-				                                   pl_bdec_cloudy_marg[plt_idx,1], 
-				                                   pl_bdec_cloudy_marg[plt_idx,2],log=False)
+		### errors for this sample
+		errs_obs = threed_dutils.asym_errors(pl_bdec_measured[plt_idx], 
+	                                         bdec_to_ext(e_pinfo['obs']['bdec'][keep_idx][plt_idx]+e_pinfo['obs']['bdec_err'][keep_idx][plt_idx]),
+	                                         bdec_to_ext(e_pinfo['obs']['bdec'][keep_idx][plt_idx]-e_pinfo['obs']['bdec_err'][keep_idx][plt_idx]), log=False)
+		errs_cloudy_marg = threed_dutils.asym_errors(pl_bdec_cloudy_marg[plt_idx,0],
+			                                   pl_bdec_cloudy_marg[plt_idx,1], 
+			                                   pl_bdec_cloudy_marg[plt_idx,2],log=False)
+		errs_calc_marg = threed_dutils.asym_errors(pl_bdec_cloudy_marg[plt_idx,0],
+			                                   pl_bdec_cloudy_marg[plt_idx,1], 
+			                                   pl_bdec_cloudy_marg[plt_idx,2],log=False)
 
-			norm_errs.append(normalize_error(pl_bdec_measured[plt_idx],errs_obs,pl_bdec_cloudy_marg[plt_idx,0],errs_cloudy_marg))
-			norm_flag.append([labels[ii]]*np.sum(plt_idx))
+		norm_errs.append(normalize_error(pl_bdec_measured[plt_idx],errs_obs,pl_bdec_cloudy_marg[plt_idx,0],errs_cloudy_marg))
+		norm_flag.append([labels[ii]]*np.sum(plt_idx))
 
-			ax1.errorbar(pl_bdec_measured[plt_idx], pl_bdec_cloudy_marg[plt_idx,0], xerr=errs_obs, yerr=errs_cloudy_marg,
-				         linestyle=' ',**pdict)
+		ax1.errorbar(pl_bdec_measured[plt_idx], pl_bdec_cloudy_marg[plt_idx,0], xerr=errs_obs, yerr=errs_cloudy_marg,
+			         linestyle=' ',fmt='o',**pdict)
 
-			ax2[0].errorbar(pl_bdec_measured[plt_idx], pl_bdec_calc_marg[plt_idx,0], xerr=errs_obs, yerr=errs_calc_marg,
-				           linestyle=' ',**pdict)
-			ax2[1].errorbar(pl_bdec_measured[plt_idx], pl_bdec_calc_bfit[plt_idx], xerr=errs_obs,
-				           linestyle=' ',**pdict)
-			ax2[2].errorbar(pl_bdec_measured[plt_idx], pl_bdec_cloudy_bfit[plt_idx], xerr=errs_obs,
-				           linestyle=' ',**pdict)
+		ax2[0].errorbar(pl_bdec_measured[plt_idx], pl_bdec_calc_marg[plt_idx,0], xerr=errs_obs, yerr=errs_calc_marg,
+			           linestyle=' ',fmt='o',**pdict)
+		ax2[1].errorbar(pl_bdec_measured[plt_idx], pl_bdec_calc_bfit[plt_idx], xerr=errs_obs,
+			           linestyle=' ',fmt='o',**pdict)
+		ax2[2].errorbar(pl_bdec_measured[plt_idx], pl_bdec_cloudy_bfit[plt_idx], xerr=errs_obs,
+			           linestyle=' ',fmt='o',**pdict)
 
 	#### MAIN FIGURE ERRATA
-	ax1.text(0.04,0.92, r'S/N (H$\alpha$,H$\beta$) > {0}'.format(int(e_pinfo['obs']['sn_cut'])), transform = ax1.transAxes,horizontalalignment='left')
+	#ax1.text(0.04,0.92, r'S/N (H$\alpha$,H$\beta$) > {0}'.format(int(e_pinfo['obs']['sn_cut'])), transform = ax1.transAxes,horizontalalignment='left')
 	#ax1.text(0.04,0.92, r'EQW (H$\alpha$,H$\beta$) > {0} $\AA$'.format(int(e_pinfo['obs']['eqw_cut'])), transform = ax1.transAxes,horizontalalignment='left')
+	bpt_legend(ax1,loc=2)
 	ax1.text(0.04,0.87, r'N = '+str(int(np.sum(keep_idx))), transform = ax1.transAxes,horizontalalignment='left')
 	ax1.set_xlabel(r'observed log(F/F$_0$)$_{\mathrm{H}\alpha}$ - log(F/F$_0$)$_{\mathrm{H}\beta}$')
 	ax1.set_ylabel(r'Prospector log(F/F$_0$)$_{\mathrm{H}\alpha}$ - log(F/F$_0$)$_{\mathrm{H}\beta}$')
@@ -2638,6 +2640,14 @@ def obs_vs_prosp_sfr(e_pinfo,hflag,outname='test.png'):
 
 	plt.savefig(outname, dpi=dpi)
 	plt.close()
+
+def bpt_legend(ax, loc=1,size=14):
+	'''
+	best: 0, upper right: 1, upper left: 2, lower left: 3, lower right: 4, right: 5, center left: 6, center right:7
+	lower center: 8, upper center: 9, center: 10
+	'''
+
+	ax.legend(loc=loc, fontsize=size, prop={'size':size}, frameon=True, title='BPT location',numpoints=1)
 
 def return_agn_str(idx, string=False):
 
@@ -2856,11 +2866,12 @@ def residual_plots(e_pinfo,hflag,outfolder):
 	ax.set_xlabel('diffuse dust optical depth')
 	ax.set_ylabel(r'dlog($\tau_{\mathrm{diffuse}}$)/d$\lambda$')
 
+	bpt_legend(ax,loc=4)
 	ax.set_xlim(-0.1,2.0)
 	ax.yaxis.get_major_formatter().set_powerlimits((0, 1))
-	ax.set_ylim(-6e-4,0)
+	ax.set_ylim(-7e-4,0)
 
-	ax.text(0.98,0.04, 'radiative transfer models \n from Chevallard+13', ha='right',va='bottom',multialignment='right',\
+	ax.text(0.98,0.3, 'radiative transfer models \n from Chevallard+13', ha='right',va='bottom',multialignment='right',\
 		    transform=ax.transAxes,fontsize=15,weight='roman')
 
 	ax.xaxis.set_major_locator(MaxNLocator(5))
@@ -2977,15 +2988,16 @@ def plot_emline_comp(alldata,outfolder,hflag):
 		(4) model Halpha (from Kennicutt + dust) versus observed Halpha
 	'''
 
+	import brown_io
 	##### Pull relevant information out of alldata
 	emline_names = alldata[0]['residuals']['emlines']['em_name']
 
 	##### load moustakas+10 line flux information
 	objnames = np.array([f['objname'] for f in alldata])
-	dat = threed_dutils.load_moustakas_data(objnames = list(objnames))
+	dat = brown_io.load_moustakas_data(objnames = list(objnames))
 
 	##### load new moustakas line flux information (from email, january 2016)
-	newdat = threed_dutils.load_moustakas_newdat(objnames = list(objnames))
+	newdat = brown_io.load_moustakas_newdat(objnames = list(objnames))
 
 	'''
 	##### plots, one by one
@@ -3293,7 +3305,7 @@ def prospector_comparison(alldata,outfolder,hflag):
 	ax[0,0].set_xlabel(r'dust_index')
 	ax[0,0].axis((didx.min()-0.1,didx.max()+0.1,dusttot.min()-0.1,dusttot.max()+0.1))
 
-	for flag,pdict in zip(agn_flags,bptdict): ax[0,1].errorbar(didx[flag],sfr_100[flag], fmt='o',alpha=0.6,linestyle=' ',**pdict)
+	for flag,pdict in zip(agn_flags,bptdict): ax[0,1].errorbar(didx[flag],sfr_100[flag], fmt='o',linestyle=' ',**pdict)
 	ax[0,1].set_xlabel(r'dust_index')
 	ax[0,1].set_ylabel(r'SFR$_{100 \mathrm{ Myr}}$ [M$_{\odot}$/yr]')
 	ax[0,1].axis((didx.min()-0.1,didx.max()+0.1,sfr_100.min()-0.1,sfr_100.max()+0.1))

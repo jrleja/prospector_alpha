@@ -70,8 +70,10 @@ def calc_extra_quantities(sample_results, ncalc=2000, ir_priors=False):
 
     ##### initialize output arrays for SFH + emission line posterior draws #####
 	half_time,sfr_10,sfr_100,sfr_1000,ssfr_100,totmass,emp_ha,lir,luv, \
-	bdec_cloudy,bdec_calc,ext_5500,dn4000,ssfr_10 = [np.zeros(shape=(ncalc)) for i in range(14)]
-	
+	bdec_cloudy,bdec_calc,ext_5500,dn4000,ssfr_10,xray_lum = [np.zeros(shape=(ncalc)) for i in range(15)]
+	if 'fagn' in parnames:
+		l_agn = np.zeros(shape=(ncalc))
+
 	##### information for empirical emission line calculation ######
 	d1_idx = np.array(parnames) == 'dust1'
 	d2_idx = np.array(parnames) == 'dust2'
@@ -153,6 +155,11 @@ def calc_extra_quantities(sample_results, ncalc=2000, ir_priors=False):
 		ssfr_10[jj] = sfr_10[jj] / totmass[jj]
 		ssfr_100[jj] = sfr_100[jj] / totmass[jj]
 
+		##### calculate L_AGN if necessary
+		if 'fagn' in parnames:
+			l_agn[jj] = threed_dutils.measure_agn_luminosity(thetas[np.array(parnames)=='fagn'],sps,sfh_params['mformed'])
+		xray_lum[jj] = threed_dutils.estimate_xray_lum(sfr_100[jj])
+
 		##### empirical halpha
 		emp_ha[jj] = threed_dutils.synthetic_halpha(sfr_10[jj],sample_flatchain[jj,d1_idx],
 			                          flatchain[jj,d2_idx],-1.0,
@@ -168,17 +175,12 @@ def calc_extra_quantities(sample_results, ncalc=2000, ir_priors=False):
 			 										model=sample_results['model'], obs = sample_results['obs'],
 											        measure_ir=True, measure_luv=True)
 
-		##### no dust, to get the intrinsic balmer decrement
-		nd_thetas = copy(thetas)
-		nd_thetas[d1_idx] = 0.0
-		nd_thetas[d2_idx] = 0.0
-
 		##### Balmer decrements
 		bdec_cloudy[jj] = modelout['emlines']['Halpha']['flux'] / modelout['emlines']['Hbeta']['flux']
 		bdec_calc[jj] = threed_dutils.calc_balmer_dec(sample_flatchain[jj,d1_idx], sample_flatchain[jj,d2_idx], -1.0, 
 			                                          sample_flatchain[jj,didx],
 			                                          kriek = (sample_results['model'].params['dust_type'] == 4)[0])
-		
+		#### save names!
 		if jj == 0:
 			emnames = np.array(modelout['emlines'].keys())
 			nline = len(emnames)
@@ -209,7 +211,9 @@ def calc_extra_quantities(sample_results, ncalc=2000, ir_priors=False):
 	for kk in xrange(ntheta): q_16[kk], q_50[kk], q_84[kk] = corner.quantile(sample_flatchain[:,kk], [0.16, 0.5, 0.84])
 	
 	##### CALCULATE Q16,Q50,Q84 FOR EXTRA PARAMETERS
-	extra_flatchain = np.dstack((half_time, sfr_10, sfr_100, sfr_1000, ssfr_10, ssfr_100, totmass, emp_ha, bdec_cloudy,bdec_calc, ext_5500))[0]
+	extra_flatchain = np.dstack((half_time, sfr_10, sfr_100, sfr_1000, ssfr_10, ssfr_100, totmass, emp_ha, bdec_cloudy,bdec_calc, ext_5500, xray_lum))[0]
+	if 'fagn' in parnames:
+		extra_flatchain = np.append(extra_flatchain, l_agn[:,None],axis=1)
 	nextra = extra_flatchain.shape[1]
 	q_16e, q_50e, q_84e = (np.zeros(nextra)+np.nan for i in range(3))
 	for kk in xrange(nextra): q_16e[kk], q_50e[kk], q_84e[kk] = corner.quantile(extra_flatchain[:,kk], [0.16, 0.5, 0.84])
@@ -265,12 +269,14 @@ def calc_extra_quantities(sample_results, ncalc=2000, ir_priors=False):
 
 	#### EXTRA PARAMETER OUTPUTS 
 	extras = {'flatchain': extra_flatchain,
-			  'parnames': np.array(['half_time','sfr_10','sfr_100','sfr_1000','ssfr_10','ssfr_100','totmass','emp_ha','bdec_cloudy','bdec_calc','total_ext5500']),
+			  'parnames': np.array(['half_time','sfr_10','sfr_100','sfr_1000','ssfr_10','ssfr_100','totmass','emp_ha','bdec_cloudy','bdec_calc','total_ext5500', 'xray_lum']),
 			  'q16': q_16e,
 			  'q50': q_50e,
 			  'q84': q_84e,
 			  'sfh': intsfr,
 			  't_sfh': t}
+	if 'fagn' in parnames:
+		extras['parnames'] = np.append(extras['parnames'],np.atleast_1d('l_agn'))
 	sample_results['extras'] = extras
 
 	#### OBSERVABLES
@@ -315,14 +321,14 @@ def calc_extra_quantities(sample_results, ncalc=2000, ir_priors=False):
 
 	return sample_results
 
-def update_all(runname):
+def update_all(runname, **kwargs):
 	'''
 	change some parameters, need to update the post-processing?
 	run this!
 	'''
 	filebase, parm_basename, ancilname=threed_dutils.generate_basenames(runname)
 	for param in parm_basename:
-		post_processing(param)
+		post_processing(param, **kwargs)
 
 def post_processing(param_name, add_extra=True, **extras):
 

@@ -490,7 +490,7 @@ def plot_obs_spec(obs_spec, phot, spec_res, alpha,
 	'''
 	plt_max=np.array([np.nanmax(np.abs(obs_spec_plot)),np.nanmax(np.abs(prosp_spec_plot))]).max()
 	plt_min=np.array([np.nanmin(np.abs(obs_spec_plot)),np.nanmin(np.abs(prosp_spec_plot))]).min()
-	spec_res.set_ylim(plt_min-0.1,plt_max+0.1)
+	spec_res.set_ylim(plt_min-0.25,plt_max+0.25)
 
 	spec_res.set_xscale('log',nonposx='clip', subsx=(1,2,3,4,5,6,7,8,9))
 	spec_res.xaxis.set_minor_formatter(minorFormatter)
@@ -621,7 +621,7 @@ def sed_comp_figure(sample_results, sps, model, magphys,
 
 	# plot limits
 	phot.set_xlim(min(xplot)*0.4,max(xplot)*1.5)
-	phot.set_ylim(min(yplot[np.isfinite(yplot)])-0.3,max(yplot[np.isfinite(yplot)])+0.3)
+	phot.set_ylim(min(yplot[np.isfinite(yplot)])-0.4,max(yplot[np.isfinite(yplot)])+0.4)
 	res.set_xlim(min(xplot)*0.4,max(xplot)*1.5)
 	res.axhline(0, linestyle=':', color='grey')
 
@@ -650,7 +650,7 @@ def sed_comp_figure(sample_results, sps, model, magphys,
 	for ii in xrange(3):
 		
 		if label[ii] == 'Optical':
-			#residuals['emlines'] = measure_emline_lum.measure(sample_results, obs_spec, magphys,sps)
+			residuals['emlines'] = measure_emline_lum.measure(sample_results, obs_spec, magphys,sps)
 			if residuals.get('emlines',None) is not None:
 				sigsmooth[ii] = residuals['emlines']['sigsmooth']
 			else:
@@ -679,8 +679,8 @@ def sed_comp_figure(sample_results, sps, model, magphys,
 	'''
 
 	# diagnostic text
-	textx = 0.98
-	texty = 0.15
+	textx = 0.02
+	texty = 0.97
 	deltay = 0.05
 
 
@@ -699,13 +699,13 @@ def sed_comp_figure(sample_results, sps, model, magphys,
 	chisq=np.sum(chi**2)/(np.sum(sample_results['obs']['phot_mask']))
 	chisq_magphys=np.sum(chi_magphys**2)/np.sum(sample_results['obs']['phot_mask'])
 	phot.text(textx, texty-deltay, r'best-fit $\chi^2$/N$_{\mathrm{phot}}$='+"{:.2f}".format(chisq),
-			  fontsize=14, ha='right', color=prosp_color,transform = phot.transAxes)
+			  fontsize=14, ha='left', color=prosp_color,transform = phot.transAxes)
 		
 	z_txt = sample_results['model'].params['zred'][0]
 		
 	# galaxy text
 	phot.text(textx, texty-2*deltay, 'z='+"{:.2f}".format(z_txt),
-			  fontsize=14, ha='right',transform = phot.transAxes)
+			  fontsize=14, ha='left',transform = phot.transAxes)
 		
 	# extra line
 	phot.axhline(0, linestyle=':', color='grey')
@@ -865,11 +865,10 @@ def plt_all(runname=None,startup=True,**extras):
 
 		for jj in xrange(len(filebase)):
 			print 'iteration '+str(jj) 
-			'''
 			if (filebase[jj].split('_')[-1] != 'NGC 4125') & \
 			   (filebase[jj].split('_')[-1] != 'NGC 6090'):
 				continue
-			'''
+
 			dictionary = collate_data(filebase=filebase[jj],\
 			                           outfolder=outfolder,
 			                           **extras)

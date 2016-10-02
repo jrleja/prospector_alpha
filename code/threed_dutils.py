@@ -341,7 +341,7 @@ def chev_extinction(tau_v, lam, ebars=False):
 def charlot_and_fall_extinction(lam,dust1,dust2,dust1_index,dust2_index, kriek=False, nobc=False, nodiff=False):
 
 	'''
-	returns F(obs) / F(tot)
+	returns F(obs) / F(tot) for a given attenuation curve + dust1 + dust2
 	'''
 
 	dust1_ext = np.exp(-dust1*(lam/5500.)**dust1_index)
@@ -652,77 +652,6 @@ def return_mwave_custom(filters):
 
 	return lameff_return
 
-def load_moustakas_data(objnames = None):
-
-	'''
-	specifically written to load optical emission line fluxes, of the "radial strip" variety
-	this corresponds to the aperture used in the Brown sample
-
-	if we pass a list of object names, return a sorted, matched list
-	otherwise return everything
-
-	returns in units of 10^-15^erg/s/cm^2
-	'''
-
-	#### load data
-	# arcane vizier formatting means I'm using astropy tables here
-	from astropy.io import ascii
-	foldername = os.getenv('APPS')+'/threedhst_bsfh/data/Moustakas+10/'
-	filename = 'table3.dat'
-	readme = 'ReadMe'
-	table = ascii.read(foldername+filename, readme=foldername+readme)
-
-	#### filter to only radial strips
-	accept = table['Spectrum'] == 'Radial Strip'
-	table = table[accept.data]
-
-	#####
-	if objnames is not None:
-		outtable = []
-		for name in objnames:
-			match = table['Name'] == name
-			if np.sum(match.data) == 0:
-				outtable.append(None)
-				continue
-			else:
-				outtable.append(table[match.data])
-	else:
-		outtable = table
-
-	return outtable
-
-def load_moustakas_newdat(objnames = None):
-
-	'''
-	access (new) Moustakas line fluxes, from email in Jan 2016
-
-	if we pass a list of object names, return a sorted, matched list
-	otherwise return everything
-
-	returns in units of erg/s/cm^2
-	'''
-
-	#### load data
-	from astropy.io import fits
-	filename = os.getenv('APPS')+'/threedhst_bsfh/data/Moustakas_new/atlas_specdata_solar_drift_v1.1.fits'
-	hdulist = fits.open(filename)
-
-	##### match
-	if objnames is not None:
-		outtable = []
-		objnames = np.core.defchararray.replace(objnames, ' ', '')  # strip spaces
-		for name in objnames:
-			match = hdulist[1].data['GALAXY'] == name
-			if np.sum(match.data) == 0:
-				outtable.append(None)
-				continue
-			else:
-				outtable.append(hdulist[1].data[match])
-	else:
-		outtable = hdulist.data
-
-	return outtable
-
 def asym_errors(center, up, down, log=False):
 
 	if log:
@@ -896,10 +825,13 @@ def create_prosp_filename(filebase):
 
 	return mcmc_filename,model_filename
 
-def load_prospector_data(filebase,no_sample_results=False):
+def load_prospector_data(filebase,no_sample_results=False,objname=None,runname=None):
 
 	from prospect.io import read_results
 
+	#### shortcut: pass None to filebase and objname + runname keywords
+	if (objname is not None) & (runname is not None):
+		filebase = os.getenv('APPS')+'/threedhst_bsfh/results/'+runname+'/'+runname+'_'+objname
 	mcmc_filename, model_filename = create_prosp_filename(filebase)
 
 	if no_sample_results:
@@ -1392,6 +1324,35 @@ def integrate_sfh(t1,t2,sfh_params):
 		tot_mformed = np.sum((weights/time_per_bin)*sfh_params['mass_fraction'])
 
 	return tot_mformed
+
+def measure_agn_luminosity(fagn,sps,mass):
+
+	'''
+	requires TOTMASS
+	calculate L_AGN for a given F_AGN, SPS
+	return in erg / s
+	'''
+
+	## get SPS lbol, weighted by SSP weights
+	ssp_lbol = np.insert(10**sps.ssp.log_lbol, 0, 10**sps.ssp.log_lbol[0])
+	weights = sps.all_ssp_weights
+	weighted_lbol = (ssp_lbol * weights).sum() / weights.sum()
+
+	## calculate L_AGN
+	lagn_sps = weighted_lbol*fagn
+	lagn = lagn_sps * mass * constants.L_sun.cgs.value
+
+	return lagn
+
+def estimate_xray_lum(sfr):
+	'''
+	requires SFR in Msun/year
+	L[0.5-8 keV] in erg / s = CONSTANT * SFR  (FROM MINEO+14)
+	SFR is corrected into a Salpeter IMF
+	'''
+
+	sfr_chabrier = 10**(np.log10(sfr)+0.24)
+	return 4e39*sfr_chabrier
 
 def measure_emline_lum(sps, model = None, obs = None, thetas = None, 
 	                   measure_ir = False, measure_luv = False, savestr = None,

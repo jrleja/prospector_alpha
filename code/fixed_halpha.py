@@ -6,6 +6,7 @@ import matplotlib as mpl
 import random
 import pickle
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 import math
 import corner
 import magphys_plot_pref
@@ -40,7 +41,8 @@ with open(outloc, "rb") as f:
 fit = np.poly1d(coeff)
 
 #### global plotting parameters
-fontsize = 20
+fontsize = 24
+mpl.rcParams.update({'font.size': fontsize})
 
 class jLogFormatter(mpl.ticker.LogFormatter):
 	'''
@@ -225,13 +227,13 @@ def label_sed(sedax,ylim):
 		ax.plot([8,1000],[yloc,yloc], lw=lw, alpha=alpha, color=color, zorder=zorder)
 		ax.plot([8,8],[yloc-length,yloc+length], lw=lw, alpha=alpha, color=color, zorder=zorder)
 		ax.plot([1e3,1e3],[yloc-length,yloc+length], lw=lw, alpha=alpha, color=color, zorder=zorder)
-		ax.text(90,yloc+0.05,r'L$_{\mathrm{IR}}$',weight='bold',fontsize=fontsize,ha='center', zorder=zorder)
+		ax.text(90,yloc+0.07,r'L$_{\mathrm{IR}}$',weight='bold',fontsize=fontsize,ha='center', zorder=zorder)
 		
 		# L_UV
 		ax.plot([.1216,.3000],[yloc,yloc], lw=lw, alpha=alpha, color=color, zorder=zorder)
 		ax.plot([.1216,.1216],[yloc-length,yloc+length], lw=lw, alpha=alpha, color=color, zorder=zorder)
 		ax.plot([.3000,.3000],[yloc-length,yloc+length], lw=lw, alpha=alpha, color=color, zorder=zorder)
-		ax.text(.19,yloc+0.05,r'L$_{\mathrm{UV}}$',weight='bold',fontsize=fontsize,ha='center', zorder=zorder)
+		ax.text(.19,yloc+0.07,r'L$_{\mathrm{UV}}$',weight='bold',fontsize=fontsize,ha='center', zorder=zorder)
 
 		# Halpha
 		ax.plot([.6563,.6563],[ylim[0],ylim[1]],linestyle='--',color='0.2', zorder=zorder)
@@ -314,9 +316,9 @@ def main(redraw_thetas=True,pass_guesses=False,redraw_lbol_thetas=True):
 
 	#### Open figure
 	sedfig = plt.figure(figsize=(18, 8))
-	sedax = [sedfig.add_axes([0.05, 0.1, 0.4, 0.85]),
-		     sedfig.add_axes([0.494, 0.1, 0.4, 0.85])]
-	cmap_ax = sedfig.add_axes([0.948,0.05,0.05,0.9])
+	sedax = [sedfig.add_axes([0.08, 0.1, 0.36, 0.85]),
+		     sedfig.add_axes([0.5, 0.1, 0.36, 0.85])]
+	cmap_ax = sedfig.add_axes([0.94,0.05,0.05,0.9])
 
 	relfig, relax = plt.subplots(ncols=1, nrows=1, figsize=(8,8))
 
@@ -424,7 +426,7 @@ def main(redraw_thetas=True,pass_guesses=False,redraw_lbol_thetas=True):
 	sedax[0].set_xlabel(r'wavelength [microns]')
 	sedax[0].set_xlim(xlim_sed)
 	sedax[0].set_ylim(ylim_sed)
-	sedax[0].set_xscale('log',nonposx='clip',subsx=(1,2,4))
+	sedax[0].set_xscale('log',nonposx='clip',subsx=(1,3))
 	sedax[0].xaxis.set_minor_formatter(minorFormatter)
 	sedax[0].xaxis.set_major_formatter(majorFormatter)
 
@@ -443,7 +445,7 @@ def main(redraw_thetas=True,pass_guesses=False,redraw_lbol_thetas=True):
 	sedax[1].set_xlabel(r'wavelength [microns]')
 	sedax[1].set_xlim(xlim_sed)
 	sedax[1].set_ylim(ylim_sed)
-	sedax[1].set_xscale('log',nonposx='clip',subsx=(1,2,4))
+	sedax[1].set_xscale('log',nonposx='clip',subsx=(1,3))
 	sedax[1].xaxis.set_minor_formatter(minorFormatter)
 	sedax[1].xaxis.set_major_formatter(majorFormatter)
 	sedax[1].text(xt,yt,r'SED variation at fixed L$_{\mathbf{IR}}$ + L$_{\mathbf{UV}}$',
