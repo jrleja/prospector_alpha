@@ -18,13 +18,14 @@ def collate_data(alldata):
 	xray = brown_io.load_xray_mastercat(xmatch = True)
 
 	#### for each object
-	fagn, fagn_up, fagn_down, xray_lum = [], [], [], []
+	fagn, fagn_up, fagn_down, mass, xray_lum = [], [], [], [], []
 	for ii, dat in enumerate(alldata):
 		
 		#### photometric f_agn
 		fagn.append(dat['pquantiles']['q50'][parnames=='fagn'][0])
 		fagn_up.append(dat['pquantiles']['q84'][parnames=='fagn'][0])
 		fagn_down.append(dat['pquantiles']['q16'][parnames=='fagn'][0])
+		mass.append(10**dat['pquantiles']['q50'][parnames=='logmass'][0])
 		
 		#### x-ray fluxes
 		# match
@@ -40,6 +41,7 @@ def collate_data(alldata):
 		xray_lum.append(xflux * dfactor)
 
 	out = {}
+	out['mass'] = mass
 	out['fagn'] = fagn
 	out['fagn_up'] = fagn_up
 	out['fagn_down'] = fagn_down
@@ -77,10 +79,10 @@ def plot(pdata):
 
 	#### generate x, y values
 	xmin = 1e34
-	yerr =  threed_dutils.asym_errors(pdata['fagn'], 
-			                          pdata['fagn_up'],
-			                          pdata['fagn_down'])
-	yplot = pdata['fagn']
+	yerr =  threed_dutils.asym_errors(pdata['fagn']*pdata['mass'], 
+			                          pdata['fagn_up']*pdata['mass'],
+			                          pdata['fagn_down']*pdata['mass'])
+	yplot = pdata['fagn']*pdata['mass']
 	xplot = np.clip(pdata['xray_luminosity'],xmin,np.inf)
 
 	#### plot photometry
