@@ -1218,8 +1218,7 @@ def atlas_3d_met(e_pinfo,hflag,outfolder=''):
 
 	prosp_met, prosp_met_err, a3d_met, a3d_met_err, a3d_alpha, obj_idx = brown_quality_cuts.load_atlas3d(e_pinfo)
 
-	fig, ax = plt.subplots(1,1,figsize=(7.5,7.5))
-	fig.subplots_adjust(left=0.15,bottom=0.1,top=0.95,right=0.95)
+	fig, ax = plt.subplots(1,1,figsize=(6,6))
 	ax.errorbar(a3d_met,prosp_met,xerr=a3d_met_err,yerr=prosp_met_err, color='#1C86EE',alpha=0.9,fmt='o')
 	ax.set_xlabel('log(Z$_{\mathrm{ATLAS-3D}}$/Z$_{\odot}$)',fontsize=22)
 	ax.set_ylabel('log(Z$_{\mathrm{Prosp}}$/Z$_{\odot}$)',fontsize=22)
@@ -1227,9 +1226,10 @@ def atlas_3d_met(e_pinfo,hflag,outfolder=''):
 	ax = threed_dutils.equalize_axes(ax,a3d_met+0.1,prosp_met-0.1, dynrange=0.1, line_of_equality=True, log=False)
 
 	off,scat = threed_dutils.offset_and_scatter(a3d_met,prosp_met, biweight=True)
-	ax.text(0.03,0.92, 'biweight scatter='+"{:.2f}".format(scat) +' dex', transform = ax.transAxes,horizontalalignment='left',fontsize=22)
-	ax.text(0.03,0.85, 'mean offset='+"{:.2f}".format(off)+ ' dex', transform = ax.transAxes,horizontalalignment='left',fontsize=22)
+	ax.text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat) +' dex', transform = ax.transAxes,horizontalalignment='right')
+	ax.text(0.96,0.10, 'mean offset='+"{:.2f}".format(off)+ ' dex', transform = ax.transAxes,horizontalalignment='right')
 
+	plt.tight_layout()
 	plt.savefig(outfolder+'atlas3d_starmet.png',dpi=150)
 	plt.close()
 
@@ -1843,7 +1843,59 @@ def paper_summary_plot(e_pinfo, hflag, outname='test.png'):
 	fig.savefig(outname,dpi=dpi)
 	plt.close()
 
+def balmlines_delta(e_pinfo,outname='test.png',model='obs',
+	                       standardized_ha_axlim = False):
 
+	#################
+	#### plot observed Halpha versus expected (PROSPECTOR ONLY)
+	#################
+	keep_idx = brown_quality_cuts.halpha_cuts(e_pinfo)
+
+	##### AGN identifiers
+	sfing, composite, agn = return_agn_str(keep_idx)
+	keys = [sfing, composite, agn]
+
+	##### plot!
+	fig, ax = plt.subplots(1,1, figsize = (6,6))
+	ax = np.ravel(ax)
+
+	f_ha = e_pinfo['obs']['f_ha'][keep_idx,:]
+	f_hb = e_pinfo['obs']['f_hb'][keep_idx,:]
+	model_ha = e_pinfo['prosp']['cloudy_ha'][keep_idx,:]
+	model_hb = e_pinfo['prosp']['cloudy_hb'][keep_idx,:]
+	ylabel = [r'log(L[H$_{\alpha}$,obs] / L[H$_{\alpha},$model])']
+	xlabel = [r'log(L[H$_{\alpha}$,obs]) from observed spectrum']
+
+	xplot_ha = minlog(f_ha,axis=0)
+	yplot_ha = minlog(model_ha,axis=0)
+
+	xplot_hb = minlog(f_hb,axis=0)
+	yplot_hb = minlog(model_hb,axis=0)
+
+	for ii in xrange(len(labels)):
+
+		### update colors, define region
+		pdict = bptdict[ii]
+		plt_idx = keys[ii]
+
+		### setup errors
+		xerr_ha = threed_dutils.asym_errors(xplot_ha[plt_idx,0],xplot_ha[plt_idx,1], xplot_ha[plt_idx,2],log=False)
+		yerr_ha = threed_dutils.asym_errors(yplot_ha[plt_idx,0],yplot_ha[plt_idx,1], yplot_ha[plt_idx,2],log=False)
+
+		ax[0].errorbar(xplot_ha[plt_idx,0], xplot_ha[plt_idx,0]-yplot_ha[plt_idx,0], yerr=yerr_ha, xerr=xerr_ha, 
+			           linestyle=' ',fmt='o',**pdict)
+
+	bpt_legend(ax[0],loc=2,size=10)
+	ax[0].set_ylabel(ylabel[0])
+	ax[0].set_xlabel(xlabel[0])
+	off,scat = threed_dutils.offset_and_scatter(xplot_ha[:,0],yplot_ha[:,0],biweight=True)
+	ax[0].text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat)+ ' dex', transform = ax[0].transAxes,horizontalalignment='right')
+	ax[0].text(0.96,0.1, 'mean offset='+"{:.2f}".format(off) + ' dex', transform = ax[0].transAxes,horizontalalignment='right')
+	ax[0].text(0.95,0.91, 'WITH AGN', transform = ax[0].transAxes,horizontalalignment='right',fontsize=25,weight='bold')
+	ax[0].axhline(0, linestyle='--', color='0.5',lw=2,zorder=-5)
+	ax[0].set_ylim(-1,1)
+	fig.tight_layout()
+	fig.savefig(outname,dpi=dpi)
 
 def obs_vs_prosp_balmlines(e_pinfo,hflag,outname='test.png',outname_resid='test.png',model='obs',
 	                       standardized_ha_axlim = False):
@@ -2210,7 +2262,7 @@ def obs_vs_model_dn(e_pinfo,hflag,outname=None):
 		norm_flag.append([labels[ii]]*np.sum(plt_idx))
 
 		# xerr = [np.random.rand(pl_dn4000_obs.shape[0])*0.04+0.01,np.random.rand(pl_dn4000_obs.shape[0])*0.04+0.01]
-		ax.errorbar(pl_dn4000_obs, pl_dn4000_prosp, fmt='o',yerr=errs_pro, xerr=None, linestyle=' ', **pdict)
+		ax.errorbar(pl_dn4000_obs, pl_dn4000_prosp, fmt='o',yerr=errs_pro, xerr = [np.random.rand(pl_dn4000_obs.shape[0])*0.04+0.01,np.random.rand(pl_dn4000_obs.shape[0])*0.04+0.01], linestyle=' ', **pdict)
 
 	bpt_legend(ax,loc=2)
 	ax.set_xlabel(r'observed D$_n$4000')
@@ -3062,6 +3114,9 @@ def plot_emline_comp(alldata,outfolder,hflag):
 	ha_errs,ha_flag = obs_vs_prosp_balmlines(e_pinfo,hflag,
 								 outname=outfolder+'balmer_line_comp.png',
 								 outname_resid=outfolder+'balmer_line_resid.png')
+
+	balmlines_delta(e_pinfo,outname=outfolder+'balmer_line_delta.png')
+	print 1/0
 
 	# model SFR versus observed SFR(Ha) corrected for dust attenuation
 	obs_vs_prosp_sfr(e_pinfo,hflag,outname=outfolder+'obs_sfr_comp.png')

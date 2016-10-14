@@ -70,7 +70,7 @@ def calc_extra_quantities(sample_results, ncalc=2000, ir_priors=False):
 
     ##### initialize output arrays for SFH + emission line posterior draws #####
 	half_time,sfr_10,sfr_100,sfr_1000,ssfr_100,totmass,emp_ha,lir,luv, \
-	bdec_cloudy,bdec_calc,ext_5500,dn4000,ssfr_10,xray_lum = [np.zeros(shape=(ncalc)) for i in range(15)]
+	bdec_cloudy,bdec_calc,ext_5500,dn4000,ssfr_10,xray_lum, luv0 = [np.zeros(shape=(ncalc)) for i in range(16)]
 	if 'fagn' in parnames:
 		l_agn = np.zeros(shape=(ncalc))
 
@@ -121,6 +121,7 @@ def calc_extra_quantities(sample_results, ncalc=2000, ir_priors=False):
 
 	##### set up model flux vectors
 	mags = np.zeros(shape=(len(sample_results['obs']['filters']),ncalc))
+	mags_nodust = copy(mags)
 	spec = np.zeros(shape=(len(sps.wavelengths),ncalc))
 
 	sample_flatchain = flatchain[:ncalc,:]
@@ -205,6 +206,16 @@ def calc_extra_quantities(sample_results, ncalc=2000, ir_priors=False):
 		luv[jj]        = modelout['luv']
 		dn4000[jj]     = modelout['dn4000']
 
+		#### no dust
+		thetas[d1_idx] = np.array([0.0])
+		thetas[d2_idx] = np.array([0.0])
+		_,mags_nodust[:,jj],sm = sample_results['model'].mean_model(thetas, sample_results['obs'], sps=sps)
+		modelout = threed_dutils.measure_emline_lum(sps, thetas = thetas,
+			 										model=sample_results['model'], obs = sample_results['obs'],
+											        measure_ir=False, measure_luv=True)
+		luv0[jj]       = modelout['luv']
+
+
 	##### CALCULATE Q16,Q50,Q84 FOR VARIABLE PARAMETERS
 	ntheta = len(sample_results['initial_theta'])
 	q_16, q_50, q_84 = (np.zeros(ntheta)+np.nan for i in range(3))
@@ -282,9 +293,11 @@ def calc_extra_quantities(sample_results, ncalc=2000, ir_priors=False):
 	#### OBSERVABLES
 	observables = {'spec': spec,
 	               'mags': mags,
+	               'mags_nodust': mags_nodust,
 	               'lam_obs': sps.wavelengths,
 	               'L_IR':lir,
-	               'L_UV':luv}
+	               'L_UV':luv,
+	               'L_UV_INTRINSIC':luv0}
 	sample_results['observables'] = observables
 
 	#### QUANTILE OUTPUTS #
@@ -306,6 +319,7 @@ def calc_extra_quantities(sample_results, ncalc=2000, ir_priors=False):
 	             'sfr_1000':sfr_1000[0],
 	             'lir':lir[0],
 	             'luv':luv[0],
+	             'luv_intrinsic':luv0[0],
 	             'halpha_flux':emflux[0,emnames == 'Halpha'],
 	             'hbeta_flux':emflux[0,emnames == 'Hbeta'],
 	             'hdelta_flux':emflux[0,emnames == 'Hdelta'],
@@ -316,8 +330,10 @@ def calc_extra_quantities(sample_results, ncalc=2000, ir_priors=False):
 	             'bdec_calc':bdec_calc[0],
 	             'dn4000':dn4000[0],
 	             'spec':spec[:,0],
-	             'mags':mags[:,0]}
+	             'mags':mags[:,0],
+	             'mags_nodust': mags_nodust[:,0]}
 	sample_results['bfit'] = bfit
+	print 1/0
 
 	return sample_results
 

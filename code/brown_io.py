@@ -1,5 +1,6 @@
 import pickle
 import numpy as np
+import os
 
 #### where do alldata pickle files go?
 outpickle = '/Users/joel/code/magphys/data/pickles'
@@ -98,7 +99,7 @@ def save_alldata(alldata,runname='brownseds'):
 
 def write_results(alldata,outfolder):
 	'''
-	create table, write out in AASTeX format
+	create table for Prospector-Alpha paper, write out in AASTeX format
 	'''
 
 	data, errup, errdown, names, fmts, objnames = [], [], [], [], [], []
@@ -198,14 +199,16 @@ def write_coordinates():
 		for r, d in zip(ra,dec):
 			f.write(str(r)+', '+d+'; ')
 
-def load_xray_mastercat(xmatch = True):
+def load_xray_mastercat(xmatch = True,maxradius=30):
 
 	'''
 	returns flux in (erg/cm^2/s) and object name from brown catalog
 	flux is the brightest x-ray source within 1'
 	by taking the brightest over multiple tables, we are biasing high (also blended sources?
-	    refine in future: we have the count rate error so can get S/Name
 	    prefer observatory with highest resolution (Chandra ?) to avoid blending
+	    think about a cut on location (e.g., within 10'', or 30'')
+	    would like to do ERROR_RADIUS cut but most entries don't have it. similar with EXPOSURE.
+	    if we could translate COUNT_RATE into FLUX for ARBITRARY TELESCOPE AND DATA TABLE then we could include many more sources
 	'''
 
 	location = '/Users/joel/code/python/threedhst_bsfh/data/brownseds_data/photometry/xray/xray_mastercat.dat'
@@ -221,10 +224,15 @@ def load_xray_mastercat(xmatch = True):
 				break
 
 	#### load
-	# names = ('', 'name', 'ra', 'dec', 'count_rate', 'count_rate_error', 'flux', 'database_table', 'observatory', 'class', '_Search_Offset')
+	# names = ('', 'name', 'ra', 'dec', 'count_rate', 'count_rate_error', 'flux', 'database_table', 'observatory','error_radius', 'exposure', 'class', '_Search_Offset')
 	dat = np.loadtxt(location, comments = '#', delimiter='|',skiprows=5,
                      dtype = {'names':([str(n) for n in hdr]),\
-                              'formats':(['S40','S40','S40','S40','f16','f16','f16','S40','S40','S40','S40','S40'])})
+                              'formats':(['S40','S40','S40','S40','f16','f16','f16','S40','S40','S40','S40','S40','S40','S40'])})
+
+	### remove whitespace from strings
+	for i in xrange(dat.shape[0]):
+		dat['database_table'][i] = str(np.core.defchararray.strip(dat['database_table'][i]))
+		dat['observatory'][i] = str(np.core.defchararray.strip(dat['observatory'][i]))
 
 	#### match based on query string
 	if xmatch == True:
@@ -235,29 +243,138 @@ def load_xray_mastercat(xmatch = True):
 		bcoords = []
 		for r, d in zip(ra,dec):
 			bcoords.append(str(r)+', '+d)
-		match = []
+		match, offset = [], []
 		for query in dat['_Search_Offset']:
 			match_str = (query.split('('))[1].split(')')[0]
-
 			match.append(objname[bcoords.index(match_str)])	
 
-		### take brightest X-ray detection per object
-		flux = []
-		for i, name in enumerate(objname):
-			idx = np.array(match) == name
+			n = 0
+			offset_float = None
+			while offset_float == None:
+				try: 
+					offset_float = float(query.split(' ')[n])
+				except ValueError:
+					n+=1
+			offset.append(offset_float)
 
+		offset = np.array(offset)
+
+		### take brightest X-ray detection per object
+		flux, flux_err, observatory, database = [], [], [], []
+		for i, name in enumerate(objname):
+
+			### find matches in the query with nonzero flux entries within MAXIMUM radius in arcseconds (max is 1')
+			# forbidden datatables either use bandpasses above 10 keV or flux definition is unclear
+			idx = (np.array(match) == name) & (dat['flux'] != 0.0) & (offset < maxradius/60.) & \
+				  (dat['database_table'] != 'INTAGNCAT') & (dat['database_table'] != 'INTIBISAGN') & \
+				  (dat['database_table'] != 'BMWHRICAT') & (dat['database_table'] != 'IBISCAT4') & \
+				  (dat['database_table'] != 'INTIBISASS') & (dat['database_table'] != 'ULXRBCAT')
 			### if no detections, give it a dummy number
 			if idx.sum() == 0:
 				flux.append(-99)
+				flux_err.append(0.0)
+				observatory.append('no match')
+				database.append('no match')
 				continue 
 
-			### fill it up the easiest way
-			flux.append( dat['flux'][idx].max())
+			### choose the detection to keep
+			# prefer chandra
+			ch_idx = np.core.defchararray.strip(dat['observatory'][idx]) == 'CHANDRA'
+			if ch_idx.sum() > 0:
+				dat['flux'][idx][~ch_idx] = -1
+			idx_keep = dat['flux'][idx].argmax()
 
-		out = {'objname':objname,'flux':np.array(flux)}
+			### fill out data
+			cfactor = correct_for_window(dat['database_table'][idx][idx_keep])
+			flux.append(dat['flux'][idx][idx_keep]*cfactor)
+			fractional_count_err = dat['count_rate_error'][idx][idx_keep]/dat['count_rate'][idx][idx_keep]
+			if np.isnan(fractional_count_err):
+				fractional_count_err = 0.0
+			flux_err.append(flux[-1] * fractional_count_err)
+			observatory.append(dat['observatory'][idx][idx_keep])
+			database.append(dat['database_table'][idx][idx_keep])
+
+		out = {'objname':objname,
+		       'flux':np.array(flux),
+		       'flux_err':np.array(flux_err),
+		       'observatory':np.array(observatory),
+		       'database':np.array(database)}
 		return out
 	else:
 		return dat
+
+def table_window(table):
+
+	if table == 'ASCAGIS':
+		low, high = 0.7, 7.0
+	elif table == 'CHNGPSCLIU':
+		low, high = 0.3, 8.0
+	elif table == 'CSC':
+		low, high = 0.5, 7.0
+	elif table == 'CXOXASSIST':
+		low, high = 0.3, 8.0
+	elif table == 'EINGALCAT':
+		low, high = 0.2, 4.0
+	elif table == 'ETGALXRAY': #CAREFUL
+		low, high = 0.088, 17.25
+	elif table == 'RASSBSCPGC':
+		low, high = 0.1, 2.4
+	elif table == 'RASSDSSAGN':
+		low, high = 0.1, 2.4
+	elif table == 'RBSCNVSS':
+		low, high = 0.1, 2.4
+	elif table == 'ROSATRQQ':
+		low, high = 0.1, 2.4
+	elif table == 'ROXA':
+		low, high = 0.1, 2.4
+	elif table == 'SACSTPSCAT': 
+		low, high = 0.5, 8.0
+	elif table == 'TARTARUS':
+		low, high = (2,7.5), (5,10)
+	elif table == 'ULXNGCAT':
+		low, high = 0.3, 10
+	elif table == 'WGACAT':
+		low, high = 0.05, 2.5
+	elif table == 'XMMSLEWCLN':
+		low, high = 0.2, 12
+	elif table == 'XMMSSC':
+		low, high = 0.2, 12
+	elif table == 'XMMSSCLWBS':
+		low, high = 0.2, 12
+	else:
+		print 1/0
+
+	# return list if it's not a tuple
+	try:
+		len(low)
+	except TypeError: 
+		low = [low]
+		high = [high]
+
+	return low, high
+
+
+def correct_for_window(table, targlow = 0.5, targhigh = 8):
+
+	# Want 0.5-8 keV
+	# n(E)dE proportional to E^-gamma dE
+	# n(E)dE = c E^-gamma dE where c is a constant
+	# integrate
+	# Etot = int_Elow^Ehigh (c E^-gamma dE)
+	# Etot = (1./(-gamma+1)) c E^(-gamma+1) |_Elow^Ehigh
+	# Etot = (1./(-gamma+1)) c [Ehigh^(-gamma+1) - Elow^(-gamma+1)]
+
+	factor = 0.0
+	gamma = -1.8
+
+	low, high = table_window(table)
+
+	for l, h in zip(low, high):
+		factor += h**(gamma+1) - l**(gamma+1)
+
+	fscale = (targhigh**(1+gamma) - targlow**(1+gamma)) / factor
+
+	return fscale
 
 def plot_brown_coordinates():
 
@@ -274,4 +391,8 @@ def plot_brown_coordinates():
 	plt.ylabel('Declination [degrees]')
 
 	plt.show()
+
+def write_euphrasio_data(alldata):
+
+	# All I need is UV (intrinsic and observed), and mid-IR fluxes, sSFRs, SFRs, Mstars, and tau_Vs (tau_FUVs if it's also available)
 

@@ -25,7 +25,8 @@ majorFormatter = jLogFormatter(base=10, labelOnlyBase=True)
 def subcorner(sample_results,  sps, model,
                 outname=None, showpars=None,
                 start=0, thin=1, truths=None,
-                powell_results=None, 
+                powell_results=None, plotchain=None,
+                plotnames=None,
                 **kwargs):
     """
     Make a corner plot of the (thinned, latter) samples of the posterior
@@ -35,7 +36,7 @@ def subcorner(sample_results,  sps, model,
 
     # pull out the parameter names and flatten the thinned chains
     parnames = np.array(sample_results['model'].theta_labels())
-    plotflatchain = threed_dutils.chop_chain(sample_results['plotchain'])
+    plotflatchain = threed_dutils.chop_chain(plotchain)
 
     # restrict to parameters you want to show
     if showpars is not None:
@@ -52,7 +53,7 @@ def subcorner(sample_results,  sps, model,
     else:
         ptruths = None
 
-    fig = corner.corner(plotflatchain, labels = sample_results['plotnames'],
+    fig = corner.corner(plotflatchain, labels = plotnames,
                           quantiles=[0.16, 0.5, 0.84], verbose=False,
                           truths = ptruths, range=sample_results['extents'],truth_color='red',**kwargs)
 
@@ -386,13 +387,10 @@ def create_plotquant(sample_results, logplot = ['mass'], truths=None):
 				plotnames.append(parnames[ii])
 	else:
 		plotnames = [f for f in parnames]
-    
-	sample_results['plotnames'] = plotnames
-	sample_results['plotchain'] = plotchain
 
-	return sample_results
+	return plotnames, plotchain
 
-def return_extent(sample_results):    
+def return_extent(sample_results,plotchain=None):    
     
 	'''
 	sets plot range for chain plot and corner plot for each parameter
@@ -404,8 +402,8 @@ def return_extent(sample_results):
 	for ii in xrange(len(parnames)):
 		
 		# set min/max
-		extent = [np.percentile(sample_results['plotchain'][:,:,ii],0.5),
-		          np.percentile(sample_results['plotchain'][:,:,ii],99.5)]
+		extent = [np.percentile(plotchain[:,:,ii],0.5),
+		          np.percentile(plotchain[:,:,ii],99.5)]
 
 		# is the chain stuck at one point? if so, set the range equal to param*0.8,param*1.2
 		# else check if we butting up against the prior? if so, extend by 10%
@@ -439,7 +437,7 @@ def return_extent(sample_results):
 	
 	return extents
 
-def show_chain(sample_results,outname=None,alpha=0.6,truths=None):
+def show_chain(sample_results,plotnames=None,plotchain=None,outname=None,alpha=0.6,truths=None):
 	
 	'''
 	plot the MCMC chain for all parameters
@@ -447,8 +445,8 @@ def show_chain(sample_results,outname=None,alpha=0.6,truths=None):
 	
 	# set + load variables
 	parnames = np.array(sample_results['model'].theta_labels())
-	nwalkers = sample_results['plotchain'].shape[0]
-	nsteps = sample_results['plotchain'].shape[1]
+	nwalkers = plotchain.shape[0]
+	nsteps = plotchain.shape[1]
 
 	
 	# plot geometry
@@ -470,10 +468,10 @@ def show_chain(sample_results,outname=None,alpha=0.6,truths=None):
 	# sample_results['chain']: nwalkers, nsteps, nparams
 	for ii in xrange(nx):
 		walkerstart = nwalkers_per_column*ii
-		walkerend   = np.clip(nwalkers_per_column*(ii+1),0,sample_results['plotchain'].shape[0])
+		walkerend   = np.clip(nwalkers_per_column*(ii+1),0,plotchain.shape[0])
 		for jj in xrange(len(parnames)):
 			for kk in xrange(walkerstart,walkerend):
-				axarr[jj,ii].plot(sample_results['plotchain'][kk,:,jj],'-',
+				axarr[jj,ii].plot(plotchain[kk,:,jj],'-',
 						   	   color='black',
 						   	   alpha=alpha)
 				
@@ -483,7 +481,7 @@ def show_chain(sample_results,outname=None,alpha=0.6,truths=None):
 				
 			# fiddle with y-axis
 			if ii == 0:
-				axarr[jj,ii].set_ylabel(sample_results['plotnames'][jj])
+				axarr[jj,ii].set_ylabel(plotnames[jj])
 			else:
 				axarr[jj,ii].set_yticklabels([])
 			axarr[jj,ii].set_ylim(sample_results['extents'][jj])
@@ -775,10 +773,10 @@ def make_all_plots(filebase=None,
 		print 'MAKING CHAIN PLOT'
 
 		# define nice plotting quantities
-		sample_results = create_plotquant(sample_results, truths=truths)
-		sample_results['extents'] = return_extent(sample_results)
+		plotnames, plotchain = create_plotquant(sample_results, truths=truths)
+		sample_results['extents'] = return_extent(sample_results,plotchain=plotchain)
 
-		show_chain(sample_results,
+		show_chain(sample_results, plotnames=plotnames,plotchain=plotchain,
 	               outname=outfolder+objname+'.chain.png',
 			       alpha=0.3,truths=truths)
 
@@ -788,7 +786,8 @@ def make_all_plots(filebase=None,
 		chopped_sample_results = copy.deepcopy(sample_results)
 
 		subcorner(sample_results, sps, copy.deepcopy(sample_results['model']),
-							 outname=outfolder+objname,
+							 outname=outfolder+objname,plotchain=plotchain,
+							 plotnames=plotnames,
 							 showpars=None,start=0,
 							 show_titles=True, truths=truths, powell_results=powell_results)
 

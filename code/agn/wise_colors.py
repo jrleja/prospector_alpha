@@ -138,7 +138,7 @@ def plot_mir_colors(runname='brownseds_agn',alldata=None,outfolder=None, vega=Tr
 		                   xlabel='IRAC [5.8]-[8.0] (AB)', ylabel='IRAC [3.6]-[4.5] (AB)',
 		                   colorpar='fagn',colorparlabel=r'log(f$_{\mathrm{AGN}}$)',log_cpar=True, cpar_range=cpar_range)
 	plot_nenkova_templates(ax, xfilt=xfilt,yfilt=yfilt)
-	plot_prospector_templates(ax, xfilt=xfilt,yfilt=yfilt,outfolder=outfolder)
+	#plot_prospector_templates(ax, xfilt=xfilt,yfilt=yfilt,outfolder=outfolder)
 	plt.savefig(outfolder+'irac_colors.png',dpi=dpi)
 	plt.close()
 
@@ -149,7 +149,7 @@ def plot_mir_colors(runname='brownseds_agn',alldata=None,outfolder=None, vega=Tr
 		                             colorpar='fagn',colorparlabel=r'log(f$_{\mathrm{AGN}}$)',
 		                             log_cpar=True, cpar_range=cpar_range,vega=vega)
 	plot_nenkova_templates(ax, xfilt=xfilt,yfilt=yfilt,vega=vega)
-	plot_prospector_templates(ax, xfilt=xfilt,yfilt=yfilt,outfolder=outfolder,vega=vega)
+	#plot_prospector_templates(ax, xfilt=xfilt,yfilt=yfilt,outfolder=outfolder,vega=vega)
 	outstring = 'wise_hotcolors'
 	if vega:
 		outstring += '_vega'
@@ -166,7 +166,7 @@ def plot_mir_colors(runname='brownseds_agn',alldata=None,outfolder=None, vega=Tr
 		                   xlabel='WISE [4.6]-[12] (AB)',ylabel='WISE [12]-[22] '+system,
 		                   colorpar='fagn',colorparlabel=r'log(f$_{\mathrm{AGN}}$)',log_cpar=True, cpar_range=cpar_range,vega=vega)
 	plot_nenkova_templates(ax, xfilt=xfilt,yfilt=yfilt,vega=vega)
-	plot_prospector_templates(ax, xfilt=xfilt,yfilt=yfilt,outfolder=outfolder,vega=vega)
+	#plot_prospector_templates(ax, xfilt=xfilt,yfilt=yfilt,outfolder=outfolder,vega=vega)
 
 	plt.savefig(outfolder+outstring+'.png',dpi=dpi)
 	plt.close()
