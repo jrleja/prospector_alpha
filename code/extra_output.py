@@ -43,7 +43,7 @@ def maxprob_model(sample_results,sps):
 	return thetas, maxprob
 
 
-def calc_extra_quantities(sample_results, ncalc=2000, ir_priors=False):
+def calc_extra_quantities(sample_results, ncalc=2000, ir_priors=True):
 
 	'''' 
 	CALCULATED QUANTITIES
@@ -88,6 +88,7 @@ def calc_extra_quantities(sample_results, ncalc=2000, ir_priors=False):
 
 	### cut in IR priors
 	if ir_priors:
+
 		gamma_idx = np.array(parnames) == 'duste_gamma'
 		umin_idx = np.array(parnames) == 'duste_umin'
 		qpah_idx = np.array(parnames) == 'duste_qpah'
@@ -97,7 +98,8 @@ def calc_extra_quantities(sample_results, ncalc=2000, ir_priors=False):
 		good = (flatchain[:,gamma_idx] < gamma_prior) & \
 		       (flatchain[:,umin_idx] < umin_prior) & \
 		       (flatchain[:,qpah_idx] < qpah_prior)
-		flatchain = flatchain[np.squeeze(good),:]
+		if good.sum() > ncalc:
+			flatchain = flatchain[np.squeeze(good),:]
 	flatchain[0,:] = maxthetas
 
 	##### set up time vector for full SFHs
@@ -391,103 +393,4 @@ def post_processing(param_name, add_extra=True, **extras):
 
 if __name__ == "__main__":
 	post_processing(sys.argv[1])
-
-def write_kinney_txt():
-	
-	filebase, parm_basename, ancilname=threed_dutils.generate_basenames('virgo')
-	ngals = len(filebase)
-	mass, sfr10, sfr100, cloudyha, dmass = [np.zeros(shape=(3,ngals)) for i in xrange(5)]
-	names = []
-	for jj in xrange(ngals):
-		sample_results, powell_results, model = threed_dutils.load_prospector_data(filebase[jj])
-		
-		if jj == 0:
-			sfr10_ind = sample_results['extras']['parnames'] == 'sfr_10'
-			sfr100_ind = sample_results['extras']['parnames'] == 'sfr_100'
-			mass_ind = sample_results['quantiles']['parnames'] == 'mass'
-			ha_ind = sample_results['model_emline']['name'] == 'Halpha'
-
-			nwav = len(sample_results['observables']['lam_obs'])
-			nmag = len(sample_results['observables']['mags'])
-			lam_obs = np.zeros(shape=(nwav,ngals))
-			spec_obs = np.zeros(shape=(4,nwav,ngals)) # q50, q84, q16, best-fit
-			mag_obs = np.zeros(shape=(4,nmag,ngals)) # q50, q84, q16, best-fit
-
-
-		lam_obs[:,jj] = sample_results['observables']['lam_obs']
-		for kk in xrange(nwav):
-			spec_obs[:,kk,jj] = np.percentile(sample_results['observables']['spec'][kk,:],[5.0,50.0,95.0]).tolist()+\
-		                        [sample_results['observables']['spec'][kk,0]]
-		for kk in xrange(nmag):
-			mag_obs[:,kk,jj] = np.percentile(sample_results['observables']['mags'][kk,:],[5.0,50.0,95.0]).tolist()+\
-		                        [sample_results['observables']['mags'][kk,0]]
-
-		mass[:,jj] = [sample_results['quantiles']['q50'][mass_ind],
-					  sample_results['quantiles']['q84'][mass_ind],
-					  sample_results['quantiles']['q16'][mass_ind]]
-		
-		sfr10[:,jj] = [sample_results['extras']['q50'][sfr10_ind],
-					  sample_results['extras']['q84'][sfr10_ind],
-					  sample_results['extras']['q16'][sfr10_ind]]
-		
-		sfr100[:,jj] = [sample_results['extras']['q50'][sfr100_ind],
-					  sample_results['extras']['q84'][sfr100_ind],
-					  sample_results['extras']['q16'][sfr100_ind]]
-		
-		dmass[:,jj] = [sample_results['extras']['q50'][dmass_ind],
-					  sample_results['extras']['q84'][dmass_ind],
-					  sample_results['extras']['q16'][dmass_ind]]
-
-		cloudyha[:,jj] = [sample_results['model_emline']['q50'][ha_ind],
-					  sample_results['model_emline']['q84'][ha_ind],
-					  sample_results['model_emline']['q16'][ha_ind]]
-		names.append(sample_results['run_params']['objname'])
-
-	outobs = '/Users/joel/code/python/threedhst_bsfh/data/virgo/observables.txt'
-	outpars = '/Users/joel/code/python/threedhst_bsfh/data/virgo/parameters.txt'
-
-	# write out observables
-	with open(outpars, 'w') as f:
-		
-		### header ###
-		f.write('# name mass mass_errup mass_errdown sfr10 sfr10_errup sfr10_errdown sfr100 sfr100_errup sfr100_errdown dustmass dustmass_errup dustmass_errdown halpha_flux halpha_flux_errup halpha_flux_errdown')
-		f.write('\n')
-
-		### data ###
-		for jj in xrange(ngals):
-			f.write(names[jj]+' ')
-			for kk in xrange(3): f.write("{:.2f}".format(mass[kk,jj])+' ')
-			for kk in xrange(3): f.write("{:.2e}".format(sfr10[kk,jj])+' ')
-			for kk in xrange(3): f.write("{:.2e}".format(sfr100[kk,jj])+' ')
-			for kk in xrange(3): f.write("{:.2f}".format(dmass[kk,jj])+' ')
-			for kk in xrange(3): f.write("{:.2e}".format(cloudyha[kk,jj])+' ')
-			f.write('\n')
-
-	# write out observables
-	with open(outobs, 'w') as f:
-		
-		### header ###
-		f.write('# lambda, best-fit spectrum, median spectrum, 84th percentile, 16th percentile, best-fit fluxes, median fluxes, 84th percentile flux, 16th percentile flux')
-		for jj in xrange(ngals):
-			for kk in xrange(nwav): f.write("{:.1f}".format(lam_obs[kk,jj])+' ')
-			f.write('\n')
-			for kk in xrange(nwav): f.write("{:.3e}".format(spec_obs[3,kk,jj])+' ')
-			f.write('\n')
-			for kk in xrange(nwav): f.write("{:.3e}".format(spec_obs[0,kk,jj])+' ')
-			f.write('\n')
-			for kk in xrange(nwav): f.write("{:.3e}".format(spec_obs[1,kk,jj])+' ')
-			f.write('\n')
-			for kk in xrange(nwav): f.write("{:.3e}".format(spec_obs[2,kk,jj])+' ')
-			f.write('\n')
-			
-			for kk in xrange(nmag): f.write("{:.3e}".format(mag_obs[3,kk,jj])+' ')
-			f.write('\n')
-			for kk in xrange(nmag): f.write("{:.3e}".format(mag_obs[0,kk,jj])+' ')
-			f.write('\n')
-			for kk in xrange(nmag): f.write("{:.3e}".format(mag_obs[1,kk,jj])+' ')
-			f.write('\n')
-			for kk in xrange(nmag): f.write("{:.3e}".format(mag_obs[2,kk,jj])+' ')
-			f.write('\n')
-
-
 

@@ -392,7 +392,223 @@ def plot_brown_coordinates():
 
 	plt.show()
 
-def write_euphrasio_data(alldata):
+def write_euphrasio_data():
 
-	# All I need is UV (intrinsic and observed), and mid-IR fluxes, sSFRs, SFRs, Mstars, and tau_Vs (tau_FUVs if it's also available)
+	from threed_dutils import generate_basenames, load_prospector_data
+
+	# All I need is UV (intrinsic and observed), and mid-IR fluxes, sSFRs, SFRs, Mstars, and tau_V	
+	filebase, parm_basename, ancilname = generate_basenames('brownseds_np')
+	ngals = len(filebase)
+	mass, sfr100, ssfr100, tauv, tautot, luv, luv0 = [np.zeros(shape=(3,ngals)) for i in xrange(7)]
+	
+	names = []
+	for jj in xrange(ngals):
+		sample_results, powell_results, model = load_prospector_data(filebase[jj])
+		
+		if jj == 0:
+			mass_idx = sample_results['quantiles']['parnames'] == 'mass'
+			tauv_idx = sample_results['quantiles']['parnames'] == 'dust2'
+			sfr100_idx = sample_results['extras']['parnames'] == 'sfr_100'
+			ssfr100_idx = sample_results['extras']['parnames'] == 'ssfr_100'
+			tautot_idx = sample_results['extras']['parnames'] == 'ext_5500'
+
+			nmag = len(sample_results['observables']['mags'])
+			mags, mags_nodust = [np.zeros(shape=(3,nmag,ngals)) for i in xrange(2)]
+			magsobs = np.zeros(shape=(nmag,ngals))
+
+		for kk in xrange(nmag):
+			mags[:,kk,jj] = np.percentile(sample_results['observables']['mags'][kk,:],[50.0,84.0,16.0]).tolist()
+			mags_nodust[:,kk,jj] = np.percentile(sample_results['observables']['mags'][kk,:],[50.0,84.0,16.0]).tolist()
+			magsobs[kk,jj] = sample_results['obs']['maggies'][kk]
+
+		mass[:,jj] = [sample_results['quantiles']['q50'][mass_idx],
+					  sample_results['quantiles']['q84'][mass_idx],
+					  sample_results['quantiles']['q16'][mass_idx]]
+		
+		sfr100[:,jj] = [sample_results['extras']['q50'][sfr100_idx],
+					    sample_results['extras']['q84'][sfr100_idx],
+					    sample_results['extras']['q16'][sfr100_idx]]
+		
+		ssfr100[:,jj] = [sample_results['extras']['q50'][ssfr100_idx],
+					     sample_results['extras']['q84'][ssfr100_idx],
+					     sample_results['extras']['q16'][ssfr100_idx]]
+		
+		tauv[:,jj] = [sample_results['quantiles']['q50'][tauv_idx],
+					  sample_results['quantiles']['q84'][tauv_idx],
+					  sample_results['quantiles']['q16'][tauv_idx]]
+
+		tautot[:,jj] = [sample_results['extras']['q50'][tautot_idx],
+					    sample_results['extras']['q84'][tautot_idx],
+					    sample_results['extras']['q16'][tautot_idx]]
+
+		luv[:,jj] = np.percentile(sample_results['observables']['L_UV'][:],[5.0,50.0,95.0]).tolist()
+		luv0[:,jj] = np.percentile(sample_results['observables']['L_UV'][:],[5.0,50.0,95.0]).tolist()
+
+		names.append(sample_results['run_params']['objname'])
+
+	outmod = '/Users/joel/code/python/threedhst_bsfh/data/eufrasio_model_parameters.txt'
+	outdat = '/Users/joel/code/python/threedhst_bsfh/data/eufrasio_data_parameters.txt'
+
+	outdict ={
+			  'mass': mass,
+			  'sfr100': sfr100,
+			  'ssfr100': ssfr100,
+			  'tauv': tauv,
+			  'tautot': tautot,
+			  'luv': luv,
+			  'luv0': luv0,
+			 }
+
+	outdict_mags =  { 
+			        'mag': mag,
+			        'mags_nodust': mags_nodust,
+			        'magsobs': magsobs
+			        }
+
+	# write out model parameters
+	with open(outpars, 'w') as f:
+		
+		### header ###
+		f.write('# name mass mass_errup mass_errdown sfr100 sfr100_errup sfr100_errdown ssfr100 ssfr100_errup ssfr100_errdown')
+		f.write('\n')
+
+		### data ###
+		for jj in xrange(ngals):
+			f.write(names[jj]+' ')
+			for kk in xrange(3): f.write("{:.2f}".format(mass[kk,jj])+' ')
+			for kk in xrange(3): f.write("{:.2e}".format(sfr10[kk,jj])+' ')
+			for kk in xrange(3): f.write("{:.2e}".format(sfr100[kk,jj])+' ')
+			for kk in xrange(3): f.write("{:.2f}".format(dmass[kk,jj])+' ')
+			for kk in xrange(3): f.write("{:.2e}".format(cloudyha[kk,jj])+' ')
+			f.write('\n')
+
+	# write out observables
+	# fluxes are in maggies (show link to SDSS thing)
+	# I set the observed flux errors equal to 5% of the flux density for my work
+	# An observed value of 0.0 means that there is no available photometry
+	# I include MODEL_WITH_DUST, MODEL_NODUST, and OBSERVED
+	with open(outobs, 'w') as f:
+		
+		### header ###
+		f.write('# lambda, best-fit spectrum, median spectrum, 84th percentile, 16th percentile, best-fit fluxes, median fluxes, 84th percentile flux, 16th percentile flux')
+		for jj in xrange(ngals):
+			for kk in xrange(nwav): f.write("{:.1f}".format(lam_obs[kk,jj])+' ')
+			f.write('\n')
+			for kk in xrange(nwav): f.write("{:.3e}".format(spec_obs[3,kk,jj])+' ')
+			f.write('\n')
+			for kk in xrange(nwav): f.write("{:.3e}".format(spec_obs[0,kk,jj])+' ')
+			f.write('\n')
+			for kk in xrange(nwav): f.write("{:.3e}".format(spec_obs[1,kk,jj])+' ')
+			f.write('\n')
+			for kk in xrange(nwav): f.write("{:.3e}".format(spec_obs[2,kk,jj])+' ')
+			f.write('\n')
+			
+			for kk in xrange(nmag): f.write("{:.3e}".format(mag_obs[3,kk,jj])+' ')
+			f.write('\n')
+			for kk in xrange(nmag): f.write("{:.3e}".format(mag_obs[0,kk,jj])+' ')
+			f.write('\n')
+			for kk in xrange(nmag): f.write("{:.3e}".format(mag_obs[1,kk,jj])+' ')
+			f.write('\n')
+			for kk in xrange(nmag): f.write("{:.3e}".format(mag_obs[2,kk,jj])+' ')
+			f.write('\n')
+
+
+
+def write_kinney_txt():
+	
+	filebase, parm_basename, ancilname=threed_dutils.generate_basenames('virgo')
+	ngals = len(filebase)
+	mass, sfr10, sfr100, cloudyha, dmass = [np.zeros(shape=(3,ngals)) for i in xrange(5)]
+	names = []
+	for jj in xrange(ngals):
+		sample_results, powell_results, model = threed_dutils.load_prospector_data(filebase[jj])
+		
+		if jj == 0:
+			sfr10_ind = sample_results['extras']['parnames'] == 'sfr_10'
+			sfr100_ind = sample_results['extras']['parnames'] == 'sfr_100'
+			mass_ind = sample_results['quantiles']['parnames'] == 'mass'
+			ha_ind = sample_results['model_emline']['name'] == 'Halpha'
+
+			nwav = len(sample_results['observables']['lam_obs'])
+			nmag = len(sample_results['observables']['mags'])
+			lam_obs = np.zeros(shape=(nwav,ngals))
+			spec_obs = np.zeros(shape=(4,nwav,ngals)) # q50, q84, q16, best-fit
+			mag_obs = np.zeros(shape=(4,nmag,ngals)) # q50, q84, q16, best-fit
+
+
+		lam_obs[:,jj] = sample_results['observables']['lam_obs']
+		for kk in xrange(nwav):
+			spec_obs[:,kk,jj] = np.percentile(sample_results['observables']['spec'][kk,:],[5.0,50.0,95.0]).tolist()+\
+		                        [sample_results['observables']['spec'][kk,0]]
+		for kk in xrange(nmag):
+			mag_obs[:,kk,jj] = np.percentile(sample_results['observables']['mags'][kk,:],[5.0,50.0,95.0]).tolist()+\
+		                        [sample_results['observables']['mags'][kk,0]]
+
+		mass[:,jj] = [sample_results['quantiles']['q50'][mass_ind],
+					  sample_results['quantiles']['q84'][mass_ind],
+					  sample_results['quantiles']['q16'][mass_ind]]
+		
+		sfr10[:,jj] = [sample_results['extras']['q50'][sfr10_ind],
+					  sample_results['extras']['q84'][sfr10_ind],
+					  sample_results['extras']['q16'][sfr10_ind]]
+		
+		sfr100[:,jj] = [sample_results['extras']['q50'][sfr100_ind],
+					  sample_results['extras']['q84'][sfr100_ind],
+					  sample_results['extras']['q16'][sfr100_ind]]
+		
+		dmass[:,jj] = [sample_results['extras']['q50'][dmass_ind],
+					  sample_results['extras']['q84'][dmass_ind],
+					  sample_results['extras']['q16'][dmass_ind]]
+
+		cloudyha[:,jj] = [sample_results['model_emline']['q50'][ha_ind],
+					  sample_results['model_emline']['q84'][ha_ind],
+					  sample_results['model_emline']['q16'][ha_ind]]
+		names.append(sample_results['run_params']['objname'])
+
+	outobs = '/Users/joel/code/python/threedhst_bsfh/data/virgo/observables.txt'
+	outpars = '/Users/joel/code/python/threedhst_bsfh/data/virgo/parameters.txt'
+
+	# write out observables
+	with open(outpars, 'w') as f:
+		
+		### header ###
+		f.write('# name mass mass_errup mass_errdown sfr10 sfr10_errup sfr10_errdown sfr100 sfr100_errup sfr100_errdown dustmass dustmass_errup dustmass_errdown halpha_flux halpha_flux_errup halpha_flux_errdown')
+		f.write('\n')
+
+		### data ###
+		for jj in xrange(ngals):
+			f.write(names[jj]+' ')
+			for kk in xrange(3): f.write("{:.2f}".format(mass[kk,jj])+' ')
+			for kk in xrange(3): f.write("{:.2e}".format(sfr10[kk,jj])+' ')
+			for kk in xrange(3): f.write("{:.2e}".format(sfr100[kk,jj])+' ')
+			for kk in xrange(3): f.write("{:.2f}".format(dmass[kk,jj])+' ')
+			for kk in xrange(3): f.write("{:.2e}".format(cloudyha[kk,jj])+' ')
+			f.write('\n')
+
+	# write out observables
+	with open(outobs, 'w') as f:
+		
+		### header ###
+		f.write('# lambda, best-fit spectrum, median spectrum, 84th percentile, 16th percentile, best-fit fluxes, median fluxes, 84th percentile flux, 16th percentile flux')
+		for jj in xrange(ngals):
+			for kk in xrange(nwav): f.write("{:.1f}".format(lam_obs[kk,jj])+' ')
+			f.write('\n')
+			for kk in xrange(nwav): f.write("{:.3e}".format(spec_obs[3,kk,jj])+' ')
+			f.write('\n')
+			for kk in xrange(nwav): f.write("{:.3e}".format(spec_obs[0,kk,jj])+' ')
+			f.write('\n')
+			for kk in xrange(nwav): f.write("{:.3e}".format(spec_obs[1,kk,jj])+' ')
+			f.write('\n')
+			for kk in xrange(nwav): f.write("{:.3e}".format(spec_obs[2,kk,jj])+' ')
+			f.write('\n')
+			
+			for kk in xrange(nmag): f.write("{:.3e}".format(mag_obs[3,kk,jj])+' ')
+			f.write('\n')
+			for kk in xrange(nmag): f.write("{:.3e}".format(mag_obs[0,kk,jj])+' ')
+			f.write('\n')
+			for kk in xrange(nmag): f.write("{:.3e}".format(mag_obs[1,kk,jj])+' ')
+			f.write('\n')
+			for kk in xrange(nmag): f.write("{:.3e}".format(mag_obs[2,kk,jj])+' ')
+			f.write('\n')
+
 
