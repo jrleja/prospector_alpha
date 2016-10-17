@@ -360,8 +360,7 @@ def calc_extra_quantities(sample_results, ncalc=2000, ir_priors=True):
 	             'mags':mags[:,0],
 	             'mags_nodust': mags_nodust[:,0]}
 	sample_results['bfit'] = bfit
-	print 1/0
-
+	
 	return sample_results
 
 def update_all(runname, **kwargs):
