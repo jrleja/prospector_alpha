@@ -42,6 +42,26 @@ def maxprob_model(sample_results,sps):
 
 	return thetas, maxprob
 
+def measure_uvj(sample_results, flatchain, sps):
+
+
+	from sedpy.observate import load_filters
+	filters = ['bessell_U','bessell_V','twomass_J']
+	obs = {'filters': load_filters(filters), 'wavelength': None}
+	zsave = sample_results['model'].params['zred']
+	sample_results['model'].params['zred'] = np.array([0.0])
+
+	ncalc = flatchain.shape[0]
+	mags = np.zeros(shape=(len(filters),ncalc))
+
+	for i in xrange(ncalc):
+		_,mags[:,i],sm = sample_results['model'].mean_model(flatchain[i,:], obs, sps=sps)
+	sample_results['model'].params['zred'] = zsave
+	sample_results['uvj'] = {}
+	sample_results['uvj']['mags'] = mags
+	sample_results['uvj']['name'] = filters
+
+	return sample_results
 
 def calc_extra_quantities(sample_results, ncalc=2000, ir_priors=True):
 
@@ -127,7 +147,7 @@ def calc_extra_quantities(sample_results, ncalc=2000, ir_priors=True):
 	spec = np.zeros(shape=(len(sps.wavelengths),ncalc))
 
 	sample_flatchain = flatchain[:ncalc,:]
-
+	
 	######## posterior sampling #########
 	for jj in xrange(ncalc):
 		
@@ -217,6 +237,7 @@ def calc_extra_quantities(sample_results, ncalc=2000, ir_priors=True):
 											        measure_ir=False, measure_luv=True)
 		luv0[jj]       = modelout['luv']
 
+	sample_results = measure_uvj(sample_results, sample_flatchain, sps)
 
 	##### CALCULATE Q16,Q50,Q84 FOR VARIABLE PARAMETERS
 	ntheta = len(sample_results['initial_theta'])

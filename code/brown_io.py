@@ -406,13 +406,14 @@ def write_euphrasio_data():
 		sample_results, powell_results, model = load_prospector_data(filebase[jj])
 		
 		if jj == 0:
-			mass_idx = sample_results['quantiles']['parnames'] == 'mass'
-			tauv_idx = sample_results['quantiles']['parnames'] == 'dust2'
+			mass_idx = np.array(sample_results['quantiles']['parnames']) == 'logmass'
+			tauv_idx = np.array(sample_results['quantiles']['parnames']) == 'dust2'
 			sfr100_idx = sample_results['extras']['parnames'] == 'sfr_100'
 			ssfr100_idx = sample_results['extras']['parnames'] == 'ssfr_100'
-			tautot_idx = sample_results['extras']['parnames'] == 'ext_5500'
+			tautot_idx = sample_results['extras']['parnames'] == 'total_ext5500'
 
 			nmag = len(sample_results['observables']['mags'])
+			fnames = [f.name for f in sample_results['obs']['filters']]
 			mags, mags_nodust = [np.zeros(shape=(3,nmag,ngals)) for i in xrange(2)]
 			magsobs = np.zeros(shape=(nmag,ngals))
 
@@ -442,7 +443,7 @@ def write_euphrasio_data():
 					    sample_results['extras']['q16'][tautot_idx]]
 
 		luv[:,jj] = np.percentile(sample_results['observables']['L_UV'][:],[5.0,50.0,95.0]).tolist()
-		luv0[:,jj] = np.percentile(sample_results['observables']['L_UV'][:],[5.0,50.0,95.0]).tolist()
+		luv0[:,jj] = np.percentile(sample_results['observables']['L_UV_INTRINSIC'][:],[5.0,50.0,95.0]).tolist()
 
 		names.append(sample_results['run_params']['objname'])
 
@@ -466,6 +467,11 @@ def write_euphrasio_data():
 			        }
 
 	# write out model parameters
+	# logmass is in log(M/Msun), Chabrier IMF
+	# sfr100 is in Msun/yr
+	# ssfr100 is in yr^-1
+	# tauv, tautot are in optical depths
+	# luvs are in LSUN ? DOUBLE CHECK
 	with open(outpars, 'w') as f:
 		
 		### header ###
