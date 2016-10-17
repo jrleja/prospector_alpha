@@ -1,10 +1,14 @@
 from prospect.models import model_setup
 from prospect.io import read_results
-import os, threed_dutils, corner, threedhst_diag, pickle, sys
+import os, threed_dutils, corner, pickle, sys
 import numpy as np
-import matplotlib.pyplot as plt
 from copy import copy
 from astropy import constants
+
+try:
+	import threedhst_diag
+except IOError:
+	pass
 
 def calc_emp_ha(mass,sfr,dust1,dust2,dustindex,ncomp=1):
 
@@ -147,7 +151,7 @@ def calc_extra_quantities(sample_results, ncalc=2000, ir_priors=True):
 	spec = np.zeros(shape=(len(sps.wavelengths),ncalc))
 
 	sample_flatchain = flatchain[:ncalc,:]
-	
+
 	######## posterior sampling #########
 	for jj in xrange(ncalc):
 		

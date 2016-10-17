@@ -1,6 +1,9 @@
 import numpy as np
 import os, fsps
-import matplotlib.pyplot as plt
+try:
+	import matplotlib.pyplot as plt
+except:
+	pass
 from prospect.models import model_setup
 from scipy.interpolate import interp1d
 from scipy.integrate import simps
