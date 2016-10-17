@@ -360,7 +360,7 @@ def calc_extra_quantities(sample_results, ncalc=2000, ir_priors=True):
 	             'mags':mags[:,0],
 	             'mags_nodust': mags_nodust[:,0]}
 	sample_results['bfit'] = bfit
-	
+
 	return sample_results
 
 def update_all(runname, **kwargs):
@@ -377,7 +377,7 @@ def post_processing(param_name, add_extra=True, **extras):
 	'''
 	Driver. Loads output, makes all plots for a given galaxy.
 	'''
-	
+
 	print 'begun post-processing'
 	parmfile = model_setup.import_module_from_file(param_name)
 	outname = parmfile.run_params['outfile']
@@ -408,7 +408,11 @@ def post_processing(param_name, add_extra=True, **extras):
 		sample_results = calc_extra_quantities(sample_results,**extras)
 
 		### MAKE PLOTS HERE
-		threedhst_diag.make_all_plots(sample_results=sample_results,filebase=outname,outfolder=outfolder,param_name=param_name)
+		try:
+			threedhst_diag.make_all_plots(sample_results=sample_results,filebase=outname,outfolder=outfolder,param_name=param_name)
+		except NameError:
+			print "unable to make plots in threedhst_diag"
+			pass
 
 		### SAVE OUTPUT HERE
 		sample_results['chain'] = None # dump the chain...
