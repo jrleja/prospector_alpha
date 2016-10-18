@@ -392,15 +392,14 @@ def plot_brown_coordinates():
 
 	plt.show()
 
-def write_euphrasio_data():
+def write_eufrasio_data():
 
 	from threed_dutils import generate_basenames, load_prospector_data
 
 	# All I need is UV (intrinsic and observed), and mid-IR fluxes, sSFRs, SFRs, Mstars, and tau_V	
 	filebase, parm_basename, ancilname = generate_basenames('brownseds_np')
 	ngals = len(filebase)
-	mass, sfr100, ssfr100, tauv, tautot, luv, luv0 = [np.zeros(shape=(3,ngals)) for i in xrange(7)]
-	
+	mass, sfr100, ssfr100, tauv, tautot, luv, lir, luv0 = [np.zeros(shape=(3,ngals)) for i in xrange(8)]
 	names = []
 	for jj in xrange(ngals):
 		sample_results, powell_results, model = load_prospector_data(filebase[jj])
@@ -419,7 +418,7 @@ def write_euphrasio_data():
 
 		for kk in xrange(nmag):
 			mags[:,kk,jj] = np.percentile(sample_results['observables']['mags'][kk,:],[50.0,84.0,16.0]).tolist()
-			mags_nodust[:,kk,jj] = np.percentile(sample_results['observables']['mags'][kk,:],[50.0,84.0,16.0]).tolist()
+			mags_nodust[:,kk,jj] = np.percentile(sample_results['observables']['mags_nodust'][kk,:],[50.0,84.0,16.0]).tolist()
 			magsobs[kk,jj] = sample_results['obs']['maggies'][kk]
 
 		mass[:,jj] = [sample_results['quantiles']['q50'][mass_idx],
@@ -442,13 +441,14 @@ def write_euphrasio_data():
 					    sample_results['extras']['q84'][tautot_idx],
 					    sample_results['extras']['q16'][tautot_idx]]
 
-		luv[:,jj] = np.percentile(sample_results['observables']['L_UV'][:],[5.0,50.0,95.0]).tolist()
-		luv0[:,jj] = np.percentile(sample_results['observables']['L_UV_INTRINSIC'][:],[5.0,50.0,95.0]).tolist()
+		luv[:,jj] = np.percentile(sample_results['observables']['L_UV'][:],[50.0,84.0,16.0]).tolist()
+		lir[:,jj] = np.percentile(sample_results['observables']['L_IR'][:],[50.0,84.0,16.0]).tolist()
+		luv0[:,jj] = np.percentile(sample_results['observables']['L_UV_INTRINSIC'][:],[50.0,84.0,16.0]).tolist()
 
-		names.append(sample_results['run_params']['objname'])
-
+		names.append("_".join(sample_results['run_params']['objname'].split(' ')))
+		print tauv[:,jj]
 	outmod = '/Users/joel/code/python/threedhst_bsfh/data/eufrasio_model_parameters.txt'
-	outdat = '/Users/joel/code/python/threedhst_bsfh/data/eufrasio_data_parameters.txt'
+	outdat = '/Users/joel/code/python/threedhst_bsfh/data/eufrasio_photometry_'
 
 	outdict ={
 			  'mass': mass,
@@ -457,11 +457,12 @@ def write_euphrasio_data():
 			  'tauv': tauv,
 			  'tautot': tautot,
 			  'luv': luv,
+			  'lir': lir,
 			  'luv0': luv0,
 			 }
 
 	outdict_mags =  { 
-			        'mag': mag,
+			        'mags': mags,
 			        'mags_nodust': mags_nodust,
 			        'magsobs': magsobs
 			        }
@@ -471,21 +472,19 @@ def write_euphrasio_data():
 	# sfr100 is in Msun/yr
 	# ssfr100 is in yr^-1
 	# tauv, tautot are in optical depths
-	# luvs are in LSUN ? DOUBLE CHECK
-	with open(outpars, 'w') as f:
+	# luv, lirs are in LSUN
+	with open(outmod, 'w') as f:
 		
 		### header ###
-		f.write('# name mass mass_errup mass_errdown sfr100 sfr100_errup sfr100_errdown ssfr100 ssfr100_errup ssfr100_errdown')
-		f.write('\n')
+		hdr = '# objname '
+		for key in outdict.keys(): hdr += key+' '+key+'_84th '+key+'_16th '
+		f.write(hdr+'\n')
 
-		### data ###
 		for jj in xrange(ngals):
 			f.write(names[jj]+' ')
-			for kk in xrange(3): f.write("{:.2f}".format(mass[kk,jj])+' ')
-			for kk in xrange(3): f.write("{:.2e}".format(sfr10[kk,jj])+' ')
-			for kk in xrange(3): f.write("{:.2e}".format(sfr100[kk,jj])+' ')
-			for kk in xrange(3): f.write("{:.2f}".format(dmass[kk,jj])+' ')
-			for kk in xrange(3): f.write("{:.2e}".format(cloudyha[kk,jj])+' ')
+			for key in outdict.keys():
+				fmt = "{:.2e}"
+				f.write(fmt.format(outdict[key][0,jj]) + ' ' + fmt.format(outdict[key][1,jj]) + ' ' + fmt.format(outdict[key][2,jj])+' ')
 			f.write('\n')
 
 	# write out observables
@@ -493,31 +492,50 @@ def write_euphrasio_data():
 	# I set the observed flux errors equal to 5% of the flux density for my work
 	# An observed value of 0.0 means that there is no available photometry
 	# I include MODEL_WITH_DUST, MODEL_NODUST, and OBSERVED
-	with open(outobs, 'w') as f:
+	with open(outdat+'model.txt', 'w') as f:
 		
 		### header ###
-		f.write('# lambda, best-fit spectrum, median spectrum, 84th percentile, 16th percentile, best-fit fluxes, median fluxes, 84th percentile flux, 16th percentile flux')
-		for jj in xrange(ngals):
-			for kk in xrange(nwav): f.write("{:.1f}".format(lam_obs[kk,jj])+' ')
-			f.write('\n')
-			for kk in xrange(nwav): f.write("{:.3e}".format(spec_obs[3,kk,jj])+' ')
-			f.write('\n')
-			for kk in xrange(nwav): f.write("{:.3e}".format(spec_obs[0,kk,jj])+' ')
-			f.write('\n')
-			for kk in xrange(nwav): f.write("{:.3e}".format(spec_obs[1,kk,jj])+' ')
-			f.write('\n')
-			for kk in xrange(nwav): f.write("{:.3e}".format(spec_obs[2,kk,jj])+' ')
-			f.write('\n')
-			
-			for kk in xrange(nmag): f.write("{:.3e}".format(mag_obs[3,kk,jj])+' ')
-			f.write('\n')
-			for kk in xrange(nmag): f.write("{:.3e}".format(mag_obs[0,kk,jj])+' ')
-			f.write('\n')
-			for kk in xrange(nmag): f.write("{:.3e}".format(mag_obs[1,kk,jj])+' ')
-			f.write('\n')
-			for kk in xrange(nmag): f.write("{:.3e}".format(mag_obs[2,kk,jj])+' ')
-			f.write('\n')
+		hdr = '# objname '
+		for filt in fnames: hdr += filt+' '+filt+'_84th '+filt+'_16th '
+		f.write(hdr+'\n')
+		key = 'mags'
 
+		# mags shape = (3,nmag,ngals)
+		for jj in xrange(ngals):
+			f.write(names[jj]+' ')
+			for i,filt in enumerate(fnames):
+				fmt = "{:.3e}"
+				f.write(fmt.format(outdict_mags[key][0,i,jj]) + ' ' + fmt.format(outdict_mags[key][1,i,jj]) +' '+ fmt.format(outdict_mags[key][2,i,jj])+' ')
+
+	with open(outdat+'model_intrinsic.txt', 'w') as f:
+		
+		### header ###
+		hdr = '# objname '
+		for filt in fnames: hdr += filt+' '+filt+'_84th '+filt+'_16th '
+		f.write(hdr+'\n')
+		key = 'mags_nodust'
+
+		# mags shape = (3,nmag,ngals)
+		for jj in xrange(ngals):
+			f.write(names[jj]+' ')
+			for i,filt in enumerate(fnames):
+				fmt = "{:.3e}"
+				f.write(fmt.format(outdict_mags[key][0,i,jj]) + ' ' + fmt.format(outdict_mags[key][1,i,jj]) +' '+ fmt.format(outdict_mags[key][2,i,jj])+' ')
+
+	with open(outdat+'observed.txt', 'w') as f:
+		
+		### header ###
+		hdr = '# objname '
+		for filt in fnames: hdr += filt+' '
+		f.write(hdr+'\n')
+		key = 'magsobs'
+
+		# mags shape = (3,nmag,ngals)
+		for jj in xrange(ngals):
+			f.write(names[jj]+' ')
+			for i,filt in enumerate(fnames):
+				fmt = "{:.3e}"
+				f.write(fmt.format(outdict_mags[key][i,jj])+' ')
 
 
 def write_kinney_txt():

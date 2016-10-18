@@ -5,7 +5,7 @@
 ### Requested number of nodes
 #SBATCH -N 1
 ### Requested computing time in minutes
-#SBATCH -t 480
+#SBATCH -t 960
 ### Partition or queue name
 #SBATCH -p conroy,serial_requeue
 ### memory per cpu, in MB

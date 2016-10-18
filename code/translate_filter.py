@@ -80,7 +80,7 @@ def translate_txt_to_sedpy(txt_name,sedpy_filtname,
 					       outfolder='/Users/joel/code/python/sedpy/sedpy/data/filters'):
 
 	'''
-	used to translate text filter curves into sedpy-style filter files
+	used to translate text filter curves into yanny-style filter files
 	INPUT: text filter file
 	OUTPUT: sedpy-style filter definition file at outfolder/sedpy_filtname.par
 	'''

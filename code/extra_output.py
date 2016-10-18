@@ -46,11 +46,11 @@ def maxprob_model(sample_results,sps):
 
 	return thetas, maxprob
 
-def measure_uvj(sample_results, flatchain, sps):
+def measure_model_phot(sample_results, flatchain, sps):
 
 
 	from sedpy.observate import load_filters
-	filters = ['bessell_U','bessell_V','twomass_J']
+	filters = ['bessell_U','bessell_V','twomass_J','bessell_B','bessell_R','twomass_Ks']
 	obs = {'filters': load_filters(filters), 'wavelength': None}
 	zsave = sample_results['model'].params['zred']
 	sample_results['model'].params['zred'] = np.array([0.0])
@@ -61,9 +61,9 @@ def measure_uvj(sample_results, flatchain, sps):
 	for i in xrange(ncalc):
 		_,mags[:,i],sm = sample_results['model'].mean_model(flatchain[i,:], obs, sps=sps)
 	sample_results['model'].params['zred'] = zsave
-	sample_results['uvj'] = {}
-	sample_results['uvj']['mags'] = mags
-	sample_results['uvj']['name'] = filters
+	sample_results['mphot'] = {}
+	sample_results['mphot']['mags'] = mags
+	sample_results['mphot']['name'] = np.array(filters)
 
 	return sample_results
 
@@ -156,7 +156,7 @@ def calc_extra_quantities(sample_results, ncalc=2000, ir_priors=True):
 	for jj in xrange(ncalc):
 		
 		##### model call, to set parameters
-		thetas = sample_flatchain[jj,:]
+		thetas = copy(sample_flatchain[jj,:])
 		spec[:,jj],mags[:,jj],sm = sample_results['model'].mean_model(thetas, sample_results['obs'], sps=sps)
 
 		##### extract sfh parameters
@@ -233,15 +233,16 @@ def calc_extra_quantities(sample_results, ncalc=2000, ir_priors=True):
 		dn4000[jj]     = modelout['dn4000']
 
 		#### no dust
-		thetas[d1_idx] = np.array([0.0])
-		thetas[d2_idx] = np.array([0.0])
-		_,mags_nodust[:,jj],sm = sample_results['model'].mean_model(thetas, sample_results['obs'], sps=sps)
-		modelout = threed_dutils.measure_emline_lum(sps, thetas = thetas,
+		nd_thetas = copy(thetas)
+		nd_thetas[d1_idx] = np.array([0.0])
+		nd_thetas[d2_idx] = np.array([0.0])
+		_,mags_nodust[:,jj],sm = sample_results['model'].mean_model(nd_thetas, sample_results['obs'], sps=sps)
+		modelout = threed_dutils.measure_emline_lum(sps, thetas = nd_thetas,
 			 										model=sample_results['model'], obs = sample_results['obs'],
 											        measure_ir=False, measure_luv=True)
 		luv0[jj]       = modelout['luv']
 
-	sample_results = measure_uvj(sample_results, sample_flatchain, sps)
+	sample_results = measure_model_phot(sample_results, sample_flatchain, sps)
 
 	##### CALCULATE Q16,Q50,Q84 FOR VARIABLE PARAMETERS
 	ntheta = len(sample_results['initial_theta'])

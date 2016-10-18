@@ -542,6 +542,15 @@ def update_model_info(alldata, sample_results, magphys):
 	alldata['pquantiles']['parnames'] = np.array(sample_results['model'].theta_labels())
 	alldata['bfit'] = sample_results['bfit']
 
+	if 'uvj' in sample_results.keys():
+
+		uv = -2.5*np.log10(sample_results['uvj']['mags'][0,:])+2.5*np.log10(sample_results['uvj']['mags'][1,:])
+		vj = -2.5*np.log10(sample_results['uvj']['mags'][1,:])+2.5*np.log10(sample_results['uvj']['mags'][2,:])
+
+		alldata['uvj'] = {}
+		alldata['uvj']['uv'] = np.percentile(uv,[50.0,84.0,16.0])
+		alldata['uvj']['vj'] = np.percentile(vj,[50.0,84.0,16.0])
+		print 'uvj'
 	return alldata
 
 def sed_comp_figure(sample_results, sps, model, magphys,
