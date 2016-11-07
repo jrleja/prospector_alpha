@@ -18,7 +18,6 @@ mpl.rcParams['ytick.minor.size'] = 4
 mpl.rcParams['lines.markersize'] = 8
 mpl.pyplot.ioff() # don't pop up a window for each plot
 
-
 class jLogFormatter(mpl.ticker.LogFormatter):
 	'''
 	this changes the format from exponential to floating point.

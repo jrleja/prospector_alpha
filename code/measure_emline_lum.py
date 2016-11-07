@@ -446,7 +446,7 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 	# convert distance factor
 	pc = 3.085677581467192e18  # cm
 	dfactor = 4*np.pi*(pc*cosmo.luminosity_distance(magphys['metadata']['redshift']).value *
-                    1e6)**2 * (1+magphys['metadata']['redshift'])
+                    1e6)**2 * (1+magphys['metadata']['redshift']) 
 	obsflux = obs_spec['flux_lsun']*dfactor
 	obslam = obs_spec['rest_lam']
 

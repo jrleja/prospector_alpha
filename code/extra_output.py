@@ -67,6 +67,28 @@ def measure_model_phot(sample_results, flatchain, sps):
 
 	return sample_results
 
+def measure_spire_phot(sample_results, flatchain, sps):
+
+	'''
+	for plots for kim-vy tran on 10/26/16
+	'''
+
+	from sedpy.observate import load_filters
+	filters = ['herschel_spire_250','herschel_spire_350','herschel_spire_500']
+	obs = {'filters': load_filters(filters), 'wavelength': None}
+
+	ncalc = flatchain.shape[0]
+	mags = np.zeros(shape=(len(filters),ncalc))
+	for i in xrange(ncalc):
+		_,mags[:,i],sm = sample_results['model'].mean_model(flatchain[i,:], obs, sps=sps)
+		print i
+
+	sample_results['hphot'] = {}
+	sample_results['hphot']['mags'] = mags
+	sample_results['hphot']['name'] = np.array(filters)
+
+	return sample_results
+
 def calc_extra_quantities(sample_results, ncalc=2000, ir_priors=True):
 
 	'''' 
@@ -151,6 +173,9 @@ def calc_extra_quantities(sample_results, ncalc=2000, ir_priors=True):
 	spec = np.zeros(shape=(len(sps.wavelengths),ncalc))
 
 	sample_flatchain = flatchain[:ncalc,:]
+	sample_results = measure_spire_phot(sample_results, sample_flatchain, sps)
+
+	return sample_results
 
 	######## posterior sampling #########
 	for jj in xrange(ncalc):
@@ -407,7 +432,12 @@ def post_processing(param_name, add_extra=True, **extras):
 		if 'flatchain' not in sample_results.keys():
 			sample_results['flatchain'] = threed_dutils.chop_chain(sample_results['chain'])
 		sample_results = calc_extra_quantities(sample_results,**extras)
+		
+		sample_results['chain'] = None # dump the chain...
+		mcmc_filename, model_filename = threed_dutils.create_prosp_filename(outname)
+		pickle.dump(sample_results,open(mcmc_filename, "wb"))
 
+		print 1/0
 		### MAKE PLOTS HERE
 		try:
 			threedhst_diag.make_all_plots(sample_results=sample_results,filebase=outname,outfolder=outfolder,param_name=param_name)

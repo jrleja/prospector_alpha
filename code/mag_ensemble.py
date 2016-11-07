@@ -1220,8 +1220,8 @@ def atlas_3d_met(e_pinfo,hflag,outfolder=''):
 
 	fig, ax = plt.subplots(1,1,figsize=(6,6))
 	ax.errorbar(a3d_met,prosp_met,xerr=a3d_met_err,yerr=prosp_met_err, color='#1C86EE',alpha=0.9,fmt='o')
-	ax.set_xlabel('log(Z$_{\mathrm{ATLAS-3D}}$/Z$_{\odot}$)',fontsize=22)
-	ax.set_ylabel('log(Z$_{\mathrm{Prosp}}$/Z$_{\odot}$)',fontsize=22)
+	ax.set_xlabel('log(Z$_{\mathrm{ATLAS-3D}}$/Z$_{\odot}$) from spectrum',fontsize=22)
+	ax.set_ylabel('log(Z$_{\mathrm{Prospector}}$/Z$_{\odot}$) from photometry',fontsize=22)
 
 	ax = threed_dutils.equalize_axes(ax,a3d_met+0.1,prosp_met-0.1, dynrange=0.1, line_of_equality=True, log=False)
 
@@ -2265,8 +2265,8 @@ def obs_vs_model_dn(e_pinfo,hflag,outname=None):
 		ax.errorbar(pl_dn4000_obs, pl_dn4000_prosp, fmt='o',yerr=errs_pro, xerr = [np.random.rand(pl_dn4000_obs.shape[0])*0.04+0.01,np.random.rand(pl_dn4000_obs.shape[0])*0.04+0.01], linestyle=' ', **pdict)
 
 	bpt_legend(ax,loc=2)
-	ax.set_xlabel(r'observed D$_n$4000')
-	ax.set_ylabel(r'Prospector D$_n$4000')
+	ax.set_xlabel(r'D$_n$4000 from observed spectrum')
+	ax.set_ylabel(r'D$_n$4000 from fits to photometry')
 	ax = threed_dutils.equalize_axes(ax, dn4000_obs, dn4000_prosp)
 	off,scat = threed_dutils.offset_and_scatter(dn4000_obs, dn4000_prosp,biweight=True)
 	ax.text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat), transform = ax.transAxes,horizontalalignment='right')
@@ -2557,8 +2557,8 @@ def obs_vs_model_bdec(e_pinfo,hflag,outname1='test.png',outname2='test.png'):
 	#ax1.text(0.04,0.92, r'EQW (H$\alpha$,H$\beta$) > {0} $\AA$'.format(int(e_pinfo['obs']['eqw_cut'])), transform = ax1.transAxes,horizontalalignment='left')
 	bpt_legend(ax1,loc=2)
 	ax1.text(0.04,0.87, r'N = '+str(int(np.sum(keep_idx))), transform = ax1.transAxes,horizontalalignment='left')
-	ax1.set_xlabel(r'observed log(F/F$_0$)$_{\mathrm{H}\alpha}$ - log(F/F$_0$)$_{\mathrm{H}\beta}$')
-	ax1.set_ylabel(r'Prospector log(F/F$_0$)$_{\mathrm{H}\alpha}$ - log(F/F$_0$)$_{\mathrm{H}\beta}$')
+	ax1.set_xlabel(r'spectroscopic log(F/F$_0$)$_{\mathrm{H}\alpha}$ - log(F/F$_0$)$_{\mathrm{H}\beta}$')
+	ax1.set_ylabel(r'photometric log(F/F$_0$)$_{\mathrm{H}\alpha}$ - log(F/F$_0$)$_{\mathrm{H}\beta}$')
 	ax1 = threed_dutils.equalize_axes(ax1, pl_bdec_measured,pl_bdec_cloudy_marg[:,0],axlims=axlims)
 	off,scat = threed_dutils.offset_and_scatter(pl_bdec_measured,pl_bdec_cloudy_marg[:,0],biweight=True)
 	ax1.text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat)+' dex', transform = ax1.transAxes,horizontalalignment='right')

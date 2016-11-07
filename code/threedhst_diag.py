@@ -556,9 +556,10 @@ def return_sedplot_vars(sample_results, nufnu=True):
 
 def sed_figure(outname = None, truths = None,
 			   colors = ['#1974D2'], sresults = None,
-			   labels = ['maximum likelihood'],
+			   labels = ['model posterior'],
 			   sfh_loc = [0.19,0.7,0.14,0.17],
 			   model_photometry = True, main_color=['black'],
+			   fir_extra = False, ml_spec=False,
                **kwargs):
 	"""
 	Plot the photometry for the model and data (with error bars), and
@@ -602,11 +603,7 @@ def sed_figure(outname = None, truths = None,
 		
 		res.plot(wave_eff, chi, color=colors[i],
 		         marker='o', linestyle=' ', label=labels[i], 
-			     ms=ms,alpha=alpha,markeredgewidth=0.7,**kwargs)
-
-		nz = modspec > 0
-		phot.plot(modlam[nz], modspec[nz], linestyle='-',
-	              color=colors[i], alpha=0.9,zorder=-1,label = labels[i],**kwargs)
+			     ms=ms,alpha=alpha,markeredgewidth=0.7,**kwargs)		
 
 		###### spectra for q50 + 5th, 95th percentile
 		w = sample_results['observables']['lam_obs']
@@ -615,6 +612,14 @@ def sed_figure(outname = None, truths = None,
 		for jj in xrange(len(w)): spec_pdf[jj,:] = np.percentile(sample_results['observables']['spec'][jj,:],[5.0,50.0,95.0])
 		
 		sfactor = 3e18/w
+		nz = modspec > 0
+		if ml_spec:
+			phot.plot(modlam[nz], modspec[nz], linestyle='-',
+		              color=colors[i], alpha=0.9,zorder=-1,label = labels[i],**kwargs)
+		else:
+			phot.plot(modlam[nz], spec_pdf[nz,1]*sfactor[nz], linestyle='-',
+		              color=colors[i], alpha=0.9,zorder=-1,label = labels[i],**kwargs)	
+
 		nz = spec_pdf[:,1] > 0
 		phot.fill_between(w/1e4, spec_pdf[:,0]*sfactor, 
 			                     spec_pdf[:,2]*sfactor,
@@ -638,11 +643,46 @@ def sed_figure(outname = None, truths = None,
 		phot.text(textx, texty+deltay*(i+1), r'best-fit $\chi^2$/N$_{\mathrm{phot}}$='+"{:.2f}".format(reduced_chisq),
 			  fontsize=10, ha='right',transform = phot.transAxes,color=main_color[i])
 
-	### apply plot limits
 	xlim = (min(xplot)*0.4,max(xplot)*1.5)
+
+	### FIR extras
+	if fir_extra:
+		# FIR photometry for IC 4553 / Arp 220
+		# from NED: http://ned.ipac.caltech.edu/cgi-bin/nph-objsearch?objname=IC%204553&extend=no&out_csys=Equatorial&out_equinox=J2000.0&obj_sort=RA+or+Longitude&of=pre_text&zv_breaker=30000.0&list_limit=5&img_stamp=YES
+		# FILTER FLUX UNCERTAINTY (jansky)
+		# 250 microns (SPIRE)	30.1 1.5
+		# 350 microns (SPIRE)	11.7 0.6
+		# 500 microns (SPIRE)	3.9 0.2
+		lam = np.array([250,350,500])*1e4
+		to_nufnu = 3e18/lam
+
+		fir_obs_phot = np.array([30.1,11.7,3.9]) / 3631. * to_nufnu # in maggies
+		fir_obs_err  = np.array([1.5,0.6,0.2]) / 3631. * to_nufnu # in maggies
+
+		fir_model_phot = np.zeros(shape=(3,3))
+		for i in range(3): fir_model_phot[i,:] = np.percentile(sample_results['hphot']['mags'][i,:],[50.0,84.0,16.0])*to_nufnu[i]
+		fir_model_err = threed_dutils.asym_errors(fir_model_phot[:,0],fir_model_phot[:,1],fir_model_phot[:,2],log=False)
+
+		#### plot points
+		phot.errorbar(lam/1e4, fir_obs_phot, yerr=fir_obs_err,
+	                  color='red', marker='o', label='observed [NOT FIT]', alpha=alpha, linestyle=' ',ms=ms,zorder=0)
+
+		phot.errorbar(lam/1e4, fir_model_phot[:,0], yerr=fir_model_err,
+	                  color=colors[0], 
+				      marker='o', ms=ms, linestyle=' ', alpha=alpha, 
+				      markeredgewidth=0.7,**kwargs)
+
+		chi_hersch = (fir_obs_phot-fir_model_phot[:,0])/fir_obs_err
+		res.plot(lam/1e4, chi_hersch, color='red',
+		         marker='o', linestyle=' ',
+			     ms=ms,alpha=alpha,markeredgewidth=0.7,**kwargs)
+
+		xlim = (xlim[0],750)
+
+	### apply plot limits
 	phot.set_xlim(xlim)
 	res.set_xlim(xlim)
-	phot.set_ylim(min(yplot[np.isfinite(yplot)])*0.5,max(yplot[np.isfinite(yplot)])*2.5)
+	phot.set_ylim(min(yplot[np.isfinite(yplot)])*0.5,max(yplot[np.isfinite(yplot)])*5)
 
 	#### add SFH plot
 	add_sfh_plot(sresults,fig,
@@ -706,6 +746,7 @@ def sed_figure(outname = None, truths = None,
 	fig.add_subplot(phot)
 	fig.add_subplot(res)
 	
+	'''
 	# set second x-axis
 	y1, y2=phot.get_ylim()
 	x1, x2=phot.get_xlim()
@@ -717,7 +758,7 @@ def sed_figure(outname = None, truths = None,
 	ax2.set_xscale('log',nonposx='clip',subsx=(2,5))
 	ax2.xaxis.set_minor_formatter(minorFormatter)
 	ax2.xaxis.set_major_formatter(majorFormatter)
-
+	'''
 	# remove ticks
 	phot.set_xticklabels([])
     

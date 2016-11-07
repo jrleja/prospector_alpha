@@ -122,15 +122,14 @@ def plot_comparison(runname='brownseds_agn',runname_noagn='brownseds_np',alldata
 	plot_residuals(pdata,idx_plot,outfolder)
 	plot_sfh(pdata,idx_plot,outfolder)
 
-def add_txt(ax,pdata,fs=12,x=0.05,y=0.95,dy=0.05,ha='right',**extras):
+def add_txt(ax,pdata,fs=12,x=0.05,y=0.95,dy=0.05,ha='left',**extras):
 
 	for i,key in enumerate(pdata.keys()):
 		ax.text(x,y-i*dy,key.replace('_',' ').upper(),fontsize=fs,transform=ax.transAxes,ha=ha,color=pdata[key]['color'],**extras)
 
-def add_identifier(ax,idx,pdata,fs=12,x=0.98,y=0.95,dy=0.05,weight='bold'):
+def add_identifier(ax,idx,pdata,fs=12,x=0.98,y=0.95,dy=0.07,weight='bold'):
 
-	ax.text(x,y,pdata['agn']['objname'][idx],fontsize=fs,transform=ax.transAxes,ha='left',weight=weight)
-
+	ax.text(x,y,pdata['agn']['objname'][idx],fontsize=fs,transform=ax.transAxes,ha='right',weight=weight)
 
 	mid = pdata['agn']['model_pars']['fagn']['q50'][idx]
 	fmt = "{{0:{0}}}".format(".2f").format
@@ -140,24 +139,18 @@ def add_identifier(ax,idx,pdata,fs=12,x=0.98,y=0.95,dy=0.05,weight='bold'):
 		               fmt(pdata['agn']['model_pars']['fagn']['q84'][idx]-mid))
 	text = "{0} = {1}".format(r'f$_{\mathrm{AGN}}$=', text)
 
-	#ax.text(x,y-dy,text,fontsize=fs,transform=ax.transAxes,ha='right')
+	ax.text(x,y-dy,text,fontsize=fs,transform=ax.transAxes,ha='right')
 
 def plot_sfh(pdata,idx_plot,outfolder):
 
 	### open figure
 	fig, ax = plt.subplots(5,2, figsize=(7, 15))
-	fig, ax = plt.subplots(1,1, figsize=(7, 7))
 
 	ax = np.ravel(ax)
-	fs = 24
+	fs = 10
 
 	### begin loop
 	for ii,idx in enumerate(idx_plot):
-
-		if ii != 2:
-			continue
-
-		ii = 0
 
 		pmin,pmax = np.inf, -np.inf
 		for key in pdata.keys():
@@ -172,8 +165,8 @@ def plot_sfh(pdata,idx_plot,outfolder):
 
 			### labels and ranges
 			pmin,pmax = np.min([pmin,perc.min()]), np.max([pmax,perc.max()])
-			ax[ii].set_ylabel(r'SFR [M$_{\odot}$/yr]',fontsize=fs)
-			ax[ii].set_xlabel('lookback time [Gyr]',fontsize=fs)
+			ax[ii].set_ylabel(r'SFR [M$_{\odot}$/yr]',fontsize=fs*1.5)
+			ax[ii].set_xlabel('lookback time [Gyr]',fontsize=fs*1.5)
 
 			ax[ii].set_xscale('log',nonposx='clip',subsx=(1,3))
 			ax[ii].xaxis.set_minor_formatter(minorFormatter)
@@ -183,13 +176,11 @@ def plot_sfh(pdata,idx_plot,outfolder):
 			ax[ii].yaxis.set_minor_formatter(minorFormatter)
 			ax[ii].yaxis.set_major_formatter(majorFormatter)
 
-			add_identifier(ax[ii],idx,pdata,x=0.04,y=0.93, dy=0.06,fs=fs,weight='bold')
-			add_txt(ax[ii],pdata,fs=fs,x=0.96,y=0.93,dy=0.07,weight='bold')
+			add_identifier(ax[ii],idx,pdata, fs=fs,weight='bold')
+			add_txt(ax[ii],pdata,fs=fs,weight='bold')
 
 		ax[ii].set_ylim(pmin*0.6,pmax*3)
 		ax[ii].set_xlim(t.min()*30,t.max())
-
-		break
 
 	plt.tight_layout(w_pad=0.5,h_pad=0.3)
 	plt.savefig(outfolder+'sfh_comparison.png',dpi=150)

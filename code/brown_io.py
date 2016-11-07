@@ -537,6 +537,26 @@ def write_eufrasio_data():
 				fmt = "{:.3e}"
 				f.write(fmt.format(outdict_mags[key][i,jj])+' ')
 
+def write_bestfit_photometry():
+
+	import threed_dutils
+
+	objnames = ['NGC 0628', 'NGC 2798', 'NGC 4559', 'NGC 4579', 'NGC 7331']
+
+	# write out observables
+	with open('bfit_phot.dat', 'w') as f:
+
+		for obj in objnames:
+			sample_results, powell_results, model = threed_dutils.load_prospector_data(None,objname=obj,runname='brownseds_np')
+		
+			fnames = [filt.name for filt in sample_results['obs']['filters']]
+			bfit_maggies = sample_results['bfit']['mags']
+
+			f.write('# '+obj+'\n')
+			f.write('# '+" ".join(fnames)+'\n')
+			for mag in bfit_maggies: f.write("{:.3e}".format(mag)+' ')
+			f.write('\n')
+
 
 def write_kinney_txt():
 	
