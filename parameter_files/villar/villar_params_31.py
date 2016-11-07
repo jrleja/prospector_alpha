@@ -4,7 +4,6 @@ from prospect.models import priors, sedmodel
 from prospect.sources import StepSFHBasis
 from sedpy import observate
 from astropy.cosmology import WMAP9
-from astropy.io import fits
 tophat = priors.tophat
 logarithmic = priors.logarithmic
 
@@ -442,10 +441,15 @@ def load_sps(**extras):
 def load_model(objname='',datname='', agelims=[], **extras):
 
     ###### REDSHIFT ######
-    hdulist = fits.open(datname)
-    idx = hdulist[1].data['Name'] == objname
-    zred =  hdulist[1].data['cz'][idx][0] / 3e5
-    hdulist.close()
+    with open(datname, 'r') as f:
+        hdr = f.readline()
+
+    hdr = hdr[1:-2].split(',')
+    dtype = np.dtype([(hdr[0],'S40')] + [(n, np.float) for n in hdr[1:]])
+    dat = np.loadtxt(datname, comments = '#', delimiter=',', dtype = dtype)
+    obj_ind = np.where(dat['Gal_Name'] == objname)[0][0]
+    zred = dat['Redshift'][obj_ind]
+    print 1/0
 
     #### CALCULATE TUNIV #####
     tuniv = WMAP9.age(zred).value
