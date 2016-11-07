@@ -25,6 +25,6 @@ do
   echo $LINE
   
   # find line with "'objname': '9'", replace 9 with $i
-  sed -ie "s/\'objname\':\'Arp 256 N\'/\'objname\':\'$LINE\'/g" $PARAMFOLDER$PARAMBASE"_$i"$PARAMEXT
+  sed -ie "s/\'objname\':\'2MASX J00445922-0853228\'/\'objname\':\'$LINE\'/g" $PARAMFOLDER$PARAMBASE"_$i"$PARAMEXT
   rm $PARAMFOLDER$PARAMBASE"_$i"$PARAMEXT"e"
 done

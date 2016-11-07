@@ -31,7 +31,7 @@ run_params = {'verbose':True,
               'agelims': [0.0,8.0,8.5,9.0,9.5,9.8,10.0],
               # Data info
               'datname':os.getenv('APPS')+'/threedhst_bsfh/data/ashley/galaxy_flux.dat',
-              'objname':'2MASX J00445922-0853228',
+              'objname':'CGCG 249-011',
               }
 run_params['outfile'] = run_params['outfile']+'_'+run_params['objname']
 
