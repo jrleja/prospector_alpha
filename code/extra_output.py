@@ -173,9 +173,7 @@ def calc_extra_quantities(sample_results, ncalc=2000, ir_priors=True):
 	spec = np.zeros(shape=(len(sps.wavelengths),ncalc))
 
 	sample_flatchain = flatchain[:ncalc,:]
-	sample_results = measure_spire_phot(sample_results, sample_flatchain, sps)
-
-	return sample_results
+	#sample_results = measure_spire_phot(sample_results, sample_flatchain, sps)
 
 	######## posterior sampling #########
 	for jj in xrange(ncalc):
@@ -437,7 +435,6 @@ def post_processing(param_name, add_extra=True, **extras):
 		mcmc_filename, model_filename = threed_dutils.create_prosp_filename(outname)
 		pickle.dump(sample_results,open(mcmc_filename, "wb"))
 
-		print 1/0
 		### MAKE PLOTS HERE
 		try:
 			threedhst_diag.make_all_plots(sample_results=sample_results,filebase=outname,outfolder=outfolder,param_name=param_name)

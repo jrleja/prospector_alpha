@@ -597,6 +597,20 @@ def generate_basenames(runname):
 			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+runname+'_'+ids[jj])
 			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
 
+	elif 'villar' in runname:
+
+		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/ashley/villar_list.dat"
+		ids = np.loadtxt(id_list, dtype='|S60',delimiter=',')
+		ngals = len(ids)
+
+		parm_basename = runname+"_params"
+		ancilname=None
+
+		for jj in xrange(ngals):
+			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+runname+'_'+ids[jj])
+			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
+
+
 	else:
 
 		id_list = os.getenv('APPS')+"/threedhst_bsfh/data/"+runname+".ids"
