@@ -459,7 +459,7 @@ def write_villar_data():
 		for jj in xrange(ngals):
 			f.write(names[jj]+' ')
 			for key in outdict.keys():
-				fmt = "{:.2e}"
+				fmt = "{:.6e}"
 				f.write(fmt.format(outdict[key][0,jj]) + ' ' + fmt.format(outdict[key][1,jj]) + ' ' + fmt.format(outdict[key][2,jj])+' ')
 			f.write('\n')
 
