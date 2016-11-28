@@ -433,7 +433,7 @@ def write_villar_data():
 
 		names.append("_".join(sample_results['run_params']['objname'].split(' ')))
 
-	outmod = '/Users/joel/code/python/threedhst_bsfh/data/ashley/ashley_out.dat'
+	outmod = os.getenv('APPS')+'/threedhst_bsfh/data/ashley/ashley_out.dat'
 
 	outdict ={
 			  'mass': mass,
