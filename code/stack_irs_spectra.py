@@ -81,8 +81,16 @@ def prep_spectra(alldata,nbins=None,log_qpah=False,equal_n_bins=True):
 
 def label_pah(ax):
 
-	lam = [6.2,7.7,8.3,8.6,11.3,12.6,17]
-	for ii in xrange(len(lam)): ax.plot([lam[ii],lam[ii]],[0,1e5],linestyle='--',lw=2,color='k')
+	lam = [6.2,7.7,8.6,11.3,12.6,17] #8.3
+	#for ii in xrange(len(lam)): ax.plot([lam[ii],lam[ii]],[0,1e5],linestyle='--',lw=2,color='k')
+
+	neb_color = '0.7'
+	alpha = 0.7
+	delta = 0.025
+	for wave in lam:
+		ax.fill_between([wave*(1-delta),wave*(1+delta)], [0.,0.], [1e5,1e5], 
+	                    color=neb_color,
+	                    alpha=alpha)
 
 def cloudy_spectrum(ax):
 
@@ -106,6 +114,7 @@ def cloudy_spectrum(ax):
 	spec_neb_smooth = smooth_spectrum(sps.wavelengths[in_plot], spec_neb[in_plot], 3500)
 	spec_neb_smooth *= 1e5 / spec_neb_smooth.max()
 
+	'''
 	neb_color = '0.7'
 	alpha = 0.7
 	ax.fill_between(sps.wavelengths[in_plot]/1e4, np.zeros_like(spec_neb_smooth), spec_neb_smooth, 
@@ -115,19 +124,26 @@ def cloudy_spectrum(ax):
 	### label H2 + [ArII] (second is in cloudy but very small)
 	ax.fill_between([9.55,9.85],[0,0],[1,1],color=neb_color,alpha=alpha)
 	ax.fill_between([6.8,7.1],[0,0],[1,1],color=neb_color,alpha=alpha)
+	'''
+	lines = ['[ArII]',r'H$_2$','[SIV]','[NeIII]','[SIII]']
+	lam = [6.95,9.7,10.45,15.5,18.7]
+	# removed because they're too weak, just distracting
+	#lines = ['[ArIII]','[NeII]']
+	#lam = [9.0,12.8]
 
-	lines = ['[ArII]','[ArIII]',r'H$_2$','[SIV]','[NeII]','[NeIII]','[SIII]']
-	lam = [6.95,9.0,9.7,10.45,12.8,15.5,18.7]
 	for ii in xrange(len(lines)):
-		ax.text(lam[ii],0.14,lines[ii],
-			    ha='center',fontsize=9.5)
+		ax.text(lam[ii]*1.008,0.14,lines[ii],
+			    ha='left',fontsize=9.5)
+	for ii in xrange(len(lam)): ax.plot([lam[ii],lam[ii]],[0,1e5],linestyle='--',lw=1.5,color='k')
 
 
-def plot_stacks(outfolder=None,alldata=None,runname=None,log_qpah=False,smooth=True,add_cloudy_spectrum=True):
+def plot_stacks(outfolder=None,alldata=None,runname='brownseds_np',log_qpah=False,
+	            smooth=True,add_cloudy_spectrum=True):
 
 	#### load data if necessary
 	if alldata is None:
 		alldata = brown_io.load_alldata(runname=runname)
+	if outfolder is None:
 		outfolder = os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/pcomp/'
 
 	if log_qpah:
@@ -172,6 +188,8 @@ def plot_stacks(outfolder=None,alldata=None,runname=None,log_qpah=False,smooth=T
 	ax.set_xlim(5.8,30.5)
 
 	plt.savefig(outfolder+'irs_stack.png')
+	os.system('open '+outfolder+'irs_stack.png')
+
 	plt.close()
 
 

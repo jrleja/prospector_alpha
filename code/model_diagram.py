@@ -519,7 +519,7 @@ def qpah_xplot(ax, par, par_idx):
 	ax.xaxis.set_minor_formatter(minorFormatter)
 	ax.xaxis.set_major_formatter(majorFormatter)
 	ax.set_ylim(1e-6,1e-2)
-	ax.set_ylabel('dn/d(radius) $\times$ volume' '\n' '[carbon dust]')
+	ax.set_ylabel('dn/d(radius) x volume' '\n' '[carbon dust]')
 	make_ticklabels_invisible(ax,showx=True)
 	ax.set_xlabel(r'grain radius [$\AA$]')
 
@@ -576,10 +576,6 @@ def plot_sed(ax,ax_res,par_idx,par=None,txtlabel=None,fmt="{:.2e}",init=None):
 	ax_res.xaxis.set_major_formatter(majorFormatter)
 
 def main_plot():
-
-	#### I/O
-	fig1_out = '/Users/joel/code/python/threedhst_bsfh/plots/brownseds/pcomp/diagram1.png'
-	fig2_out = '/Users/joel/code/python/threedhst_bsfh/plots/brownseds/pcomp/diagram2.png'
 
 	#### open figures
 	fig1 = plt.figure(figsize = (37.5,37.5))

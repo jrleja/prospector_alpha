@@ -626,7 +626,7 @@ def generate_basenames(runname):
 
 	return filebase,parm,ancilname
 
-def chop_chain(chain):
+def chop_chain(chain,nochop=False):
 	'''
 	simple placeholder
 	will someday replace with a test for convergence to determine where to chop
@@ -636,6 +636,8 @@ def chop_chain(chain):
 	JRL 6/8/15
 	'''
 	nchop=4./3
+	if nochop:
+		nchop=np.inf
 
 	if len(chain.shape) == 3:
 		flatchain = chain[:,int(chain.shape[1]/nchop):,:]

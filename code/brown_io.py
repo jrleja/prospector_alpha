@@ -392,6 +392,78 @@ def plot_brown_coordinates():
 
 	plt.show()
 
+def write_villar_data():
+	
+	from threed_dutils import generate_basenames, load_prospector_data
+
+	# All I need is UV (intrinsic and observed), and mid-IR fluxes, sSFRs, SFRs, Mstars, and tau_V	
+	filebase, parm_basename, ancilname = generate_basenames('villar')
+	ngals = len(filebase)
+	mass, sfr100, ssfr100, tauv, met = [np.zeros(shape=(3,ngals)) for i in xrange(5)]
+	names = []
+	for jj in xrange(ngals):
+		sample_results, powell_results, model = load_prospector_data(filebase[jj])
+		
+		if jj == 0:
+			mass_idx = np.array(sample_results['quantiles']['parnames']) == 'logmass'
+			tauv_idx = np.array(sample_results['quantiles']['parnames']) == 'dust2'
+			met_idx = np.array(sample_results['quantiles']['parnames']) == 'logzsol'
+			sfr100_idx = sample_results['extras']['parnames'] == 'sfr_100'
+			ssfr100_idx = sample_results['extras']['parnames'] == 'ssfr_100'
+
+		mass[:,jj] = [sample_results['quantiles']['q50'][mass_idx],
+					  sample_results['quantiles']['q84'][mass_idx],
+					  sample_results['quantiles']['q16'][mass_idx]]
+		print 1/0
+		sfr100[:,jj] = [sample_results['extras']['q50'][sfr100_idx],
+					    sample_results['extras']['q84'][sfr100_idx],
+					    sample_results['extras']['q16'][sfr100_idx]]
+		
+		ssfr100[:,jj] = [sample_results['extras']['q50'][ssfr100_idx],
+					     sample_results['extras']['q84'][ssfr100_idx],
+					     sample_results['extras']['q16'][ssfr100_idx]]
+		
+		tauv[:,jj] = [sample_results['quantiles']['q50'][tauv_idx],
+					  sample_results['quantiles']['q84'][tauv_idx],
+					  sample_results['quantiles']['q16'][tauv_idx]]
+
+		met[:,jj] = [sample_results['quantiles']['q50'][met_idx],
+					    sample_results['quantiles']['q84'][met_idx],
+					    sample_results['quantiles']['q16'][met_idx]]
+
+		names.append("_".join(sample_results['run_params']['objname'].split(' ')))
+
+	outmod = '/Users/joel/code/python/threedhst_bsfh/data/ashley/ashley_out.dat'
+
+	outdict ={
+			  'mass': mass,
+			  'sfr100': sfr100,
+			  'ssfr100': ssfr100,
+			  'tauv': tauv,
+			  'logzsol': met,
+			 }
+
+	# write out model parameters
+	# logmass is in log(M/Msun), Chabrier IMF
+	# sfr100 is in Msun/yr
+	# ssfr100 is in yr^-1
+	# tauv, tautot are in optical depths
+	# luv, lirs are in LSUN
+	with open(outmod, 'w') as f:
+		
+		### header ###
+		hdr = '# objname '
+		for key in outdict.keys(): hdr += key+' '+key+'_84th '+key+'_16th '
+		f.write(hdr+'\n')
+
+		for jj in xrange(ngals):
+			f.write(names[jj]+' ')
+			for key in outdict.keys():
+				fmt = "{:.2e}"
+				f.write(fmt.format(outdict[key][0,jj]) + ' ' + fmt.format(outdict[key][1,jj]) + ' ' + fmt.format(outdict[key][2,jj])+' ')
+			f.write('\n')
+
+
 def write_eufrasio_data():
 
 	from threed_dutils import generate_basenames, load_prospector_data

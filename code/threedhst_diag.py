@@ -36,7 +36,10 @@ def subcorner(sample_results,  sps, model,
 
     # pull out the parameter names and flatten the thinned chains
     parnames = np.array(sample_results['model'].theta_labels())
-    plotflatchain = threed_dutils.chop_chain(plotchain)
+    if plotchain.shape[1] == sample_results['run_params']['niter']:
+    	plotflatchain = threed_dutils.chop_chain(plotchain)
+    else:
+    	plotflatchain = threed_dutils.chop_chain(plotchain,nochop=True)
 
     # restrict to parameters you want to show
     if showpars is not None:
@@ -328,8 +331,11 @@ def create_plotquant(sample_results, logplot = ['mass'], truths=None):
 	creates plottable versions of chain and sets up new plotnames
 	'''
 
-	# set up plot chain, parnames
-	plotchain = copy.deepcopy(sample_results['chain'])
+	#### reconstruct chopped chain!
+	niter_new = sample_results['flatchain'].shape[0] / sample_results['run_params']['nwalkers']
+	plotchain = sample_results['flatchain'].reshape(sample_results['run_params']['nwalkers'],
+		                                            niter_new,
+		                                            sample_results['flatchain'].shape[1])
 	parnames = np.array(sample_results['model'].theta_labels())
 
 	# properly define timescales in certain parameters
@@ -559,7 +565,7 @@ def sed_figure(outname = None, truths = None,
 			   labels = ['model posterior'],
 			   sfh_loc = [0.19,0.7,0.14,0.17],
 			   model_photometry = True, main_color=['black'],
-			   fir_extra = False, ml_spec=False,
+			   fir_extra = False, ml_spec=True,
                **kwargs):
 	"""
 	Plot the photometry for the model and data (with error bars), and
@@ -809,13 +815,14 @@ def make_all_plots(filebase=None,
 	except KeyError:
 		truths=None
 
-    # chain plot (ONLY WORKS IF WE STILL HAVE CHAIN)
-	if plt_chain and sample_results['chain'] is not None: 
-		print 'MAKING CHAIN PLOT'
-
+	if 'extents' not in sample_results.keys():
 		# define nice plotting quantities
 		plotnames, plotchain = create_plotquant(sample_results, truths=truths)
 		sample_results['extents'] = return_extent(sample_results,plotchain=plotchain)
+
+    # chain plot (ONLY WORKS IF WE STILL HAVE CHAIN)
+	if plt_chain and sample_results['chain'] is not None: 
+		print 'MAKING CHAIN PLOT'
 
 		show_chain(sample_results, plotnames=plotnames,plotchain=plotchain,
 	               outname=outfolder+objname+'.chain.png',
