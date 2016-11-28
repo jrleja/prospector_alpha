@@ -414,7 +414,7 @@ def write_villar_data():
 		mass[:,jj] = [sample_results['quantiles']['q50'][mass_idx],
 					  sample_results['quantiles']['q84'][mass_idx],
 					  sample_results['quantiles']['q16'][mass_idx]]
-		print 1/0
+
 		sfr100[:,jj] = [sample_results['extras']['q50'][sfr100_idx],
 					    sample_results['extras']['q84'][sfr100_idx],
 					    sample_results['extras']['q16'][sfr100_idx]]
