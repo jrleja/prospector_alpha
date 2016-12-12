@@ -17,13 +17,13 @@ def vega_conversions(fname):
 
 	# mVega = mAB-delta_m
 	# Table 5, http://wise2.ipac.caltech.edu/docs/release/prelim/expsup/sec4_3g.html#PhotometricZP
-	if fname=='wise_w1':
+	if fname.lower().replace(' ','_')=='wise_w1':
 		return -2.683
-	if fname=='wise_w2':
+	if fname.lower().replace(' ','_')=='wise_w2':
 		return -3.319
-	if fname=='wise_w3':
+	if fname.lower().replace(' ','_')=='wise_w3':
 		return -5.242
-	if fname=='wise_w4':
+	if fname.lower().replace(' ','_')=='wise_w4':
 		return -6.604
 
 def collate_data(alldata):

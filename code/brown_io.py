@@ -21,6 +21,12 @@ def load_alldata(runname='brownseds'):
 		alldata=pickle.load(f)
 	return alldata
 
+def save_alldata(alldata,runname='brownseds'):
+
+	output = outpickle+'/'+runname+'_alldata.pickle'
+	with open(outname, "wb") as out:
+		pickle.dump(model_store, out)
+
 def load_moustakas_data(objnames = None):
 
 	'''
