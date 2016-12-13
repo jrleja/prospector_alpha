@@ -29,3 +29,5 @@ to_fit = (dat['twomass_Ks'] > 0) & \
 with open('villar_list.dat', 'w') as f:
 	for name in dat['Gal_Name'][to_fit]:
 		f.write(name+'\n')
+	for name in dat['Gal_Name'][~to_fit]:
+		f.write(name+'\n')
