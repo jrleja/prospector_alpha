@@ -450,7 +450,6 @@ def load_model(objname='',datname='', agelims=[], **extras):
     dat = np.loadtxt(datname, comments = '#', delimiter=',', dtype = dtype)
     obj_ind = np.where(dat['Gal_Name'] == objname)[0][0]
     zred = dat['Redshift'][obj_ind]
-    print zred
 
     #### CALCULATE TUNIV #####
     tuniv = WMAP9.age(zred).value
