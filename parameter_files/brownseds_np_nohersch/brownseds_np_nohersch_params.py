@@ -561,15 +561,10 @@ class FracSFH(StepSFHBasis):
 
         # Now normalize the weights in each bin by the massfrac parameter, and sum
         # over bins.
+        # note that because we don't divide by sps.bin_mass_fraction,
+        # we are implicitly working in mass formed, NOT in stellar mass
         bin_masses = np.array(self.params['sfr_fraction'])
         bin_masses = np.append(bin_masses,(1-np.sum(self.params['sfr_fraction'])))*self._time_per_bin
-        if np.all(self.params.get('mass_units', 'mstar') == 'mstar'):
-            # Convert from mstar to mformed for each bin.  We have to do this
-            # here as well as in get_spectrum because the *relative*
-            # normalization in each bin depends on the units, as well as the
-            # overall normalization.
-            bin_masses /= self.bin_mass_fraction
-        w = (bin_masses[:, None] * self._bin_weights).sum(axis=0)
 
         return w
 

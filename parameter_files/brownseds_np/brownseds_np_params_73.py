@@ -127,7 +127,7 @@ def translate_filters(bfilters, full_list = False):
     }
 
     if full_list:
-        return translate.values()
+        return translate_pfsps.values()
     else:
         return np.array([translate[f] for f in bfilters]), np.array([translate_pfsps[f] for f in bfilters])
 
@@ -480,7 +480,7 @@ model_params.append({'name': 'mass_units', 'N': 1,
 #### resort list of parameters 
 #### so that major ones are fit first
 parnames = [m['name'] for m in model_params]
-fit_order = ['logmass','sfr_fraction','dust2', 'logzsol', 'dust_index', 'dust1', 'duste_qpah', 'duste_gamma', 'duste_umin']
+fit_order = ['logmass','sfr_fraction', 'dust2', 'logzsol', 'dust_index', 'dust1', 'duste_qpah', 'duste_gamma', 'duste_umin']
 tparams = [model_params[parnames.index(i)] for i in fit_order]
 for param in model_params: 
     if param['name'] not in fit_order:
@@ -521,10 +521,6 @@ class BurstyModel(sedmodel.SedModel):
                 dust2 = theta[start:end]
                 if dust1/1.5 > dust2:
                     return -np.inf
-                '''
-                if dust1 < 0.5*dust2:
-                    return -np.inf
-                '''
 
         # sum of SFH fractional bins <= 1.0
         if 'sfr_fraction' in self.theta_index:
@@ -561,14 +557,11 @@ class FracSFH(StepSFHBasis):
 
         # Now normalize the weights in each bin by the massfrac parameter, and sum
         # over bins.
+        # note that because we don't divide by sps.bin_mass_fraction,
+        # we are implicitly working in mass formed, NOT in stellar mass
         bin_masses = np.array(self.params['sfr_fraction'])
         bin_masses = np.append(bin_masses,(1-np.sum(self.params['sfr_fraction'])))*self._time_per_bin
-        if np.all(self.params.get('mass_units', 'mstar') == 'mstar'):
-            # Convert from mstar to mformed for each bin.  We have to do this
-            # here as well as in get_spectrum because the *relative*
-            # normalization in each bin depends on the units, as well as the
-            # overall normalization.
-            bin_masses /= self.bin_mass_fraction
+
         w = (bin_masses[:, None] * self._bin_weights).sum(axis=0)
 
         return w

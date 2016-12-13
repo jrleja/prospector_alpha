@@ -191,7 +191,7 @@ def find_sfh_params(model,theta,obs,sps,sm=None):
 	iterable = [(str_sfh_parms[ii],sfh_out[ii]) for ii in xrange(len(sfh_out))]
 	out = {key: value for (key, value) in iterable}
 
-	# if we pass sm from a prior model call,
+	# if we pass stellar mass from a prior model call,
 	# we don't have to calculate it here
 	if sm is None and out['mass'].shape[0] == 1:
 		_,_,sm_new=model.sed(theta, obs, sps=sps)
@@ -200,30 +200,16 @@ def find_sfh_params(model,theta,obs,sps,sm=None):
 		except AttributeError as e: 
 			sm = sm_new
 	
-	# create mass fractions
+	### create mass fractions for nonparametric SFHs
 	if out['sfr_fraction'].shape[0] != 0:
 		out['sfr_fraction_full'] = np.concatenate((out['sfr_fraction'],np.atleast_1d(1-out['sfr_fraction'].sum())))
-		out['mass_fraction'] = out['sfr_fraction_full']*sps._time_per_bin / sps.bin_mass_fraction
+		out['mass_fraction'] = out['sfr_fraction_full']*sps._time_per_bin
 		out['mass_fraction'] /= out['mass_fraction'].sum()
 
-	### NEW, for log(M)
-	# this is in mformed
-	# this nomenclature is shit, but it conforms to previous nomenclature
-	if out['mass'].shape[0] > 1:
-		out['mformed_fraction'] = out['mass'] #/ sm
-		out['mass_fraction'] = out['mformed_fraction'] / out['mformed_fraction'].sum()
+	# Need this because mass is 
+	# current mass, not total mass formed!
+	out['mformed'] = out['mass'] / sm
 
-	### NEW, for logSSFR_bin
-	# this nomenclature is shit, but it conforms to previous nomenclature
-	if out['logsfr'].shape[0] != 0:
-		out['mass_fraction'] = (10**out['logsfr']) * sps._time_per_bin  # this should be mformed(bin)
-		out['mass_fraction'] /= out['mass_fraction'].sum() # this is fractional
-		out['mformed'] = out['mass']
-		out['mass'] = out['mformed'] * sm
-	else:
-		# Need this because mass is 
-		# current mass, not total mass formed!
-		out['mformed'] = out['mass'] / sm
 	return out
 
 def test_likelihood(sps,model,obs,thetas,param_file):
