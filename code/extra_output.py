@@ -402,23 +402,19 @@ def post_processing(param_name, add_extra=True, **extras):
 	Driver. Loads output, makes all plots for a given galaxy.
 	'''
 
-	print 'begun post-processing'
+	from brown_io import load_prospector_data, create_prosp_filename
+
+	# I/O
 	parmfile = model_setup.import_module_from_file(param_name)
 	outname = parmfile.run_params['outfile']
 	outfolder = os.getenv('APPS')+'/threedhst_bsfh/plots/'+outname.split('/')[-2]+'/'
 
-	# thin and chop the chain?
-	thin=1
-	chop_chain=1.666
-
-	# make sure the output folder exists
-	try:
+	# check for output folder, create if necessary
+	if not os.path.isdir(outfolder):
 		os.makedirs(outfolder)
-	except OSError:
-		pass
 
 	try:
- 		sample_results, powell_results, model = threed_dutils.load_prospector_data(outname)
+ 		sample_results, powell_results, model = load_prospector_data(outname)
  	except AttributeError:
  		print 'failed to load '+param_name
  		return
@@ -432,7 +428,7 @@ def post_processing(param_name, add_extra=True, **extras):
 		sample_results = calc_extra_quantities(sample_results,**extras)
 		
 		sample_results['chain'] = None # dump the chain...
-		mcmc_filename, model_filename = threed_dutils.create_prosp_filename(outname)
+		mcmc_filename, model_filename = create_prosp_filename(outname)
 		pickle.dump(sample_results,open(mcmc_filename, "wb"))
 
 		### MAKE PLOTS HERE
@@ -444,7 +440,7 @@ def post_processing(param_name, add_extra=True, **extras):
 
 		### SAVE OUTPUT HERE
 		sample_results['chain'] = None # dump the chain...
-		mcmc_filename, model_filename = threed_dutils.create_prosp_filename(outname)
+		mcmc_filename, model_filename = create_prosp_filename(outname)
 		pickle.dump(sample_results,open(mcmc_filename, "wb"))
 
 if __name__ == "__main__":

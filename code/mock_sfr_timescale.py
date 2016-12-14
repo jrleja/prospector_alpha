@@ -6,6 +6,7 @@ import magphys_plot_pref
 import pickle
 from matplotlib.ticker import MaxNLocator
 from corner import quantile
+from brown_io import load_prospector_data
 
 minsfr = 1e-4
 minssfr = 1e-15
@@ -88,7 +89,7 @@ def collate_data(runname='ha_80myr',outpickle=None):
 
 		outdat = {}
 		try:
-			sample_results, powell_results, model = threed_dutils.load_prospector_data(filebase[jj])
+			sample_results, powell_results, model = load_prospector_data(filebase[jj])
 		except:
 			print 'failed to load number ' + str(int(jj))
 			continue

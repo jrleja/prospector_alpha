@@ -27,6 +27,56 @@ def save_alldata(alldata,runname='brownseds'):
 	with open(outname, "wb") as out:
 		pickle.dump(model_store, out)
 
+def load_prospector_data(filebase,no_sample_results=False,objname=None,runname=None,hdf5=False):
+
+	'''
+	loads Prospector chains
+	filebase: string describing the location + objname. automatically finds 
+	no_sample_results: only load the Powell results and the model
+	objname and runname: if both of these are supplied, don't need to supply filebase
+	hdf5: load HDF5 output
+	'''
+
+	from prospect.io import read_results
+
+	#### shortcut: pass None to filebase and objname + runname keywords
+	if (objname is not None) & (runname is not None):
+		filebase = os.getenv('APPS')+'/threedhst_bsfh/results/'+runname+'/'+runname+'_'+objname
+	mcmc_filename, model_filename, hdf5_filename = create_prosp_filename(filebase)
+
+	if hdf5:
+
+	else:
+
+		if no_sample_results:
+			model, powell_results = read_results.read_model(model_filename)
+			return powell_results, model
+		else:
+			sample_results, powell_results, model = read_results.read_pickles(mcmc_filename, model_file=model_filename,inmod=None)
+			return sample_results, powell_results, model
+
+def create_prosp_filename(filebase):
+
+	# find most recent output file
+	# with the objname
+	folder = "/".join(filebase.split('/')[:-1])
+	filename = filebase.split("/")[-1]
+	files = [f for f in os.listdir(folder) if "_".join(f.split('_')[:-2]) == filename]	
+	times = [f.split('_')[-2] for f in files]
+
+	# if we found no files, skip this object
+	if len(times) == 0:
+		print 'Failed to find any files to extract times in ' + folder + ' of form ' + filename
+		return None,None,None
+
+	# generate output
+	mcmc_filename=filebase+'_'+max(times)+"_mcmc"
+	model_filename=filebase+'_'+max(times)+"_model"
+	hdf5_filename=mcmc_filename+'.hdf5'
+
+	return mcmc_filename, model_filename, hdf5_filename
+
+
 def load_moustakas_data(objnames = None):
 
 	'''
@@ -400,7 +450,7 @@ def plot_brown_coordinates():
 
 def write_villar_data():
 	
-	from threed_dutils import generate_basenames, load_prospector_data
+	from threed_dutils import generate_basenames
 
 	# All I need is UV (intrinsic and observed), and mid-IR fluxes, sSFRs, SFRs, Mstars, and tau_V	
 	filebase, parm_basename, ancilname = generate_basenames('villar')
@@ -472,7 +522,7 @@ def write_villar_data():
 
 def write_eufrasio_data():
 
-	from threed_dutils import generate_basenames, load_prospector_data
+	from threed_dutils import generate_basenames
 
 	# All I need is UV (intrinsic and observed), and mid-IR fluxes, sSFRs, SFRs, Mstars, and tau_V	
 	filebase, parm_basename, ancilname = generate_basenames('brownseds_np')
@@ -625,7 +675,7 @@ def write_bestfit_photometry():
 	with open('bfit_phot.dat', 'w') as f:
 
 		for obj in objnames:
-			sample_results, powell_results, model = threed_dutils.load_prospector_data(None,objname=obj,runname='brownseds_np')
+			sample_results, powell_results, model = load_prospector_data(None,objname=obj,runname='brownseds_np')
 		
 			fnames = [filt.name for filt in sample_results['obs']['filters']]
 			bfit_maggies = sample_results['bfit']['mags']
@@ -643,7 +693,7 @@ def write_kinney_txt():
 	mass, sfr10, sfr100, cloudyha, dmass = [np.zeros(shape=(3,ngals)) for i in xrange(5)]
 	names = []
 	for jj in xrange(ngals):
-		sample_results, powell_results, model = threed_dutils.load_prospector_data(filebase[jj])
+		sample_results, powell_results, model = load_prospector_data(filebase[jj])
 		
 		if jj == 0:
 			sfr10_ind = sample_results['extras']['parnames'] == 'sfr_10'

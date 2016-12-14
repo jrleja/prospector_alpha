@@ -391,21 +391,20 @@ def collate_data(runname_nh=None, runname_h=None, runname_nh_weighted=None,outpi
 
 		#### load no herschel runs
 		try:
-			sample_results_nh, powell_results_nh, model_nh = threed_dutils.load_prospector_data(filebase_nh[jj])
+			sample_results_nh, powell_results_nh, model_nh = brown_io.load_prospector_data(filebase_nh[jj])
 		except:
 			print 'failed to load number ' + str(int(jj))
 			continue
 		try:
-			sample_results_nh_weighted, powell_results_nh_weighted, model_nh_weighted = threed_dutils.load_prospector_data(filebase_nh_weighted[jj])
+			sample_results_nh_weighted, powell_results_nh_weighted, model_nh_weighted = brown_io.load_prospector_data(filebase_nh_weighted[jj])
 		except:
 			print 'failed to load number ' + str(int(jj))
 			continue
 
-
 		### match to filebase_nh
 		name = filebase_nh[jj].split('_')[-1]
 		match = [s for s in filebase_h if name in s][0]
-		sample_results_h, powell_results_h, model_h = threed_dutils.load_prospector_data(match)
+		sample_results_h, powell_results_h, model_h = brown_io.load_prospector_data(match)
 
 		### save CLOUDY-marginalized Halpha
 		try: 
@@ -413,7 +412,7 @@ def collate_data(runname_nh=None, runname_h=None, runname_nh_weighted=None,outpi
 		except KeyError:
 			param_name = os.getenv('APPS')+'/threed'+sample_results_nh['run_params']['param_file'].split('/threed')[1]
 			post_processing(param_name, add_extra=True)
-			sample_results_nh, powell_results_nh, model_nh = threed_dutils.load_prospector_data(filebase_nh[jj])
+			sample_results_nh, powell_results_nh, model_nh = brown_io.load_prospector_data(filebase_nh[jj])
 
 		ha_em = linenames == 'Halpha'
 		outdat_nh['ha_q50'] = sample_results_nh['model_emline']['flux']['q50'][ha_em]

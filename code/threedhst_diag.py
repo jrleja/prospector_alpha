@@ -10,6 +10,7 @@ from matplotlib.ticker import MaxNLocator
 from prospect.models import model_setup
 import copy
 from magphys_plot_pref import jLogFormatter
+from brown_io import load_prospector_data
 
 plt.ioff() # don't pop up a window for each plot
 
@@ -793,12 +794,12 @@ def make_all_plots(filebase=None,
 
 	if sample_results is None:
 		try:
-			sample_results, powell_results, model = threed_dutils.load_prospector_data(filebase)
+			sample_results, powell_results, model = load_prospector_data(filebase)
 		except TypeError:
 			return
 	else: # if we already have sample results, but want powell results
 		try:
-			powell_results, model = threed_dutils.load_prospector_data(filebase,no_sample_results=True)
+			powell_results, model = load_prospector_data(filebase,no_sample_results=True)
 		except TypeError:
 			return	
 

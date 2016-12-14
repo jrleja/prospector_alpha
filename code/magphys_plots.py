@@ -822,7 +822,7 @@ def collate_data(filebase=None,
 
 	# attempt to load data
 	try:
-		sample_results, powell_results, model = threed_dutils.load_prospector_data(filebase)
+		sample_results, powell_results, model = brown_io.load_prospector_data(filebase)
 	except AttributeError:
 		print 'failed to load ' + filebase
 		return None
@@ -1084,7 +1084,7 @@ def add_sfr_info(runname=None, outfolder=None):
 	for ii,dat in enumerate(alldata):
 
 		#### load up spec by generating it from model
-		sample_results, powell_results, model = threed_dutils.load_prospector_data(filebase[ii])
+		sample_results, powell_results, model = brown_io.load_prospector_data(filebase[ii])
 		maxprob = sample_results['bfit']['maxprob_params']
 		sample_results['model'].params['zred'] = np.array(0.0)
 		spec,mags,sm = sample_results['model'].mean_model(maxprob, sample_results['obs'], sps=sps) # Lsun / Hz
@@ -1156,7 +1156,7 @@ def add_prosp_mag_info(runname=None):
 
 	filebase, parm_basename, ancilname=threed_dutils.generate_basenames(runname)
 	for ii,dat in enumerate(alldata):
-		sample_results, powell_results, model = threed_dutils.load_prospector_data(filebase[ii])
+		sample_results, powell_results, model = brown_io.load_prospector_data(filebase[ii])
 		magphys = read_magphys_output(objname=dat['objname'])
 		dat = update_model_info(dat, sample_results, magphys)
 		print str(ii)+' done'

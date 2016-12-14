@@ -1905,24 +1905,6 @@ def obs_vs_prosp_balmlines(e_pinfo,hflag,outname='test.png',outname_resid='test.
 	#################
 	keep_idx = brown_quality_cuts.halpha_cuts(e_pinfo)
 
-	'''
-	##### test to see if AGN runs improve the Halpha model--obs comparison
-	objnames = e_pinfo['objnames'][keep_idx]
-	filebase, parm_basename, ancilname=threed_dutils.generate_basenames('brownseds_agn')
-	for i,f in enumerate(filebase):
-		objname = f.split('_')[-1]
-		if objname in objnames: # if the object has a measured Halpha flux...
-			sample_results, powell_results, model = threed_dutils.load_prospector_data(f) # load AGN-on data
-			ha_idx = sample_results['model_emline']['emnames'] == 'Halpha'
-			agn_flux = sample_results['model_emline']['flux']['q50'][ha_idx]
-
-			old_flux = e_pinfo['prosp']['cloudy_ha'][keep_idx,0][objnames == objname]
-			obs_flux = e_pinfo['obs']['f_ha'][keep_idx,0][objnames == objname]
-
-			print objname + ': old is {0}, new is {1}'.format(old_flux[0]/obs_flux[0],agn_flux[0]/obs_flux[0])
-
-	'''
-
 	##### AGN identifiers
 	sfing, composite, agn = return_agn_str(keep_idx)
 	keys = [sfing, composite, agn]
