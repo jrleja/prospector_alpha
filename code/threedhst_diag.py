@@ -562,7 +562,7 @@ def return_sedplot_vars(sample_results, nufnu=True):
 
 def sed_figure(outname = None, truths = None,
 			   colors = ['#1974D2'], sresults = None,
-			   labels = ['model posterior'],
+			   labels = ['spectrum, best-fit'],
 			   sfh_loc = [0.19,0.7,0.14,0.17],
 			   model_photometry = True, main_color=['black'],
 			   fir_extra = False, ml_spec=True,
@@ -604,7 +604,7 @@ def sed_figure(outname = None, truths = None,
 		#### plot maximum probability model
 		if model_photometry:
 			phot.plot(wave_eff, modmags, color=colors[i], 
-				      marker='o', ms=ms, linestyle=' ', label = labels[i], alpha=alpha, 
+				      marker='o', ms=ms, linestyle=' ', label = 'photometry, best-fit', alpha=alpha, 
 				      markeredgewidth=0.7,**kwargs)
 		
 		res.plot(wave_eff, chi, color=colors[i],
@@ -688,7 +688,7 @@ def sed_figure(outname = None, truths = None,
 	### apply plot limits
 	phot.set_xlim(xlim)
 	res.set_xlim(xlim)
-	phot.set_ylim(min(yplot[np.isfinite(yplot)])*0.5,max(yplot[np.isfinite(yplot)])*5)
+	phot.set_ylim(min(yplot[np.isfinite(yplot)])*0.4,max(yplot[np.isfinite(yplot)])*5)
 
 	#### add SFH plot
 	add_sfh_plot(sresults,fig,
@@ -725,23 +725,24 @@ def sed_figure(outname = None, truths = None,
 	z_txt = sresults[0]['model'].params['zred'][0]
 	phot.text(textx, texty, 'z='+"{:.2f}".format(z_txt),
 			  fontsize=10, ha='right',transform = phot.transAxes)
-		
+
 	# extra line
 	res.axhline(0, linestyle=':', color='grey')
-	
+	res.yaxis.set_major_locator(MaxNLocator(5))
+
 	# legend
 	# make sure not to repeat labels
 	from collections import OrderedDict
 	handles, labels = phot.get_legend_handles_labels()
 	by_label = OrderedDict(zip(labels, handles))
 	phot.legend(by_label.values(), by_label.keys(), 
-				loc=1, prop={'size':8},
-			    frameon=False)
+				loc=1, prop={'size':10},
+			    scatterpoints=1)
 			    
     # set labels
 	res.set_ylabel( r'$\chi$')
-	phot.set_ylabel(r'$\nu f_{\nu}$')
-	res.set_xlabel(r'$\lambda_{obs}$ [$\mu$m]')
+	phot.set_ylabel(r'$\nu f_{\nu}$ [Watts/m$^2$]')
+	res.set_xlabel(r'$\lambda_{\mathrm{obs}}$ [$\mu$m]')
 	phot.set_yscale('log',nonposx='clip')
 	phot.set_xscale('log',nonposx='clip')
 	res.set_xscale('log',nonposx='clip',subsx=(2,5))
