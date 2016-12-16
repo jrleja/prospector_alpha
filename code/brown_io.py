@@ -42,18 +42,17 @@ def load_prospector_data(filebase,no_sample_results=False,objname=None,runname=N
 	#### shortcut: pass None to filebase and objname + runname keywords
 	if (objname is not None) & (runname is not None):
 		filebase = os.getenv('APPS')+'/threedhst_bsfh/results/'+runname+'/'+runname+'_'+objname
-	mcmc_filename, model_filename, hdf5_filename = create_prosp_filename(filebase)
+	mcmc_filename, model_filename, postname = create_prosp_filename(filebase)
 
 	if hdf5:
+		mcmc_filename += '.h5'
 
+	if no_sample_results:
+		model, powell_results = read_results.read_model(model_filename)
+		return powell_results, model
 	else:
-
-		if no_sample_results:
-			model, powell_results = read_results.read_model(model_filename)
-			return powell_results, model
-		else:
-			sample_results, powell_results, model = read_results.read_pickles(mcmc_filename, model_file=model_filename,inmod=None)
-			return sample_results, powell_results, model
+		sample_results, powell_results, model = read_results.results_from(mcmc_filename, model_file=model_filename,inmod=None)
+		return sample_results, powell_results, model
 
 def create_prosp_filename(filebase):
 
@@ -72,9 +71,9 @@ def create_prosp_filename(filebase):
 	# generate output
 	mcmc_filename=filebase+'_'+max(times)+"_mcmc"
 	model_filename=filebase+'_'+max(times)+"_model"
-	hdf5_filename=mcmc_filename+'.hdf5'
+	postname = mcmc_filename[:-4]+'post'
 
-	return mcmc_filename, model_filename, hdf5_filename
+	return mcmc_filename, model_filename, postname
 
 
 def load_moustakas_data(objnames = None):

@@ -29,22 +29,21 @@ def calc_emp_ha(mass,sfr,dust1,dust2,dustindex,ncomp=1):
 
 def maxprob_model(sample_results,sps):
 
-	# grab maximum probability, plus the thetas that gave it
-	chopped_prob = threed_dutils.chop_chain(sample_results['lnprobability'])
-	maxprob = chopped_prob.max()
-	probind = chopped_prob == maxprob
-	thetas = sample_results['flatchain'][probind]
-	if type(thetas[0]) != np.dtype('float64'):
-		thetas = thetas[0]
+	### grab maximum probability, plus the thetas that gave it
+	maxprob = sample_results['flatprob'].max()
+	maxtheta = sample_results['flatchain'][sample_results['flatprob'].argmax()]
 
-	# ensure that maxprob stored is the same as calculated now
-	current_maxprob = threed_dutils.test_likelihood(sps,sample_results['model'],sample_results['obs'],thetas,sample_results['run_params']['param_file'])
-	print current_maxprob
-	print maxprob
+	### ensure that maxprob stored is the same as calculated now 
+	current_maxprob = threed_dutils.test_likelihood(sps,
+		                                            sample_results['model'],
+		                                            sample_results['obs'],
+		                                            maxtheta,
+		                                            sample_results['run_params']['param_file'])
 
-	#np.testing.assert_array_almost_equal(current_maxprob,maxprob,decimal=4)
+	print 'Probability during sampling: {0}'.format(maxprob)
+	print 'Probability right now: {0}'.format(current_maxprob)
 
-	return thetas, maxprob
+	return maxtheta, maxprob
 
 def measure_model_phot(sample_results, flatchain, sps):
 
@@ -89,6 +88,34 @@ def measure_spire_phot(sample_results, flatchain, sps):
 
 	return sample_results
 
+def sample_flatchain(chain, lnprob, parnames, ir_priors=False, include_maxlnprob=True, nsamp=2000):
+
+	'''
+	CURRENTLY UNDER DEVELOPMENT
+	goal: sample the flatchain in a smart way
+	'''
+
+	##### use randomized, flattened chain for posterior draws
+	# don't allow draws which are outside the priors
+	good = np.isfinite(lnprob) == True
+
+	### cut in IR priors
+	if ir_priors:
+		gamma_idx = parnames.index('duste_gamma')
+		umin_idx = parnames.index('duste_umin')
+		qpah_idx = parnames.index('duste_qpah')
+		gamma_prior = 0.15
+		umin_prior = 15
+		qpah_prior = 7
+		good = (flatchain[:,gamma_idx] < gamma_prior) & \
+		       (flatchain[:,umin_idx] < umin_prior) & \
+		       (flatchain[:,qpah_idx] < qpah_prior)
+		if good.sum() > ncalc:
+			flatchain = flatchain[np.squeeze(good),:]
+	flatchain[0,:] = maxthetas
+
+	return sample_idx
+
 def calc_extra_quantities(sample_results, ncalc=2000, ir_priors=True):
 
 	'''' 
@@ -99,22 +126,14 @@ def calc_extra_quantities(sample_results, ncalc=2000, ir_priors=True):
 
 	parnames = sample_results['model'].theta_labels()
 
-	##### modify nebon status
-	# we want to be able to turn it on and off at will
-	if sample_results['model'].params['add_neb_emission'] == 2:
-		sample_results['model'].params['add_neb_emission'] = np.array(True)
-
-	##### initialize sps
-	sps = model_setup.load_sps(**sample_results['run_params'])
-
-	##### maxprob
-	# also confirm probability calculations are consistent with fit
-	maxthetas, maxprob = maxprob_model(sample_results,sps)
-
-	##### set call parameters
+	##### describe number of components in Prospector model [legacy]
 	sample_results['ncomp'] = np.sum(['mass' in x for x in sample_results['model'].theta_labels()])
 
-    ##### initialize output arrays for SFH + emission line posterior draws #####
+	##### array indexes over which to sample the flatchain
+	sample_idx = sample_flatchain(sample_results['flatchain'], sample_results['flatprob'], 
+		                          parnames, ir_priors=False, include_maxlnprob=True, nsamp=ncalc)
+
+    ##### initialize output arrays for SFH + emission line posterior draws
 	half_time,sfr_10,sfr_100,sfr_1000,ssfr_100,totmass,emp_ha,lir,luv, \
 	bdec_cloudy,bdec_calc,ext_5500,dn4000,ssfr_10,xray_lum, luv0 = [np.zeros(shape=(ncalc)) for i in range(16)]
 	if 'fagn' in parnames:
@@ -124,29 +143,6 @@ def calc_extra_quantities(sample_results, ncalc=2000, ir_priors=True):
 	d1_idx = np.array(parnames) == 'dust1'
 	d2_idx = np.array(parnames) == 'dust2'
 	didx = np.array(parnames) == 'dust_index'
-
-	##### use randomized, flattened, thinned chain for posterior draws
-	# don't allow things outside the priors
-	# make maxprob the first stop
-	in_priors = np.isfinite(threed_dutils.chop_chain(sample_results['lnprobability'])) == True
-	flatchain = copy(sample_results['flatchain'][in_priors])
-	np.random.shuffle(flatchain)
-
-	### cut in IR priors
-	if ir_priors:
-
-		gamma_idx = np.array(parnames) == 'duste_gamma'
-		umin_idx = np.array(parnames) == 'duste_umin'
-		qpah_idx = np.array(parnames) == 'duste_qpah'
-		gamma_prior = 0.15
-		umin_prior = 15
-		qpah_prior = 7
-		good = (flatchain[:,gamma_idx] < gamma_prior) & \
-		       (flatchain[:,umin_idx] < umin_prior) & \
-		       (flatchain[:,qpah_idx] < qpah_prior)
-		if good.sum() > ncalc:
-			flatchain = flatchain[np.squeeze(good),:]
-	flatchain[0,:] = maxthetas
 
 	##### set up time vector for full SFHs
 	# if parameterized, calculate linearly in 100 steps from t=0 to t=tage
@@ -172,11 +168,21 @@ def calc_extra_quantities(sample_results, ncalc=2000, ir_priors=True):
 	mags_nodust = copy(mags)
 	spec = np.zeros(shape=(len(sps.wavelengths),ncalc))
 
-	sample_flatchain = flatchain[:ncalc,:]
+	# sample_flatchain = flatchain[:ncalc,:]
 	#sample_results = measure_spire_phot(sample_results, sample_flatchain, sps)
 
+	##### modify nebon status
+	# don't cache
+	if sample_results['model'].params['add_neb_emission'] == 2:
+		sample_results['model'].params['add_neb_emission'] = np.array(True)
+
+	##### initialize sps, calculate maxprob
+	# also confirm probability calculations are consistent with fit
+	sps = model_setup.load_sps(**sample_results['run_params'])
+	maxthetas, maxprob = maxprob_model(sample_results,sps)
+
 	######## posterior sampling #########
-	for jj in xrange(ncalc):
+	for jj,idx in enumerate(sample_idx):
 		
 		##### model call, to set parameters
 		thetas = copy(sample_flatchain[jj,:])
@@ -184,7 +190,7 @@ def calc_extra_quantities(sample_results, ncalc=2000, ir_priors=True):
 
 		##### extract sfh parameters
 		# pass stellar mass to avoid extra model call
-		sfh_params = threed_dutils.find_sfh_params(sample_results['model'],sample_flatchain[jj,:],
+		sfh_params = threed_dutils.find_sfh_params(sample_results['model'],sample_fatchain[jj,:],
 			                                       sample_results['obs'],sps,sm=sm)
 
 		##### calculate SFH
@@ -211,13 +217,13 @@ def calc_extra_quantities(sample_results, ncalc=2000, ir_priors=True):
 		xray_lum[jj] = threed_dutils.estimate_xray_lum(sfr_100[jj])
 
 		##### empirical halpha
-		emp_ha[jj] = threed_dutils.synthetic_halpha(sfr_10[jj],sample_flatchain[jj,d1_idx],
+		emp_ha[jj] = threed_dutils.synthetic_halpha(sfr_10[jj],sample_fatchain[jj,d1_idx],
 			                          flatchain[jj,d2_idx],-1.0,
 			                          flatchain[jj,didx],
 			                          kriek = (sample_results['model'].params['dust_type'] == 4)[0])
 
 		##### dust extinction at 5500 angstroms
-		ext_5500[jj] = sample_flatchain[jj,d1_idx] + sample_flatchain[jj,d2_idx]
+		ext_5500[jj] = sample_fatchain[jj,d1_idx] + sample_fatchain[jj,d2_idx]
 
 		##### spectral quantities (emission line flux, Balmer decrement, Hdelta absorption, Dn4000)
 		##### and magnitudes (LIR, LUV)
@@ -227,8 +233,8 @@ def calc_extra_quantities(sample_results, ncalc=2000, ir_priors=True):
 
 		##### Balmer decrements
 		bdec_cloudy[jj] = modelout['emlines']['Halpha']['flux'] / modelout['emlines']['Hbeta']['flux']
-		bdec_calc[jj] = threed_dutils.calc_balmer_dec(sample_flatchain[jj,d1_idx], sample_flatchain[jj,d2_idx], -1.0, 
-			                                          sample_flatchain[jj,didx],
+		bdec_calc[jj] = threed_dutils.calc_balmer_dec(sample_fatchain[jj,d1_idx], sample_fatchain[jj,d2_idx], -1.0, 
+			                                          sample_fatchain[jj,didx],
 			                                          kriek = (sample_results['model'].params['dust_type'] == 4)[0])
 		#### save names!
 		if jj == 0:
@@ -265,12 +271,12 @@ def calc_extra_quantities(sample_results, ncalc=2000, ir_priors=True):
 											        measure_ir=False, measure_luv=True)
 		luv0[jj]       = modelout['luv']
 
-	sample_results = measure_model_phot(sample_results, sample_flatchain, sps)
+	sample_results = measure_model_phot(sample_results, sample_fatchain, sps)
 
 	##### CALCULATE Q16,Q50,Q84 FOR VARIABLE PARAMETERS
 	ntheta = len(sample_results['initial_theta'])
 	q_16, q_50, q_84 = (np.zeros(ntheta)+np.nan for i in range(3))
-	for kk in xrange(ntheta): q_16[kk], q_50[kk], q_84[kk] = np.percentile(sample_flatchain[:,kk], [16.0, 50.0, 84.0])
+	for kk in xrange(ntheta): q_16[kk], q_50[kk], q_84[kk] = np.percentile(sample_fatchain[:,kk], [16.0, 50.0, 84.0])
 	
 	##### CALCULATE Q16,Q50,Q84 FOR EXTRA PARAMETERS
 	extra_flatchain = np.dstack((half_time, sfr_10, sfr_100, sfr_1000, ssfr_10, ssfr_100, totmass, emp_ha, bdec_cloudy,bdec_calc, ext_5500, xray_lum))[0]
@@ -352,7 +358,7 @@ def calc_extra_quantities(sample_results, ncalc=2000, ir_priors=True):
 	sample_results['observables'] = observables
 
 	#### QUANTILE OUTPUTS #
-	quantiles = {'sample_flatchain': sample_flatchain,
+	quantiles = {'sample_fatchain': sample_fatchain,
 				 'parnames': parnames,
 				 'q16':q_16,
 				 'q50':q_50,
@@ -396,10 +402,10 @@ def update_all(runname, **kwargs):
 	for param in parm_basename:
 		post_processing(param, **kwargs)
 
-def post_processing(param_name, add_extra=True, **extras):
+def post_processing(param_name, **extras):
 
 	'''
-	Driver. Loads output, makes all plots for a given galaxy.
+	Driver. Loads output. Creates 
 	'''
 
 	from brown_io import load_prospector_data, create_prosp_filename
@@ -414,34 +420,28 @@ def post_processing(param_name, add_extra=True, **extras):
 		os.makedirs(outfolder)
 
 	try:
- 		sample_results, powell_results, model = load_prospector_data(outname)
+ 		sample_results, powell_results, model = load_prospector_data(outname,hdf5=True)
  	except AttributeError:
- 		print 'failed to load '+param_name
+ 		print 'Failed to load chain for '+sample_results['run_params']['objname']+'. Returning.'
  		return
 
-	if add_extra:
-		print 'ADDING EXTRA OUTPUT FOR ' + sample_results['run_params']['objname'] + ' in ' + outfolder
+	print 'Performing post-processing on ' + sample_results['run_params']['objname']
 
-		# if we're not doing it again...
-		if 'flatchain' not in sample_results.keys():
-			sample_results['flatchain'] = threed_dutils.chop_chain(sample_results['chain'])
-		sample_results = calc_extra_quantities(sample_results,**extras)
-		
-		sample_results['chain'] = None # dump the chain...
-		mcmc_filename, model_filename = create_prosp_filename(outname)
-		pickle.dump(sample_results,open(mcmc_filename, "wb"))
+	### create flatchain, run post-processing
+	sample_results['flatchain'] = threed_dutils.chop_chain(sample_results['chain'])
+	sample_results['flatprob'] = threed_dutils.chop_chain(sample_results['lnprobability'])
+	post_processing = calc_extra_quantities(sample_results,**extras)
+	
+	### create post-processing name, dump info
+	mcmc_filename, model_filename, postname = create_prosp_filename(outname)
+	pickle.dump(post_processing,open(postname, "wb"))
 
-		### MAKE PLOTS HERE
-		try:
-			threedhst_diag.make_all_plots(sample_results=sample_results,filebase=outname,outfolder=outfolder,param_name=param_name)
-		except NameError:
-			print "unable to make plots in threedhst_diag"
-			pass
-
-		### SAVE OUTPUT HERE
-		sample_results['chain'] = None # dump the chain...
-		mcmc_filename, model_filename = create_prosp_filename(outname)
-		pickle.dump(sample_results,open(mcmc_filename, "wb"))
+	### MAKE PLOTS HERE
+	try:
+		threedhst_diag.make_all_plots(sample_results=sample_results,filebase=outname,outfolder=outfolder,param_name=param_name)
+	except NameError:
+		print "Unable to make plots for "+sample_results['run_params']['objname']+" due to import error. Passing."
+		pass
 
 if __name__ == "__main__":
 	post_processing(sys.argv[1])
