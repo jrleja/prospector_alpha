@@ -21,7 +21,7 @@ run_params = {'verbose':True,
               # MCMC params
               'nwalkers':620,
               'nburn':[150,200,400,600], 
-              'niter': 3000,
+              'niter': 2000,
               'interval': 0.2,
               # Model info
               'zcontinuous': 2,
