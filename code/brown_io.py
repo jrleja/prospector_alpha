@@ -447,6 +447,16 @@ def plot_brown_coordinates():
 
 	plt.show()
 
+def write_spectrum(sample_results,outname='best_fit_spectrum.dat'):
+
+
+	with open(outname,'w') as f:
+
+			f.write('# First line is wavelength in Angstroms, second line is best-fit flux in maggies (multiply by 3631 to get to Jy)\n')
+			for lam in sample_results['observables']['lam_obs']: f.write("{:.1f}".format(lam)+' ')
+			f.write('\n')
+			for spec in sample_results['bfit']['spec']: f.write("{:.3e}".format(spec)+' ')
+
 def write_villar_data():
 	
 	from threed_dutils import generate_basenames

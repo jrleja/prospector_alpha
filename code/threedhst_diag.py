@@ -10,7 +10,6 @@ from matplotlib.ticker import MaxNLocator
 from prospect.models import model_setup
 import copy
 from magphys_plot_pref import jLogFormatter
-from brown_io import load_prospector_data
 
 plt.ioff() # don't pop up a window for each plot
 
@@ -524,7 +523,7 @@ def show_chain(sample_results,plotnames=None,plotchain=None,outname=None,alpha=0
 		plt.savefig(outname, bbox_inches='tight',dpi=100)
 		plt.close()
 
-def return_sedplot_vars(sample_results, nufnu=True):
+def return_sedplot_vars(sample_results, nufnu=True, watts=True):
 
 	'''
 	if nufnu == True: return in units of nu * fnu. Else, return maggies.
@@ -551,6 +550,10 @@ def return_sedplot_vars(sample_results, nufnu=True):
 	if nufnu == True:
 		c = 3e8
 		factor = c*1e10
+
+		if watts: # convert to Watts / m^2 / Hz
+			factor *= 1e-26 * 3631 * 1e7 / 10000
+
 		mu *= factor/wave_eff
 		spec *= factor/sample_results['observables']['lam_obs']
 		obs_maggies *= factor/wave_eff
@@ -618,7 +621,7 @@ def sed_figure(outname = None, truths = None,
 
 		for jj in xrange(len(w)): spec_pdf[jj,:] = np.percentile(sample_results['observables']['spec'][jj,:],[5.0,50.0,95.0])
 		
-		sfactor = 3e18/w
+		sfactor = 3e18/w * 1e-26 * 3631 * 1e7 / 10000
 		nz = modspec > 0
 		if ml_spec:
 			phot.plot(modlam[nz], modspec[nz], linestyle='-',
@@ -794,12 +797,12 @@ def make_all_plots(filebase=None,
 
 	if sample_results is None:
 		try:
-			sample_results, powell_results, model = load_prospector_data(filebase)
+			sample_results, powell_results, model = threed_dutils.load_prospector_data(filebase)
 		except TypeError:
 			return
 	else: # if we already have sample results, but want powell results
 		try:
-			powell_results, model = load_prospector_data(filebase,no_sample_results=True)
+			powell_results, model = threed_dutils.load_prospector_data(filebase,no_sample_results=True)
 		except TypeError:
 			return	
 
