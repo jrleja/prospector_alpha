@@ -1,7 +1,7 @@
 import numpy as np
 import os
 from prospect.models import priors, sedmodel
-from prospect.sources import StepSFHBasis
+from prospect.sources import FastStepBasis
 from sedpy import observate
 from astropy.cosmology import WMAP9
 tophat = priors.tophat
@@ -21,7 +21,7 @@ run_params = {'verbose':True,
               # MCMC params
               'nwalkers':620,
               'nburn':[150,200,400,600], 
-              'niter': 2000,
+              'niter': 2500,
               'interval': 0.2,
               # Model info
               'zcontinuous': 2,
@@ -404,35 +404,21 @@ class BurstyModel(sedmodel.SedModel):
             lnp_prior += this_prior
         return lnp_prior
 
-class FracSFH(StepSFHBasis):
+class FracSFH(FastStepBasis):
     
-    @property
-    def all_ssp_weights(self):
-        # Cache age bins and relative weights.  This means params['agebins']
-        # *must not change* without also setting _ages = None
-        if getattr(self, '_ages', None) is None:
-            self._ages = self.params['agebins']
-            nbin, nssp = len(self._ages), len(self.logage) + 1
-            self._bin_weights = np.zeros([nbin, nssp])
-            self._time_per_bin = np.zeros(nbin)
-            for i, (t1, t2) in enumerate(self._ages):
-                # These *should* sum to one (or zero) for each bin
-                self._bin_weights[i,:] = self.bin_weights(t1, t2)
-                self._time_per_bin[i] = 10**t2-10**t1
+    def get_galaxy_spectrum(self, **params):
+        self.update(**params)
 
-        # Now normalize the weights in each bin by the massfrac parameter, and sum
-        # over bins.
-        bin_masses = np.array(self.params['sfr_fraction'])
-        bin_masses = np.append(bin_masses,(1-np.sum(self.params['sfr_fraction'])))*self._time_per_bin
-        if np.all(self.params.get('mass_units', 'mstar') == 'mstar'):
-            # Convert from mstar to mformed for each bin.  We have to do this
-            # here as well as in get_spectrum because the *relative*
-            # normalization in each bin depends on the units, as well as the
-            # overall normalization.
-            bin_masses /= self.bin_mass_fraction
-        w = (bin_masses[:, None] * self._bin_weights).sum(axis=0)
+        fractions = np.array(self.params['sfr_fraction'])
+        bin_fractions = np.append(fractions,(1-np.sum(fractions)))
+        mass = bin_fractions*self.params['mass']
+        mtot = self.params['mass'].sum()
 
-        return w
+        time, sfr, tmax = self.convert_sfh(self.params['agebins'], self.params['mass'])
+        self.ssp.params["sfh"] = 3 #Hack to avoid rewriting the superclass
+        self.ssp.set_tabular_sfh(time, sfr)
+        wave, spec = self.ssp.get_spectrum(tage=tmax, peraa=False)
+        return wave, spec / mtot, self.ssp.stellar_mass / mtot
 
 def load_sps(**extras):
 

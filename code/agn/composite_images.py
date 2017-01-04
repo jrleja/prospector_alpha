@@ -149,7 +149,8 @@ def plot_all(runname='brownseds_agn',alldata=None,outfolder=None):
 
 	#### select data to plot. generate SEDs with no AGN contribution if necessary.
 	# 10 most massive AGN
-	idx_plot = pdata['pars']['fagn']['q50'].argsort()[-10:][::-1]
+	#idx_plot = pdata['pars']['fagn']['q50'].argsort()[-10:][::-1]
+	idx_plot = pdata['pars']['fagn']['q50'].argsort()[:10][::-1]
 	pdata = collate_spectra(alldata,idx_plot,pdata,runname)
 
 	#### plot data
@@ -230,18 +231,25 @@ def plot_composites(pdata,idx_plot,outfolder,contour_colors=True,calibration_plo
 
 
 			### Don't show WISE colors for pixels below BACKGROUND_FILTER*MEDIAN(CUTOUT)
-			background_filter = 5.0
+			background_filter = 20.0
 
-			#### load up two HDUs, move to common image scale
+			#### load up HDU, subtract background and convert to physical units
+			# also convolve to W2 resolution
 			hdu = load_image(objname,contours[0])
 			hdu.data *= 1.9350E-06 ### convert from DN to flux in Janskies, from this table: http://wise2.ipac.caltech.edu/docs/release/allsky/expsup/sec2_3f.html
+			hdu.data -= np.median(hdu.data) ### subtract background as median
 			data1_noconv, footprint = reproject_interp(hdu, hdu_original)
+			data_convolved, kernel = match_resolution(hdu.data,contours[0],contours[1],kernel=kernel,data1_res=hdu.header['PXSCAL1']) # convolve to W2 resolution
+			hdu.data = data_convolved
+			data1, footprint = reproject_interp(hdu, hdu_original)
 
-			data1, kernel = match_resolution(data1_noconv,contours[0],contours[1],kernel=kernel,data1_res=hdu.header['PXSCAL1']) # convolve to W2 resolution
-
+			### load up HDU2, subtract background, convert to physical units
 			hdu = load_image(objname,contours[1])
+			hdu.data -= np.median(hdu.data) ### subtract background as median
+			hdu.data *= 2.7048E-06 ### convert from DN to flux in Janskies, from this table: http://wise2.ipac.caltech.edu/docs/release/allsky/expsup/sec2_3f.html
+
+			#### put onto same scale
 			data2, footprint = reproject_interp(hdu, hdu_original)
-			data2 *= 2.7048E-06
 
 			#### PLOTTING
 			if calibration_plot:
@@ -269,10 +277,19 @@ def plot_composites(pdata,idx_plot,outfolder,contour_colors=True,calibration_plo
 				plt.colorbar(img,ax=axcal[3])
 				axcal[3].set_title(contours[0]+'-'+contours[1])
 
+				'''
 				background1 = np.nanmedian(data1_slice)
 				background2 = np.nanmedian(data2_slice)
 				background = (data1_slice < background1*background_filter) & (data2_slice < background2*background_filter)
 				flux_color[background] = np.nan
+				'''
+				### don't trust anything less than 0.001 the max!
+				maxlim = 0.08
+				max1 = np.nanmax(data1_slice)
+				max2 = np.nanmax(data2_slice)
+				background = (data1_slice < max1*maxlim) | (data2_slice < max2*maxlim)
+				flux_color[background] = np.nan
+
 
 				img = axcal[4].imshow(flux_color, origin='lower')
 				plt.colorbar(img,ax=axcal[4])
@@ -416,9 +433,17 @@ def plot_color_contour(ax,flux1,flux2,filter1,filter2,size,ncontours=25,color='w
 	# define background as median in slice * background_filter
 	flux1_slice = flux1[size[2]:size[3],size[0]:size[1]]
 	flux2_slice = flux2[size[2]:size[3],size[0]:size[1]]
+
+	'''
 	background1 = np.nanmedian(flux1_slice)
 	background2 = np.nanmedian(flux2_slice)
 	background = (flux1 < background1*background_filter) & (flux2 < background2*background_filter)
+	flux_color[background] = np.nan
+	'''
+	maxlim = 0.08
+	max1 = np.nanmax(flux1_slice)
+	max2 = np.nanmax(flux2_slice)
+	background = (flux1 < max1*maxlim) | (flux2 < max2*maxlim)
 	flux_color[background] = np.nan
 
 	#### set levels
