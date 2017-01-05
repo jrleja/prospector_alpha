@@ -411,6 +411,12 @@ class FracSFH(FastStepBasis):
 
         fractions = np.array(self.params['sfr_fraction'])
         bin_fractions = np.append(fractions,(1-np.sum(fractions)))
+
+        time_per_bin = []
+        for (t1, t2) in self.params['agebins']: time_per_bin.append(10**t2-10**t1)
+        bin_fractions *= np.array(time_per_bin)
+        bin_fractions /= bin_fractions.sum()
+        
         mass = bin_fractions*self.params['mass']
         mtot = self.params['mass'].sum()
 
@@ -463,6 +469,7 @@ def load_model(objname='',datname='', agelims=[], **extras):
     time_per_bin = []
     for (t1, t2) in agebins.T: time_per_bin.append(10**t2-10**t1)
     frac_init = (np.array(time_per_bin) / np.array(time_per_bin).sum())[:-1]
+    frac_init = np.zeros(ncomp-1)+1./ncomp # going back to the old formulation
     model_params[n.index('sfr_fraction')]['init'] = frac_init
     model_params[n.index('sfr_fraction')]['init_disp'] = 0.02
 
