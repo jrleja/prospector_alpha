@@ -455,13 +455,16 @@ def load_model(objname='',datname='', agelims=[], **extras):
     #### FRACTIONAL MASS INITIALIZATION
     # N-1 bins, last is set by x = 1 - np.sum(sfr_fraction)
     model_params[n.index('sfr_fraction')]['N'] = ncomp-1
-    model_params[n.index('sfr_fraction')]['init'] = np.zeros(ncomp-1)+1./ncomp
     model_params[n.index('sfr_fraction')]['prior_args'] = {
                                                            'maxi':np.full(ncomp-1,1.0), 
                                                            'mini':np.full(ncomp-1,0.0),
                                                            # NOTE: ncomp instead of ncomp-1 makes the prior take into account the implicit Nth variable too
                                                           }
-    model_params[n.index('sfr_fraction')]['init_disp'] = 0.15
+    time_per_bin = []
+    for (t1, t2) in agebins.T: time_per_bin.append(10**t2-10**t1)
+    frac_init = (np.array(time_per_bin) / np.array(time_per_bin).sum())[:-1]
+    model_params[n.index('sfr_fraction')]['init'] = frac_init
+    model_params[n.index('sfr_fraction')]['init_disp'] = 0.02
 
     #### INSERT REDSHIFT INTO MODEL PARAMETER DICTIONARY ####
     zind = n.index('zred')
