@@ -409,9 +409,9 @@ class FracSFH(FastStepBasis):
     def get_galaxy_spectrum(self, **params):
         self.update(**params)
 
+        #### here's the custom fractional stuff
         fractions = np.array(self.params['sfr_fraction'])
         bin_fractions = np.append(fractions,(1-np.sum(fractions)))
-
         time_per_bin = []
         for (t1, t2) in self.params['agebins']: time_per_bin.append(10**t2-10**t1)
         bin_fractions *= np.array(time_per_bin)
@@ -420,10 +420,11 @@ class FracSFH(FastStepBasis):
         mass = bin_fractions*self.params['mass']
         mtot = self.params['mass'].sum()
 
-        time, sfr, tmax = self.convert_sfh(self.params['agebins'], self.params['mass'])
+        time, sfr, tmax = self.convert_sfh(self.params['agebins'], mass)
         self.ssp.params["sfh"] = 3 #Hack to avoid rewriting the superclass
         self.ssp.set_tabular_sfh(time, sfr)
         wave, spec = self.ssp.get_spectrum(tage=tmax, peraa=False)
+
         return wave, spec / mtot, self.ssp.stellar_mass / mtot
 
 def load_sps(**extras):
@@ -466,11 +467,7 @@ def load_model(objname='',datname='', agelims=[], **extras):
                                                            'mini':np.full(ncomp-1,0.0),
                                                            # NOTE: ncomp instead of ncomp-1 makes the prior take into account the implicit Nth variable too
                                                           }
-    time_per_bin = []
-    for (t1, t2) in agebins.T: time_per_bin.append(10**t2-10**t1)
-    frac_init = (np.array(time_per_bin) / np.array(time_per_bin).sum())[:-1]
-    frac_init = np.zeros(ncomp-1)+1./ncomp # going back to the old formulation
-    model_params[n.index('sfr_fraction')]['init'] = frac_init
+    model_params[n.index('sfr_fraction')]['init'] =  np.zeros(ncomp-1)+1./ncomp
     model_params[n.index('sfr_fraction')]['init_disp'] = 0.02
 
     #### INSERT REDSHIFT INTO MODEL PARAMETER DICTIONARY ####
