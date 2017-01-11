@@ -27,7 +27,7 @@ def save_alldata(alldata,runname='brownseds'):
 	with open(outname, "wb") as out:
 		pickle.dump(model_store, out)
 
-def load_prospector_data(filebase,no_sample_results=False,objname=None,runname=None,hdf5=False):
+def load_prospector_data(filebase,no_sample_results=False,objname=None,runname=None,hdf5=False,load_extra_output=True):
 
 	'''
 	loads Prospector chains
@@ -38,21 +38,29 @@ def load_prospector_data(filebase,no_sample_results=False,objname=None,runname=N
 	'''
 
 	from prospect.io import read_results
+	import hickle
 
 	#### shortcut: pass None to filebase and objname + runname keywords
 	if (objname is not None) & (runname is not None):
 		filebase = os.getenv('APPS')+'/threedhst_bsfh/results/'+runname+'/'+runname+'_'+objname
-	mcmc_filename, model_filename, postname = create_prosp_filename(filebase)
+	mcmc_filename, model_filename, extra_name = create_prosp_filename(filebase)
 
 	if hdf5:
 		mcmc_filename += '.h5'
 
+	if load_extra_output:
+		with open(extra_name, "r") as f:
+			extra_output=hickle.load(f)
+	else:
+		extra_output = None
+
 	if no_sample_results:
 		model, powell_results = read_results.read_model(model_filename)
-		return powell_results, model
+		sample_results = None
 	else:
 		sample_results, powell_results, model = read_results.results_from(mcmc_filename, model_file=model_filename,inmod=None)
-		return sample_results, powell_results, model
+	
+	return sample_results, powell_results, model, extra_output
 
 def create_prosp_filename(filebase):
 
