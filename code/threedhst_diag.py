@@ -10,6 +10,7 @@ from matplotlib.ticker import MaxNLocator
 from prospect.models import model_setup
 import copy
 from magphys_plot_pref import jLogFormatter
+from brown_io import load_prospector_data
 
 plt.ioff() # don't pop up a window for each plot
 
@@ -473,10 +474,6 @@ def return_sedplot_vars(sample_results, extra_output, nufnu=True):
 	if nufnu == True:
 		c = 3e8
 		factor = c*1e10
-
-		if watts: # convert to Watts / m^2 / Hz
-			factor *= 1e-26 * 3631 * 1e7 / 10000
-
 		mu *= factor/wave_eff
 		spec *= factor/extra_output['observables']['lam_obs']
 		obs_maggies *= factor/wave_eff
@@ -544,7 +541,7 @@ def sed_figure(outname = None, truths = None,
 
 		for jj in xrange(len(w)): spec_pdf[jj,:] = np.percentile(extra_output[i]['observables']['spec'][jj,:],[5.0,50.0,95.0])
 		
-		sfactor = 3e18/w * 1e-26 * 3631 * 1e7 / 10000
+		sfactor = 3e18/w
 		nz = modspec > 0
 		if ml_spec:
 			phot.plot(modlam[nz], modspec[nz], linestyle='-',
