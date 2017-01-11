@@ -199,16 +199,20 @@ def find_sfh_params(model,theta,obs,sps,sm=None):
 			sm = sps.csp.stellar_mass
 		except AttributeError as e: 
 			sm = sm_new
-	
+
 	### create mass fractions for nonparametric SFHs
 	if out['sfr_fraction'].shape[0] != 0:
 		out['sfr_fraction_full'] = np.concatenate((out['sfr_fraction'],np.atleast_1d(1-out['sfr_fraction'].sum())))
-		out['mass_fraction'] = out['sfr_fraction_full']*sps._time_per_bin
+		time_per_bin = []
+		for (t1, t2) in sps.params['agebins']: time_per_bin.append(10**t2-10**t1)
+		out['mass_fraction'] = out['sfr_fraction_full']*np.array(time_per_bin)
 		out['mass_fraction'] /= out['mass_fraction'].sum()
-
-	# Need this because mass is 
-	# current mass, not total mass formed!
-	out['mformed'] = out['mass'] / sm
+		out['mformed'] = copy.copy(out['mass'])
+		out['mass'] *= sm
+	else:
+		# Need this because mass is 
+		# current mass, not total mass formed!
+		out['mformed'] = out['mass'] / sm
 
 	return out
 
@@ -1333,19 +1337,25 @@ def integrate_sfh(t1,t2,sfh_params):
 def measure_agn_luminosity(fagn,sps,mass):
 
 	'''
-	requires TOTMASS
+	requires mformed
 	calculate L_AGN for a given F_AGN, SPS
 	return in erg / s
 	'''
 
 	## get SPS lbol, weighted by SSP weights
-	ssp_lbol = np.insert(10**sps.ssp.log_lbol, 0, 10**sps.ssp.log_lbol[0])
-	weights = sps.all_ssp_weights
-	weighted_lbol = (ssp_lbol * weights).sum() / weights.sum()
+	# two options due to very different meanings of ssp.log_lbol when using
+	# tabular or "regular" SSPs
+	if np.isscalar(sps.ssp.log_lbol):
+		weighted_lbol = 10**sps.ssp.log_lbol
+		lagn = weighted_lbol*fagn*constants.L_sun.cgs.value
+	else:
+		ssp_lbol = np.insert(10**sps.ssp.log_lbol, 0, 10**sps.ssp.log_lbol[0])
+		weights = sps.all_ssp_weights
+		weighted_lbol = (ssp_lbol * weights).sum() / weights.sum()
 
-	## calculate L_AGN
-	lagn_sps = weighted_lbol*fagn
-	lagn = lagn_sps * mass * constants.L_sun.cgs.value
+		## calculate L_AGN
+		lagn_sps = weighted_lbol*fagn
+		lagn = lagn_sps * mass * constants.L_sun.cgs.value
 
 	return lagn
 

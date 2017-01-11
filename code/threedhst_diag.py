@@ -22,10 +22,10 @@ dpi = 150
 minorFormatter = jLogFormatter(base=10, labelOnlyBase=False)
 majorFormatter = jLogFormatter(base=10, labelOnlyBase=True)
 
-def subcorner(sample_results,  sps, model,
+def subcorner(sample_results,  sps, model, extra_output,
                 outname=None, showpars=None,
-                start=0, thin=1, truths=None,
-                powell_results=None, plotchain=None,
+                truths=None, extents=None,
+                powell_results=None,
                 plotnames=None,
                 **kwargs):
     """
@@ -36,15 +36,12 @@ def subcorner(sample_results,  sps, model,
 
     # pull out the parameter names and flatten the thinned chains
     parnames = np.array(sample_results['model'].theta_labels())
-    if plotchain.shape[1] == sample_results['run_params']['niter']:
-    	plotflatchain = threed_dutils.chop_chain(plotchain)
-    else:
-    	plotflatchain = threed_dutils.chop_chain(plotchain,nochop=True)
+    flatchain = threed_dutils.chop_chain(sample_results['chain'])
 
     # restrict to parameters you want to show
     if showpars is not None:
         ind_show = np.array([p in showpars for p in parnames], dtype= bool)
-        plotflatchain = plotflatchain[:,ind_show]
+        flatchain = flatchain[:,ind_show]
         truths = truths[ind_show]
         parnames= parnames[ind_show]
 
@@ -56,11 +53,11 @@ def subcorner(sample_results,  sps, model,
     else:
         ptruths = None
 
-    fig = corner.corner(plotflatchain, labels = plotnames,
-                          quantiles=[0.16, 0.5, 0.84], verbose=False,
-                          truths = ptruths, range=sample_results['extents'],truth_color='red',**kwargs)
+    fig = corner.corner(flatchain, labels = plotnames,
+                        quantiles=[0.16, 0.5, 0.84], verbose=False,
+                        truths = ptruths, range=extents,truth_color='red',**kwargs)
 
-    fig = add_to_corner(fig, sample_results, sps, model, truths=truths, powell_results=powell_results)
+    fig = add_to_corner(fig, sample_results, extra_output, sps, model, truths=truths, powell_results=powell_results)
     if outname is not None:
         fig.savefig('{0}.corner.png'.format(outname))
         plt.close(fig)
@@ -68,30 +65,24 @@ def subcorner(sample_results,  sps, model,
         return fig
 
 
-def add_to_corner(fig, sample_results, sps, model,truths=None,maxprob=True,powell_results=None):
+def add_to_corner(fig, sample_results, extra_output, sps, model,truths=None,maxprob=True,powell_results=None):
 
     '''
     adds in posterior distributions for 'select' parameters
     if we have truths, list them as text
     '''
-
-	# pull information from corner to replicate plots
-	# will want to put them in axes[6-8] or something
-    axes = fig.get_axes()
 	
-    plotquant = sample_results['extras'].get('flatchain',None)
-    plotname   = sample_results['extras'].get('parnames',None)
+    plotquant = extra_output['extras'].get('flatchain',None)
+    plotname  = extra_output['extras'].get('parnames',None)
 
-    to_show = ['half_time','ssfr_100','sfr_100']
-    ptitle = [r't$_{\mathrm{half}}$ [Gyr]',r'sSFR(100 Myr) [yr$^{-1}$]',r'SFR(100 Myr) [M$_{\odot}$ yr$^{-1}$]']
-    if sample_results['ncomp'] > 1:
-        to_show.append('totmass')
-        ptitle.append(r'stellar mass [M$_{\odot}$]')
+    to_show = ['half_time','ssfr_100','sfr_100','stellar_mass']
+    ptitle = [r't$_{\mathrm{half}}$ [Gyr]',r'log(sSFR) (100 Myr) [yr$^{-1}$]',
+              r'log(SFR) (100 Myr) [M$_{\odot}$ yr$^{-1}$]',r'log(M$_*$) [M$_{\odot}$]']
 
     showing = np.array([x in to_show for x in plotname])
 
     # extra text
-    scale    = len(sample_results['model'].theta_labels())
+    scale    = len(extra_output['quantiles']['parnames'])
     ttop     = 0.88-0.02*(12-scale)
     fs       = 24-(12-scale)
     
@@ -126,16 +117,16 @@ def add_to_corner(fig, sample_results, sps, model,truths=None,maxprob=True,powel
 
     # show maximum probability
     if maxprob:
-        maxprob_parnames = np.append(sample_results['model'].theta_labels(),'lnprob')
+        maxprob_parnames = np.append(extra_output['quantiles']['parnames'],'lnprob')
         plt.figtext(0.75, ttop, 'pmax',weight='bold',
                        horizontalalignment='left',fontsize=fs)
         for kk in xrange(len(maxprob_parnames)):
             if maxprob_parnames[kk] == 'mass':
-               yplot = np.log10(sample_results['bfit']['maxprob_params'][kk])
+               yplot = np.log10(extra_output['bfit']['maxprob_params'][kk])
             elif maxprob_parnames[kk] == 'lnprob':
-                yplot = sample_results['bfit']['maxprob']
+                yplot = float(extra_output['bfit']['maxprob'])
             else:
-                yplot = sample_results['bfit']['maxprob_params'][kk]
+                yplot = extra_output['bfit']['maxprob_params'][kk]
 
             # add parameter names if not covered by truths
             if truths is None:
@@ -145,27 +136,30 @@ def add_to_corner(fig, sample_results, sps, model,truths=None,maxprob=True,powel
            		plt.figtext(0.75, ttop-0.02*(kk+1), "{:.2f}".format(yplot),
                        horizontalalignment='left',fontsize=fs)
 
-    # show burn-in results
-    burn_params = np.append(sample_results['post_burnin_center'],sample_results['post_burnin_prob'])
-    burn_names = np.append(sample_results['model'].theta_labels(), 'lnprobability')
+    # show burn-in results, if we have them
+    try: 
+	    burn_params = np.append(sample_results['post_burnin_center'],sample_results['post_burnin_prob'])
+	    burn_names = np.append(sample_results['model'].theta_labels(), 'lnprobability')
 
-    plt.figtext(0.82, ttop, 'burn-in',weight='bold',
-                   horizontalalignment='left',fontsize=fs)
+	    plt.figtext(0.82, ttop, 'burn-in',weight='bold',
+	                   horizontalalignment='left',fontsize=fs)
 
-    for kk in xrange(len(burn_names)):
-        if burn_names[kk] == 'mass':
-           yplot = np.log10(burn_params[kk])
-        else:
-            yplot = burn_params[kk]
+	    for kk in xrange(len(burn_names)):
+	        if burn_names[kk] == 'mass':
+	           yplot = np.log10(burn_params[kk])
+	        else:
+	            yplot = burn_params[kk]
 
-        plt.figtext(0.82, ttop-0.02*(kk+1), "{:.2f}".format(yplot),
-                   horizontalalignment='left',fontsize=fs)
+	        plt.figtext(0.82, ttop-0.02*(kk+1), "{:.2f}".format(yplot),
+	                   horizontalalignment='left',fontsize=fs)
+    except KeyError:
+    	pass
 
     # show powell results
     if powell_results:
         best = np.argmin([p.fun for p in powell_results])
         powell_params = np.append(powell_results[best].x,-1*powell_results[best]['fun'])
-        powell_names = np.append(sample_results['model'].theta_labels(),'lnprob')
+        powell_names = np.append(extra_output['quantiles']['parnames'],'lnprob')
 
         plt.figtext(0.89, ttop, 'powell',weight='bold',
                        horizontalalignment='left',fontsize=fs)
@@ -180,69 +174,71 @@ def add_to_corner(fig, sample_results, sps, model,truths=None,maxprob=True,powel
                        horizontalalignment='left',fontsize=fs)
 
 
-    plotloc   = 2
+    #### create my own axes here
+    # size them using size of other windows
+    axis_size = fig.get_axes()[0].get_position().size
+    xs, ys = 0.4, 0.82
+    xdelta, ydelta = axis_size[0]*1.4, axis_size[1]*1.7
+    plotloc = 0
+
     for jj in xrange(len(plotname)):
 
 		if showing[jj] == 0:
 		    continue
-		plotloc += 1
 
-		axes[plotloc].set_visible(True)
-		axes[plotloc].set_frame_on(True)
+		ax = fig.add_axes([xs+(plotloc % 2)*xdelta, ys+(plotloc>1)*ydelta, axis_size[0], axis_size[1]])
+		plotloc+=1
+
+		if plotname[jj] == 'half_time':
+			plot = plotquant[:,jj]
+		else:
+			plot = np.log10(plotquant[:,jj])
 
 		# Plot the histograms.
-		try:
-		    n, b, p = axes[plotloc].hist(plotquant[:,jj], bins=50,
-		                      histtype="step",color='k',
-		                      range=[np.min(plotquant[:,jj]),np.max(plotquant[:,jj])])
-		except:
-		    plt.close()
-		    print np.min(plotquant[:,jj])
-		    print np.max(plotquant[:,jj])
-		    print 1/0
-
+		n, b, p = ax.hist(plot, bins=50,
+		                  histtype="step",color='k',
+		                  range=[np.min(plot),np.max(plot)])
 
 		# plot quantiles
-		qvalues = np.log10([sample_results['extras']['q16'][jj],
-				            sample_results['extras']['q50'][jj],
-				            sample_results['extras']['q84'][jj]])
+		qvalues = np.log10([extra_output['extras']['q16'][jj],
+				            extra_output['extras']['q50'][jj],
+				            extra_output['extras']['q84'][jj]])
 
-		qvalues = 10**qvalues
+		if plotname[jj] == 'half_time':
+			qvalues = 10**qvalues
 
 		for q in qvalues:
-			axes[plotloc].axvline(q, ls="dashed", color='k')
+			ax.axvline(q, ls="dashed", color='k')
 
 		# display quantiles
 		q_m = qvalues[1]-qvalues[0]
 		q_p = qvalues[2]-qvalues[1]
 
 		# format quantile display
-		if plotname[jj] == 'ssfr_100' or plotname[jj] == 'totmass':
-			fmt = "{{0:{0}}}".format(".1e").format
-		else:
-			fmt = "{{0:{0}}}".format(".2f").format
+		fmt = "{{0:{0}}}".format(".2f").format
 		title = r"${{{0}}}_{{-{1}}}^{{+{2}}}$"
 		title = title.format(fmt(qvalues[1]), fmt(q_m), fmt(q_p))
-		axes[plotloc].set_title(title)
-		axes[plotloc].set_xlabel(ptitle[to_show.index(plotname[jj])])
+		ax.set_title(title)
+		ax.set_xlabel(ptitle[to_show.index(plotname[jj])])
 
 		# axes
 		# set min/max
-		axes[plotloc].set_xlim(np.percentile(plotquant[:,jj],0.5),
-							  np.percentile(plotquant[:,jj],99.5))
-		axes[plotloc].set_ylim(0, 1.1 * np.max(n))
-		axes[plotloc].set_yticklabels([])
-		axes[plotloc].xaxis.set_major_locator(MaxNLocator(5))
-	
+		ax.set_xlim(np.percentile(plot,0.5),
+					np.percentile(plot,99.5))
+		ax.set_ylim(0, 1.1 * np.max(n))
+		ax.set_yticklabels([])
+		ax.xaxis.set_major_locator(MaxNLocator(5))
+		[l.set_rotation(45) for l in ax.get_xticklabels()]
+
 		# truths
 		if truths is not None:
 		    if plotname[jj] in parnames:
 		        plottruth = tvals[parnames == plotname[jj]]
-		        axes[plotloc].axvline(x=plottruth,color='r')
+		        ax.axvline(x=plottruth,color='r')
 
     return fig
 
-def add_sfh_plot(sresults,fig,ax_loc=None,
+def add_sfh_plot(exout,fig,ax_loc=None,
 				 main_color=None,tmin=0.01,
 	             truths=None,text_size=1,
 	             ax_inset=None):
@@ -263,12 +259,12 @@ def add_sfh_plot(sresults,fig,ax_loc=None,
 
 	xmin, ymin = np.inf, np.inf
 	xmax, ymax = -np.inf, -np.inf
-	for i, sample_results in enumerate(sresults):
+	for i, extra_output in enumerate(exout):
 		
 		#### load SFH
-		t = sample_results['extras']['t_sfh']
+		t = extra_output['extras']['t_sfh']
 		perc = np.zeros(shape=(len(t),3))
-		for jj in xrange(len(t)): perc[jj,:] = np.percentile(sample_results['extras']['sfh'][jj,:],[16.0,50.0,84.0])
+		for jj in xrange(len(t)): perc[jj,:] = np.percentile(extra_output['extras']['sfh'][jj,:],[16.0,50.0,84.0])
 
 		#### plot SFH
 		ax_inset.plot(t, perc[:,1],'-',color=main_color[i])
@@ -325,78 +321,7 @@ def plot_sfh_fast(tau,tage,mass,tuniv=None):
 
 	return t,sfr
 
-def create_plotquant(sample_results, logplot = ['mass'], truths=None):
-    
-	'''
-	creates plottable versions of chain and sets up new plotnames
-	'''
-
-	#### reconstruct chopped chain!
-	niter_new = sample_results['flatchain'].shape[0] / sample_results['run_params']['nwalkers']
-	plotchain = sample_results['flatchain'].reshape(sample_results['run_params']['nwalkers'],
-		                                            niter_new,
-		                                            sample_results['flatchain'].shape[1])
-	parnames = np.array(sample_results['model'].theta_labels())
-
-	# properly define timescales in certain parameters
-	# will have to redefine after inserting p(z)
-	# note that we switch prior min/max here!!
-	tuniv = WMAP9.age(sample_results['model'].params['zred'][0]).value
-	if truths is not None:
-		tuniv = 14.0
-	# COMMENTED OUT FOR NOW, FOR TRUTH TESTS
-	# MAYBE REINTRODUCE LATER FOR REAL DATA
-	#redefine = ['sf_start','sf_trunc']
-	redefine = []
-
-	# check for multiple stellar populations
-	for ii in xrange(len(parnames)):   	
-		if parnames[ii] in redefine:
-			priors = [f['prior_args'] for f in sample_results['model'].config_list if f['name'] == parnames[ii]][0]
-			min = priors['mini']
-			max = priors['maxi']
-			priors['mini'] = np.clip(tuniv-max,tiny_number,big_number)
-			priors['maxi'] = tuniv-min
-
-			plotchain[:,:,list(parnames).index(parnames[ii])] = np.clip(tuniv - plotchain[:,:,list(parnames).index(parnames[ii])],tiny_number,big_number)
-
-		elif parnames[ii][:-2] in redefine:
-			priors = [f['prior_args'] for f in sample_results['model'].config_list if f['name'] == parnames[ii][:-2]][0]
-			min = np.zeros(2)+priors['mini']
-			max = np.zeros(2)+priors['maxi']
-			priors['mini'] = np.clip(tuniv-max,tiny_number,big_number)
-			priors['maxi'] = tuniv-min
-
-			plotchain[:,:,ii] = np.clip(tuniv - plotchain[:,:,ii],tiny_number,big_number)	    	
-
-	# define plot quantities and plot names
-	# primarily converting to log or not
-	if logplot is not None:
-
-		# if we're interested in logging it...
-		# change the plotname, chain values, and priors
-		plotnames=[]
-		for ii in xrange(len(parnames)): 
-			
-			# check for multiple stellar populations
-			if (parnames[ii] in logplot): 
-				plotnames.append('log('+parnames[ii]+')')
-				plotchain[:,:,ii] = np.log10(plotchain[:,:,ii])
-				priors = [f['prior_args'] for f in sample_results['model'].config_list if f['name'] == parnames[ii]][0]
-				for k,v in priors.iteritems(): priors[k]=np.log10(v)
-			elif (parnames[ii][:-2] in logplot):
-				plotnames.append('log('+parnames[ii]+')')
-				plotchain[:,:,ii] = np.log10(plotchain[:,:,ii])
-				priors = [f['prior_args'] for f in sample_results['model'].config_list if f['name'] == parnames[ii][:-2]][0]
-				for k,v in priors.iteritems(): priors[k]=np.log10(np.clip(v,1e-30,1e99))
-			else:
-				plotnames.append(parnames[ii])
-	else:
-		plotnames = [f for f in parnames]
-
-	return plotnames, plotchain
-
-def return_extent(sample_results,plotchain=None):    
+def return_extent(sample_results):    
     
 	'''
 	sets plot range for chain plot and corner plot for each parameter
@@ -408,8 +333,8 @@ def return_extent(sample_results,plotchain=None):
 	for ii in xrange(len(parnames)):
 		
 		# set min/max
-		extent = [np.percentile(plotchain[:,:,ii],0.5),
-		          np.percentile(plotchain[:,:,ii],99.5)]
+		extent = [np.percentile(sample_results['chain'][:,:,ii],0.5),
+		          np.percentile(sample_results['chain'][:,:,ii],99.5)]
 
 		# is the chain stuck at one point? if so, set the range equal to param*0.8,param*1.2
 		# else check if we butting up against the prior? if so, extend by 10%
@@ -443,7 +368,7 @@ def return_extent(sample_results,plotchain=None):
 	
 	return extents
 
-def show_chain(sample_results,plotnames=None,plotchain=None,outname=None,alpha=0.6,truths=None):
+def show_chain(sample_results,plotnames=None,chain=None,outname=None,alpha=0.6,truths=None,extents=None):
 	
 	'''
 	plot the MCMC chain for all parameters
@@ -451,13 +376,13 @@ def show_chain(sample_results,plotnames=None,plotchain=None,outname=None,alpha=0
 	
 	# set + load variables
 	parnames = np.array(sample_results['model'].theta_labels())
-	nwalkers = plotchain.shape[0]
-	nsteps = plotchain.shape[1]
+	nwalkers = chain.shape[0]
+	nsteps = chain.shape[1]
 
 	
 	# plot geometry
 	ndim = len(parnames)
-	nwalkers_per_column = 64
+	nwalkers_per_column = 128
 	nx = int(math.ceil(nwalkers/float(nwalkers_per_column)))
 	ny = ndim+1
 	sz = np.array([nx,ny])
@@ -474,12 +399,11 @@ def show_chain(sample_results,plotnames=None,plotchain=None,outname=None,alpha=0
 	# sample_results['chain']: nwalkers, nsteps, nparams
 	for ii in xrange(nx):
 		walkerstart = nwalkers_per_column*ii
-		walkerend   = np.clip(nwalkers_per_column*(ii+1),0,plotchain.shape[0])
+		walkerend   = np.clip(nwalkers_per_column*(ii+1),0,chain.shape[0])
 		for jj in xrange(len(parnames)):
 			for kk in xrange(walkerstart,walkerend):
-				axarr[jj,ii].plot(plotchain[kk,:,jj],'-',
-						   	   color='black',
-						   	   alpha=alpha)
+				axarr[jj,ii].plot(chain[kk,:,jj],'-',
+						   	      alpha=alpha)
 				
 			# fiddle with x-axis
 			axarr[jj,ii].axis('tight')
@@ -490,7 +414,7 @@ def show_chain(sample_results,plotnames=None,plotchain=None,outname=None,alpha=0
 				axarr[jj,ii].set_ylabel(plotnames[jj])
 			else:
 				axarr[jj,ii].set_yticklabels([])
-			axarr[jj,ii].set_ylim(sample_results['extents'][jj])
+			axarr[jj,ii].set_ylim(extents[jj])
 			axarr[jj,ii].yaxis.get_major_ticks()[0].label1On = False # turn off bottom ticklabel
 
 			# add truths
@@ -523,14 +447,13 @@ def show_chain(sample_results,plotnames=None,plotchain=None,outname=None,alpha=0
 		plt.savefig(outname, bbox_inches='tight',dpi=100)
 		plt.close()
 
-def return_sedplot_vars(sample_results, nufnu=True, watts=True):
+def return_sedplot_vars(sample_results, extra_output, nufnu=True):
 
 	'''
 	if nufnu == True: return in units of nu * fnu. Else, return maggies.
 	'''
 
 	# observational information
-	# hack to reload obs for brownseds_logzsol run
 	'''
 	if 'truename' in sample_results['run_params']:
 		from nonparametric_mocks_params import load_obs
@@ -543,8 +466,8 @@ def return_sedplot_vars(sample_results, nufnu=True, watts=True):
 	obs_maggies_unc = sample_results['obs']['maggies_unc'][mask]
 
 	# model information
-	spec = copy.copy(sample_results['bfit']['spec'])
-	mu = sample_results['bfit']['mags'][mask]
+	spec = copy.copy(extra_output['bfit']['spec'])
+	mu = extra_output['bfit']['mags'][mask]
 
 	# output units
 	if nufnu == True:
@@ -555,17 +478,17 @@ def return_sedplot_vars(sample_results, nufnu=True, watts=True):
 			factor *= 1e-26 * 3631 * 1e7 / 10000
 
 		mu *= factor/wave_eff
-		spec *= factor/sample_results['observables']['lam_obs']
+		spec *= factor/extra_output['observables']['lam_obs']
 		obs_maggies *= factor/wave_eff
 		obs_maggies_unc *= factor/wave_eff
 
 	# here we want to return
 	# effective wavelength of photometric bands, observed maggies, observed uncertainty, model maggies, observed_maggies-model_maggies / uncertainties
 	# model maggies, observed_maggies-model_maggies/uncertainties
-	return wave_eff/1e4, obs_maggies, obs_maggies_unc, mu, (obs_maggies-mu)/obs_maggies_unc, spec, sample_results['observables']['lam_obs']/1e4
+	return wave_eff/1e4, obs_maggies, obs_maggies_unc, mu, (obs_maggies-mu)/obs_maggies_unc, spec, extra_output['observables']['lam_obs']/1e4
 
 def sed_figure(outname = None, truths = None,
-			   colors = ['#1974D2'], sresults = None,
+			   colors = ['#1974D2'], sresults = None, extra_output = None,
 			   labels = ['spectrum, best-fit'],
 			   sfh_loc = [0.19,0.7,0.14,0.17],
 			   model_photometry = True, main_color=['black'],
@@ -603,7 +526,7 @@ def sed_figure(outname = None, truths = None,
 	for i,sample_results in enumerate(sresults):
 
 		#### grab data for maximum probability model
-		wave_eff, obsmags, obsmags_unc, modmags, chi, modspec, modlam = return_sedplot_vars(sample_results)
+		wave_eff, obsmags, obsmags_unc, modmags, chi, modspec, modlam = return_sedplot_vars(sample_results,extra_output[i])
 
 		#### plot maximum probability model
 		if model_photometry:
@@ -616,10 +539,10 @@ def sed_figure(outname = None, truths = None,
 			     ms=ms,alpha=alpha,markeredgewidth=0.7,**kwargs)		
 
 		###### spectra for q50 + 5th, 95th percentile
-		w = sample_results['observables']['lam_obs']
+		w = extra_output[i]['observables']['lam_obs']
 		spec_pdf = np.zeros(shape=(len(w),3))
 
-		for jj in xrange(len(w)): spec_pdf[jj,:] = np.percentile(sample_results['observables']['spec'][jj,:],[5.0,50.0,95.0])
+		for jj in xrange(len(w)): spec_pdf[jj,:] = np.percentile(extra_output[i]['observables']['spec'][jj,:],[5.0,50.0,95.0])
 		
 		sfactor = 3e18/w * 1e-26 * 3631 * 1e7 / 10000
 		nz = modspec > 0
@@ -695,7 +618,7 @@ def sed_figure(outname = None, truths = None,
 	phot.set_ylim(min(yplot[np.isfinite(yplot)])*0.4,max(yplot[np.isfinite(yplot)])*5)
 
 	#### add SFH plot
-	add_sfh_plot(sresults,fig,
+	add_sfh_plot(extra_output,fig,
 				 main_color = main_color,
                  truths=truths, ax_inset=sfh_ax,
                  text_size=1.4)
@@ -745,7 +668,7 @@ def sed_figure(outname = None, truths = None,
 			    
     # set labels
 	res.set_ylabel( r'$\chi$')
-	phot.set_ylabel(r'$\nu f_{\nu}$ [Watts/m$^2$]')
+	phot.set_ylabel(r'$\nu f_{\nu}$')
 	res.set_xlabel(r'$\lambda_{\mathrm{obs}}$ [$\mu$m]')
 	phot.set_yscale('log',nonposx='clip')
 	phot.set_xscale('log',nonposx='clip')
@@ -780,6 +703,7 @@ def sed_figure(outname = None, truths = None,
 	#os.system('open '+outname)
 
 def make_all_plots(filebase=None,
+				   extra_output=None,
 				   outfolder=os.getenv('APPS')+'/threedhst_bsfh/plots/',
 				   sample_results=None,
 				   param_name=None,
@@ -797,12 +721,12 @@ def make_all_plots(filebase=None,
 
 	if sample_results is None:
 		try:
-			sample_results, powell_results, model = threed_dutils.load_prospector_data(filebase)
+			sample_results, powell_results, model, extra_output = load_prospector_data(filebase, hdf5=True)
 		except TypeError:
 			return
 	else: # if we already have sample results, but want powell results
 		try:
-			powell_results, model = threed_dutils.load_prospector_data(filebase,no_sample_results=True)
+			_, powell_results, model, extra_output = load_prospector_data(filebase,no_sample_results=True, hdf5=True)
 		except TypeError:
 			return	
 
@@ -818,19 +742,15 @@ def make_all_plots(filebase=None,
 		truths = threed_dutils.load_truths(os.getenv('APPS')+'/threed'+sample_results['run_params']['param_file'].split('/threed')[1],
 			                               model=sample_results['model'],obs=sample_results['obs'], sps=sps)
 	except KeyError:
-		truths=None
+		truths = None
 
-	if 'extents' not in sample_results.keys():
-		# define nice plotting quantities
-		plotnames, plotchain = create_plotquant(sample_results, truths=truths)
-		sample_results['extents'] = return_extent(sample_results,plotchain=plotchain)
-
-    # chain plot (ONLY WORKS IF WE STILL HAVE CHAIN)
-	if plt_chain and sample_results['chain'] is not None: 
+    # chain plot
+	extents = return_extent(sample_results)
+	if plt_chain: 
 		print 'MAKING CHAIN PLOT'
 
-		show_chain(sample_results, plotnames=plotnames,plotchain=plotchain,
-	               outname=outfolder+objname+'.chain.png',
+		show_chain(sample_results, plotnames=sample_results['model'].theta_labels(),chain=sample_results['chain'],
+	               outname=outfolder+objname+'.chain.png', extents=extents,
 			       alpha=0.3,truths=truths)
 
 	# corner plot
@@ -839,10 +759,9 @@ def make_all_plots(filebase=None,
 		chopped_sample_results = copy.deepcopy(sample_results)
 
 		subcorner(sample_results, sps, copy.deepcopy(sample_results['model']),
-							 outname=outfolder+objname,plotchain=plotchain,
-							 plotnames=plotnames,
-							 showpars=None,start=0,
-							 show_titles=True, truths=truths, powell_results=powell_results)
+				  extra_output,outname=outfolder+objname,
+				  plotnames=sample_results['model'].theta_labels(),
+				  extents=extents, truths=truths, powell_results=powell_results)
 
 	# sed plot
 	if plt_sed:
@@ -856,7 +775,7 @@ def make_all_plots(filebase=None,
 			fast=0
 
  		# plot
- 		pfig = sed_figure(sresults = [sample_results],
+ 		pfig = sed_figure(sresults = [sample_results], extra_output=[extra_output],
  			              truths=truths, outname=outfolder+objname+'.sed.png')
  		
 def plot_all_driver(runname=None,**extras):
