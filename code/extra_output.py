@@ -29,13 +29,9 @@ def calc_emp_ha(mass,sfr,dust1,dust2,dustindex,ncomp=1):
 
 def maxprob_model(sample_results,sps):
 
-	# grab maximum probability, plus the thetas that gave it
-	chopped_prob = threed_dutils.chop_chain(sample_results['lnprobability'])
-	maxprob = chopped_prob.max()
-	probind = chopped_prob == maxprob
-	thetas = sample_results['flatchain'][probind]
-	if type(thetas[0]) != np.dtype('float64'):
-		thetas = thetas[0]
+	### grab maximum probability, plus the thetas that gave it
+	maxprob = sample_results['flatprob'].max()
+	maxtheta = sample_results['flatchain'][sample_results['flatprob'].argmax()]
 
 	### ensure that maxprob stored is the same as calculated now 
 	current_maxprob = threed_dutils.test_likelihood(sps,
@@ -47,7 +43,7 @@ def maxprob_model(sample_results,sps):
 	print 'Best-fit lnprob currently: {0}'.format(current_maxprob)
 	print 'Best-fit lnprob during sampling: {0}'.format(maxprob)
 
-	return thetas, maxprob
+	return maxtheta, maxprob
 
 def measure_model_phot(sample_results, sample_idx, sps):
 
@@ -98,9 +94,6 @@ def measure_spire_phot(sample_results, flatchain, sps):
 
 	return sample_results
 
-<<<<<<< HEAD
-def calc_extra_quantities(sample_results, ncalc=2000, ir_priors=True):
-=======
 def sample_flatchain(chain, lnprob, parnames, ir_priors=True, include_maxlnprob=True, nsamp=2000):
 
 	'''
@@ -186,13 +179,8 @@ def calc_extra_quantities(sample_results, ncalc=2000, ir_priors=True, opts=None)
 
 	parnames = np.array(sample_results['model'].theta_labels())
 
-	##### modify nebon status
-	# we want to be able to turn it on and off at will
-	if sample_results['model'].params['add_neb_emission'] == 2:
-		sample_results['model'].params['add_neb_emission'] = np.array(True)
-
-	##### initialize sps
-	sps = model_setup.load_sps(**sample_results['run_params'])
+	##### describe number of components in Prospector model [legacy]
+	sample_results['ncomp'] = np.sum(['mass' in x for x in sample_results['model'].theta_labels()])
 
 	##### array indexes over which to sample the flatchain
 	sample_idx = sample_flatchain(sample_results['flatchain'], sample_results['flatprob'], 
@@ -201,7 +189,6 @@ def calc_extra_quantities(sample_results, ncalc=2000, ir_priors=True, opts=None)
     ##### initialize output arrays for SFH + emission line posterior draws
 	half_time,sfr_10,sfr_100,sfr_1000,ssfr_100,stellar_mass,emp_ha,lir,luv, \
 	bdec_calc,ext_5500,dn4000,ssfr_10,xray_lum = [np.zeros(shape=(ncalc)) for i in range(14)]
-
 	if 'fagn' in parnames:
 		l_agn = np.zeros(shape=(ncalc))
 
@@ -209,29 +196,6 @@ def calc_extra_quantities(sample_results, ncalc=2000, ir_priors=True, opts=None)
 	d1_idx = parnames == 'dust1'
 	d2_idx = parnames == 'dust2'
 	didx = parnames == 'dust_index'
-
-	##### use randomized, flattened, thinned chain for posterior draws
-	# don't allow things outside the priors
-	# make maxprob the first stop
-	in_priors = np.isfinite(threed_dutils.chop_chain(sample_results['lnprobability'])) == True
-	flatchain = copy(sample_results['flatchain'][in_priors])
-	np.random.shuffle(flatchain)
-
-	### cut in IR priors
-	if ir_priors:
-
-		gamma_idx = np.array(parnames) == 'duste_gamma'
-		umin_idx = np.array(parnames) == 'duste_umin'
-		qpah_idx = np.array(parnames) == 'duste_qpah'
-		gamma_prior = 0.15
-		umin_prior = 15
-		qpah_prior = 7
-		good = (flatchain[:,gamma_idx] < gamma_prior) & \
-		       (flatchain[:,umin_idx] < umin_prior) & \
-		       (flatchain[:,qpah_idx] < qpah_prior)
-		if good.sum() > ncalc:
-			flatchain = flatchain[np.squeeze(good),:]
-	flatchain[0,:] = maxthetas
 
 	##### set up time vector for full SFHs
 	t = set_sfh_time_vector(sample_results)
@@ -252,7 +216,7 @@ def calc_extra_quantities(sample_results, ncalc=2000, ir_priors=True, opts=None)
 		sample_results['model'].params['add_neb_emission'] = np.array(True)
 
 	######## posterior sampling #########
-	for jj in xrange(ncalc):
+	for jj,idx in enumerate(sample_idx):
 		
 		##### model call, to set parameters
 		thetas = copy(sample_results['flatchain'][idx])
@@ -482,31 +446,27 @@ def update_all(runname, **kwargs):
 	for param in parm_basename:
 		post_processing(param, **kwargs)
 
-def post_processing(param_name, add_extra=True, **extras):
+def post_processing(param_name, **extras):
 
 	'''
-	Driver. Loads output, makes all plots for a given galaxy.
+	Driver. Loads output, runs post-processing routine.
 	'''
 
-	print 'begun post-processing'
+	from brown_io import load_prospector_data, create_prosp_filename
+
+	# I/O
 	parmfile = model_setup.import_module_from_file(param_name)
 	outname = parmfile.run_params['outfile']
 	outfolder = os.getenv('APPS')+'/threedhst_bsfh/plots/'+outname.split('/')[-2]+'/'
 
-	# thin and chop the chain?
-	thin=1
-	chop_chain=1.666
-
-	# make sure the output folder exists
-	try:
+	# check for output folder, create if necessary
+	if not os.path.isdir(outfolder):
 		os.makedirs(outfolder)
-	except OSError:
-		pass
 
 	try:
  		sample_results, powell_results, model, _ = load_prospector_data(outname,hdf5=True,load_extra_output=False)
  	except AttributeError:
- 		print 'failed to load '+param_name
+ 		print 'Failed to load chain for '+sample_results['run_params']['objname']+'. Returning.'
  		return
 
 	print 'Performing post-processing on ' + sample_results['run_params']['objname']
