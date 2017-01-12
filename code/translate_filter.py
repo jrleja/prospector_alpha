@@ -120,6 +120,23 @@ def translate_fsps_to_sedpy(fsps_filtname,sedpy_filtname,
 
 	print 'created '+outfile
 
+def modify_w4():
+	
+	'''
+	according to http://adsabs.harvard.edu/abs/2014arXiv1411.5444B
+	'''
+
+	curve = '/Users/joel/code/python/sedpy/sedpy/data/filters/wise_w4.par'
+	lam, res = [], []
+	with open(curve,'r') as f:
+		for line in f:
+			lam.append(float(line.split('  ')[0])*1.033)
+			res.append(float(line.split('  ')[1][:-1]))
+
+	newcurve = '/Users/joel/code/python/sedpy/sedpy/data/filters/wise_w4_prime.par'
+	with open(newcurve,'w') as f:
+		for i in xrange(len(res)): f.write('{0}  {1}\n'.format(lam[i],res[i]))
+
 def main(field=False):
 
 	''' TRANSLATES FAST FILTER DEFINITIONS TO FSPS '''

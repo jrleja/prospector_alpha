@@ -38,7 +38,6 @@ def load_prospector_data(filebase,no_sample_results=False,objname=None,runname=N
 	'''
 
 	from prospect.io import read_results
-	import hickle
 
 	#### shortcut: pass None to filebase and objname + runname keywords
 	if (objname is not None) & (runname is not None):
@@ -49,8 +48,7 @@ def load_prospector_data(filebase,no_sample_results=False,objname=None,runname=N
 		mcmc_filename += '.h5'
 
 	if load_extra_output:
-		with open(extra_name, "r") as f:
-			extra_output=hickle.load(f)
+		extra_output = load_prospector_extra(filebase,objname=objname,runname=runname)
 	else:
 		extra_output = None
 
@@ -61,6 +59,20 @@ def load_prospector_data(filebase,no_sample_results=False,objname=None,runname=N
 		sample_results, powell_results, model = read_results.results_from(mcmc_filename, model_file=model_filename,inmod=None)
 	
 	return sample_results, powell_results, model, extra_output
+
+def load_prospector_extra(filebase,objname=None,runname=None):
+
+	import hickle
+
+	#### shortcut: pass None to filebase and objname + runname keywords
+	if (objname is not None) & (runname is not None):
+		filebase = os.getenv('APPS')+'/threedhst_bsfh/results/'+runname+'/'+runname+'_'+objname
+	mcmc_filename, model_filename, extra_name = create_prosp_filename(filebase)
+
+	with open(extra_name, "r") as f:
+		extra_output=hickle.load(f)
+
+	return extra_output
 
 def create_prosp_filename(filebase):
 
@@ -475,36 +487,42 @@ def write_villar_data():
 	mass, sfr100, ssfr100, tauv, met = [np.zeros(shape=(3,ngals)) for i in xrange(5)]
 	names = []
 	for jj in xrange(ngals):
-		sample_results, powell_results, model = load_prospector_data(filebase[jj])
 		
+		try:
+			extra_output = load_prospector_extra(filebase[jj])
+		except TypeError:
+			print 'galaxy {0} named '.format(jj)+filebase[jj].split('_')[-1]+' failed to load.'
+			print 'not adding this to the output.'
+			continue
+
 		if jj == 0:
-			mass_idx = np.array(sample_results['quantiles']['parnames']) == 'logmass'
-			tauv_idx = np.array(sample_results['quantiles']['parnames']) == 'dust2'
-			met_idx = np.array(sample_results['quantiles']['parnames']) == 'logzsol'
-			sfr100_idx = sample_results['extras']['parnames'] == 'sfr_100'
-			ssfr100_idx = sample_results['extras']['parnames'] == 'ssfr_100'
+			mass_idx = np.array(extra_output['extras']['parnames']) == 'stellar_mass'
+			tauv_idx = np.array(extra_output['quantiles']['parnames']) == 'dust2'
+			met_idx = np.array(extra_output['quantiles']['parnames']) == 'logzsol'
+			sfr100_idx = extra_output['extras']['parnames'] == 'sfr_100'
+			ssfr100_idx = extra_output['extras']['parnames'] == 'ssfr_100'
 
-		mass[:,jj] = [sample_results['quantiles']['q50'][mass_idx],
-					  sample_results['quantiles']['q84'][mass_idx],
-					  sample_results['quantiles']['q16'][mass_idx]]
+		mass[:,jj] = [np.log10(extra_output['extras']['q50'][mass_idx])[0],
+					  np.log10(extra_output['extras']['q84'][mass_idx])[0],
+					  np.log10(extra_output['extras']['q16'][mass_idx])[0]]
 
-		sfr100[:,jj] = [sample_results['extras']['q50'][sfr100_idx],
-					    sample_results['extras']['q84'][sfr100_idx],
-					    sample_results['extras']['q16'][sfr100_idx]]
+		sfr100[:,jj] = [extra_output['extras']['q50'][sfr100_idx],
+					    extra_output['extras']['q84'][sfr100_idx],
+					    extra_output['extras']['q16'][sfr100_idx]]
 		
-		ssfr100[:,jj] = [sample_results['extras']['q50'][ssfr100_idx],
-					     sample_results['extras']['q84'][ssfr100_idx],
-					     sample_results['extras']['q16'][ssfr100_idx]]
+		ssfr100[:,jj] = [extra_output['extras']['q50'][ssfr100_idx],
+					     extra_output['extras']['q84'][ssfr100_idx],
+					     extra_output['extras']['q16'][ssfr100_idx]]
 		
-		tauv[:,jj] = [sample_results['quantiles']['q50'][tauv_idx],
-					  sample_results['quantiles']['q84'][tauv_idx],
-					  sample_results['quantiles']['q16'][tauv_idx]]
+		tauv[:,jj] = [extra_output['quantiles']['q50'][tauv_idx],
+					  extra_output['quantiles']['q84'][tauv_idx],
+					  extra_output['quantiles']['q16'][tauv_idx]]
 
-		met[:,jj] = [sample_results['quantiles']['q50'][met_idx],
-					    sample_results['quantiles']['q84'][met_idx],
-					    sample_results['quantiles']['q16'][met_idx]]
+		met[:,jj] = [extra_output['quantiles']['q50'][met_idx],
+					    extra_output['quantiles']['q84'][met_idx],
+					    extra_output['quantiles']['q16'][met_idx]]
 
-		names.append("_".join(sample_results['run_params']['objname'].split(' ')))
+		names.append(filebase[jj].split('_')[-1])
 
 	outmod = os.getenv('APPS')+'/threedhst_bsfh/data/ashley/ashley_out.dat'
 
@@ -529,13 +547,15 @@ def write_villar_data():
 		for key in outdict.keys(): hdr += key+' '+key+'_84th '+key+'_16th '
 		f.write(hdr+'\n')
 
-		for jj in xrange(ngals):
+		ngals_loaded = len(names)
+		for jj in xrange(ngals_loaded):
 			f.write(names[jj]+' ')
 			for key in outdict.keys():
 				fmt = "{:.6e}"
 				f.write(fmt.format(outdict[key][0,jj]) + ' ' + fmt.format(outdict[key][1,jj]) + ' ' + fmt.format(outdict[key][2,jj])+' ')
 			f.write('\n')
 
+	print 1/0
 
 def write_eufrasio_data():
 
