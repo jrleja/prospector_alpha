@@ -27,7 +27,6 @@ def subcorner(sample_results,  sps, model, extra_output,
                 outname=None, showpars=None,
                 truths=None, extents=None,
                 powell_results=None,
-                plotnames=None,
                 **kwargs):
     """
     Make a corner plot of the (thinned, latter) samples of the posterior
@@ -54,9 +53,10 @@ def subcorner(sample_results,  sps, model, extra_output,
     else:
         ptruths = None
 
-    fig = corner.corner(flatchain, labels = plotnames,
-                        quantiles=[0.16, 0.5, 0.84], verbose=False,
-                        truths = ptruths, range=extents,truth_color='red',**kwargs)
+    fig = corner.corner(flatchain, labels = parnames,
+                        quantiles=[0.16, 0.5, 0.84], verbose = False,
+                        truths = ptruths, range = extents, truth_color='red',
+                        show_titles = True, **kwargs)
 
     fig = add_to_corner(fig, sample_results, extra_output, sps, model, truths=truths, powell_results=powell_results)
     if outname is not None:
@@ -757,7 +757,6 @@ def make_all_plots(filebase=None,
 
 		subcorner(sample_results, sps, copy.deepcopy(sample_results['model']),
 				  extra_output,outname=outfolder+objname,
-				  plotnames=sample_results['model'].theta_labels(),
 				  extents=extents, truths=truths, powell_results=powell_results)
 
 	# sed plot

@@ -149,8 +149,8 @@ def plot_all(runname='brownseds_agn',alldata=None,outfolder=None):
 
 	#### select data to plot. generate SEDs with no AGN contribution if necessary.
 	# 10 most massive AGN
-	#idx_plot = pdata['pars']['fagn']['q50'].argsort()[-10:][::-1]
-	idx_plot = pdata['pars']['fagn']['q50'].argsort()[:10][::-1]
+	idx_plot = pdata['pars']['fagn']['q50'].argsort()[-10:][::-1]
+	#idx_plot = pdata['pars']['fagn']['q50'].argsort()[:10][::-1]
 	pdata = collate_spectra(alldata,idx_plot,pdata,runname)
 
 	#### plot data
@@ -284,7 +284,7 @@ def plot_composites(pdata,idx_plot,outfolder,contour_colors=True,calibration_plo
 				flux_color[background] = np.nan
 				'''
 				### don't trust anything less than 0.001 the max!
-				maxlim = 0.08
+				maxlim = 0.15
 				max1 = np.nanmax(data1_slice)
 				max2 = np.nanmax(data2_slice)
 				background = (data1_slice < max1*maxlim) | (data2_slice < max2*maxlim)
@@ -440,7 +440,7 @@ def plot_color_contour(ax,flux1,flux2,filter1,filter2,size,ncontours=25,color='w
 	background = (flux1 < background1*background_filter) & (flux2 < background2*background_filter)
 	flux_color[background] = np.nan
 	'''
-	maxlim = 0.08
+	maxlim = 0.15
 	max1 = np.nanmax(flux1_slice)
 	max2 = np.nanmax(flux2_slice)
 	background = (flux1 < max1*maxlim) | (flux2 < max2*maxlim)

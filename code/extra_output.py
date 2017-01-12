@@ -347,7 +347,7 @@ def calc_extra_quantities(sample_results, ncalc=2000, ir_priors=True, opts=None)
 
 	#### BEST-FITS
 	bfit      = {'maxprob_params':maxthetas,
-				 'maxprob':maxprob[0],
+				 'maxprob':maxprob,
 	             'emp_ha': emp_ha[0],
 	             'sfh': intsfr[:,0],
 	             'half_time': half_time[0],
@@ -483,7 +483,7 @@ def post_processing(param_name, **extras):
 	### MAKE PLOTS HERE
 	try:
 		threedhst_diag.make_all_plots(sample_results=sample_results,extra_output=extra_output,
-			                          filebase=outname,outfolder=outfolder,param_name=param_name)
+			                          filebase=outname,outfolder=outfolder,param_name=param_name+'.py')
 	except NameError:
 		print "Unable to make plots for "+sample_results['run_params']['objname']+" due to import error. Passing."
 		pass
