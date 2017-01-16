@@ -1,7 +1,7 @@
 import numpy as np
 import os
 from prospect.models import priors, sedmodel
-from prospect.sources import StepSFHBasis
+from prospect.sources import FastStepBasis
 from sedpy import observate
 from astropy.cosmology import WMAP9
 from astropy.io import fits
@@ -21,8 +21,9 @@ run_params = {'verbose':True,
               'maxfev':5000,
               # MCMC params
               'nwalkers':620,
-              'nburn':[150,200,400], 
-              'niter': 3000,
+              'nburn':[150,200,400,600], 
+              'niter': 2500,
+              'interval': 0.2,
               # Model info
               'zcontinuous': 2,
               'compute_vega_mags': False,
@@ -473,10 +474,6 @@ model_params.append({'name': 'peraa', 'N': 1,
                      'isfree': False,
                      'init': False})
 
-model_params.append({'name': 'mass_units', 'N': 1,
-                     'isfree': False,
-                     'init': 'mstar'})
-
 #### resort list of parameters 
 #### so that major ones are fit first
 parnames = [m['name'] for m in model_params]
@@ -539,32 +536,28 @@ class BurstyModel(sedmodel.SedModel):
             lnp_prior += this_prior
         return lnp_prior
 
-class FracSFH(StepSFHBasis):
+class FracSFH(FastStepBasis):
     
-    @property
-    def all_ssp_weights(self):
-        # Cache age bins and relative weights.  This means params['agebins']
-        # *must not change* without also setting _ages = None
-        if getattr(self, '_ages', None) is None:
-            self._ages = self.params['agebins']
-            nbin, nssp = len(self._ages), len(self.logage) + 1
-            self._bin_weights = np.zeros([nbin, nssp])
-            self._time_per_bin = np.zeros(nbin)
-            for i, (t1, t2) in enumerate(self._ages):
-                # These *should* sum to one (or zero) for each bin
-                self._bin_weights[i,:] = self.bin_weights(t1, t2)
-                self._time_per_bin[i] = 10**t2-10**t1
+    def get_galaxy_spectrum(self, **params):
+        self.update(**params)
 
-        # Now normalize the weights in each bin by the massfrac parameter, and sum
-        # over bins.
-        # note that because we don't divide by sps.bin_mass_fraction,
-        # we are implicitly working in mass formed, NOT in stellar mass
-        bin_masses = np.array(self.params['sfr_fraction'])
-        bin_masses = np.append(bin_masses,(1-np.sum(self.params['sfr_fraction'])))*self._time_per_bin
+        #### here's the custom fractional stuff
+        fractions = np.array(self.params['sfr_fraction'])
+        bin_fractions = np.append(fractions,(1-np.sum(fractions)))
+        time_per_bin = []
+        for (t1, t2) in self.params['agebins']: time_per_bin.append(10**t2-10**t1)
+        bin_fractions *= np.array(time_per_bin)
+        bin_fractions /= bin_fractions.sum()
+        
+        mass = bin_fractions*self.params['mass']
+        mtot = self.params['mass'].sum()
 
-        w = (bin_masses[:, None] * self._bin_weights).sum(axis=0)
+        time, sfr, tmax = self.convert_sfh(self.params['agebins'], mass)
+        self.ssp.params["sfh"] = 3 #Hack to avoid rewriting the superclass
+        self.ssp.set_tabular_sfh(time, sfr)
+        wave, spec = self.ssp.get_spectrum(tage=tmax, peraa=False)
 
-        return w
+        return wave, spec / mtot, self.ssp.stellar_mass / mtot
 
 def load_sps(**extras):
 
@@ -597,13 +590,13 @@ def load_model(objname='',datname='', agelims=[], **extras):
     #### FRACTIONAL MASS INITIALIZATION
     # N-1 bins, last is set by x = 1 - np.sum(sfr_fraction)
     model_params[n.index('sfr_fraction')]['N'] = ncomp-1
-    model_params[n.index('sfr_fraction')]['init'] = np.zeros(ncomp-1)+1./ncomp
     model_params[n.index('sfr_fraction')]['prior_args'] = {
                                                            'maxi':np.full(ncomp-1,1.0), 
                                                            'mini':np.full(ncomp-1,0.0),
                                                            # NOTE: ncomp instead of ncomp-1 makes the prior take into account the implicit Nth variable too
                                                           }
-    model_params[n.index('sfr_fraction')]['init_disp'] = 0.15
+    model_params[n.index('sfr_fraction')]['init'] =  np.zeros(ncomp-1)+1./ncomp
+    model_params[n.index('sfr_fraction')]['init_disp'] = 0.02
 
     #### INSERT REDSHIFT INTO MODEL PARAMETER DICTIONARY ####
     zind = n.index('zred')
