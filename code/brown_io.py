@@ -555,8 +555,6 @@ def write_villar_data():
 				f.write(fmt.format(outdict[key][0,jj]) + ' ' + fmt.format(outdict[key][1,jj]) + ' ' + fmt.format(outdict[key][2,jj])+' ')
 			f.write('\n')
 
-	print 1/0
-
 def write_eufrasio_data():
 
 	from threed_dutils import generate_basenames

@@ -383,10 +383,6 @@ model_params.append({'name': 'peraa', 'N': 1,
                      'isfree': False,
                      'init': False})
 
-model_params.append({'name': 'mass_units', 'N': 1,
-                     'isfree': False,
-                     'init': 'mstar'})
-
 #### resort list of parameters 
 #### so that major ones are fit first
 parnames = [m['name'] for m in model_params]

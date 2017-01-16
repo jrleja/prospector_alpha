@@ -56,7 +56,7 @@ def subcorner(sample_results,  sps, model, extra_output,
     fig = corner.corner(flatchain, labels = parnames,
                         quantiles=[0.16, 0.5, 0.84], verbose = False,
                         truths = ptruths, range = extents, truth_color='red',
-                        show_titles = True, **kwargs)
+                        show_titles = True, plot_datapoints=False, **kwargs)
 
     fig = add_to_corner(fig, sample_results, extra_output, sps, model, truths=truths, powell_results=powell_results)
     if outname is not None:
@@ -508,6 +508,7 @@ def sed_figure(outname = None, truths = None,
 	gs = gridspec.GridSpec(2,1, height_ratios=[3,1])
 	gs.update(hspace=0)
 	phot, res = plt.Subplot(fig, gs[0]), plt.Subplot(fig, gs[1])
+	sfh_loc = [0.19,0.4,0.14,0.17]
 	sfh_ax = fig.add_axes(sfh_loc,zorder=32)
 
 	### diagnostic text
