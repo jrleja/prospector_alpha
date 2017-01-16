@@ -9,7 +9,7 @@
 ### Partition or queue name
 #SBATCH -p conroy,serial_requeue
 ### memory per cpu, in MB
-#SBATCH --mem-per-cpu=10000
+#SBATCH --mem-per-cpu=6500
 ### Job name
 #SBATCH -J 'bseds_np_sec'
 ### output and error logs
@@ -18,5 +18,4 @@
 ### mail
 #SBATCH --mail-type=END
 #SBATCH --mail-user=joel.leja@gmail.com
-### source activate pympi
 python $APPS/threedhst_bsfh/code/extra_output.py $APPS/threedhst_bsfh/parameter_files/brownseds_np/brownseds_np_params_$SLURM_ARRAY_TASK_ID.py 

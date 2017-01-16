@@ -5,7 +5,7 @@
 ### Requested number of nodes
 #SBATCH -N 1
 ### Requested computing time in minutes
-#SBATCH -t 720
+#SBATCH -t 1440
 ### Partition or queue name
 #SBATCH -p conroy,general
 ### memory per cpu, in MB
@@ -18,5 +18,4 @@
 ### mail
 #SBATCH --mail-type=END
 #SBATCH --mail-user=joel.leja@gmail.com
-### source activate pympi
-mpirun -n $SLURM_NPROCS python $APPS/bsfh/scripts/prospector.py --param_file=$APPS/threedhst_bsfh/parameter_files/brownseds_np/brownseds_np_params_$SLURM_ARRAY_TASK_ID.py 
+srun -n $SLURM_NTASKS --mpi=pmi2 python $APPS/bsfh/scripts/prospector.py --param_file=$APPS/threedhst_bsfh/parameter_files/brownseds_np/brownseds_np_params_$SLURM_ARRAY_TASK_ID.py 
