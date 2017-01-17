@@ -150,8 +150,8 @@ def load_obs(photname='', extinctname='', herschname='', objname='', **extras):
     magunc_fields = [f for f in dat.dtype.names if f[0:2] == 'e_']
 
     # extract fluxes for particular object, converting from record array to numpy array
-    mag = dat[mag_fields].view(float).reshape(len(dat),-1)[obj_ind]
-    magunc  = dat[magunc_fields].view(float).reshape(len(dat),-1)[obj_ind]
+    mag = np.array([f for f in dat[mag_fields][obj_ind]])
+    magunc  = np.array([f for f in dat[magunc_fields][obj_ind]])
 
     # extinctions
     extinct = fits.open(extinctname)
