@@ -516,50 +516,50 @@ def plot_obs_spec(obs_spec, phot, spec_res, alpha,
 
 	return out
 
-def update_model_info(alldata, sample_results, magphys):
+def update_model_info(alldata, sample_results, extra_output, magphys):
 
 	alldata['objname'] = sample_results['run_params']['objname']
 	alldata['magphys'] = magphys['pdfs']
 	alldata['model'] = magphys['model']
-	alldata['pquantiles'] = sample_results['quantiles']
+	alldata['pquantiles'] = extra_output['quantiles']
 	npars = len(sample_results['initial_theta'])
 	
 	# choose 2000 random samples
 	in_priors = np.isfinite(threed_dutils.chop_chain(sample_results['lnprobability'])) == True
-	flatchain = sample_results['flatchain'][in_priors]
+	flatchain = threed_dutils.chop_chain(sample_results['chain'])[in_priors]
 	ransamp = flatchain[np.random.choice(flatchain.shape[0], 2000, replace=False),:]
 
 	alldata['pquantiles']['random_chain'] = ransamp
-	alldata['spec_info'] = sample_results['spec_info']
-	alldata['model_emline'] = sample_results['model_emline']
-	alldata['lir'] = sample_results['observables']['L_IR']
+	alldata['spec_info'] = extra_output['spec_info']
+	alldata['model_emline'] = extra_output['model_emline']
+	alldata['lir'] = extra_output['observables']['L_IR']
 	mask = sample_results['obs']['phot_mask']
-	alldata['model_maggies'] = sample_results['observables']['mags'][mask]
+	alldata['model_maggies'] = extra_output['observables']['mags'][mask]
 	alldata['obs_maggies'] = sample_results['obs']['maggies'][mask]
 	alldata['filters'] = np.array(sample_results['obs']['filternames'])[mask]
 
-	alldata['pextras'] = sample_results['extras']
+	alldata['pextras'] = extra_output['extras']
 	alldata['pquantiles']['parnames'] = np.array(sample_results['model'].theta_labels())
-	alldata['bfit'] = sample_results['bfit']
+	alldata['bfit'] = extra_output['bfit']
 
-	if 'mphot' in sample_results.keys():
+	if 'mphot' in extra_output.keys() and isinstance(extra_output['mphot'],dict):
 
-		uv = -2.5*np.log10(sample_results['mphot']['mags'][0,:])+2.5*np.log10(sample_results['mphot']['mags'][1,:])
-		vj = -2.5*np.log10(sample_results['mphot']['mags'][1,:])+2.5*np.log10(sample_results['mphot']['mags'][2,:])
+		uv = -2.5*np.log10(extra_output['mphot']['mags'][0,:])+2.5*np.log10(extra_output['mphot']['mags'][1,:])
+		vj = -2.5*np.log10(extra_output['mphot']['mags'][1,:])+2.5*np.log10(extra_output['mphot']['mags'][2,:])
 
 		alldata['mphot'] = {}
 		alldata['mphot']['uv'] = np.percentile(uv,[50.0,84.0,16.0])
 		alldata['mphot']['vj'] = np.percentile(vj,[50.0,84.0,16.0])
-		alldata['mphot']['mags'] = sample_results['mphot']
+		alldata['mphot']['mags'] = extra_output['mphot']
 	else:
-		print 1/0
+		pass
 	return alldata
 
-def sed_comp_figure(sample_results, sps, model, magphys,
-                alpha=0.3, samples = [-1],
-                maxprob=0, outname=None, fast=False,
-                truths = None, agb_off = False,
-                **kwargs):
+def sed_comp_figure(sample_results, extra_output, sps, model, magphys,
+                    alpha=0.3, samples = [-1],
+                    maxprob=0, outname=None, fast=False,
+                    truths = None, agb_off = False,
+                    **kwargs):
 	"""
 	Plot the photometry for the model and data (with error bars) for
 	a single object, and plot residuals.
@@ -591,7 +591,9 @@ def sed_comp_figure(sample_results, sps, model, magphys,
 	##### Prospector maximum probability model ######
 	# plot the spectrum, photometry, and chi values
 	try:
-		wave_eff, obsmags, obsmags_unc, modmags, chi, frac_prosp, modspec, modlam = return_sedplot_vars(sample_results['bfit']['spec'], sample_results['bfit']['mags'], sample_results['obs'], sps)
+		wave_eff, obsmags, obsmags_unc, modmags, chi, frac_prosp, modspec, modlam = return_sedplot_vars(extra_output['bfit']['spec'], 
+			                                                                                            extra_output['bfit']['mags'], 
+			                                                                                            sample_results['obs'], sps)
 	except KeyError as e:
 		print e
 		print "You must run post-processing on the Prospector " + \
@@ -612,9 +614,9 @@ def sed_comp_figure(sample_results, sps, model, magphys,
               color=prosp_color, alpha=0.6,**kwargs)
 
 	###### spectra for q50 + 5th, 95th percentile
-	w = sample_results['observables']['lam_obs']
+	w = extra_output['observables']['lam_obs']
 	spec_pdf = np.zeros(shape=(len(w),3))
-	for jj in xrange(len(w)): spec_pdf[jj,:] = np.percentile(sample_results['observables']['spec'][jj,:],[16.0,50.0,84.0])
+	for jj in xrange(len(w)): spec_pdf[jj,:] = np.percentile(extra_output['observables']['spec'][jj,:],[16.0,50.0,84.0])
 	sfactor = 3e18/w 	# must convert to nu fnu
 
 	nz = spec_pdf[:,1] > 0
@@ -661,7 +663,7 @@ def sed_comp_figure(sample_results, sps, model, magphys,
 	for ii in xrange(3):
 		
 		if label[ii] == 'Optical':
-			residuals['emlines'] = measure_emline_lum.measure(sample_results, obs_spec, magphys,sps)
+			residuals['emlines'] = measure_emline_lum.measure(sample_results, extra_output, obs_spec, magphys,sps)
 			if residuals.get('emlines',None) is not None:
 				sigsmooth[ii] = residuals['emlines']['sigsmooth']
 			else:
@@ -697,12 +699,9 @@ def sed_comp_figure(sample_results, sps, model, magphys,
 
 	#### SFR and mass
 	# calibrated to be to the right of ax_loc = [0.38,0.68,0.13,0.13]
-	prosp_sfr = sample_results['extras']['q50'][sample_results['extras']['parnames'] == 'sfr_100'][0]
+	prosp_sfr = extra_output['extras']['q50'][extra_output['extras']['parnames'] == 'sfr_100'][0]
 	# logmass or mass?
-	try:
-		prosp_mass = np.log10(sample_results['quantiles']['q50'][np.array(sample_results['quantiles']['parnames']) == 'mass'][0])
-	except IndexError:
-		prosp_mass = sample_results['quantiles']['q50'][np.array(sample_results['quantiles']['parnames']) == 'logmass'][0]
+	prosp_mass = np.log10(extra_output['extras']['q50'][np.array(extra_output['extras']['parnames']) == 'stellar_mass'][0])
 	mag_mass = np.log10(magphys['model']['parameters'][magphys['model']['parnames'] == 'M*'][0])
 	mag_sfr = magphys['model']['parameters'][magphys['model']['parnames'] == 'SFR'][0]
 	
@@ -724,8 +723,10 @@ def sed_comp_figure(sample_results, sps, model, magphys,
 	##### add SFH plot
 	from threedhst_diag import add_sfh_plot
 	ax_loc = [0.38,0.68,0.13,0.13]
+	ax_inset = fig.add_axes(ax_loc,zorder=32)
 	text_size = 1.5
-	ax_inset = add_sfh_plot(sample_results,fig,sps,text_size=text_size,ax_loc=ax_loc)
+
+	add_sfh_plot([extra_output],fig,sps,text_size=text_size,ax_inset=ax_inset,main_color='black')
 
 	##### add MAGPHYS SFH
 	magmass = magphys['model']['full_parameters'][[magphys['model']['full_parnames'] == 'M*/Msun']]
@@ -784,7 +785,6 @@ def sed_comp_figure(sample_results, sps, model, magphys,
 	ax2.xaxis.set_minor_formatter(minorFormatter)
 	ax2.xaxis.set_major_formatter(majorFormatter)
 
-
 	# remove ticks
 	phot.set_xticklabels([])
     
@@ -822,7 +822,7 @@ def collate_data(filebase=None,
 
 	# attempt to load data
 	try:
-		sample_results, powell_results, model = brown_io.load_prospector_data(filebase)
+		 sample_results, powell_results, model, extra_output = brown_io.load_prospector_data(filebase)
 	except AttributeError:
 		print 'failed to load ' + filebase
 		return None
@@ -842,16 +842,16 @@ def collate_data(filebase=None,
 	sample_results['model'].params['add_neb_emission'] = np.array(True)
 	print 'MAKING SED COMPARISON PLOT'
 	# plot
-	residuals = sed_comp_figure(sample_results, sps, copy.deepcopy(sample_results['model']),
-					  magphys, maxprob=1,
-					  outname=outfolder+objname.replace(' ','_')+'.sed.png')
+	residuals = sed_comp_figure(sample_results, extra_output, sps, copy.deepcopy(sample_results['model']),
+					            magphys, maxprob=1,
+					            outname=outfolder+objname.replace(' ','_')+'.sed.png')
  		
 	# SAVE OUTPUTS
 	alldata = {}
 	if residuals is not None:
 		print 'SAVING OUTPUTS for ' + sample_results['run_params']['objname']
 		alldata['residuals'] = residuals
-		alldata = update_model_info(alldata, sample_results, magphys)
+		alldata = update_model_info(alldata, sample_results, extra_output, magphys)
 	else:
 		alldata = None
 
@@ -875,16 +875,11 @@ def plt_all(runname=None,startup=True,**extras):
 		alldata = []
 
 		for jj in xrange(len(filebase)):
-			print 'iteration '+str(jj) 
-			if (filebase[jj].split('_')[-1] != 'NGC 4125') & \
-			   (filebase[jj].split('_')[-1] != 'NGC 6090'):
-				continue
 
 			dictionary = collate_data(filebase=filebase[jj],\
 			                           outfolder=outfolder,
 			                           **extras)
 			alldata.append(dictionary)
-		print 1/0
 		brown_io.save_alldata(alldata,runname=runname)
 	else:
 		alldata = brown_io.load_alldata(runname=runname)
@@ -1158,7 +1153,7 @@ def add_prosp_mag_info(runname=None):
 	for ii,dat in enumerate(alldata):
 		sample_results, powell_results, model = brown_io.load_prospector_data(filebase[ii])
 		magphys = read_magphys_output(objname=dat['objname'])
-		dat = update_model_info(dat, sample_results, magphys)
+		dat = update_model_info(dat, sample_results, extra_output, magphys)
 		print str(ii)+' done'
 
 	brown_io.save_alldata(alldata,runname=runname)

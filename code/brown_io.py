@@ -27,7 +27,7 @@ def save_alldata(alldata,runname='brownseds'):
 	with open(outname, "wb") as out:
 		pickle.dump(model_store, out)
 
-def load_prospector_data(filebase,no_sample_results=False,objname=None,runname=None,hdf5=False,load_extra_output=True):
+def load_prospector_data(filebase,no_sample_results=False,objname=None,runname=None,hdf5=True,load_extra_output=True):
 
 	'''
 	loads Prospector chains

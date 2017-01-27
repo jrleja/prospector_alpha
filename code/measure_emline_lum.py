@@ -352,7 +352,7 @@ def umbrella_model(lams, amp_tied, lam_tied, sig_tied,continuum_6400):
 
 	return model
 
-def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
+def measure(sample_results, extra_output, obs_spec, magphys, sps, sigsmooth=None):
 	
 	'''
 	measure rest-frame emission line luminosities using two different continuum models, MAGPHYS and Prospector
@@ -430,10 +430,10 @@ def measure(sample_results, obs_spec, magphys, sps, sigsmooth=None):
 	# save redshift, restore at end
 	z = sample_results['model'].params.get('zred', np.array(0.0))
 	sample_results['model'].params['zred'] = np.array(0.0)
-	prospflux_em,mags_em,sm = sample_results['model'].mean_model(sample_results['bfit']['maxprob_params'], sample_results['obs'], sps=sps)
+	prospflux_em,mags_em,sm = sample_results['model'].mean_model(extra_output['bfit']['maxprob_params'], sample_results['obs'], sps=sps)
 	sample_results['model'].params['add_neb_emission'] = np.array(False)
 	sample_results['model'].params['add_neb_continuum'] = np.array(False)
-	prospflux,mags,sm = sample_results['model'].mean_model(sample_results['bfit']['maxprob_params'], sample_results['obs'], sps=sps)
+	prospflux,mags,sm = sample_results['model'].mean_model(extra_output['bfit']['maxprob_params'], sample_results['obs'], sps=sps)
 	wav = sps.wavelengths
 	sample_results['model'].params['add_neb_emission'] = np.array(2)
 	sample_results['model'].params['add_neb_continuum'] = np.array(True)

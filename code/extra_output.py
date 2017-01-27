@@ -66,11 +66,11 @@ def measure_model_phot(sample_results, sample_idx, sps):
 	for i,idx in enumerate(sample_idx):
 		_,mags[:,i],sm = sample_results['model'].mean_model(sample_results['flatchain'][idx], obs, sps=sps)
 	sample_results['model'].params['zred'] = zsave
-	sample_results['mphot'] = {}
-	sample_results['mphot']['mags'] = mags
-	sample_results['mphot']['name'] = np.array(filters)
+	out = {}
+	out['mags'] = mags
+	out['name'] = np.array(filters)
 
-	return sample_results
+	return out
 
 def measure_spire_phot(sample_results, flatchain, sps):
 

@@ -134,7 +134,6 @@ def specpar_pdf_distance(pinfo,alldata, delta_functions=True, center_obs=True):
 	             None,'dn4000','hdel_eqw'] # will have to jig metallicity
 
 	# hdelta flags
-	index_flags = np.loadtxt('/Users/joel/code/python/threedhst_bsfh/data/brownseds_data/hdelta_index.txt', dtype = {'names':('name','flag'),'formats':('S40','i4')})
 	anames = alldata[0]['spec_info']['absnames']
 
 	### setup figure
@@ -198,7 +197,7 @@ def specpar_pdf_distance(pinfo,alldata, delta_functions=True, center_obs=True):
 				truth_chain = np.log10(pinfo['obs']['pdf_hb'][kk])
 
 			if ii == 2: # bdec
-				chain = bdec_to_ext(dat['pextras']['flatchain'][:,dat['pextras']['parnames']=='bdec_cloudy'])
+				chain = bdec_to_ext(dat['pextras']['flatchain'][:,dat['pextras']['parnames']=='bdec_calc'])
 				truth = bdec_to_ext(pinfo['obs'][obs_names[ii]][kk])
 				truth_chain = bdec_to_ext(np.random.choice(pinfo['obs']['pdf_ha'][kk],size=1000) / np.random.choice(pinfo['obs']['pdf_hb'][kk],size=1000))
 
@@ -213,10 +212,7 @@ def specpar_pdf_distance(pinfo,alldata, delta_functions=True, center_obs=True):
 				truth_chain = np.atleast_1d(0.05)
 
 			if ii == 5: # hdelta absorption
-				match = index_flags['name'] == dat['objname'].replace(' ','')
-				flag = index_flags['flag'][match]
-				if flag == 1: hdelta_ind = 'hdelta_narrow'
-				if flag == 0: hdelta_ind = 'hdelta_wide'
+				hdelta_ind = define_hdelta_index(dat)
 				chain = np.squeeze(dat['spec_info']['eqw']['chain'][:,dat['spec_info']['absnames'] == hdelta_ind])
 
 				truth = pinfo['obs'][obs_names[ii]][kk,0]
@@ -696,6 +692,14 @@ def compare_model_flux(alldata, emline_names, outname = 'test.png'):
 	plt.savefig(outname,dpi=dpi)
 	plt.close()	
 
+def define_hdelta_index(dat):
+
+	flag = dat['pextras']['q50'][0] > 8  # half-mass time > 8 Gyr, narrow. < 8 Gyr, wide.
+	if flag == True: halph_ind = 'halpha_narrow'
+	if flag == False: halph_ind = 'halpha_wide'
+
+	return halph_ind
+
 def fmt_emline_info(alldata,add_abs_err = True):
 
 	ngals = len(alldata)
@@ -775,7 +779,6 @@ def fmt_emline_info(alldata,add_abs_err = True):
 
 	####### model absorption properties (Prospector: marginalized + best-fit
 	# which index should we use; wide or narrow?
-	index_flags = np.loadtxt('/Users/joel/code/python/threedhst_bsfh/data/brownseds_data/hdelta_index.txt', dtype = {'names':('name','flag'),'formats':('S40','i4')})
 	anames = alldata[0]['spec_info']['absnames']
 	
 	ha_lum_pro_marg,ha_eqw_pro_marg,\
@@ -794,11 +797,7 @@ def fmt_emline_info(alldata,add_abs_err = True):
 						            	  dat['spec_info']['eqw']['q84'][anames == 'hbeta'],
 						           		  dat['spec_info']['eqw']['q16'][anames == 'hbeta']])[:,0]
 
-		match = index_flags['name'] == dat['objname'].replace(' ','')
-		flag = index_flags['flag'][match]
-		
-		if flag == 1: halph_ind = 'halpha_narrow'
-		if flag == 0: halph_ind = 'halpha_wide'
+		halph_ind = define_hdelta_index(dat)
 
 		ha_lum_pro_marg[kk,:] = np.log10([dat['spec_info']['flux']['q50'][anames == halph_ind],
 						           	      dat['spec_info']['flux']['q84'][anames == halph_ind],
@@ -884,11 +883,7 @@ def fmt_emline_info(alldata,add_abs_err = True):
 	hd_lum_eline_prosp, hd_eqw_eline_prosp = [np.zeros(ngals) for i in xrange(4)]
 	for kk, dat in enumerate(alldata):
 		
-		# figure out index
-		match = index_flags['name'] == dat['objname'].replace(' ','')
-		flag = index_flags['flag'][match]
-		if flag == 1: hdelta_ind = 'hdelta_narrow'
-		if flag == 0: hdelta_ind = 'hdelta_wide'
+		hdelta_ind = define_hdelta_index(dat)
 
 		#### Prospector marginalized
 		hd_lum_prosp_marg[kk,:] = [dat['spec_info']['flux']['q50'][anames == hdelta_ind],
@@ -954,7 +949,6 @@ def fmt_emline_info(alldata,add_abs_err = True):
 	##### NAME VARIABLES
 	# Prospector model variables
 	parnames = alldata[0]['pquantiles']['parnames']
-	logmass_idx = parnames == 'logmass'
 	dinx_idx = parnames == 'dust_index'
 	dust1_idx = parnames == 'dust1'
 	dust2_idx = parnames == 'dust2'
@@ -966,8 +960,8 @@ def fmt_emline_info(alldata,add_abs_err = True):
 
 	# Prospector extra variables
 	parnames = alldata[0]['pextras']['parnames']
+	mass_idx = parnames == 'stellar_mass'
 	bcalc_idx = parnames == 'bdec_calc'
-	bcloud_idx = parnames == 'bdec_cloudy'
 	emp_ha_idx = parnames == 'emp_ha'
 	sfr_10_idx_p = parnames == 'sfr_10'
 	sfr_100_idx_p = parnames == 'sfr_100'
@@ -994,35 +988,24 @@ def fmt_emline_info(alldata,add_abs_err = True):
 
 	#### calculate expected Balmer decrement for Prospector, MAGPHYS
 	# best-fits + marginalized
-	bdec_cloudy_bfit,bdec_calc_bfit,bdec_magphys, ha_magphys, sfr_10_mag, sfr_100_mag, \
-	ha_ext_mag, met_mag = [np.zeros(ngals) for i in xrange(8)]
+	bdec_calc_bfit,bdec_magphys, ha_magphys, sfr_10_mag, sfr_100_mag, \
+	ha_ext_mag, met_mag = [np.zeros(ngals) for i in xrange(7)]
 	
-	bdec_cloudy_marg, bdec_calc_marg, cloudy_ha, cloudy_hb, cloudy_hd, \
+	bdec_calc_marg, cloudy_ha, cloudy_hb, cloudy_hd, \
 	cloudy_nii, cloudy_oiii, ha_emp, pmet, ha_ratio, oiii_hb, \
 	nii_ha, dn4000, d1, d2, didx,sfr_10,sfr_100,ha_ext,sfr_100_mag_marginalized,\
 	cloudy_ha_eqw, cloudy_hb_eqw, cloudy_oiii_eqw, cloudy_nii_eqw, \
-	cloudy_hd_eqw, d1_d2,mass, dtau_dlam_prosp = [np.zeros(shape=(ngals,3)) for i in xrange(28)]
+	cloudy_hd_eqw, d1_d2,mass, dtau_dlam_prosp = [np.zeros(shape=(ngals,3)) for i in xrange(27)]
 	for ii,dat in enumerate(np.array(alldata)):
 
 		####### BALMER DECREMENTS
 		### best-fit calculated balmer decrement
 		bdec_calc_bfit[ii] = dat['bfit']['bdec_calc']
 
-		### best-fit CLOUDY balmer decrement
-		bdec_cloudy_bfit[ii] = dat['bfit']['bdec_cloudy']
-
-		#### marginalized CLOUDY balmer decrement
-		bdec_cloudy_marg[ii,0] = dat['pextras']['q50'][bcloud_idx]
-		bdec_cloudy_marg[ii,1] = dat['pextras']['q84'][bcloud_idx]
-		bdec_cloudy_marg[ii,2] = dat['pextras']['q16'][bcloud_idx]
-
 		# marginalized calculated balmer decrement
 		bdec_calc_marg[ii,0] = dat['pextras']['q50'][bcalc_idx]
 		bdec_calc_marg[ii,1] = dat['pextras']['q84'][bcalc_idx]
 		bdec_calc_marg[ii,2] = dat['pextras']['q16'][bcalc_idx]
-
-		### if we can't generate emission lines due to age, use the marginalized version
-		if np.sum(np.isfinite(bdec_cloudy_marg[ii,:])) != 3: bdec_cloudy_marg[ii,:] = bdec_calc_marg[ii,:]
 
 		#MAGPHYS balmer decrement
 		tau1 = (1-dat['model']['parameters'][mu_idx][0])*dat['model']['parameters'][tauv_idx][0]
@@ -1114,9 +1097,9 @@ def fmt_emline_info(alldata,add_abs_err = True):
 		d1[ii,1] = dat['pquantiles']['q84'][dust1_idx]
 		d1[ii,2] = dat['pquantiles']['q16'][dust1_idx]
 
-		mass[ii,0] = 10**dat['pquantiles']['q50'][logmass_idx]
-		mass[ii,1] = 10**dat['pquantiles']['q84'][logmass_idx]
-		mass[ii,2] = 10**dat['pquantiles']['q16'][logmass_idx]
+		mass[ii,0] = dat['pextras']['q50'][mass_idx]
+		mass[ii,1] = dat['pextras']['q84'][mass_idx]
+		mass[ii,2] = dat['pextras']['q16'][mass_idx]
 
 		d2[ii,0] = dat['pquantiles']['q50'][dust2_idx]
 		d2[ii,1] = dat['pquantiles']['q84'][dust2_idx]
@@ -1152,9 +1135,7 @@ def fmt_emline_info(alldata,add_abs_err = True):
 		dtau_dlam_prosp[ii,:] = corner.quantile(dtau_dlam_chain, [0.5, 0.84, 0.16])
 
 
-	prosp['bdec_cloudy_bfit'] = bdec_cloudy_bfit
 	prosp['bdec_calc_bfit'] = bdec_calc_bfit
-	prosp['bdec_cloudy_marg'] = bdec_cloudy_marg
 	prosp['bdec_calc_marg'] = bdec_calc_marg
 	prosp['cloudy_ha'] = cloudy_ha
 	prosp['cloudy_ha_eqw'] = cloudy_ha_eqw
@@ -2419,7 +2400,7 @@ def eline_errs(e_pinfo,hflag,outname='test.png'):
 
 		ha_sig_distr = threed_dutils.normalize_error_asym(f_ha[keep_idx,:],e_pinfo['prosp']['cloudy_ha'][keep_idx,:])
 		hb_sig_distr = threed_dutils.normalize_error_asym(f_hb[keep_idx,:],e_pinfo['prosp']['cloudy_hb'][keep_idx,:])
-		bdec_sig_distr = threed_dutils.normalize_error_asym(bdec_obs_fake[keep_idx,:],e_pinfo['prosp']['bdec_cloudy_marg'][keep_idx,:])
+		bdec_sig_distr = threed_dutils.normalize_error_asym(bdec_obs_fake[keep_idx,:],e_pinfo['prosp']['bdec_calc_marg'][keep_idx,:])
 		
 		##### calculate average (over +/- 1 sigma) distance from observations at 1 sigma
 		# could also fit a Gaussian
@@ -2484,9 +2465,7 @@ def obs_vs_model_bdec(e_pinfo,hflag,outname1='test.png',outname2='test.png'):
 	keep_idx = brown_quality_cuts.halpha_cuts(e_pinfo)
 
 	##### write down plot variables
-	pl_bdec_cloudy_marg = bdec_to_ext(e_pinfo['prosp']['bdec_cloudy_marg'][keep_idx,:])
 	pl_bdec_calc_marg = bdec_to_ext(e_pinfo['prosp']['bdec_calc_marg'][keep_idx,:])
-	pl_bdec_cloudy_bfit = bdec_to_ext(e_pinfo['prosp']['bdec_cloudy_bfit'][keep_idx])
 	pl_bdec_calc_bfit = bdec_to_ext(e_pinfo['prosp']['bdec_calc_bfit'][keep_idx])
 	pl_bdec_magphys = bdec_to_ext(e_pinfo['mag']['bdec'][keep_idx])
 	pl_bdec_measured = bdec_to_ext(e_pinfo['obs']['bdec'][keep_idx])
@@ -2498,7 +2477,7 @@ def obs_vs_model_bdec(e_pinfo,hflag,outname1='test.png',outname2='test.png'):
 
 	#### create plots
 	fig1, ax1 = plt.subplots(1,1, figsize = (6,6))
-	fig2, ax2 = plt.subplots(1,3, figsize = (18.75,6))
+	fig2, ax2 = plt.subplots(1,2, figsize = (12.5,6))
 	axlims = (-0.15,0.6)
 	norm_errs = []
 	norm_flag = []
@@ -2514,24 +2493,22 @@ def obs_vs_model_bdec(e_pinfo,hflag,outname1='test.png',outname2='test.png'):
 		errs_obs = threed_dutils.asym_errors(pl_bdec_measured[plt_idx], 
 	                                         bdec_to_ext(e_pinfo['obs']['bdec'][keep_idx][plt_idx]+e_pinfo['obs']['bdec_err'][keep_idx][plt_idx]),
 	                                         bdec_to_ext(e_pinfo['obs']['bdec'][keep_idx][plt_idx]-e_pinfo['obs']['bdec_err'][keep_idx][plt_idx]), log=False)
-		errs_cloudy_marg = threed_dutils.asym_errors(pl_bdec_cloudy_marg[plt_idx,0],
-			                                   pl_bdec_cloudy_marg[plt_idx,1], 
-			                                   pl_bdec_cloudy_marg[plt_idx,2],log=False)
-		errs_calc_marg = threed_dutils.asym_errors(pl_bdec_cloudy_marg[plt_idx,0],
-			                                   pl_bdec_cloudy_marg[plt_idx,1], 
-			                                   pl_bdec_cloudy_marg[plt_idx,2],log=False)
+		errs_cloudy_marg = threed_dutils.asym_errors(pl_bdec_calc_marg[plt_idx,0],
+			                                   pl_bdec_calc_marg[plt_idx,1], 
+			                                   pl_bdec_calc_marg[plt_idx,2],log=False)
+		errs_calc_marg = threed_dutils.asym_errors(pl_bdec_calc_marg[plt_idx,0],
+			                                   pl_bdec_calc_marg[plt_idx,1], 
+			                                   pl_bdec_calc_marg[plt_idx,2],log=False)
 
-		norm_errs.append(normalize_error(pl_bdec_measured[plt_idx],errs_obs,pl_bdec_cloudy_marg[plt_idx,0],errs_cloudy_marg))
+		norm_errs.append(normalize_error(pl_bdec_measured[plt_idx],errs_obs,pl_bdec_calc_marg[plt_idx,0],errs_cloudy_marg))
 		norm_flag.append([labels[ii]]*np.sum(plt_idx))
 
-		ax1.errorbar(pl_bdec_measured[plt_idx], pl_bdec_cloudy_marg[plt_idx,0], xerr=errs_obs, yerr=errs_cloudy_marg,
+		ax1.errorbar(pl_bdec_measured[plt_idx], pl_bdec_calc_marg[plt_idx,0], xerr=errs_obs, yerr=errs_cloudy_marg,
 			         linestyle=' ',fmt='o',**pdict)
 
 		ax2[0].errorbar(pl_bdec_measured[plt_idx], pl_bdec_calc_marg[plt_idx,0], xerr=errs_obs, yerr=errs_calc_marg,
 			           linestyle=' ',fmt='o',**pdict)
 		ax2[1].errorbar(pl_bdec_measured[plt_idx], pl_bdec_calc_bfit[plt_idx], xerr=errs_obs,
-			           linestyle=' ',fmt='o',**pdict)
-		ax2[2].errorbar(pl_bdec_measured[plt_idx], pl_bdec_cloudy_bfit[plt_idx], xerr=errs_obs,
 			           linestyle=' ',fmt='o',**pdict)
 
 	#### MAIN FIGURE ERRATA
@@ -2541,8 +2518,8 @@ def obs_vs_model_bdec(e_pinfo,hflag,outname1='test.png',outname2='test.png'):
 	ax1.text(0.04,0.87, r'N = '+str(int(np.sum(keep_idx))), transform = ax1.transAxes,horizontalalignment='left')
 	ax1.set_xlabel(r'spectroscopic log(F/F$_0$)$_{\mathrm{H}\alpha}$ - log(F/F$_0$)$_{\mathrm{H}\beta}$')
 	ax1.set_ylabel(r'photometric log(F/F$_0$)$_{\mathrm{H}\alpha}$ - log(F/F$_0$)$_{\mathrm{H}\beta}$')
-	ax1 = threed_dutils.equalize_axes(ax1, pl_bdec_measured,pl_bdec_cloudy_marg[:,0],axlims=axlims)
-	off,scat = threed_dutils.offset_and_scatter(pl_bdec_measured,pl_bdec_cloudy_marg[:,0],biweight=True)
+	ax1 = threed_dutils.equalize_axes(ax1, pl_bdec_measured,pl_bdec_calc_marg[:,0],axlims=axlims)
+	off,scat = threed_dutils.offset_and_scatter(pl_bdec_measured,pl_bdec_calc_marg[:,0],biweight=True)
 	ax1.text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat)+' dex', transform = ax1.transAxes,horizontalalignment='right')
 	ax1.text(0.96,0.1, 'mean offset='+"{:.2f}".format(off)+' dex', transform = ax1.transAxes,horizontalalignment='right')
 
@@ -2560,14 +2537,6 @@ def obs_vs_model_bdec(e_pinfo,hflag,outname1='test.png',outname2='test.png'):
 	off,scat = threed_dutils.offset_and_scatter(pl_bdec_measured,pl_bdec_calc_bfit,biweight=True)
 	ax2[1].text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat), transform = ax2[1].transAxes,horizontalalignment='right')
 	ax2[1].text(0.96,0.1, 'mean offset='+"{:.2f}".format(off), transform = ax2[1].transAxes,horizontalalignment='right')
-
-	ax2[2].set_xlabel(r'observed log(F/F$_0$)$_{\mathrm{H}\alpha}$ - log(F/F$_0$)$_{\mathrm{H}\beta}$')
-	ax2[2].set_ylabel(r'Prospector CLOUDY best-fit log(F/F$_0$)$_{\mathrm{H}\alpha}$ - log(F/F$_0$)$_{\mathrm{H}\beta}$')
-	ax2[2] = threed_dutils.equalize_axes(ax2[2], pl_bdec_measured,pl_bdec_cloudy_bfit,axlims=axlims)
-	off,scat = threed_dutils.offset_and_scatter(pl_bdec_measured,pl_bdec_cloudy_bfit,biweight=True)
-	ax2[2].text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat), transform = ax2[2].transAxes,horizontalalignment='right')
-	ax2[2].text(0.96,0.1, 'mean offset='+"{:.2f}".format(off), transform = ax2[2].transAxes,horizontalalignment='right')
-
 
 	fig1.tight_layout()
 	fig1.savefig(outname1,dpi=dpi)
@@ -2590,7 +2559,7 @@ def obs_vs_prosp_sfr(e_pinfo,hflag,outname='test.png'):
 
 	# Balmer decrements
 	bdec_obs = e_pinfo['obs']['bdec'][keep_idx]
-	bdec_mod = e_pinfo['prosp']['bdec_cloudy_marg'][keep_idx]
+	bdec_mod = e_pinfo['prosp']['bdec_calc_marg'][keep_idx]
 
 	#### AGN+Herschel identifiers ######
 	sfing, composite, agn = return_agn_str(keep_idx)
@@ -2634,7 +2603,7 @@ def obs_vs_prosp_sfr(e_pinfo,hflag,outname='test.png'):
 
 	#### compute balmer decrement residuals
 	# obs - model
-	bdec_resid = e_pinfo['obs']['bdec'][keep_idx] - e_pinfo['prosp']['bdec_cloudy_marg'][keep_idx,0]
+	bdec_resid = e_pinfo['obs']['bdec'][keep_idx] - e_pinfo['prosp']['bdec_calc_marg'][keep_idx,0]
 
 	#### plot
 	fig, ax = plt.subplots(1,3, figsize = (18.75,6))
@@ -2722,11 +2691,11 @@ def residual_plots(e_pinfo,hflag,outfolder):
 	hflag = [hflag[keep_idx],~hflag[keep_idx]]
 
 	#### bdec resid versus ha resid
-	bdec_resid = bdec_to_ext(e_pinfo['prosp']['bdec_cloudy_marg'][keep_idx,0])-bdec_to_ext(e_pinfo['obs']['bdec'][keep_idx])
-	bdec_resid_errup_prosp = bdec_to_ext(e_pinfo['prosp']['bdec_cloudy_marg'][keep_idx,1])-bdec_to_ext(e_pinfo['prosp']['bdec_cloudy_marg'][keep_idx,0])
+	bdec_resid = bdec_to_ext(e_pinfo['prosp']['bdec_calc_marg'][keep_idx,0])-bdec_to_ext(e_pinfo['obs']['bdec'][keep_idx])
+	bdec_resid_errup_prosp = bdec_to_ext(e_pinfo['prosp']['bdec_calc_marg'][keep_idx,1])-bdec_to_ext(e_pinfo['prosp']['bdec_calc_marg'][keep_idx,0])
 	bdec_resid_errup_obs = bdec_to_ext(e_pinfo['obs']['bdec'][keep_idx]+e_pinfo['obs']['bdec_err'][keep_idx])-bdec_to_ext(e_pinfo['obs']['bdec'][keep_idx])
 	bdec_resid_errup = np.sqrt(bdec_resid_errup_prosp**2+bdec_resid_errup_obs**2)
-	bdec_resid_errdo_prosp = bdec_to_ext(e_pinfo['prosp']['bdec_cloudy_marg'][keep_idx,0])-bdec_to_ext(e_pinfo['prosp']['bdec_cloudy_marg'][keep_idx,2])
+	bdec_resid_errdo_prosp = bdec_to_ext(e_pinfo['prosp']['bdec_calc_marg'][keep_idx,0])-bdec_to_ext(e_pinfo['prosp']['bdec_calc_marg'][keep_idx,2])
 	bdec_resid_errdo_obs = bdec_to_ext(e_pinfo['obs']['bdec'][keep_idx])-bdec_to_ext(e_pinfo['obs']['bdec'][keep_idx]-+e_pinfo['obs']['bdec_err'][keep_idx])
 	bdec_resid_errdo = np.sqrt(bdec_resid_errdo_prosp**2+bdec_resid_errdo_obs**2)
 
@@ -2925,7 +2894,7 @@ def residual_plots(e_pinfo,hflag,outfolder):
 	ax.set_ylim(-0.6,0.6)
 	ax.set_xlim(-5,95)
 
-	off,scat = threed_dutils.offset_and_scatter(bdec_to_ext(e_pinfo['prosp']['bdec_cloudy_marg'][keep_idx,0]),bdec_to_ext(e_pinfo['obs']['bdec'][keep_idx]))
+	off,scat = threed_dutils.offset_and_scatter(bdec_to_ext(e_pinfo['prosp']['bdec_calc_marg'][keep_idx,0]),bdec_to_ext(e_pinfo['obs']['bdec'][keep_idx]))
 	ax.text(0.98,0.94, 'biweight scatter='+"{:.2f}".format(scat)+' magnitudes', ha='right',transform=ax.transAxes,fontsize=15,weight='roman')
 
 	ax.arrow(0.06, 0.52, 0.0, 0.10, head_width=0.02, head_length=0.03, fc='k', ec='k',width=0.003,transform = ax.transAxes)
@@ -3033,22 +3002,60 @@ def plot_emline_comp(alldata,outfolder,hflag):
 	##### load new moustakas line flux information (from email, january 2016)
 	newdat = brown_io.load_moustakas_newdat(objnames = list(objnames))
 
-	'''
-	##### plots, one by one
-	# observed line fluxes, with MAGPHYS / Prospector continuum
-	compare_model_flux(alldata,emline_names,outname = outfolder+'continuum_model_flux_comparison.png')
-
-	# observed line fluxes versus Moustakas+10
-	# TURN THIS BACK ON AND FIX IT
-	compare_moustakas_fluxes(alldata,dat,emline_names,objnames,
-							 outname=outfolder+'moustakas_flux_comp.png',
-							 outdec=outfolder+'moustakas_bdec_comp.png')
-	compare_moustakas_newfluxes(alldata,newdat,np.array(['[OIII] 5007','H$\\beta$','[NII] 6583','H$\\alpha$']),objnames,
-							    outname=outfolder+'moustakas_flux_newcomp.png',
-							    outdec=outfolder+'moustakas_bdec_comp.png')
-	'''
 	##### format emission line data for plotting
 	e_pinfo = fmt_emline_info(alldata)
+
+	'''
+	#### CHECKING DIFFERENT WAYS TO REPRODUCE VISUAL CLASSIFICATION
+	#### FOR HDELTA INDEX
+	index_flags = np.loadtxt('/Users/joel/code/python/threedhst_bsfh/data/brownseds_data/hdelta_index.txt',
+	                         dtype = {'names':('name','flag'),'formats':('S40','i4')})
+	halftime, flag = [], []
+	sfrfrac = np.zeros(shape=(129,6))
+	sfrfrac_idx = np.array([True if 'sfr_fraction' in p else False for p in alldata[0]['pquantiles']['parnames']],dtype=bool)
+	for i, dat in enumerate(alldata):
+		halftime.append(dat['pextras']['q50'][0])
+		match = index_flags['name'] == dat['objname'].replace(' ','')
+		flag.append(index_flags['flag'][match][0])
+		sfrfrac[i,:5] = dat['pquantiles']['q50'][sfrfrac_idx]
+		#sfrfrac[i,5] = 1-sfrfrac[i,:4].sum()
+		sfrfrac[i,5] = np.median(1-dat['pquantiles']['random_chain'][:,sfrfrac_idx].sum(axis=1))
+	halftime = np.array(halftime)
+	flag = np.array(flag,dtype=bool)
+
+	wide_idx = np.squeeze(flag) == 0
+
+	values, base = np.histogram(halftime[wide_idx], bins=200, range=(halftime.min(),halftime.max()))
+	plt.plot(base[:-1],values.cumsum()/float(values.sum()),'o',color='red',lw=2)
+	values, base = np.histogram(halftime[~wide_idx], bins=200, range=(halftime.min(),halftime.max()))
+	plt.plot(base[:-1],values.cumsum()/float(values.sum()),lw=2,color='blue')
+	plt.show()
+
+	#### PLOT IN SFR_FRAC
+	fig, ax = plt.subplots(3,2, figsize=(10, 15))
+	ax = np.ravel(ax)
+	for i in xrange(6):
+		values, base = np.histogram(sfrfrac[wide_idx,i], bins=200, range=(sfrfrac[:,i].min(),sfrfrac[:,i].max()))
+		ax[i].plot(base[:-1],values.cumsum()/float(values.sum()),color='red',lw=2)
+		values, base = np.histogram(sfrfrac[~wide_idx,i], bins=200, range=(sfrfrac[:,i].min(),sfrfrac[:,i].max()))
+		ax[i].plot(base[:-1],values.cumsum()/float(values.sum()),lw=2,color='blue')
+	plt.show()
+
+	#### PLOT IN REVERSE SUM OF SFRFRAC (first is 6, second is 5+6, third is 4+5+6...)
+	fig, ax = plt.subplots(3,2, figsize=(10, 15))
+	ax = np.ravel(ax)
+	for i in xrange(6):
+		data =  sfrfrac[:,(i-1):].sum(axis=1)
+		values, base = np.histogram(data[wide_idx], bins=200, range=(data.min(),data.max()))
+		ax[i].plot(base[:-1],values.cumsum()/float(values.sum()),color='red',lw=2)
+		values, base = np.histogram(data[~wide_idx], bins=200, range=(data.min(),data.max()))
+		ax[i].plot(base[:-1],values.cumsum()/float(values.sum()),lw=2,color='blue')
+	plt.show()
+
+
+	for i in xrange(129): print alldata[i]['objname'] +" {:.2f}".format(sfrfrac[i,5])
+	print 1/0
+	'''
 
 	##### add in 'location in truth' PDF
 	delta_functions = True # for just the median of the observational posteriors
@@ -3098,7 +3105,6 @@ def plot_emline_comp(alldata,outfolder,hflag):
 								 outname_resid=outfolder+'balmer_line_resid.png')
 
 	balmlines_delta(e_pinfo,outname=outfolder+'balmer_line_delta.png')
-	print 1/0
 
 	# model SFR versus observed SFR(Ha) corrected for dust attenuation
 	obs_vs_prosp_sfr(e_pinfo,hflag,outname=outfolder+'obs_sfr_comp.png')
@@ -3148,11 +3154,11 @@ def plot_relationships(alldata,outfolder):
 
 	##### find prospector indexes
 	parnames = alldata[0]['pquantiles']['parnames']
-	idx_logmass = parnames == 'logmass'
 	idx_met = parnames == 'logzsol'
 
 	eparnames = alldata[0]['pextras']['parnames']
 	idx_sfr = eparnames == 'sfr_100'
+	idx_mass = eparnames == 'stellar_mass'
 
 	##### find magphys indexes
 	idx_mmet = alldata[0]['model']['full_parnames'] == 'Z/Zo'
@@ -3164,10 +3170,10 @@ def plot_relationships(alldata,outfolder):
 		if data:
 			
 			# mass
-			tmp = np.array([data['pquantiles']['q16'][idx_logmass][0],
-				            data['pquantiles']['q50'][idx_logmass][0],
-				            data['pquantiles']['q84'][idx_logmass][0]])
-			promass = np.concatenate((promass,np.atleast_2d(tmp)),axis=0)
+			tmp = np.array([data['pextras']['q16'][idx_mass][0],
+				            data['pextras']['q50'][idx_mass][0],
+				            data['pextras']['q84'][idx_mass][0]])
+			promass = np.concatenate((promass,np.atleast_2d(np.log10(tmp))),axis=0)
 			magmass = np.concatenate((magmass,np.atleast_2d(data['magphys']['percentiles']['M*'][1:4])))
 
 			# SFR
@@ -3310,12 +3316,15 @@ def prospector_comparison(alldata,outfolder,hflag):
 
 	#### find prospector indexes
 	parnames = alldata[0]['pquantiles']['parnames']
-	idx_mass = parnames == 'logmass'
 	didx_idx = parnames == 'dust_index'
 	d1_idx = parnames == 'dust1'
 	d2_idx = parnames == 'dust2'
 	qpah_idx = parnames == 'duste_qpah'
 	met_idx = parnames == 'logzsol'
+
+	eparnames = alldata[0]['pextras']['parnames']
+	idx_mass = eparnames == 'stellar_mass'
+
 
 	#### agn flags
 	sfing, composite, agn = return_agn_str(np.ones_like(hflag,dtype=bool))
@@ -3395,9 +3404,9 @@ def prospector_comparison(alldata,outfolder,hflag):
 	fig, ax = plt.subplots(1,1, figsize = (7,7))
 	qpah_low = 0.001 # lower plot limit for qpah, must clip errors for presentation purposes
 
-	mass = np.array([x['pquantiles']['q50'][idx_mass][0] for x in alldata])
-	m_errup = np.array([x['pquantiles']['q84'][idx_mass][0] for x in alldata])
-	m_errdo = np.array([x['pquantiles']['q16'][idx_mass][0] for x in alldata])
+	mass = np.log10([x['pextras']['q50'][idx_mass][0] for x in alldata])
+	m_errup = np.log10([x['pextras']['q84'][idx_mass][0] for x in alldata])
+	m_errdo = np.log10([x['pextras']['q16'][idx_mass][0] for x in alldata])
 	mass_err = threed_dutils.asym_errors(mass,m_errup,m_errdo,log=False)
 
 	logzsol = np.array([x['pquantiles']['q50'][met_idx][0] for x in alldata])
@@ -3430,13 +3439,6 @@ def prospector_comparison(alldata,outfolder,hflag):
 	ax.set_ylabel(r'log(Q$_{\mathrm{PAH}}$)')
 	ax.set_ylim(np.log10(qpah_low),np.log10(11.0))
 
-	'''
-	ax[1].errorbar(lir,np.log10(qpah),xerr=lir_err,yerr=qpah_err, alpha=0.6, fmt='o', color='#1C86EE')
-	ax[1].set_xlabel(r'log(L$_{\mathrm{IR}}$)')
-	ax[1].set_ylabel(r'log(Q$_{\mathrm{PAH}}$)')
-	ax[1].set_ylim(np.log10(0.001),np.log10(11.0))
-	ax[1].set_xlim(6.5,12.5)
-	'''
 	plt.tight_layout()
 	plt.savefig(outfolder+'qpah_comp.png', dpi=dpi)
 	plt.close()
@@ -3491,13 +3493,13 @@ def plot_comparison(alldata,outfolder):
 
 	##### find prospector indexes
 	parnames = alldata[0]['pquantiles']['parnames']
-	idx_mass = parnames == 'logmass'
 	idx_met = parnames == 'logzsol'
 	dinx_idx = parnames == 'dust_index'
 	dust1_idx = parnames == 'dust1'
 	dust2_idx = parnames == 'dust2'
 
 	eparnames = alldata[0]['pextras']['parnames']
+	idx_mass = eparnames == 'stellar_mass'
 	idx_sfr = eparnames == 'sfr_100'
 	bcalc_idx = eparnames == 'bdec_calc'
 	total_ext_idx = eparnames == 'total_ext5500'
@@ -3515,9 +3517,9 @@ def plot_comparison(alldata,outfolder):
 	magmass, promass = np.empty(shape=(0,3)), np.empty(shape=(0,3))
 	for data in alldata:
 		if data:
-			tmp = np.array([data['pquantiles']['q16'][idx_mass][0],
-				            data['pquantiles']['q50'][idx_mass][0],
-				            data['pquantiles']['q84'][idx_mass][0]])
+			tmp = np.log10([data['pextras']['q16'][idx_mass][0],
+				            data['pextras']['q50'][idx_mass][0],
+				            data['pextras']['q84'][idx_mass][0]])
 			promass = np.concatenate((promass,np.atleast_2d(tmp)),axis=0)
 			magmass = np.concatenate((magmass,np.atleast_2d(data['magphys']['percentiles']['M*'][1:4])))
 

@@ -508,7 +508,7 @@ def sed_figure(outname = None, truths = None,
 	gs = gridspec.GridSpec(2,1, height_ratios=[3,1])
 	gs.update(hspace=0)
 	phot, res = plt.Subplot(fig, gs[0]), plt.Subplot(fig, gs[1])
-	sfh_loc = [0.19,0.4,0.14,0.17]
+	#sfh_loc = [0.19,0.4,0.14,0.17]
 	sfh_ax = fig.add_axes(sfh_loc,zorder=32)
 
 	### diagnostic text
