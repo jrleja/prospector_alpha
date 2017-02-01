@@ -58,7 +58,8 @@ def subcorner(sample_results,  sps, model, extra_output,
                         truths = ptruths, range = extents, truth_color='red',
                         show_titles = True, plot_datapoints=False, **kwargs)
 
-    fig = add_to_corner(fig, sample_results, extra_output, sps, model, truths=truths, powell_results=powell_results)
+    fig = add_to_corner(fig, sample_results, extra_output, sps, model, 
+    	                truths=truths, maxprob=False)#powell_results=powell_results)
     if outname is not None:
         fig.savefig('{0}.corner.png'.format(outname))
         plt.close(fig)
@@ -66,7 +67,8 @@ def subcorner(sample_results,  sps, model, extra_output,
         return fig
 
 
-def add_to_corner(fig, sample_results, extra_output, sps, model,truths=None,maxprob=True,powell_results=None):
+def add_to_corner(fig, sample_results, extra_output, sps, model,truths=None,
+	              maxprob=True,powell_results=None):
 
     '''
     adds in posterior distributions for 'select' parameters
@@ -76,9 +78,9 @@ def add_to_corner(fig, sample_results, extra_output, sps, model,truths=None,maxp
     plotquant = extra_output['extras'].get('flatchain',None)
     plotname  = extra_output['extras'].get('parnames',None)
 
-    to_show = ['half_time','ssfr_100','sfr_100','stellar_mass']
+    to_show = ['half_time','ssfr_100','sfr_100']#,'stellar_mass']
     ptitle = [r't$_{\mathrm{half}}$ [Gyr]',r'log(sSFR) (100 Myr) [yr$^{-1}$]',
-              r'log(SFR) (100 Myr) [M$_{\odot}$ yr$^{-1}$]',r'log(M$_*$) [M$_{\odot}$]']
+              r'log(SFR) (100 Myr) [M$_{\odot}$ yr$^{-1}$]']#,r'log(M$_*$) [M$_{\odot}$]']
 
     showing = np.array([x in to_show for x in plotname])
 
@@ -178,8 +180,8 @@ def add_to_corner(fig, sample_results, extra_output, sps, model,truths=None,maxp
     #### create my own axes here
     # size them using size of other windows
     axis_size = fig.get_axes()[0].get_position().size
-    xs, ys = 0.4, 0.82
-    xdelta, ydelta = axis_size[0]*1.4, axis_size[1]*1.7
+    xs, ys = 0.4, 0.91
+    xdelta, ydelta = axis_size[0]*1.6, axis_size[1]*1.7
     plotloc = 0
 
     for jj in xrange(len(plotname)):
@@ -187,7 +189,7 @@ def add_to_corner(fig, sample_results, extra_output, sps, model,truths=None,maxp
 		if showing[jj] == 0:
 		    continue
 
-		ax = fig.add_axes([xs+(plotloc % 2)*xdelta, ys+(plotloc>1)*ydelta, axis_size[0], axis_size[1]])
+		ax = fig.add_axes([xs+(plotloc % 2)*xdelta, ys-(plotloc>1)*ydelta, axis_size[0], axis_size[1]])
 		plotloc+=1
 
 		if plotname[jj] == 'half_time':
@@ -219,7 +221,7 @@ def add_to_corner(fig, sample_results, extra_output, sps, model,truths=None,maxp
 		fmt = "{{0:{0}}}".format(".2f").format
 		title = r"${{{0}}}_{{-{1}}}^{{+{2}}}$"
 		title = title.format(fmt(qvalues[1]), fmt(q_m), fmt(q_p))
-		ax.set_title(title)
+		ax.set_title(title, va='bottom')
 		ax.set_xlabel(ptitle[to_show.index(plotname[jj])])
 
 		# axes
@@ -786,6 +788,7 @@ def plot_all_driver(runname=None,**extras):
 	filebase, parm_basename, ancilname=threed_dutils.generate_basenames(runname)
 	for jj in xrange(len(filebase)):
 		print 'iteration '+str(jj) 
+
 		make_all_plots(filebase=filebase[jj],\
 		               outfolder=os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/',
 		               param_name=parm_basename[jj],

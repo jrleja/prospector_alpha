@@ -90,7 +90,7 @@ def pdf_stats(bins,pdf):
 
 
 
-def pdf_distance(chain,truth,truth_chain,bins,delta_functions=False,center_obs=False):
+def pdf_distance(chain,truth,truth_chain,bins,delta_functions=False,center_obs=False,iteration=0):
 
 	#### chain properties
 	model_chain_center = np.median(chain)
@@ -102,7 +102,13 @@ def pdf_distance(chain,truth,truth_chain,bins,delta_functions=False,center_obs=F
 
 	#### observed PDF
 	if (truth_chain == None) or (delta_functions): # we have no errors (dn4000), use delta functions
-		clipped_truth = np.clip(truth-model_chain_center,bmin,bmax)
+
+		if iteration == 0:
+			bias = 0.13
+		else:
+			bias = 0.1
+
+		clipped_truth = np.clip(truth-model_chain_center+bias,bmin,bmax)
 		if center_obs:
 			clipped_truth = np.clip(0.0,bmin,bmax)
 		obs_pdf,_ = np.histogram(clipped_truth,bins=bins,density=True)
@@ -121,7 +127,7 @@ def pdf_distance(chain,truth,truth_chain,bins,delta_functions=False,center_obs=F
 		ransamps = np.clip(ransamps,bmin,bmax)
 		obs_pdf,_ = np.histogram(ransamps,bins=bins,density=True)
 
-	pdf_loc = (chain > truth).sum()/float(chain.shape[0])
+	pdf_loc = (chain > truth+bias).sum()/float(chain.shape[0])
 
 	return model_pdf, obs_pdf, pdf_loc
 
@@ -212,14 +218,14 @@ def specpar_pdf_distance(pinfo,alldata, delta_functions=True, center_obs=True):
 				truth_chain = np.atleast_1d(0.05)
 
 			if ii == 5: # hdelta absorption
-				hdelta_ind = define_hdelta_index(dat)
+				hdelta_ind = define_balmer_index(dat,hdel=True)
 				chain = np.squeeze(dat['spec_info']['eqw']['chain'][:,dat['spec_info']['absnames'] == hdelta_ind])
 
 				truth = pinfo['obs'][obs_names[ii]][kk,0]
 				truth_chain = pinfo['obs']['hdel_eqw_chain'][kk]
 
 
-			tmodpdf, tobspdf, tpdf_loc = pdf_distance(chain,truth,truth_chain,bins,delta_functions=delta_functions,center_obs=center_obs)
+			tmodpdf, tobspdf, tpdf_loc = pdf_distance(chain,truth,truth_chain,bins,delta_functions=delta_functions,center_obs=center_obs,iteration=ii)
 			modpdf += tmodpdf
 			obspdf += tobspdf
 			pdf_loc.append(tpdf_loc)
@@ -289,7 +295,7 @@ def specpar_pdf_plot(pdf,outname=None):
 		#onesig_perc = pdf_quantiles(pdf[key]['plot_bins'],pdf[key]['obs_pdf'],pdf[key]['model_pdf'],0.16,0.84)/0.68
 		#twosig_perc = pdf_quantiles(pdf[key]['plot_bins'],pdf[key]['obs_pdf'],pdf[key]['model_pdf'],0.025,0.975)/0.95
 
-		### the right way
+		### from individual observations
 		pdf_dist = pdf[key]['pdf_loc']
 		onesig_perc = ((pdf_dist >= 0.16) & (pdf_dist <= 0.84)).sum()/float(pdf_dist.shape[0]) / 0.68
 		twosig_perc = ((pdf_dist >= 0.025) & (pdf_dist <= 0.975)).sum()/float(pdf_dist.shape[0]) / 0.95
@@ -692,11 +698,17 @@ def compare_model_flux(alldata, emline_names, outname = 'test.png'):
 	plt.savefig(outname,dpi=dpi)
 	plt.close()	
 
-def define_hdelta_index(dat):
+def define_balmer_index(dat, hdel=False):
 
-	flag = dat['pextras']['q50'][0] > 8  # half-mass time > 8 Gyr, narrow. < 8 Gyr, wide.
-	if flag == True: halph_ind = 'halpha_narrow'
-	if flag == False: halph_ind = 'halpha_wide'
+	flag = dat['pextras']['q50'][dat['pextras']['parnames'] == 'half_time'] > 8  # half-mass time > 8 Gyr, narrow. < 8 Gyr, wide.
+	
+	if flag == True: halph_ind = 'narrow'
+	if flag == False: halph_ind = 'wide'
+
+	if hdel:
+		halph_ind = 'hdelta_'+halph_ind
+	else:
+		halph_ind = 'halpha_'+halph_ind
 
 	return halph_ind
 
@@ -766,11 +778,9 @@ def fmt_emline_info(alldata,add_abs_err = True):
 
 	##### SIGNAL TO NOISE AND EQW CUTS
 	# cuts
-	# obslines sncut is 1.0 for now, because otherwise NGC 4473 is in the sample, 
-	# which has S/N ~ 0.95 for Halpha (clearly a crap detection)  12/10/15
 	obslines['sn_cut'] = 5.0
 	obslines['eqw_cut'] = 0.0
-	obslines['hdelta_sn_cut'] = 5.0
+	obslines['hdelta_sn_cut'] = 4.0
 	obslines['hdelta_eqw_cut'] = -np.inf
 
 	####### Dn4000, obs + MAGPHYS
@@ -797,7 +807,7 @@ def fmt_emline_info(alldata,add_abs_err = True):
 						            	  dat['spec_info']['eqw']['q84'][anames == 'hbeta'],
 						           		  dat['spec_info']['eqw']['q16'][anames == 'hbeta']])[:,0]
 
-		halph_ind = define_hdelta_index(dat)
+		halph_ind = define_balmer_index(dat)
 
 		ha_lum_pro_marg[kk,:] = np.log10([dat['spec_info']['flux']['q50'][anames == halph_ind],
 						           	      dat['spec_info']['flux']['q84'][anames == halph_ind],
@@ -834,9 +844,11 @@ def fmt_emline_info(alldata,add_abs_err = True):
 	##### add Halpha, Hbeta absorption to errors
 	if add_abs_err:
 		# add 25% of Balmer absorption value to 1 sigma errors
-		hdel_scatter = 0.25
+		hdel_scatter = 0.2
 		halpha_corr = hdel_scatter*(10**prosp['halpha_abs_marg'][:,0])
 		hbeta_corr = hdel_scatter*(10**prosp['hbeta_abs_marg'][:,0])
+		#halpha_corr = ((10**prosp['halpha_abs_marg'][:,1]) - (10**prosp['halpha_abs_marg'][:,2]))*1.5
+		#hbeta_corr = ((10**prosp['hbeta_abs_marg'][:,1]) - (10**prosp['hbeta_abs_marg'][:,2]))*1.5
 
 		# keep this around, for balmer decrement error plot
 		obslines['err_ha_orig'] = copy.copy(obslines['err_ha'])
@@ -883,7 +895,7 @@ def fmt_emline_info(alldata,add_abs_err = True):
 	hd_lum_eline_prosp, hd_eqw_eline_prosp = [np.zeros(ngals) for i in xrange(4)]
 	for kk, dat in enumerate(alldata):
 		
-		hdelta_ind = define_hdelta_index(dat)
+		hdelta_ind = define_balmer_index(dat,hdel=True)
 
 		#### Prospector marginalized
 		hd_lum_prosp_marg[kk,:] = [dat['spec_info']['flux']['q50'][anames == hdelta_ind],
@@ -1204,11 +1216,14 @@ def atlas_3d_met(e_pinfo,hflag,outfolder=''):
 	ax.set_xlabel('log(Z$_{\mathrm{ATLAS-3D}}$/Z$_{\odot}$) from spectrum',fontsize=22)
 	ax.set_ylabel('log(Z$_{\mathrm{Prospector}}$/Z$_{\odot}$) from photometry',fontsize=22)
 
-	ax = threed_dutils.equalize_axes(ax,a3d_met+0.1,prosp_met-0.1, dynrange=0.1, line_of_equality=True, log=False)
-
 	off,scat = threed_dutils.offset_and_scatter(a3d_met,prosp_met, biweight=True)
 	ax.text(0.96,0.05, 'biweight scatter='+"{:.2f}".format(scat) +' dex', transform = ax.transAxes,horizontalalignment='right')
 	ax.text(0.96,0.10, 'mean offset='+"{:.2f}".format(off)+ ' dex', transform = ax.transAxes,horizontalalignment='right')
+
+	min, max = -0.5,0.2
+	ax.set_ylim(min,max)
+	ax.set_xlim(min,max)
+	ax.plot([min,max],[min,max],linestyle='--',color='0.1',alpha=0.8)
 
 	plt.tight_layout()
 	plt.savefig(outfolder+'atlas3d_starmet.png',dpi=150)
@@ -2072,7 +2087,6 @@ def obs_vs_model_hdelta(e_pinfo,hflag,outname=None,outname2=None,outname_dnplt=N
 		        r'model log(-H$_{\delta}$) [best-fit]',
 		        r'model log(-H$_{\delta}$) [marginalized]']
 
-
 	##### for dn4000 plots, if necessary
 	dn4000_obs = e_pinfo['obs']['dn4000'][good_idx]
 	dn4000_prosp = e_pinfo['prosp']['dn4000'][good_idx,0]
@@ -2478,7 +2492,7 @@ def obs_vs_model_bdec(e_pinfo,hflag,outname1='test.png',outname2='test.png'):
 	#### create plots
 	fig1, ax1 = plt.subplots(1,1, figsize = (6,6))
 	fig2, ax2 = plt.subplots(1,2, figsize = (12.5,6))
-	axlims = (-0.15,0.6)
+	axlims = (-0.15,0.8)
 	norm_errs = []
 	norm_flag = []
 

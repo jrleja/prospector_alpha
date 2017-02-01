@@ -490,7 +490,7 @@ def plot_obs_spec(obs_spec, phot, spec_res, alpha,
 	'''
 	plt_max=np.array([np.nanmax(np.abs(obs_spec_plot)),np.nanmax(np.abs(prosp_spec_plot))]).max()
 	plt_min=np.array([np.nanmin(np.abs(obs_spec_plot)),np.nanmin(np.abs(prosp_spec_plot))]).min()
-	spec_res.set_ylim(plt_min-0.25,plt_max+0.25)
+	spec_res.set_ylim(plt_min-0.35,plt_max+0.35)
 
 	spec_res.set_xscale('log',nonposx='clip', subsx=(1,2,3,4,5,6,7,8,9))
 	spec_res.xaxis.set_minor_formatter(minorFormatter)
@@ -726,7 +726,7 @@ def sed_comp_figure(sample_results, extra_output, sps, model, magphys,
 	ax_inset = fig.add_axes(ax_loc,zorder=32)
 	text_size = 1.5
 
-	add_sfh_plot([extra_output],fig,sps,text_size=text_size,ax_inset=ax_inset,main_color='black')
+	add_sfh_plot([extra_output],fig,sps,text_size=text_size,ax_inset=ax_inset,main_color=['black'])
 
 	##### add MAGPHYS SFH
 	magmass = magphys['model']['full_parameters'][[magphys['model']['full_parnames'] == 'M*/Msun']]
@@ -875,7 +875,11 @@ def plt_all(runname=None,startup=True,**extras):
 		alldata = []
 
 		for jj in xrange(len(filebase)):
-
+			'''
+			if (filebase[jj].split('_')[-1] != 'NGC 4125') & \
+			   (filebase[jj].split('_')[-1] != 'NGC 6090'):
+				continue
+			'''
 			dictionary = collate_data(filebase=filebase[jj],\
 			                           outfolder=outfolder,
 			                           **extras)
@@ -1141,17 +1145,13 @@ def add_sfr_info(runname=None, outfolder=None):
 	plt.savefig(outname, dpi=dpi)
 
 
-def add_prosp_mag_info(runname=None):
-	
-	if runname == None:
-		runname = 'brownseds'
+def add_prosp_mag_info(runname='brownseds_np'):
 
-	outfolder = os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/magphys/sed_residuals/'
 	alldata = brown_io.load_alldata(runname=runname)
 
 	filebase, parm_basename, ancilname=threed_dutils.generate_basenames(runname)
 	for ii,dat in enumerate(alldata):
-		sample_results, powell_results, model = brown_io.load_prospector_data(filebase[ii])
+		sample_results, powell_results, model, extra_output = brown_io.load_prospector_data(filebase[ii], hdf5=True)
 		magphys = read_magphys_output(objname=dat['objname'])
 		dat = update_model_info(dat, sample_results, extra_output, magphys)
 		print str(ii)+' done'

@@ -10,23 +10,6 @@ try:
 except IOError:
 	pass
 
-def calc_emp_ha(mass,sfr,dust1,dust2,dustindex,ncomp=1):
-
-	# calculate empirical halpha
-
-	ha_flux=0.0
-	oiii_flux=0.0
-	for kk in xrange(ncomp):
-		x=threed_dutils.synthetic_emlines(mass[kk],
-				                          np.atleast_1d(sfr)[kk],
-				                          dust1[kk],
-				                          dust2[kk],
-				                          dustindex)
-		oiii_flux = oiii_flux + x['flux'][x['name'] == '[OIII]']
-		ha_flux = ha_flux + x['flux'][x['name'] == 'Halpha']
-	
-	return ha_flux,oiii_flux
-
 def maxprob_model(sample_results,sps):
 
 	### grab maximum probability, plus the thetas that gave it
@@ -158,7 +141,7 @@ def set_sfh_time_vector(sample_results):
 		print 1/0
 	return t
 
-def calc_extra_quantities(sample_results, ncalc=2000, ir_priors=True, opts=None):
+def calc_extra_quantities(sample_results, ncalc=3000, ir_priors=True, opts=None):
 
 	'''' 
 	CALCULATED QUANTITIES

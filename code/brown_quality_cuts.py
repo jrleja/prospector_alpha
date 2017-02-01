@@ -18,6 +18,7 @@ def halpha_cuts(e_pinfo,sn=False):
 		                  (e_pinfo['obs']['f_ha'][:,0] > 0) & \
 		                  (e_pinfo['obs']['f_hb'][:,0] > 0) & \
 		                  (e_pinfo['prosp']['cloudy_ha'][:,0] > 0))
+	print 'halpha cuts returned {0} galaxies'.format(keep_idx.sum())
 	return keep_idx
 
 def hdelta_cuts(e_pinfo, eqw=False):
@@ -29,9 +30,11 @@ def hdelta_cuts(e_pinfo, eqw=False):
 
 	### define limits
 	# need this for stupid reasons in pdf_dist
-	good_idx = (hdel_sn > 4) & \
+	good_idx = (hdel_sn > e_pinfo['obs']['hdelta_sn_cut']) & \
 			   (e_pinfo['obs']['hdel_eqw'][:,0] > e_pinfo['obs']['hdelta_eqw_cut']) & \
-	           (e_pinfo['obs']['hdel'][:,0] > 0)
+	           (e_pinfo['obs']['hdel'][:,0] > 0) & \
+	           (e_pinfo['prosp']['hdel_eqw_elineon_marg'][:,0] > 0)
+	print 'hdelta cuts returned {0} galaxies'.format(good_idx.sum())
 
 	return good_idx
 

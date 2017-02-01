@@ -40,7 +40,7 @@ def collate_data(alldata, **extras):
 	for ii, dat in enumerate(alldata):
 		
 		#### mass, SFR
-		mass.append(10**dat['pquantiles']['q50'][parnames=='logmass'][0])
+		mass.append(10**dat['pextras']['q50'][parnames=='stellar_mass'][0])
 		sfr.append(10**dat['pextras']['q50'][eparnames=='sfr_100'][0])
 
 		#### model f_agn

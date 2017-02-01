@@ -61,10 +61,10 @@ def make_plots(runname='nonparametric_mocks', recollate_data = False):
 		os.makedirs(outfolder)
 
 	#plot_dn4000(alldata,outfolder=outfolder)
-	plot_fit_parameters(alldata,outfolder=outfolder,cdf=False)
-	plot_derived_parameters(alldata,outfolder=outfolder,cdf=False)
+	#plot_fit_parameters(alldata,outfolder=outfolder,cdf=False)
+	#plot_derived_parameters(alldata,outfolder=outfolder,cdf=False)
 	plot_spectral_parameters(alldata,outfolder=outfolder)
-	plot_likelihood(alldata,outfolder=outfolder)
+	#plot_likelihood(alldata,outfolder=outfolder)
 	#### PLOTS TO ADD
 	# SFR_10 deviations versus Halpha deviations
 	# max fit likelihood divided by truth likelihood
@@ -704,6 +704,7 @@ def plot_spectral_parameters(alldata,outfolder=None):
 	ax[ii+2].xaxis.set_major_locator(MaxNLocator(5))
 	ax[ii+2].yaxis.set_major_locator(MaxNLocator(5))
 
+	plt.tight_layout()
 	plt.savefig(outfolder+'spectral_parameter_recovery.png',dpi=dpi)
 	plt.close()
 
