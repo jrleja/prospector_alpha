@@ -78,9 +78,9 @@ def add_to_corner(fig, sample_results, extra_output, sps, model,truths=None,
     plotquant = extra_output['extras'].get('flatchain',None)
     plotname  = extra_output['extras'].get('parnames',None)
 
-    to_show = ['half_time','ssfr_100','sfr_100']#,'stellar_mass']
+    to_show = ['half_time','ssfr_100','sfr_100','stellar_mass']
     ptitle = [r't$_{\mathrm{half}}$ [Gyr]',r'log(sSFR) (100 Myr) [yr$^{-1}$]',
-              r'log(SFR) (100 Myr) [M$_{\odot}$ yr$^{-1}$]']#,r'log(M$_*$) [M$_{\odot}$]']
+              r'log(SFR) (100 Myr) [M$_{\odot}$ yr$^{-1}$]',r'log(M$_*$) [M$_{\odot}$]']
 
     showing = np.array([x in to_show for x in plotname])
 
@@ -788,6 +788,9 @@ def plot_all_driver(runname=None,**extras):
 	filebase, parm_basename, ancilname=threed_dutils.generate_basenames(runname)
 	for jj in xrange(len(filebase)):
 		print 'iteration '+str(jj) 
+
+		if filebase[jj].split('_')[-1] != 'NGC 0628':
+			continue
 
 		make_all_plots(filebase=filebase[jj],\
 		               outfolder=os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/',
