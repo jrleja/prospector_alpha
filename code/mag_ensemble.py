@@ -104,7 +104,7 @@ def pdf_distance(chain,truth,truth_chain,bins,delta_functions=False,center_obs=F
 	if (truth_chain == None) or (delta_functions): # we have no errors (dn4000), use delta functions
 
 		if iteration == 0:
-			bias = 0.13
+			bias = 0.17
 		else:
 			bias = 0.1
 
@@ -2047,8 +2047,8 @@ def obs_vs_model_hdelta(e_pinfo,hflag,outname=None,outname2=None,outname_dnplt=N
 	'''
 
 	if eqw:
-		min = -3
-		max = 8
+		min = -4
+		max = 12
 		plotlim = (min,max,min,max)
 
 		good_idx = brown_quality_cuts.hdelta_cuts(e_pinfo,eqw=True)
@@ -2063,7 +2063,7 @@ def obs_vs_model_hdelta(e_pinfo,hflag,outname=None,outname2=None,outname_dnplt=N
 		        r'observed H$_{\delta}$ EW']
 		ytit = [r'model H$_{\delta}$ EW [absorption+emission]',
 		        r'model H$_{\delta}$ EW [best-fit]',
-		        r'model H$_{\delta}$ EW [marginalized]']
+		        r'model H$_{\delta}$ EW [absorption]']
 
 		# only make this plot in EQW
 		fig2, ax2 = plt.subplots(1,2, figsize=(12.5,6))
@@ -2149,7 +2149,7 @@ def obs_vs_model_hdelta(e_pinfo,hflag,outname=None,outname2=None,outname_dnplt=N
 	#ax[0].text(0.04,0.92, r'N = '+str(int(np.sum(good_idx))), transform = ax[0].transAxes,horizontalalignment='left')
 	#ax[0].text(0.04,0.87, r'S/N H$\delta$ > {0}'.format(int(e_pinfo['obs']['hdelta_sn_cut'])), transform = ax[0].transAxes,horizontalalignment='left')
 	#ax[0].text(0.04,0.82, r'EQW H$\delta$ < -{0} $\AA$'.format(int(e_pinfo['obs']['hdelta_eqw_cut'])), transform = ax[0].transAxes,horizontalalignment='left')
-	bpt_legend(ax[0],loc=2)
+	bpt_legend(ax[0],loc=2,size=11)
 	ax[0].set_xlabel(xtit[2])
 	ax[0].set_ylabel(ytit[2])
 	off,scat = threed_dutils.offset_and_scatter(hdel_obs[:,0], hdel_prosp_marg[:,0],biweight=True)
@@ -2161,12 +2161,12 @@ def obs_vs_model_hdelta(e_pinfo,hflag,outname=None,outname2=None,outname_dnplt=N
 	#ax3[0].text(0.04,0.82, r'N = '+str(int(np.sum(good_idx))), transform = ax3[0].transAxes,horizontalalignment='left')
 	#ax3[0].text(0.04,0.77, r'S/N H$\delta$ > {0}'.format(int(e_pinfo['obs']['hdelta_sn_cut'])), transform = ax3[0].transAxes,horizontalalignment='left')
 	#ax3[0].text(0.04,0.82, r'EQW H$\delta$ < -{0} $\AA$'.format(int(e_pinfo['obs']['hdelta_eqw_cut'])), transform = ax3[0].transAxes,horizontalalignment='left')
-	bpt_legend(ax3[0],loc=2,size=13)
+	bpt_legend(ax3[0],loc=2,size=11)
 	ax3[0].set_xlabel(xtit[0])
 	ax3[0].set_ylabel(ytit[0])
 	off,scat = threed_dutils.offset_and_scatter(hdel_obs[:,0], hdel_prosp_em[:,0],biweight=True)
-	ax3[0].text(0.98,0.11, 'biweight scatter='+"{:.2f}".format(scat), transform = ax3[0].transAxes,ha='right')
-	ax3[0].text(0.98,0.06, 'mean offset='+"{:.2f}".format(off), transform = ax3[0].transAxes,ha='right')
+	ax3[0].text(0.98,0.05, 'biweight scatter='+"{:.2f}".format(scat), transform = ax3[0].transAxes,ha='right')
+	ax3[0].text(0.98,0.10, 'mean offset='+"{:.2f}".format(off), transform = ax3[0].transAxes,ha='right')
 	ax3[0].axis(plotlim)
 	ax3[0].plot([min,max],[min,max],linestyle='--',color='0.1',alpha=0.8)
 
@@ -2192,9 +2192,8 @@ def obs_vs_model_hdelta(e_pinfo,hflag,outname=None,outname2=None,outname_dnplt=N
 	fig3.tight_layout()
 	fig3.savefig(outname2,dpi=dpi)
 	plt.close()
-
-	return norm_errs, norm_flag
 	print 1/0
+	return norm_errs, norm_flag
 
 def obs_vs_model_dn(e_pinfo,hflag,outname=None):
 

@@ -81,9 +81,8 @@ def add_mass_sfr_plot(alldata,fig):
 	minsfr = 1e-4
 
 	##### find prospector indexes
-	parnames = alldata[0]['pquantiles']['parnames']
-	idx_mass = parnames == 'logmass'
 	eparnames = alldata[0]['pextras']['parnames']
+	idx_mass = eparnames == 'stellar_mass'
 	idx_sfr = eparnames == 'sfr_100'
 
 	mass = np.zeros(shape=(len(alldata),3))
@@ -93,9 +92,9 @@ def add_mass_sfr_plot(alldata,fig):
 	ax = fig.add_axes([0.58,0.71,0.37,0.28])
 
 	for ii,dat in enumerate(alldata):
-		mass[ii,0] = dat['pquantiles']['q50'][idx_mass]
-		mass[ii,1] = dat['pquantiles']['q84'][idx_mass]
-		mass[ii,2] = dat['pquantiles']['q16'][idx_mass]
+		mass[ii,0] = np.log10(dat['pextras']['q50'][idx_mass])
+		mass[ii,1] = np.log10(dat['pextras']['q84'][idx_mass])
+		mass[ii,2] = np.log10(dat['pextras']['q16'][idx_mass])
 
 		sfr[ii,0] = np.clip(dat['pextras']['q50'][idx_sfr],minsfr,np.inf)
 		sfr[ii,1] = np.clip(dat['pextras']['q84'][idx_sfr],minsfr,np.inf)

@@ -542,7 +542,7 @@ class BurstyModel(sedmodel.SedModel):
                 dust1 = theta[start:end]
                 start,end = self.theta_index['dust2']
                 dust2 = theta[start:end]
-                if dust1/1.5 > dust2:
+                if dust1/2.0 > dust2:
                     return -np.inf
 
         # sum of SFH fractional bins <= 1.0

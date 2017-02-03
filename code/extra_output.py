@@ -244,8 +244,8 @@ def calc_extra_quantities(sample_results, ncalc=3000, ir_priors=True, opts=None)
 
 		##### empirical Balmer decrement
 		bdec_calc[jj] = threed_dutils.calc_balmer_dec(thetas[d1_idx], thetas[d2_idx], -1.0, 
-		                                          thetas[didx],
-		                                          kriek = (sample_results['model'].params['dust_type'] == 4)[0])
+		                                              thetas[didx],
+		                                              kriek = (sample_results['model'].params['dust_type'] == 4)[0])
 
 		##### spectral quantities (emission line flux, Balmer decrement, Hdelta absorption, Dn4000)
 		##### and magnitudes (LIR, LUV)
