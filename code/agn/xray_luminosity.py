@@ -31,7 +31,7 @@ def collate_data(alldata, **extras):
 	parnames = alldata[0]['pquantiles']['parnames']
 	eparnames = alldata[0]['pextras']['parnames']
 	xr_idx = eparnames == 'xray_lum'
-	xray = brown_io.load_xray_mastercat(xmatch = True, **extras)
+	xray = brown_io.load_xray_cat(xmatch = True, **extras)
 
 	#### for each object
 	fagn, fagn_up, fagn_down, mass, sfr, xray_lum, xray_lum_err, database, observatory = [], [], [], [], [], [], [], [], []
@@ -40,7 +40,7 @@ def collate_data(alldata, **extras):
 	for ii, dat in enumerate(alldata):
 		
 		#### mass, SFR
-		mass.append(10**dat['pextras']['q50'][parnames=='stellar_mass'][0])
+		mass.append(10**dat['pextras']['q50'][eparnames=='stellar_mass'][0])
 		sfr.append(10**dat['pextras']['q50'][eparnames=='sfr_100'][0])
 
 		#### model f_agn
@@ -69,13 +69,13 @@ def collate_data(alldata, **extras):
 
 		#### CALCULATE F_AGN_OBS
 		# take advantage of the already-computed conversion between FAGN (model) and LAGN (model)
-		fagn_chain = dat['pquantiles']['sample_flatchain'][:,parnames=='fagn']
+		fagn_chain = dat['pquantiles']['sample_chain'][:,parnames=='fagn']
 		lagn_chain = dat['pextras']['flatchain'][:,eparnames == 'l_agn']
 		conversion = (lagn_chain / fagn_chain).squeeze()
 
 		### calculate L_AGN chain
 		scale = xray_lum_err[-1]
-		if scale == 0:
+		if scale <= 0:
 			lagn_chain = np.repeat(xray_lum[-1], conversion.shape[0])
 		else: 
 			lagn_chain = np.random.normal(loc=xray_lum[-1], scale=scale, size=conversion.shape[0])
@@ -86,16 +86,16 @@ def collate_data(alldata, **extras):
 		fagn_obs_up.append(eup)
 		fagn_obs_down.append(edo)
 
-		##### L_OBS - L_SFR(MODEL)
+		##### L_OBS / L_SFR(MODEL)
 		# sample from the chain, assume gaussian errors for x-ray fluxes
 		nsamp = 10000
 		chain = dat['pextras']['flatchain'][:,xr_idx].squeeze()
 
-		if scale == 0:
-			subchain =  np.repeat(xray_lum[-1], nsamp) - \
+		if scale <= 0:
+			subchain =  np.repeat(xray_lum[-1], nsamp) / \
 			            np.random.choice(chain,nsamp)
 		else:
-			subchain =  np.random.normal(loc=xray_lum[-1], scale=scale, size=nsamp) - \
+			subchain =  np.random.normal(loc=xray_lum[-1], scale=scale, size=nsamp) / \
 			            np.random.choice(chain,nsamp)
 
 		cent, eup, edo = quantile(subchain, [0.5, 0.84, 0.16])
@@ -106,7 +106,10 @@ def collate_data(alldata, **extras):
 
 		#### database and observatory
 		database.append(str(xray['database'][idx][0]))
-		observatory.append(str(xray['observatory'][idx][0]))
+		try:
+			observatory.append(str(xray['observatory'][idx][0]))
+		except KeyError:
+			observatory.append(' ')
 
 	out = {}
 	out['database'] = database
@@ -188,18 +191,32 @@ def make_plot(runname='brownseds_agn',alldata=None,outfolder=None,maxradius=30):
 	plt.savefig(outfolder+outname,dpi=dpi)
 	plt.close()
 
-	### PLOT VERSUS 'TRUE' X-RAY FLUX
+	### SFR VS LX
 	outname = 'xray_lum_sfrcorr_fagn_model.png'
 	fig,ax = plot(pdata,color_by_observatory=cbo,color_by_database=cbd,color_by_wise=cbw,
 		          ypar='fagn',ylabel = r'model L$_{\mathrm{AGN}}$ (IR) / L$_{\mathrm{galaxy}}$ (bolometric)',
-		          xpar='lsfr',xlabel = 'observed X-ray luminosity (SFR-corrected) [erg/s]')
+		          xpar='lsfr',xlabel = '(observed X-ray) / (expected SFR X-ray) [erg/s]')
 	plt.savefig(outfolder+outname,dpi=dpi)
 	plt.close()
 
 	outname = 'xray_lum_sfrcorr_lagn.png'
 	fig,ax = plot(pdata,color_by_observatory=cbo,color_by_database=cbd,color_by_wise=cbw,
 		          ypar='lagn',ylabel = r'model L$_{\mathrm{AGN}}$ [erg/s]',
-		          xpar='lsfr',xlabel = 'observed X-ray luminosity (SFR-corrected) [erg/s]')
+		          xpar='lsfr',xlabel = '(observed X-ray) / (expected SFR X-ray) [erg/s]')
+	plt.savefig(outfolder+outname,dpi=dpi)
+
+	### PLOT VERSUS 'TRUE' X-RAY FLUX
+	outname = 'xray_lum_sfrcorr_fagn_model.png'
+	fig,ax = plot(pdata,color_by_observatory=cbo,color_by_database=cbd,color_by_wise=cbw,
+		          ypar='fagn',ylabel = r'model L$_{\mathrm{AGN}}$ (IR) / L$_{\mathrm{galaxy}}$ (bolometric)',
+		          xpar='lsfr',xlabel = '(observed X-ray) / (expected SFR X-ray) [erg/s]')
+	plt.savefig(outfolder+outname,dpi=dpi)
+	plt.close()
+
+	outname = 'xray_lum_sfrcorr_lagn.png'
+	fig,ax = plot(pdata,color_by_observatory=cbo,color_by_database=cbd,color_by_wise=cbw,
+		          ypar='lagn',ylabel = r'model L$_{\mathrm{AGN}}$ [erg/s]',
+		          xpar='lsfr',xlabel = '(observed X-ray) / (expected SFR X-ray) [erg/s]')
 	plt.savefig(outfolder+outname,dpi=dpi)
 	plt.close()
 
@@ -219,6 +236,7 @@ def plot(pdata,color_by_observatory=False,color_by_database=False,color_by_wise=
 		xerr_1d = pdata['xray_luminosity_err']
 	elif xpar == 'lsfr':
 		xmin, xmax = 1e36,1e45
+		xmin, xmax = 5e-3,1e3
 		xplot = np.clip(pdata[xpar],xmin,xmax)
 	else:
 		xmin, xmax = 5e-6,1e-1

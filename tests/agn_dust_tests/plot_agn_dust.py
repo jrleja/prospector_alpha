@@ -86,7 +86,6 @@ def plot_agn_fraction(no_dust = False):
 	nsamp = 12
 	to_samp = [r'f$_{\mathrm{AGN}}$',r'$\tau_{\mathrm{AGN}}$']
 	samp_pars = [np.linspace(0.1,5.0,nsamp),np.linspace(1,20,nsamp)] 
-	samp_pars[0] = np.array([0.0,0.1,0.5,1.0])
 	idx = [didx,tidx]
 
 	### define wavelength regime + conversions

@@ -172,14 +172,14 @@ def plot_sfh(pdata,idx_plot,outfolder):
 			ax[ii].xaxis.set_minor_formatter(minorFormatter)
 			ax[ii].xaxis.set_major_formatter(majorFormatter)
 
-			ax[ii].set_yscale('log',nonposy='clip',subsy=(1,2,4))
+			ax[ii].set_yscale('log',nonposy='clip',subsy=(1,3))
 			ax[ii].yaxis.set_minor_formatter(minorFormatter)
 			ax[ii].yaxis.set_major_formatter(majorFormatter)
 
 			add_identifier(ax[ii],idx,pdata, fs=fs,weight='bold')
 			add_txt(ax[ii],pdata,fs=fs,weight='bold')
 
-		ax[ii].set_ylim(pmin*0.6,pmax*3)
+		ax[ii].set_ylim(pmin*0.2,pmax*8)
 		ax[ii].set_xlim(t.min()*30,t.max())
 
 	plt.tight_layout(w_pad=0.5,h_pad=0.3)
@@ -240,7 +240,7 @@ def plot_residuals(pdata,idx_plot,outfolder):
 
 		# prospector_resid = np.log10(observed_flux) - np.log10(model_flux)
 		for i,key in enumerate(pdata['agn']['residuals'].keys()):
-			if pdata['agn']['residuals'][key] is not None:
+			if pdata['agn']['residuals'][key]['resid'][idx] is not None:
 				ydat = np.sqrt(pdata['no_agn']['residuals'][key]['resid'][idx]**2) - np.sqrt(pdata['agn']['residuals'][key]['resid'][idx]**2)
 				xdat = pdata['agn']['residuals'][key]['lam'][idx]
 				specx[i] += xdat.tolist()

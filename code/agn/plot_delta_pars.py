@@ -4,9 +4,12 @@ import matplotlib.pyplot as plt
 import agn_plot_pref
 from corner import quantile
 import os
-from threed_dutils import asym_errors
+from threed_dutils import asym_errors, running_median
+from matplotlib.ticker import MaxNLocator
 
 dpi = 150
+red = '#FF3D0D'
+blue = '#1C86EE' 
 
 def collate_data(alldata,alldata_noagn):
 
@@ -15,7 +18,7 @@ def collate_data(alldata,alldata_noagn):
 
 	### normal parameter labels
 	parnames = alldata_noagn[0]['pquantiles']['parnames']
-	parlabels = [r'log(M/M$_{\odot}$)', 'SFH 0-100 Myr', 'SFH 100-300 Myr', 'SFH 300 Myr-1 Gyr', 
+	parlabels = [r'log(M$_{\mathrm{form}}$/M$_{\odot}$)', 'SFH 0-100 Myr', 'SFH 100-300 Myr', 'SFH 300 Myr-1 Gyr', 
 	         'SFH 1-3 Gyr', 'SFH 3-6 Gyr', 'diffuse dust', r'log(Z/Z$_{\odot}$)', 'diffuse dust index',
 	         'birth-cloud dust', r'dust emission Q$_{\mathrm{PAH}}$',r'dust emission $\gamma$',r'dust emission U$_{\mathrm{min}}$']
 
@@ -36,6 +39,12 @@ def collate_data(alldata,alldata_noagn):
 		outq[par] = {}
 		outq[par]['q50'],outq[par]['q84'],outq[par]['q16'] = [],[],[]
 		outlabels[par] = eparlabels[ii]
+	
+	par = 'halpha'
+	outvals[par] = []
+	outq[par] = {}
+	outq[par]['q50'],outq[par]['q84'],outq[par]['q16'] = [],[],[]
+	outlabels[par] = r'log(H$_{\alpha}$ flux)'
 
 	### fill with data
 	for dat,datnoagn in zip(alldata,alldata_noagn):
@@ -56,6 +65,16 @@ def collate_data(alldata,alldata_noagn):
 				quant = float(q[1:])/100
 				outq[par][q].append(quantile(ratio, [quant])[0])
 			outvals[par].append(outq[par]['q50'][-1])
+
+		par = 'halpha'
+		ha_idx = dat['model_emline']['emnames'] == 'Halpha'
+		p1 = np.random.choice(np.log10(dat['model_emline']['flux']['chain'][:,ha_idx]).squeeze(),size=size)
+		p2 = np.random.choice(np.log10(datnoagn['model_emline']['flux']['chain'][:,ha_idx]).squeeze(),size=size)
+		ratio = p1 - p2
+		for q in outq[par].keys(): 
+			quant = float(q[1:])/100
+			outq[par][q].append(quantile(ratio, [quant])[0])
+		outvals[par].append(outq[par]['q50'][-1])
 
 	### do the errors
 	for par in outlabels.keys():
@@ -78,7 +97,7 @@ def collate_data(alldata,alldata_noagn):
 	out['median'] = outvals
 	out['errs'] = outerrs
 	out['labels'] = outlabels
-	out['ordered_labels'] = np.concatenate((parnames,eparnames))
+	out['ordered_labels'] = np.concatenate((parnames,eparnames,np.array(['halpha'])))
 	out['agn_pars'] = agn_pars
 	return out
 
@@ -108,11 +127,10 @@ def plot(runname='brownseds_agn',runname_noagn='brownseds_np',alldata=None,allda
 	plt.close()
 
 	os.system('open '+outfolder+'delta_fitpars.png')
-	print 1/0
 
 def plot_dpars(pdata,xpar=None,xparlabel=None,log_xpar=False):
 	'''
-	plots a color-color BPT scatterplot
+	plots a scatterplot
 	'''
 
 	#### generate color mapping
@@ -121,11 +139,11 @@ def plot_dpars(pdata,xpar=None,xparlabel=None,log_xpar=False):
 		xpar_plot = np.log10(xpar_plot)
 
 	#### plot photometry
-	fig, ax = plt.subplots(4,4, figsize=(16,16))
+	fig, ax = plt.subplots(4,5, figsize=(21,16))
 	ax = np.ravel(ax)
 
 	opts = {
-	        'color': '#1C86EE',
+	        'color': blue,
 	        'mew': 1.5,
 	        'alpha': 0.6,
 	        'fmt': 'o'
@@ -133,13 +151,18 @@ def plot_dpars(pdata,xpar=None,xparlabel=None,log_xpar=False):
 
 	for ii, par in enumerate(pdata['ordered_labels']):
 
-			ax[ii].errorbar(xpar_plot,pdata['median'][par], yerr=pdata['errs'][par],zorder=5,  **opts)
+			errs = pdata['errs'][par]
+			ax[ii].errorbar(xpar_plot,pdata['median'][par], yerr=errs, zorder=-3, **opts)
 			ax[ii].set_ylabel('AGN--no AGN')
 			ax[ii].set_xlabel(xparlabel)
 			ax[ii].set_title(pdata['labels'][par])
 
 			ax[ii].plot([ax[ii].get_xlim()[0],ax[ii].get_xlim()[1]],[0.0,0.0], linestyle='--',color='0.5',lw=1.5,zorder=-5)
+			ax[ii].xaxis.set_major_locator(MaxNLocator(5))
 
+			x, y = running_median(xpar_plot,pdata['median'][par],nbins=8,weights=1./(np.array(errs)[0]+np.array(errs)[1]),avg=True)
+			ax[ii].plot(x,y,color=red,lw=4,alpha=0.6)
+			ax[ii].plot(x,y,color=red,lw=4,alpha=0.6)
 
 	return fig, ax
 

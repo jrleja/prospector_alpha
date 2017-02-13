@@ -304,6 +304,9 @@ def synthetic_halpha(sfr,dust1,dust2,dust1_index,dust2_index,kriek=False):
 	# comes out in ergs/s
 	return flux
 
+def bdec_to_ext(bdec):
+	return np.log10(bdec/2.86)
+
 def chev_extinction(tau_v, lam, ebars=False):
 	'''
 	return optical depth based on Eqn 7+9,10 in Chevallard et al. 2013
@@ -496,16 +499,22 @@ def load_truths(param_file,model=None,sps=None,obs=None, calc_prob = True):
 
 	return truths_dict
 
-def running_median(x,y,nbins=10,avg=False):
+def running_median(x,y,nbins=10,avg=False,weights=None):
 
-	bins = np.linspace(x.min(),x.max(), nbins)
+	bins = np.linspace(x.min(),x.max(), nbins+1)
 	delta = bins[1]-bins[0]
-	idx  = np.digitize(x,bins)
+	idx  = np.digitize(x,bins,right=True)
 	if avg == False:
 		running_median = np.array([np.median(y[idx-1==k]) for k in range(nbins)])
 	else:
-		running_median = np.array([np.mean(y[idx-1==k]) for k in range(nbins)])
-	bins = bins+delta/2.
+		running_median= []
+		for k in range(nbins): # for loop because we can't pass an empty array to np.average!
+			if (idx-1==k).sum() == 0:
+				running_median.append(0.0)
+			else:
+				running_median.append(np.average(y[idx-1==k],weights=weights[idx-1==k]))
+		running_median = np.array(running_median)
+	bins = bins[:-1]+delta/2.
 
 	# remove empty
 	empty = np.isnan(running_median) == 1

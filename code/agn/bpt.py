@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import agn_plot_pref
 from corner import quantile
 import os
+from threed_dutils import asym_errors
 
 dpi = 150
 
@@ -111,7 +112,7 @@ def plot_scatterplot(pdata,colorpar=None,colorparlabel=None,log_cpar=False,cpar_
 	'''
 
 	#### only select those with good BPT measurements
-	sncut = 1
+	sncut = 4
 	good = (pdata['oiii_hb'][:,0]/pdata['oiii_hb'][:,1] > sncut) & \
 	       (pdata['nii_ha'][:,0]/pdata['nii_ha'][:,1] > sncut) & \
 	       (pdata['nii_ha'][:,0] > 0) & \

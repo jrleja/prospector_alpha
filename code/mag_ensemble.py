@@ -203,9 +203,9 @@ def specpar_pdf_distance(pinfo,alldata, delta_functions=True, center_obs=True):
 				truth_chain = np.log10(pinfo['obs']['pdf_hb'][kk])
 
 			if ii == 2: # bdec
-				chain = bdec_to_ext(dat['pextras']['flatchain'][:,dat['pextras']['parnames']=='bdec_calc'])
-				truth = bdec_to_ext(pinfo['obs'][obs_names[ii]][kk])
-				truth_chain = bdec_to_ext(np.random.choice(pinfo['obs']['pdf_ha'][kk],size=1000) / np.random.choice(pinfo['obs']['pdf_hb'][kk],size=1000))
+				chain = threed_dutils.bdec_to_ext(dat['pextras']['flatchain'][:,dat['pextras']['parnames']=='bdec_calc'])
+				truth = threed_dutils.bdec_to_ext(pinfo['obs'][obs_names[ii]][kk])
+				truth_chain = threed_dutils.bdec_to_ext(np.random.choice(pinfo['obs']['pdf_ha'][kk],size=1000) / np.random.choice(pinfo['obs']['pdf_hb'][kk],size=1000))
 
 			if ii == 3: # met (MAKE SURE THIS WORKS)
 				chain = np.squeeze(dat['pquantiles']['random_chain'][:,dat['pquantiles']['parnames']=='logzsol'])
@@ -1733,7 +1733,7 @@ def bdec_corr_eqn(x, hdel_eqw_obs, hdel_eqw_model,
 		hbeta_new = hbeta_obs + hbeta_abs_eqw*(use_ratio-1) * hbeta_continuum
 
 	##### bdec corrected
-	bdec_corrected = bdec_to_ext(halpha_new/hbeta_new)
+	bdec_corrected = threed_dutils.bdec_to_ext(halpha_new/hbeta_new)
 
 	return bdec_corrected
 
@@ -1743,7 +1743,7 @@ def minimize_bdec_corr_eqn(x, hdel_eqw_obs, hdel_eqw_model, halpha_obs, hbeta_ob
 	                          additive,
 	                          bdec_model):
 	'''
-	minimize the scatter in bdec_to_ext(obs_bdec), bdec_to_ext(model_bdec)
+	minimize the scatter in threed_dutils.bdec_to_ext(obs_bdec), threed_dutils.bdec_to_ext(model_bdec)
 	by some function bdec_corr_eqw() described above
 	'''
 
@@ -2192,7 +2192,7 @@ def obs_vs_model_hdelta(e_pinfo,hflag,outname=None,outname2=None,outname_dnplt=N
 	fig3.tight_layout()
 	fig3.savefig(outname2,dpi=dpi)
 	plt.close()
-	print 1/0
+
 	return norm_errs, norm_flag
 
 def obs_vs_model_dn(e_pinfo,hflag,outname=None):
@@ -2255,10 +2255,6 @@ def obs_vs_model_dn(e_pinfo,hflag,outname=None):
 	plt.close()
 
 	return norm_errs, norm_flag
-
-def bdec_to_ext(bdec):
-	return np.log10(bdec/2.86)
-	# return 2.5*np.log10(bdec/2.86)
 
 def normalize_error(obs,obserr,mod,moderr):
 	
@@ -2478,10 +2474,10 @@ def obs_vs_model_bdec(e_pinfo,hflag,outname1='test.png',outname2='test.png'):
 	keep_idx = brown_quality_cuts.halpha_cuts(e_pinfo)
 
 	##### write down plot variables
-	pl_bdec_calc_marg = bdec_to_ext(e_pinfo['prosp']['bdec_calc_marg'][keep_idx,:])
-	pl_bdec_calc_bfit = bdec_to_ext(e_pinfo['prosp']['bdec_calc_bfit'][keep_idx])
-	pl_bdec_magphys = bdec_to_ext(e_pinfo['mag']['bdec'][keep_idx])
-	pl_bdec_measured = bdec_to_ext(e_pinfo['obs']['bdec'][keep_idx])
+	pl_bdec_calc_marg = threed_dutils.bdec_to_ext(e_pinfo['prosp']['bdec_calc_marg'][keep_idx,:])
+	pl_bdec_calc_bfit = threed_dutils.bdec_to_ext(e_pinfo['prosp']['bdec_calc_bfit'][keep_idx])
+	pl_bdec_magphys = threed_dutils.bdec_to_ext(e_pinfo['mag']['bdec'][keep_idx])
+	pl_bdec_measured = threed_dutils.bdec_to_ext(e_pinfo['obs']['bdec'][keep_idx])
 
 	##### BPT classifications, herschel flag
 	sfing, composite, agn = return_agn_str(keep_idx)
@@ -2504,8 +2500,8 @@ def obs_vs_model_bdec(e_pinfo,hflag,outname1='test.png',outname2='test.png'):
 
 		### errors for this sample
 		errs_obs = threed_dutils.asym_errors(pl_bdec_measured[plt_idx], 
-	                                         bdec_to_ext(e_pinfo['obs']['bdec'][keep_idx][plt_idx]+e_pinfo['obs']['bdec_err'][keep_idx][plt_idx]),
-	                                         bdec_to_ext(e_pinfo['obs']['bdec'][keep_idx][plt_idx]-e_pinfo['obs']['bdec_err'][keep_idx][plt_idx]), log=False)
+	                                         threed_dutils.bdec_to_ext(e_pinfo['obs']['bdec'][keep_idx][plt_idx]+e_pinfo['obs']['bdec_err'][keep_idx][plt_idx]),
+	                                         threed_dutils.bdec_to_ext(e_pinfo['obs']['bdec'][keep_idx][plt_idx]-e_pinfo['obs']['bdec_err'][keep_idx][plt_idx]), log=False)
 		errs_cloudy_marg = threed_dutils.asym_errors(pl_bdec_calc_marg[plt_idx,0],
 			                                   pl_bdec_calc_marg[plt_idx,1], 
 			                                   pl_bdec_calc_marg[plt_idx,2],log=False)
@@ -2704,12 +2700,12 @@ def residual_plots(e_pinfo,hflag,outfolder):
 	hflag = [hflag[keep_idx],~hflag[keep_idx]]
 
 	#### bdec resid versus ha resid
-	bdec_resid = bdec_to_ext(e_pinfo['prosp']['bdec_calc_marg'][keep_idx,0])-bdec_to_ext(e_pinfo['obs']['bdec'][keep_idx])
-	bdec_resid_errup_prosp = bdec_to_ext(e_pinfo['prosp']['bdec_calc_marg'][keep_idx,1])-bdec_to_ext(e_pinfo['prosp']['bdec_calc_marg'][keep_idx,0])
-	bdec_resid_errup_obs = bdec_to_ext(e_pinfo['obs']['bdec'][keep_idx]+e_pinfo['obs']['bdec_err'][keep_idx])-bdec_to_ext(e_pinfo['obs']['bdec'][keep_idx])
+	bdec_resid = threed_dutils.bdec_to_ext(e_pinfo['prosp']['bdec_calc_marg'][keep_idx,0])-threed_dutils.bdec_to_ext(e_pinfo['obs']['bdec'][keep_idx])
+	bdec_resid_errup_prosp = threed_dutils.bdec_to_ext(e_pinfo['prosp']['bdec_calc_marg'][keep_idx,1])-threed_dutils.bdec_to_ext(e_pinfo['prosp']['bdec_calc_marg'][keep_idx,0])
+	bdec_resid_errup_obs = threed_dutils.bdec_to_ext(e_pinfo['obs']['bdec'][keep_idx]+e_pinfo['obs']['bdec_err'][keep_idx])-threed_dutils.bdec_to_ext(e_pinfo['obs']['bdec'][keep_idx])
 	bdec_resid_errup = np.sqrt(bdec_resid_errup_prosp**2+bdec_resid_errup_obs**2)
-	bdec_resid_errdo_prosp = bdec_to_ext(e_pinfo['prosp']['bdec_calc_marg'][keep_idx,0])-bdec_to_ext(e_pinfo['prosp']['bdec_calc_marg'][keep_idx,2])
-	bdec_resid_errdo_obs = bdec_to_ext(e_pinfo['obs']['bdec'][keep_idx])-bdec_to_ext(e_pinfo['obs']['bdec'][keep_idx]-+e_pinfo['obs']['bdec_err'][keep_idx])
+	bdec_resid_errdo_prosp = threed_dutils.bdec_to_ext(e_pinfo['prosp']['bdec_calc_marg'][keep_idx,0])-threed_dutils.bdec_to_ext(e_pinfo['prosp']['bdec_calc_marg'][keep_idx,2])
+	bdec_resid_errdo_obs = threed_dutils.bdec_to_ext(e_pinfo['obs']['bdec'][keep_idx])-threed_dutils.bdec_to_ext(e_pinfo['obs']['bdec'][keep_idx]-+e_pinfo['obs']['bdec_err'][keep_idx])
 	bdec_resid_errdo = np.sqrt(bdec_resid_errdo_prosp**2+bdec_resid_errdo_obs**2)
 
 	bdec_resid_err = [bdec_resid_errdo,bdec_resid_errup]
@@ -2907,7 +2903,7 @@ def residual_plots(e_pinfo,hflag,outfolder):
 	ax.set_ylim(-0.6,0.6)
 	ax.set_xlim(-5,95)
 
-	off,scat = threed_dutils.offset_and_scatter(bdec_to_ext(e_pinfo['prosp']['bdec_calc_marg'][keep_idx,0]),bdec_to_ext(e_pinfo['obs']['bdec'][keep_idx]))
+	off,scat = threed_dutils.offset_and_scatter(threed_dutils.bdec_to_ext(e_pinfo['prosp']['bdec_calc_marg'][keep_idx,0]),threed_dutils.bdec_to_ext(e_pinfo['obs']['bdec'][keep_idx]))
 	ax.text(0.98,0.94, 'biweight scatter='+"{:.2f}".format(scat)+' magnitudes', ha='right',transform=ax.transAxes,fontsize=15,weight='roman')
 
 	ax.arrow(0.06, 0.52, 0.0, 0.10, head_width=0.02, head_length=0.03, fc='k', ec='k',width=0.003,transform = ax.transAxes)
@@ -3634,8 +3630,8 @@ def plot_comparison(alldata,outfolder):
 		bdec = threed_dutils.calc_balmer_dec(tau1, tau2, -1.3, -0.7)
 		bdec_magphys.append(np.squeeze(bdec))
 	
-	bdec_magphys = bdec_to_ext(np.array(bdec_magphys))
-	bdec_prospector = bdec_to_ext(bdec_prospector)
+	bdec_magphys = threed_dutils.bdec_to_ext(np.array(bdec_magphys))
+	bdec_prospector = threed_dutils.bdec_to_ext(bdec_prospector)
 	bdec_prospector_errs = threed_dutils.asym_errors(bdec_prospector[:,0], 
 		                                             bdec_prospector[:,1],
 		                                             bdec_prospector[:,2])

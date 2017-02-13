@@ -274,6 +274,199 @@ def write_coordinates():
 		for r, d in zip(ra,dec):
 			f.write(str(r)+', '+d+'; ')
 
+def load_csc(bcoords,objname):
+
+	location = '/Users/joel/code/python/threedhst_bsfh/data/brownseds_data/photometry/xray/csc_table.dat'
+
+	#### extract headers
+	with open(location, 'r') as f:
+		for line in f:
+			if line[:5] != '|name':
+				continue
+			else:
+				hdr = line
+				hdr = hdr.replace(' ', '').split('|')[:-1]
+				break
+
+	#### load
+	# names = ('', 'name', 'ra', 'dec', 'count_rate', 'count_rate_error', 'flux', 'database_table', 'observatory','error_radius', 'exposure', 'class', '_Search_Offset')
+	dat = np.loadtxt(location, comments = '#', delimiter='|',skiprows=5,
+                     dtype = {'names':([str(n) for n in hdr]),\
+                              'formats':(['S40','S40','S40','S40','f16','f16','f16','f16','f16','f16','f16','S40','S40','S40'])})
+	
+	offset = gather_offset(dat['_Search_Offset'])
+	dat = np.lib.recfunctions.append_fields(dat, 'offset', data=offset)	
+
+	### add match
+	match = []
+	for query in dat['_Search_Offset']:
+		match_str = (query.split('('))[1].split(')')[0]
+		match.append(objname[bcoords.index(match_str)])
+	match = np.array(match)
+	dat = np.lib.recfunctions.append_fields(dat, 'match', data=match)
+
+	return dat
+
+def load_cxo(bcoords,objname):
+
+	location = '/Users/joel/code/python/threedhst_bsfh/data/brownseds_data/photometry/xray/cxoxassist_table.dat'
+
+	#### extract headers
+	with open(location, 'r') as f:
+		for line in f:
+			if line[:5] != '|name':
+				continue
+			else:
+				hdr = line
+				hdr = hdr.replace(' ', '').split('|')[:-1]
+				break
+
+	#### load
+	# names = ('', 'name', 'ra', 'dec', 'count_rate', 'count_rate_error', 'flux', 'database_table', 'observatory','error_radius', 'exposure', 'class', '_Search_Offset')
+	dat = np.loadtxt(location, comments = '#', delimiter='|',skiprows=5,
+                     dtype = {'names':([str(n) for n in hdr]),\
+                              'formats':(['S40','S40','S40','S40','f16','f16','f16','f16','S40','S40'])})
+	
+	offset = gather_offset(dat['_Search_Offset'])
+	dat = np.lib.recfunctions.append_fields(dat, 'offset', data=offset)
+
+	### add match
+	match = []
+	for query in dat['_Search_Offset']:
+		match_str = (query.split('('))[1].split(')')[0]
+		match.append(objname[bcoords.index(match_str)])
+	match = np.array(match)
+	dat = np.lib.recfunctions.append_fields(dat, 'match', data=match)
+
+	return dat
+
+def load_chng(bcoords,objname):
+
+	location = '/Users/joel/code/python/threedhst_bsfh/data/brownseds_data/photometry/xray/chngpscliu_table.dat'
+
+	#### extract headers
+	with open(location, 'r') as f:
+		for line in f:
+			if line[:5] != '|name':
+				continue
+			else:
+				hdr = line
+				hdr = hdr.replace(' ', '').split('|')[:-1]
+				break
+
+	#### load
+	# names = ('', 'name', 'ra', 'dec', 'count_rate', 'count_rate_error', 'flux', 'database_table', 'observatory','error_radius', 'exposure', 'class', '_Search_Offset')
+	dat = np.loadtxt(location, comments = '#', delimiter='|',skiprows=5,
+                     dtype = {'names':([str(n) for n in hdr]),\
+                              'formats':(['S40','S40','S40','S40','S40','f16','f16','f16','f16','f16','S40','S40'])})
+	
+	### add offset
+	offset = gather_offset(dat['_Search_Offset'])
+	dat = np.lib.recfunctions.append_fields(dat, 'offset', data=offset)
+
+	### add match
+	match = []
+	for query in dat['_Search_Offset']:
+		match_str = (query.split('('))[1].split(')')[0]
+		match.append(objname[bcoords.index(match_str)])
+	match = np.array(match)
+	dat = np.lib.recfunctions.append_fields(dat, 'match', data=match)
+
+	return dat
+
+def gather_offset(offset_in):
+
+	# transform offset
+	offset = []
+	for query in offset_in:
+		n = 0
+		offset_float = None
+		while offset_float == None:
+			try: 
+				offset_float = float(query.split(' ')[n])
+			except ValueError:
+				n+=1
+		offset.append(offset_float)
+	offset = np.array(offset)
+
+	return offset
+
+def load_xray_cat(xmatch = True,maxradius=30):
+
+	'''
+	returns flux in (erg/cm^2/s) and object name from brown catalog
+	use three large catalogs
+	'''
+
+	### get brown coordinates
+	ra, dec, objname = load_coordinates(dec_in_string=True)
+	bcoords = []
+	for r, d in zip(ra,dec): bcoords.append(str(r)+', '+d)
+
+	### load up each catalog
+	csc = load_csc(bcoords,objname)
+	cxo = load_cxo(bcoords,objname)
+	chng = load_chng(bcoords,objname)
+
+	#### match based on query string
+	if xmatch == True:
+		
+		#### load Brown positional data
+		#### mock up as query parameters
+
+		### take brightest X-ray detection per object
+		flux, flux_err, database = [], [], []
+		for i, name in enumerate(objname):
+
+			### find matches in the query with nonzero flux entries within MAXIMUM radius in arcseconds (max is 1')
+			idx_csc = (csc['match'] == name) & \
+			          (csc['fb_flux_ap'] > 0.0) & \
+			          (csc['offset'] < maxradius/60.) & \
+			          (np.core.defchararray.strip(csc['extent_flag']) == 'F')
+			
+			idx_cxo = (cxo['match'] == name) & \
+			          (cxo['flux'] > 0.0) & \
+			          (cxo['offset'] < maxradius/60.) & \
+			          (np.core.defchararray.strip(cxo['extent_flag']) == 'F')
+
+			idx_chng = (chng['match'] == name) & \
+			           (chng['flux'] > 0.0) & \
+			           (chng['offset'] < maxradius/60.)
+
+			### PREFER CXO > CSC > CHNG
+			if idx_cxo.sum() > 0:
+				### take brightest
+				idx = cxo['flux'][idx_cxo].argmax()
+				flux.append(cxo['flux'][idx_cxo][idx])
+				flux_err.append(cxo['flux'][idx_cxo][idx] * (cxo['counts_error'][idx_cxo][idx]/cxo['counts'][idx_cxo][idx]))
+				database.append('CXO')
+			elif idx_csc.sum() > 0:
+				### take brightest
+				idx = csc['fb_flux_ap'][idx_csc].argmax()
+				fac = correct_for_window('CSC', targlow = 0.3, targhigh = 8)
+				flux.append(csc['fb_flux_ap'][idx_csc][idx]*fac)
+				flux_err.append((csc['fb_flux_ap_upper'][idx_csc][idx]-csc['fb_flux_ap_lower'][idx_csc][idx])/2.*fac)
+				database.append('CSC')
+			elif idx_chng.sum() > 0:
+				idx = chng['flux'][idx_chng].argmax()
+				flux.append(chng['flux'][idx_chng][idx])
+				flux_err.append(0.0)
+				database.append('CHNG')
+			### if no detections, give it a dummy number
+			else:
+				flux.append(-99)
+				flux_err.append(0.0)
+				database.append('no match')
+				continue 
+
+		out = {'objname':objname,
+		       'flux':np.array(flux),
+		       'flux_err':np.array(flux_err),
+		       'database':np.array(database)}
+		return out
+	else:
+		return dat
+
 def load_xray_mastercat(xmatch = True,maxradius=30):
 
 	'''
@@ -336,16 +529,20 @@ def load_xray_mastercat(xmatch = True,maxradius=30):
 
 		### take brightest X-ray detection per object
 		flux, flux_err, observatory, database = [], [], [], []
+		count = 0
 		for i, name in enumerate(objname):
 
 			### find matches in the query with nonzero flux entries within MAXIMUM radius in arcseconds (max is 1')
 			# forbidden datatables either use bandpasses above 10 keV or flux definition is unclear
+			# SFGALHMXB is removed because it's a high-mass x-ray binary catalog!
 			idx = (np.array(match) == name) & (dat['flux'] != 0.0) & (offset < maxradius/60.) & \
 				  (dat['database_table'] != 'INTAGNCAT') & (dat['database_table'] != 'INTIBISAGN') & \
 				  (dat['database_table'] != 'BMWHRICAT') & (dat['database_table'] != 'IBISCAT4') & \
-				  (dat['database_table'] != 'INTIBISASS') & (dat['database_table'] != 'ULXRBCAT')
+				  (dat['database_table'] != 'INTIBISASS') & (dat['database_table'] != 'ULXRBCAT') & \
+				  (dat['database_table'] != 'SFGALHMXB')
 			### if no detections, give it a dummy number
-			if idx.sum() == 0:
+			if idx.sum() == 0: #or 'CHANDRA' not in dat['observatory'][idx]:
+				print dat['observatory'][idx]
 				flux.append(-99)
 				flux_err.append(0.0)
 				observatory.append('no match')
@@ -354,9 +551,13 @@ def load_xray_mastercat(xmatch = True,maxradius=30):
 
 			### choose the detection to keep
 			# prefer chandra
+			# of chandra, take the observation closest to centere
 			ch_idx = np.core.defchararray.strip(dat['observatory'][idx]) == 'CHANDRA'
 			if ch_idx.sum() > 0:
-				dat['flux'][idx][~ch_idx] = -1
+				idx_keep = np.where((offset[idx] == offset[idx][ch_idx].min()) & \
+					                (np.core.defchararray.strip(dat['observatory'][idx]) == 'CHANDRA'))[0][0]
+			else:
+				idx_keep = dat['flux'][idx].argmax()
 			idx_keep = dat['flux'][idx].argmax()
 
 			### fill out data
@@ -368,7 +569,7 @@ def load_xray_mastercat(xmatch = True,maxradius=30):
 			flux_err.append(flux[-1] * fractional_count_err)
 			observatory.append(dat['observatory'][idx][idx_keep])
 			database.append(dat['database_table'][idx][idx_keep])
-
+		print count
 		out = {'objname':objname,
 		       'flux':np.array(flux),
 		       'flux_err':np.array(flux_err),

@@ -53,13 +53,16 @@ def subcorner(sample_results,  sps, model, extra_output,
     else:
         ptruths = None
 
+    # make title font slightly smaller
+    title_kwargs = {'fontsize': 'medium'}
+
     fig = corner.corner(flatchain, labels = parnames,
                         quantiles=[0.16, 0.5, 0.84], verbose = False,
                         truths = ptruths, range = extents, truth_color='red',
-                        show_titles = True, plot_datapoints=False, **kwargs)
+                        show_titles = True, plot_datapoints=False, title_kwargs=title_kwargs,**kwargs)
 
     fig = add_to_corner(fig, sample_results, extra_output, sps, model, 
-    	                truths=truths, maxprob=False)#powell_results=powell_results)
+    	                truths=truths, maxprob=False, title_kwargs=title_kwargs)#powell_results=powell_results)
     if outname is not None:
         fig.savefig('{0}.corner.png'.format(outname))
         plt.close(fig)
@@ -68,7 +71,7 @@ def subcorner(sample_results,  sps, model, extra_output,
 
 
 def add_to_corner(fig, sample_results, extra_output, sps, model,truths=None,
-	              maxprob=True,powell_results=None):
+	              maxprob=True,powell_results=None,title_kwargs=None):
 
     '''
     adds in posterior distributions for 'select' parameters
@@ -222,7 +225,7 @@ def add_to_corner(fig, sample_results, extra_output, sps, model,truths=None,
 		title = r"${{{0}}}_{{-{1}}}^{{+{2}}}$"
 		title = title.format(fmt(qvalues[1]), fmt(q_m), fmt(q_p))
 		ax.set_title(title, va='bottom')
-		ax.set_xlabel(ptitle[to_show.index(plotname[jj])])
+		ax.set_xlabel(ptitle[to_show.index(plotname[jj])],**title_kwargs)
 
 		# axes
 		# set min/max

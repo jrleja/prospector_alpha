@@ -163,7 +163,7 @@ def plot_mir_colors(runname='brownseds_agn',alldata=None,outfolder=None, vega=Tr
 		outstring += '_vega'
 
 	fig,ax = plot_color_scatterplot(pdata,xfilt=xfilt,yfilt=yfilt,
-		                   xlabel='WISE [4.6]-[12] (AB)',ylabel='WISE [12]-[22] '+system,
+		                   xlabel='WISE [4.6]-[12] '+system,ylabel='WISE [12]-[22] '+system,
 		                   colorpar='fagn',colorparlabel=r'log(f$_{\mathrm{AGN}}$)',log_cpar=True, cpar_range=cpar_range,vega=vega)
 	plot_nenkova_templates(ax, xfilt=xfilt,yfilt=yfilt,vega=vega)
 	#plot_prospector_templates(ax, xfilt=xfilt,yfilt=yfilt,outfolder=outfolder,vega=vega)
