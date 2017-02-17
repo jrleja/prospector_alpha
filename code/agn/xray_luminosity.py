@@ -12,6 +12,14 @@ dpi = 150
 minorFormatter = magphys_plot_pref.jLogFormatter(base=10, labelOnlyBase=False)
 majorFormatter = magphys_plot_pref.jLogFormatter(base=10, labelOnlyBase=True)
 
+popts = {
+		 'fmt':'o',
+		 'ecolor':'k',
+		 'capthick':2,
+		 'elinewidth':2,
+		 'alpha':0.5
+        } 
+
 def get_cmap(N):
 	'''Returns a function that maps each index in 0, 1, ... N-1 to a distinct 
 	RGB color.'''
@@ -20,7 +28,7 @@ def get_cmap(N):
 	import matplotlib.colors as colors
 
 	color_norm  = colors.Normalize(vmin=0, vmax=N-1)
-	scalar_map = cmx.ScalarMappable(norm=color_norm, cmap='gist_rainbow') 
+	scalar_map = cmx.ScalarMappable(norm=color_norm, cmap='plasma') 
 	def map_index_to_rgb_color(index):
 		return scalar_map.to_rgba(index)
 	return map_index_to_rgb_color
@@ -34,19 +42,31 @@ def collate_data(alldata, **extras):
 	xray = brown_io.load_xray_cat(xmatch = True, **extras)
 
 	#### for each object
-	fagn, fagn_up, fagn_down, mass, sfr, xray_lum, xray_lum_err, database, observatory = [], [], [], [], [], [], [], [], []
+	fagn, fagn_up, fagn_down, mass, luv_lir, xray_lum, xray_lum_err, database, observatory = [], [], [], [], [], [], [], [], []
 	fagn_obs, fagn_obs_up, fagn_obs_down = [], [], []
 	lagn, lagn_up, lagn_down, lsfr, lsfr_up, lsfr_down = [], [], [], [], [], []
+	sfr, sfr_up, sfr_down, ssfr, ssfr_up, ssfr_down, d2, d2_up, d2_down = [[] for i in range(9)]
 	for ii, dat in enumerate(alldata):
 		
-		#### mass, SFR
-		mass.append(10**dat['pextras']['q50'][eparnames=='stellar_mass'][0])
-		sfr.append(10**dat['pextras']['q50'][eparnames=='sfr_100'][0])
+		#### mass, SFR, sSFR, dust2
+		mass.append(dat['pextras']['q50'][eparnames=='stellar_mass'][0])
+		sfr.append(dat['pextras']['q50'][eparnames=='sfr_100'][0])
+		sfr_up.append(dat['pextras']['q84'][eparnames=='sfr_100'][0])
+		sfr_down.append(dat['pextras']['q16'][eparnames=='sfr_100'][0])
+		ssfr.append(dat['pextras']['q50'][eparnames=='ssfr_100'][0])
+		ssfr_up.append(dat['pextras']['q84'][eparnames=='ssfr_100'][0])
+		ssfr_down.append(dat['pextras']['q16'][eparnames=='ssfr_100'][0])
+		d2.append(dat['pquantiles']['q50'][parnames=='dust2'][0])
+		d2_up.append(dat['pquantiles']['q84'][parnames=='dust2'][0])
+		d2_down.append(dat['pquantiles']['q16'][parnames=='dust2'][0])
 
 		#### model f_agn
 		fagn.append(dat['pquantiles']['q50'][parnames=='fagn'][0])
 		fagn_up.append(dat['pquantiles']['q84'][parnames=='fagn'][0])
 		fagn_down.append(dat['pquantiles']['q16'][parnames=='fagn'][0])
+
+		#### L_UV / L_IR
+		luv_lir.append(dat['bfit']['luv']/dat['bfit']['lir'])
 
 		#### model L_AGN
 		lagn.append(dat['pextras']['q50'][eparnames=='l_agn'][0])
@@ -116,6 +136,15 @@ def collate_data(alldata, **extras):
 	out['observatory'] = observatory
 	out['mass'] = mass
 	out['sfr'] = sfr
+	out['sfr_up'] = sfr_up
+	out['sfr_down'] = sfr_down
+	out['ssfr'] = ssfr
+	out['ssfr_up'] = ssfr_up
+	out['ssfr_down'] = ssfr_down
+	out['d2'] = d2
+	out['d2_up'] = d2_up
+	out['d2_down'] = d2_down
+	out['luv_lir'] = luv_lir
 	out['fagn'] = fagn
 	out['fagn_up'] = fagn_up
 	out['fagn_down'] = fagn_down
@@ -191,20 +220,6 @@ def make_plot(runname='brownseds_agn',alldata=None,outfolder=None,maxradius=30):
 	plt.savefig(outfolder+outname,dpi=dpi)
 	plt.close()
 
-	### SFR VS LX
-	outname = 'xray_lum_sfrcorr_fagn_model.png'
-	fig,ax = plot(pdata,color_by_observatory=cbo,color_by_database=cbd,color_by_wise=cbw,
-		          ypar='fagn',ylabel = r'model L$_{\mathrm{AGN}}$ (IR) / L$_{\mathrm{galaxy}}$ (bolometric)',
-		          xpar='lsfr',xlabel = '(observed X-ray) / (expected SFR X-ray) [erg/s]')
-	plt.savefig(outfolder+outname,dpi=dpi)
-	plt.close()
-
-	outname = 'xray_lum_sfrcorr_lagn.png'
-	fig,ax = plot(pdata,color_by_observatory=cbo,color_by_database=cbd,color_by_wise=cbw,
-		          ypar='lagn',ylabel = r'model L$_{\mathrm{AGN}}$ [erg/s]',
-		          xpar='lsfr',xlabel = '(observed X-ray) / (expected SFR X-ray) [erg/s]')
-	plt.savefig(outfolder+outname,dpi=dpi)
-
 	### PLOT VERSUS 'TRUE' X-RAY FLUX
 	outname = 'xray_lum_sfrcorr_fagn_model.png'
 	fig,ax = plot(pdata,color_by_observatory=cbo,color_by_database=cbd,color_by_wise=cbw,
@@ -219,6 +234,53 @@ def make_plot(runname='brownseds_agn',alldata=None,outfolder=None,maxradius=30):
 		          xpar='lsfr',xlabel = '(observed X-ray) / (expected SFR X-ray) [erg/s]')
 	plt.savefig(outfolder+outname,dpi=dpi)
 	plt.close()
+
+	### SFR, sSFR, dust2, LUV/LIR versus FAGN
+	fig,ax = plot_model_corrs(pdata)
+	plt.tight_layout()
+	plt.savefig(outfolder+'fagn_versus_galaxy_properties.png',dpi=dpi)
+	plt.close()
+
+def plot_model_corrs(pdata):
+
+	fig, ax = plt.subplots(2,2, figsize=(10, 10))
+	ax = np.ravel(ax)
+
+	#### fagn labeling
+	xlabel = r'log(f$_{\mathrm{AGN}}$)'
+	x = np.log10(pdata['fagn'])
+	xerr =  threed_dutils.asym_errors(pdata['fagn'], 
+		                              pdata['fagn_up'],
+		                              pdata['fagn_down'],log=True)
+
+	#### y-axis
+	ypar = ['sfr','ssfr','d2']
+	ylabels = [r'log(SFR) [M$_{\odot}$/yr]', r'log(sSFR) [yr$^{-1}$]', 'diffuse dust optical depth']
+	for ii, yp in enumerate(ypar):
+
+		if 'sfr' in yp:
+			log = True
+			y = np.log10(pdata[yp])
+		else:
+			log = False
+			y = pdata[yp]
+
+		yerr =  threed_dutils.asym_errors(pdata[yp], 
+			                              pdata[yp+'_up'],
+			                              pdata[yp+'_down'],log=log)
+		ax[ii].errorbar(x,y,yerr=yerr, xerr=xerr, ms=0.0,zorder=-2,**popts)
+		ax[ii].plot(x,y, 'o',alpha=0.9,color = '#1C86EE')
+		ax[ii].set_xlabel(xlabel)
+		ax[ii].set_ylabel(ylabels[ii])
+
+	#### luv / lir (no errors!)
+	y = 1/pdata['luv_lir']
+	ax[-1].errorbar(x, np.log10(y), xerr=xerr, ms=0.0, zorder=-2, **popts)
+	ax[-1].plot(x,np.log10(y), 'o',alpha=0.9,color = '#1C86EE')
+	ax[-1].set_xlabel(xlabel)
+	ax[-1].set_ylabel(r'log(L$_{\mathrm{IR}}$/L$_{\mathrm{UV}}$)')
+
+	return fig, ax
 
 def plot(pdata,color_by_observatory=False,color_by_database=False,color_by_wise=False,
 	     ypar=None, ylabel=None, 
@@ -247,13 +309,6 @@ def plot(pdata,color_by_observatory=False,color_by_database=False,color_by_wise=
 		fig, ax = plt.subplots(1,1, figsize=(9.5, 8))
 	else:
 		fig, ax = plt.subplots(1,1, figsize=(8, 8))
-	popts = {
-			 'fmt':'o',
-			 'ecolor':'k',
-			 'capthick':2,
-			 'elinewidth':2,
-			 'alpha':0.7
-	        }
 
 	if color_by_observatory:
 		observatories = np.unique(pdata['observatory'])

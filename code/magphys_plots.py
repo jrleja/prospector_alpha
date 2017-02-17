@@ -524,12 +524,6 @@ def update_model_info(alldata, sample_results, extra_output, magphys):
 	alldata['pquantiles'] = extra_output['quantiles']
 	npars = len(sample_results['initial_theta'])
 	
-	# choose 2000 random samples
-	in_priors = np.isfinite(threed_dutils.chop_chain(sample_results['lnprobability'])) == True
-	flatchain = threed_dutils.chop_chain(sample_results['chain'])[in_priors]
-	ransamp = flatchain[np.random.choice(flatchain.shape[0], 2000, replace=False),:]
-
-	alldata['pquantiles']['random_chain'] = ransamp
 	alldata['spec_info'] = extra_output['spec_info']
 	alldata['model_emline'] = extra_output['model_emline']
 	alldata['lir'] = extra_output['observables']['L_IR']

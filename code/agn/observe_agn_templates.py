@@ -15,6 +15,19 @@ def load_data():
 
 	return dat
 
+def get_cmap(N):
+
+	import matplotlib.cm as cmx
+	import matplotlib.colors as colors
+
+	'''Returns a function that maps each index in 0, 1, ... N-1 to a distinct 
+	RGB color.'''
+	color_norm  = colors.Normalize(vmin=0, vmax=N-1)
+	scalar_map = cmx.ScalarMappable(norm=color_norm, cmap='plasma') 
+	def map_index_to_rgb_color(index):
+		return scalar_map.to_rgba(index)
+	return map_index_to_rgb_color
+
 def plot():
 
 	import matplotlib.pyplot as plt
@@ -25,16 +38,18 @@ def plot():
 
 	dat = load_data()
 
-	fig, ax = plt.subplots(1,1, figsize=(8, 8))
+	fig, ax = plt.subplots(1,1, figsize=(6, 5))
+	template_names = dat.dtype.names[2:]
+	cmap = get_cmap(len(template_names))
 
-	for name in dat.dtype.names:
+	for i,name in enumerate(template_names):
 
 		if name == 'blank' or name == 'lambda':
 			continue
 
-		ax.plot(dat['lambda']/1e4,dat[name]*3e18/dat['lambda'],label=name,alpha=0.8,lw=2)
+		ax.plot(dat['lambda']/1e4,dat[name]*3e18/dat['lambda'],label=name,alpha=0.8,lw=2,color=cmap(i))
 
-	ax.legend(title=r'$\tau_{\mathrm{V}}$',loc=3)
+	ax.legend(title=r'$\tau_{\mathrm{V}}$',loc=2,prop={'size':12})
 	ax.set_ylabel(r'$\nu$f$_{\nu}$')
 	ax.set_xlabel(r'wavelength [micron]')
 
@@ -46,11 +61,15 @@ def plot():
 	ax.yaxis.set_minor_formatter(minorFormatter)
 	ax.yaxis.set_major_formatter(majorFormatter)
 
-	ax.set_xlim(0.1,1000)
-	ax.set_ylim(1e-8,1)
+	ax.set_xlim(0.1,100)
+	ax.set_ylim(1e-3,1)
 
-	plt.show()
-
+	outname = '/Users/joel/code/python/threedhst_bsfh/tests/agn_dust_tests/agn_templates.png'
+	plt.tight_layout()
+	plt.savefig(outname,dpi=150)
+	import os
+	os.system('open '+outname)
+	plt.close()
 
 
 def observe(fnames):

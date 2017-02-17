@@ -126,8 +126,6 @@ def plot(runname='brownseds_agn',runname_noagn='brownseds_np',alldata=None,allda
 	plt.savefig(outfolder+'delta_fitpars.png',dpi=dpi)
 	plt.close()
 
-	os.system('open '+outfolder+'delta_fitpars.png')
-
 def plot_dpars(pdata,xpar=None,xparlabel=None,log_xpar=False):
 	'''
 	plots a scatterplot

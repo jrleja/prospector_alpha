@@ -281,7 +281,7 @@ def plot_color_scatterplot(pdata,xfilt=None,yfilt=None,xlabel=None,ylabel=None,
 
 	#### plot photometry
 	fig, ax = plt.subplots(1,1, figsize=(8, 6))
-	pts = ax.scatter(xplot, yplot, marker='o', c=cpar_plot, cmap=plt.cm.jet,s=70,alpha=0.6)
+	pts = ax.scatter(xplot, yplot, marker='o', c=cpar_plot, cmap=plt.cm.plasma,s=70,alpha=0.6)
 
 	#### label and add colorbar
 	ax.set_xlabel(xlabel)

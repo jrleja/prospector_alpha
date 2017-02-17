@@ -11,8 +11,6 @@ import matplotlib as mpl
 import math
 import brownseds_agn_params as nparams
 
-#nparams = 'brownseds_agn_params.py'
-
 #### LOAD ALL OF THE THINGS
 sps = nparams.load_sps(**nparams.run_params)
 model = nparams.load_model(**nparams.run_params)
@@ -56,7 +54,7 @@ def get_cmap(N):
     '''Returns a function that maps each index in 0, 1, ... N-1 to a distinct 
     RGB color.'''
     color_norm  = colors.Normalize(vmin=0, vmax=N-1)
-    scalar_map = cmx.ScalarMappable(norm=color_norm, cmap='gist_rainbow') 
+    scalar_map = cmx.ScalarMappable(norm=color_norm, cmap='plasma') 
     def map_index_to_rgb_color(index):
         return scalar_map.to_rgba(index)
     return map_index_to_rgb_color
@@ -83,14 +81,16 @@ def plot_agn_fraction(no_dust = False):
 		outname = 'AGN_parameters.png'
 
 	#### set up parameters
-	nsamp = 12
+	nsamp = 5
 	to_samp = [r'f$_{\mathrm{AGN}}$',r'$\tau_{\mathrm{AGN}}$']
-	samp_pars = [np.linspace(0.1,5.0,nsamp),np.linspace(1,20,nsamp)] 
+	samp_pars = [np.linspace(0.0,2.0,nsamp),np.linspace(5,55,nsamp)] 
 	idx = [didx,tidx]
+	model.initial_theta[didx] = 0.3
+	model.initial_theta[tidx] = 20
 
 	### define wavelength regime + conversions
-	to_plot = np.array([5e2,1e6])
-	plt_idx = (sps.wavelengths > to_plot[0]) & (sps.wavelengths < to_plot[1])
+	to_plot = np.array([0.3,100])
+	plt_idx = (sps.wavelengths > to_plot[0]*1e4) & (sps.wavelengths < to_plot[1]*1e4)
 	c = 3e18   # angstroms per second
 	conversion = c/sps.wavelengths[plt_idx]
 
@@ -99,26 +99,27 @@ def plot_agn_fraction(no_dust = False):
 		nsamp = len(samp_pars[k])
 		cmap = get_cmap(nsamp)
 		for i in xrange(nsamp):
-			sps.ssp.params.dirtiness = 1
+			#sps.ssp.params.dirtiness = 1
 			itheta[idx[k]] = samp_pars[k][i]
 			t1 = time.time()
 			spec,mags,sm = model.mean_model(itheta, obs, sps=sps)
 			t2 = time.time()
-			print 'finishing generating spectrum ' + str(i)+', elapsed time {0}s'.format(t2-t1)
 			ax[k].plot(sps.wavelengths[plt_idx]/1e4,np.log(spec[plt_idx]*conversion),color=cmap(i),alpha=0.7,lw=2.5,label="{:.1f}".format(samp_pars[k][i]))
 		itheta[idx[k]] = model.initial_theta[idx[k]]
 
 	#### legend + labels
-	ax[0].legend(loc=4,prop={'size':12},title='L$_{\mathrm{AGN}}$/L$_{\mathrm{galaxy}}$')
+	ax[0].legend(loc=4,prop={'size':12},title='f$_{\mathrm{AGN}}$')
 	ax[1].legend(loc=4,prop={'size':12},title=to_samp[1])
+	ax[0].text(0.05,0.075,r'$\tau_{\mathrm{AGN}}$=20',transform=ax[0].transAxes,fontsize=12)
+	ax[1].text(0.05,0.075,r'f$_{\mathrm{AGN}}$=0.3',transform=ax[1].transAxes,fontsize=12)
 
 	for a in ax:
 		a.get_legend().get_title().set_fontsize('16')
 		a.set_xscale('log',nonposx='clip',subsx=(1,3))
 		a.xaxis.set_minor_formatter(minorFormatter)
 		a.xaxis.set_major_formatter(majorFormatter)
-		a.set_xlim(to_plot/1e4)
-		a.set_ylim(45,56)
+		a.set_xlim(to_plot)
+		a.set_ylim(47,54)
 
 		a.set_xlabel(r'wavelength [$\mu$m]')
 		a.set_ylabel(r'log($\nu$f$_{\nu}$)')
@@ -126,6 +127,8 @@ def plot_agn_fraction(no_dust = False):
 	plt.tight_layout()
 	fig.savefig(outname,dpi=150)
 	plt.close()
+	import os
+	os.system('open *.png')
 
 if __name__ == "__main__":
 	plot_agn_fraction()

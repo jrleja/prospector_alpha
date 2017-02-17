@@ -52,6 +52,27 @@ def return_luv(lam,spec,z=None,alt_file=None):
 
 	return luv
 
+
+def return_lmir(lam,spec,z=None,alt_file=None):
+
+	# integrates input over wavelength
+	# input must be Lsun / hz
+	# returns erg/s
+
+	# fake LUV filter
+	# over 1216-3000 angstroms
+	# note that lam must be in angstroms
+	botlam = np.atleast_1d(4e4-1)
+	toplam = np.atleast_1d(12e4+1)
+	edgetrans = np.atleast_1d(0)
+	luv_filter =  [[np.concatenate((botlam-1,np.linspace(botlam, toplam, num=100),toplam+1))],
+	               [np.concatenate((edgetrans,np.ones(100),edgetrans))]]
+
+	# calculate integral
+	_,luv     = integrate_mag(lam,spec,luv_filter, z=z, alt_file=alt_file) # comes out in ergs/s
+
+	return luv
+
 def mips_to_lir(mips_flux,z):
 
 	'''
@@ -1392,7 +1413,7 @@ def estimate_xray_lum(sfr):
 	return 4e39*sfr_chabrier
 
 def measure_emline_lum(sps, model = None, obs = None, thetas = None, 
-	                   measure_ir = False, measure_luv = False, savestr = None,
+	                   measure_ir = False, measure_luv = False, measure_mir = False, savestr = None,
 	                   abslines = True):
 	
 	'''
@@ -1460,11 +1481,12 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None,
 	out['emlines'] = measure_emlines(w,spec_nebonly_flam,smooth_spec,savestr=savestr)
 
 	if measure_ir:
-		lir = return_lir(w,spec_nebon_fnu, z=None, alt_file=None)/constants.L_sun.cgs.value # comes out in ergs/s, convert to Lsun
-		out['lir'] = lir
+		out['lir'] = return_lir(w,spec_nebon_fnu, z=None, alt_file=None)/constants.L_sun.cgs.value # comes out in ergs/s, convert to Lsun
 	if measure_luv:
-		luv = return_luv(w,spec_nebon_fnu, z=None, alt_file=None)/constants.L_sun.cgs.value # comes out in ergs/s, convert to Lsun
-		out['luv'] = luv
+		out['luv'] = return_luv(w,spec_nebon_fnu, z=None, alt_file=None)/constants.L_sun.cgs.value # comes out in ergs/s, convert to Lsun
+	if measure_mir:
+		out['lmir'] = return_lmir(w,spec_nebon_fnu, z=None, alt_file=None)/constants.L_sun.cgs.value # comes out in ergs/s, convert to Lsun
+
 
 	out['spec'] = spec_nebon_fnu
 	return out

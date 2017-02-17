@@ -173,7 +173,7 @@ def calc_extra_quantities(sample_results, ncalc=3000, ir_priors=True, opts=None)
 	half_time,sfr_10,sfr_100,sfr_1000,ssfr_100,stellar_mass,emp_ha,lir,luv, \
 	bdec_calc,ext_5500,dn4000,ssfr_10,xray_lum = [np.zeros(shape=(ncalc)) for i in range(14)]
 	if 'fagn' in parnames:
-		l_agn = np.zeros(shape=(ncalc))
+		l_agn, fmir = [np.zeros(shape=(ncalc)) for i in range(2)]
 
 	##### information for empirical emission line calculation ######
 	d1_idx = parnames == 'dust1'
@@ -252,7 +252,7 @@ def calc_extra_quantities(sample_results, ncalc=3000, ir_priors=True, opts=None)
 		if opts['measure_spectral_features']:
 			modelout = threed_dutils.measure_emline_lum(sps, thetas = thetas,
 				 										model=sample_results['model'], obs = sample_results['obs'],
-												        measure_ir=True, measure_luv=True)
+												        measure_ir=True, measure_luv=True, measure_mir=True)
 			#### save names!
 			if jj == 0:
 				emnames = np.array(modelout['emlines'].keys())
@@ -278,6 +278,9 @@ def calc_extra_quantities(sample_results, ncalc=3000, ir_priors=True, opts=None)
 			luv[jj]        = modelout['luv']
 			dn4000[jj]     = modelout['dn4000']
 
+			if 'fagn' in parnames:
+				fmir[jj] = l_agn[jj] / (modelout['lmir']*constants.L_sun.cgs.value)
+
 		#### no dust
 		if opts['mags_nodust']:
 			if i == 0:
@@ -297,7 +300,7 @@ def calc_extra_quantities(sample_results, ncalc=3000, ir_priors=True, opts=None)
 	extra_output = {}
 	extra_flatchain = np.dstack((half_time, sfr_10, sfr_100, sfr_1000, ssfr_10, ssfr_100, stellar_mass, emp_ha, bdec_calc, ext_5500, xray_lum))[0]
 	if 'fagn' in parnames:
-		extra_flatchain = np.append(extra_flatchain, l_agn[:,None],axis=1)
+		extra_flatchain = np.append(extra_flatchain, np.hstack((l_agn[:,None], fmir[:,None])), axis=1)
 	nextra = extra_flatchain.shape[1]
 	q_16e, q_50e, q_84e = (np.zeros(nextra)+np.nan for i in range(3))
 	for kk in xrange(nextra): q_16e[kk], q_50e[kk], q_84e[kk] = np.percentile(extra_flatchain[:,kk], [16.0, 50.0, 84.0])
@@ -311,7 +314,7 @@ def calc_extra_quantities(sample_results, ncalc=3000, ir_priors=True, opts=None)
 			  'sfh': intsfr,
 			  't_sfh': t}
 	if 'fagn' in parnames:
-		extras['parnames'] = np.append(extras['parnames'],np.atleast_1d('l_agn'))
+		extras['parnames'] = np.append(test,np.array(['l_agn','fmir']))
 	extra_output['extras'] = extras
 
 	#### OBSERVABLES

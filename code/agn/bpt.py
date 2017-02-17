@@ -91,6 +91,7 @@ def plot_bpt(runname='brownseds_agn',alldata=None,outfolder=None):
 	fig,ax = plot_scatterplot(pdata,colorpar='fagn',colorparlabel=r'log(f$_{\mathrm{AGN}}$)',
 		                             log_cpar=True, cpar_range=[-2,0])
 	add_kewley_classifications(ax)
+	plt.tight_layout()
 	plt.savefig(outfolder+'bpt_fagn.png',dpi=dpi)
 	plt.close()
 
@@ -136,7 +137,7 @@ def plot_scatterplot(pdata,colorpar=None,colorparlabel=None,log_cpar=False,cpar_
 
 	ax.errorbar(xplot, yplot, yerr=yerr, xerr=xerr,
 	            fmt='o', ecolor='k', capthick=2,elinewidth=2,ms=0.0,alpha=0.5,zorder=-5)
-	pts = ax.scatter(xplot, yplot, marker='o', c=cpar_plot, cmap=plt.cm.jet,s=70,zorder=10)
+	pts = ax.scatter(xplot, yplot, marker='o', c=cpar_plot, cmap=plt.cm.plasma,s=70,zorder=10)
 
 	ax.set_xlabel(r'log([NII 6583]/H$_{\alpha}$)')
 	ax.set_ylabel(r'log([OIII 5007]/H$_{\beta}$)')

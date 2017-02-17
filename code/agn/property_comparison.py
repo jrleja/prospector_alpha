@@ -122,12 +122,12 @@ def plot_comparison(runname='brownseds_agn',runname_noagn='brownseds_np',alldata
 	plot_residuals(pdata,idx_plot,outfolder)
 	plot_sfh(pdata,idx_plot,outfolder)
 
-def add_txt(ax,pdata,fs=12,x=0.05,y=0.95,dy=0.05,ha='left',**extras):
+def add_txt(ax,pdata,fs=12,x=0.05,y=0.88,dy=0.075,ha='left',**extras):
 
 	for i,key in enumerate(pdata.keys()):
 		ax.text(x,y-i*dy,key.replace('_',' ').upper(),fontsize=fs,transform=ax.transAxes,ha=ha,color=pdata[key]['color'],**extras)
 
-def add_identifier(ax,idx,pdata,fs=12,x=0.98,y=0.95,dy=0.07,weight='bold'):
+def add_identifier(ax,idx,pdata,fs=12,x=0.98,y=0.88,dy=0.08,weight='bold'):
 
 	ax.text(x,y,pdata['agn']['objname'][idx],fontsize=fs,transform=ax.transAxes,ha='right',weight=weight)
 
@@ -148,6 +148,7 @@ def plot_sfh(pdata,idx_plot,outfolder):
 
 	ax = np.ravel(ax)
 	fs = 10
+	idx_plot = idx_plot[::-1]
 
 	### begin loop
 	for ii,idx in enumerate(idx_plot):
@@ -168,11 +169,11 @@ def plot_sfh(pdata,idx_plot,outfolder):
 			ax[ii].set_ylabel(r'SFR [M$_{\odot}$/yr]',fontsize=fs*1.5)
 			ax[ii].set_xlabel('lookback time [Gyr]',fontsize=fs*1.5)
 
-			ax[ii].set_xscale('log',nonposx='clip',subsx=(1,3))
+			ax[ii].set_xscale('log',nonposx='clip',subsx=([1]))
 			ax[ii].xaxis.set_minor_formatter(minorFormatter)
 			ax[ii].xaxis.set_major_formatter(majorFormatter)
 
-			ax[ii].set_yscale('log',nonposy='clip',subsy=(1,3))
+			ax[ii].set_yscale('log',nonposy='clip',subsy=([1]))
 			ax[ii].yaxis.set_minor_formatter(minorFormatter)
 			ax[ii].yaxis.set_major_formatter(majorFormatter)
 
