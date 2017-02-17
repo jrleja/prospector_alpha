@@ -314,7 +314,7 @@ def calc_extra_quantities(sample_results, ncalc=3000, ir_priors=True, opts=None)
 			  'sfh': intsfr,
 			  't_sfh': t}
 	if 'fagn' in parnames:
-		extras['parnames'] = np.append(test,np.array(['l_agn','fmir']))
+		extras['parnames'] = np.append(extras['parnames'],np.array(['l_agn','fmir']))
 	extra_output['extras'] = extras
 
 	#### OBSERVABLES
