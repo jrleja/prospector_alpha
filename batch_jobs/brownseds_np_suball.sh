@@ -7,7 +7,7 @@
 ### Requested computing time in minutes
 #SBATCH -t 1440
 ### Partition or queue name
-#SBATCH -p conroy,general
+#SBATCH -p conroy,general,conroy-intel
 ### memory per cpu, in MB
 #SBATCH --mem-per-cpu=3000
 ### Job name
