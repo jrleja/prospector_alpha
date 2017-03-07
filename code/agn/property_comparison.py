@@ -137,7 +137,7 @@ def add_identifier(ax,idx,pdata,fs=12,x=0.98,y=0.88,dy=0.08,weight='bold'):
 	text = text.format(fmt(mid), \
 		               fmt(mid-pdata['agn']['model_pars']['fagn']['q16'][idx]), \
 		               fmt(pdata['agn']['model_pars']['fagn']['q84'][idx]-mid))
-	text = "{0} = {1}".format(r'f$_{\mathrm{AGN}}$=', text)
+	text = "{0} = {1}".format(r'f$_{\mathrm{MIR}}$=', text)
 
 	ax.text(x,y-dy,text,fontsize=fs,transform=ax.transAxes,ha='right')
 
@@ -209,7 +209,7 @@ def plot_residuals(pdata,idx_plot,outfolder):
 	cb1 = mpl.colorbar.ColorbarBase(cmap_ax, cmap=cmap,
                                 	norm=norm,
                                 	orientation='vertical')
-	cb1.set_label(r'log(f$_{\mathrm{AGN}}$)')
+	cb1.set_label(r'log(f$_{\mathrm{MIR}}$)')
 	cb1.ax.yaxis.set_ticks_position('left')
 	cb1.ax.yaxis.set_label_position('left')
 	'''
@@ -263,7 +263,7 @@ def plot_residuals(pdata,idx_plot,outfolder):
 	ymin, ymax = np.repeat(-0.3,4), np.repeat(0.3,4)
 	labelpad=-1.5
 	ax[0].set_xlabel(r'observed wavelength [$\mu$m]',labelpad=labelpad)
-	ax[0].set_ylabel(r'RMS$_{\mathrm{no-AGN}}$-RMS$_{\mathrm{AGN}}$ [dex]')
+	ax[0].set_ylabel(r'RMS$_{\mathrm{no-AGN}}$-RMS$_{\mathrm{MIR}}$ [dex]')
 	ax[0].set_ylim(ymin[0],ymax[0])
 	ax[0].set_xlim(xmin[0],xmax[0])
 
@@ -273,7 +273,7 @@ def plot_residuals(pdata,idx_plot,outfolder):
 	ax[0].xaxis.set_major_formatter(majorFormatter)
 
 	for i, key in enumerate(pdata['agn']['residuals'].keys()):
-		ax[i+1].set_ylabel(r'RMS$_{\mathrm{no-AGN}}$-RMS$_{\mathrm{AGN}}$ [dex]')
+		ax[i+1].set_ylabel(r'RMS$_{\mathrm{no-AGN}}$-RMS$_{\mathrm{MIR}}$ [dex]')
 		ax[i+1].set_xlabel(r'observed wavelength [$\mu$m]',labelpad=labelpad)
 		ax[i+1].set_ylim(ymin[i+1],ymax[i+1])
 		ax[i+1].set_xlim(xmin[i+1],xmax[i+1])

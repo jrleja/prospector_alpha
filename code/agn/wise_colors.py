@@ -136,7 +136,7 @@ def plot_mir_colors(runname='brownseds_agn',alldata=None,outfolder=None, vega=Tr
 	xfilt, yfilt = ['spitzer_irac_ch3','spitzer_irac_ch4'], ['spitzer_irac_ch1','spitzer_irac_ch2']
 	fig,ax = plot_color_scatterplot(pdata,xfilt=xfilt,yfilt=yfilt,
 		                   xlabel='IRAC [5.8]-[8.0] (AB)', ylabel='IRAC [3.6]-[4.5] (AB)',
-		                   colorpar='fagn',colorparlabel=r'log(f$_{\mathrm{AGN}}$)',log_cpar=True, cpar_range=cpar_range)
+		                   colorpar='fagn',colorparlabel=r'log(f$_{\mathrm{MIR}}$)',log_cpar=True, cpar_range=cpar_range)
 	plot_nenkova_templates(ax, xfilt=xfilt,yfilt=yfilt)
 	#plot_prospector_templates(ax, xfilt=xfilt,yfilt=yfilt,outfolder=outfolder)
 	plt.savefig(outfolder+'irac_colors.png',dpi=dpi)
@@ -145,8 +145,8 @@ def plot_mir_colors(runname='brownseds_agn',alldata=None,outfolder=None, vega=Tr
 	### WISE hot
 	xfilt, yfilt = ['wise_w2','wise_w3'], ['wise_w1','wise_w2']
 	fig, ax = plot_color_scatterplot(pdata,xfilt=xfilt,yfilt=yfilt,
-		                             xlabel='WISE [4.6]-[12] (AB)',ylabel='WISE [3.4]-[4.6] '+system,
-		                             colorpar='fagn',colorparlabel=r'log(f$_{\mathrm{AGN}}$)',
+		                             xlabel='WISE [4.6]-[12] '+system,ylabel='WISE [3.4]-[4.6] '+system,
+		                             colorpar='fagn',colorparlabel=r'log(f$_{\mathrm{MIR}}$)',
 		                             log_cpar=True, cpar_range=cpar_range,vega=vega)
 	plot_nenkova_templates(ax, xfilt=xfilt,yfilt=yfilt,vega=vega)
 	#plot_prospector_templates(ax, xfilt=xfilt,yfilt=yfilt,outfolder=outfolder,vega=vega)
@@ -164,7 +164,7 @@ def plot_mir_colors(runname='brownseds_agn',alldata=None,outfolder=None, vega=Tr
 
 	fig,ax = plot_color_scatterplot(pdata,xfilt=xfilt,yfilt=yfilt,
 		                   xlabel='WISE [4.6]-[12] '+system,ylabel='WISE [12]-[22] '+system,
-		                   colorpar='fagn',colorparlabel=r'log(f$_{\mathrm{AGN}}$)',log_cpar=True, cpar_range=cpar_range,vega=vega)
+		                   colorpar='fagn',colorparlabel=r'log(f$_{\mathrm{MIR}}$)',log_cpar=True, cpar_range=cpar_range,vega=vega)
 	plot_nenkova_templates(ax, xfilt=xfilt,yfilt=yfilt,vega=vega)
 	#plot_prospector_templates(ax, xfilt=xfilt,yfilt=yfilt,outfolder=outfolder,vega=vega)
 

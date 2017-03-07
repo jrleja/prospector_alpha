@@ -46,6 +46,7 @@ def collate_data(alldata, **extras):
 	fagn_obs, fagn_obs_up, fagn_obs_down = [], [], []
 	lagn, lagn_up, lagn_down, lsfr, lsfr_up, lsfr_down = [], [], [], [], [], []
 	sfr, sfr_up, sfr_down, ssfr, ssfr_up, ssfr_down, d2, d2_up, d2_down = [[] for i in range(9)]
+	fmir, fmir_up, fmir_down = [], [], []
 	for ii, dat in enumerate(alldata):
 		
 		#### mass, SFR, sSFR, dust2
@@ -60,18 +61,19 @@ def collate_data(alldata, **extras):
 		d2_up.append(dat['pquantiles']['q84'][parnames=='dust2'][0])
 		d2_down.append(dat['pquantiles']['q16'][parnames=='dust2'][0])
 
-		#### model f_agn
+		#### model f_agn, l_agn, fmir
 		fagn.append(dat['pquantiles']['q50'][parnames=='fagn'][0])
 		fagn_up.append(dat['pquantiles']['q84'][parnames=='fagn'][0])
 		fagn_down.append(dat['pquantiles']['q16'][parnames=='fagn'][0])
-
-		#### L_UV / L_IR
-		luv_lir.append(dat['bfit']['luv']/dat['bfit']['lir'])
-
-		#### model L_AGN
 		lagn.append(dat['pextras']['q50'][eparnames=='l_agn'][0])
 		lagn_up.append(dat['pextras']['q84'][eparnames=='l_agn'][0])
 		lagn_down.append(dat['pextras']['q16'][eparnames=='l_agn'][0])
+		fmir.append(dat['pextras']['q50'][eparnames=='fmir'][0])
+		fmir_up.append(dat['pextras']['q84'][eparnames=='fmir'][0])
+		fmir_down.append(dat['pextras']['q16'][eparnames=='fmir'][0])
+
+		#### L_UV / L_IR
+		luv_lir.append(dat['bfit']['luv']/dat['bfit']['lir'])
 
 		#### x-ray fluxes
 		# match
@@ -148,6 +150,9 @@ def collate_data(alldata, **extras):
 	out['fagn'] = fagn
 	out['fagn_up'] = fagn_up
 	out['fagn_down'] = fagn_down
+	out['fmir'] = fmir
+	out['fmir_up'] = fmir_up
+	out['fmir_down'] = fmir_down
 	out['fagn_obs'] = fagn_obs
 	out['fagn_obs_up'] = fagn_obs_up
 	out['fagn_obs_down'] = fagn_obs_down
@@ -195,42 +200,42 @@ def make_plot(runname='brownseds_agn',alldata=None,outfolder=None,maxradius=30):
 	### PLOT VERSUS OBSERVED X-RAY FRACTION
 	outname = 'fagn_obs_fagn_model.png'
 	fig,ax = plot(pdata,color_by_observatory=cbo,color_by_database=cbd,color_by_wise=cbw,
-		          ypar='fagn',ylabel = r'model L$_{\mathrm{AGN}}$ (IR) / L$_{\mathrm{galaxy}}$ (bolometric)',
-		          xpar='fagn_obs',xlabel = r'observed L$_{\mathrm{AGN}}$ (X-ray) / L$_{\mathrm{galaxy}}$ (bolometric)')
+		          ypar='fagn',ylabel = r'model L$_{\mathrm{MIR}}$ (IR) / L$_{\mathrm{galaxy}}$ (bolometric)',
+		          xpar='fagn_obs',xlabel = r'observed L$_{\mathrm{MIR}}$ (X-ray) / L$_{\mathrm{galaxy}}$ (bolometric)')
 	plt.savefig(outfolder+outname,dpi=dpi)
 	plt.close()
 
 	outname = 'fagn_obs_lagn.png'
 	fig,ax = plot(pdata,color_by_observatory=cbo,color_by_database=cbd,color_by_wise=cbw,
-		          ypar='lagn',ylabel = r'model L$_{\mathrm{AGN}}$ [erg/s]',
-		          xpar='fagn_obs',xlabel = r'observed L$_{\mathrm{AGN}}$ (X-ray) / L$_{\mathrm{galaxy}}$ (bolometric)')
+		          ypar='lagn',ylabel = r'model L$_{\mathrm{MIR}}$ [erg/s]',
+		          xpar='fagn_obs',xlabel = r'observed L$_{\mathrm{MIR}}$ (X-ray) / L$_{\mathrm{galaxy}}$ (bolometric)')
 	plt.savefig(outfolder+outname,dpi=dpi)
 	plt.close()
 
 	### PLOT VERSUS OBSERVED X-RAY FLUX
 	outname = 'xray_lum_fagn_model.png'
 	fig,ax = plot(pdata,color_by_observatory=cbo,color_by_database=cbd,color_by_wise=cbw,
-		          ypar='fagn',ylabel = r'model L$_{\mathrm{AGN}}$ (IR) / L$_{\mathrm{galaxy}}$ (bolometric)')
+		          ypar='fagn',ylabel = r'model L$_{\mathrm{MIR}}$ (IR) / L$_{\mathrm{galaxy}}$ (bolometric)')
 	plt.savefig(outfolder+outname,dpi=dpi)
 	plt.close()
 
 	outname = 'xray_lum_lagn.png'
 	fig,ax = plot(pdata,color_by_observatory=cbo,color_by_database=cbd,color_by_wise=cbw,
-		          ypar='lagn',ylabel = r'model L$_{\mathrm{AGN}}$ [erg/s]')
+		          ypar='lagn',ylabel = r'model L$_{\mathrm{MIR}}$ [erg/s]')
 	plt.savefig(outfolder+outname,dpi=dpi)
 	plt.close()
 
 	### PLOT VERSUS 'TRUE' X-RAY FLUX
 	outname = 'xray_lum_sfrcorr_fagn_model.png'
 	fig,ax = plot(pdata,color_by_observatory=cbo,color_by_database=cbd,color_by_wise=cbw,
-		          ypar='fagn',ylabel = r'model L$_{\mathrm{AGN}}$ (IR) / L$_{\mathrm{galaxy}}$ (bolometric)',
+		          ypar='fagn',ylabel = r'model L$_{\mathrm{MIR}}$ (IR) / L$_{\mathrm{galaxy}}$ (bolometric)',
 		          xpar='lsfr',xlabel = '(observed X-ray) / (expected SFR X-ray) [erg/s]')
 	plt.savefig(outfolder+outname,dpi=dpi)
 	plt.close()
 
 	outname = 'xray_lum_sfrcorr_lagn.png'
 	fig,ax = plot(pdata,color_by_observatory=cbo,color_by_database=cbd,color_by_wise=cbw,
-		          ypar='lagn',ylabel = r'model L$_{\mathrm{AGN}}$ [erg/s]',
+		          ypar='lagn',ylabel = r'model L$_{\mathrm{MIR}}$ [erg/s]',
 		          xpar='lsfr',xlabel = '(observed X-ray) / (expected SFR X-ray) [erg/s]')
 	plt.savefig(outfolder+outname,dpi=dpi)
 	plt.close()
@@ -243,22 +248,23 @@ def make_plot(runname='brownseds_agn',alldata=None,outfolder=None,maxradius=30):
 
 def plot_model_corrs(pdata):
 
-	fig, ax = plt.subplots(2,2, figsize=(10, 10))
+	fig, ax = plt.subplots(3,2, figsize=(10, 15))
 	ax = np.ravel(ax)
 
 	#### fagn labeling
-	xlabel = r'log(f$_{\mathrm{AGN}}$)'
+	xlabel = r'log(f$_{\mathrm{MIR}}$)'
 	x = np.log10(pdata['fagn'])
 	xerr =  threed_dutils.asym_errors(pdata['fagn'], 
 		                              pdata['fagn_up'],
 		                              pdata['fagn_down'],log=True)
 
 	#### y-axis
-	ypar = ['sfr','ssfr','d2']
-	ylabels = [r'log(SFR) [M$_{\odot}$/yr]', r'log(sSFR) [yr$^{-1}$]', 'diffuse dust optical depth']
+	ypar = ['sfr','ssfr','d2', 'lagn','fmir']
+	ylabels = [r'log(SFR) [M$_{\odot}$/yr]', r'log(sSFR) [yr$^{-1}$]', 'diffuse dust optical depth',\
+	           r'log(L$_{\mathrm{MIR}}$)', r'log(f$_{\mathrm{MIR}}$)']
 	for ii, yp in enumerate(ypar):
 
-		if 'sfr' in yp:
+		if 'd2' not in yp:
 			log = True
 			y = np.log10(pdata[yp])
 		else:

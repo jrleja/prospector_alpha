@@ -140,7 +140,7 @@ def stack_data(alldata,sigma_sf=None,nbins_horizontal=None,low_mass_cutoff=None,
 		### calculate sSFR chains (fn / sum(tn*fn))
 		outfrac = []
 		for dat in np.array(alldata)[on_ms][in_bin]:
-			frac = dat['pquantiles']['random_chain'][:,fracpars]
+			frac = dat['pquantiles']['sample_chain'][:,fracpars]
 			frac = np.concatenate((frac, (1-frac.sum(axis=1))[:,None]),axis=1)
 			norm = (frac * time_per_bin).sum(axis=1) ### sum(fn*tn)
 			outfrac.append(frac/norm[:,None])
@@ -177,7 +177,7 @@ def stack_data(alldata,sigma_sf=None,nbins_horizontal=None,low_mass_cutoff=None,
 		### calculate sSFR chains (fn / sum(tn*fn))
 		outfrac = []
 		for dat in np.array(alldata)[in_bin]:
-			frac = dat['pquantiles']['random_chain'][:,fracpars]
+			frac = dat['pquantiles']['sample_chain'][:,fracpars]
 			frac = np.concatenate((frac, (1-frac.sum(axis=1))[:,None]),axis=1)
 			norm = (frac * time_per_bin).sum(axis=1) ### sum(fn*tn)
 			outfrac.append(frac/norm[:,None])

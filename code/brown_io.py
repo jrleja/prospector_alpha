@@ -27,6 +27,22 @@ def save_alldata(alldata,runname='brownseds'):
 	with open(outname, "wb") as out:
 		pickle.dump(model_store, out)
 
+def return_agn_str(idx, string=False):
+
+	# NEW VERSION, WITH MY FLUXES
+	with open(os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/joel_bpt.pickle', "rb") as f:
+		agn_str=pickle.load(f)
+
+	agn_str = agn_str[idx]
+	sfing = (agn_str == 'SF') | (agn_str == '---')
+	composite = (agn_str == 'SF/AGN')
+	agn = agn_str == 'AGN'
+
+	if string:
+		return agn_str
+	else:
+		return sfing, composite, agn
+
 def load_prospector_data(filebase,no_sample_results=False,objname=None,runname=None,hdf5=True,load_extra_output=True):
 
 	'''

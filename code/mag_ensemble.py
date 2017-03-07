@@ -9,7 +9,7 @@ from scipy.optimize import minimize
 import pickle
 import corner
 from matplotlib.ticker import MaxNLocator
-import brown_quality_cuts
+import brown_quality_cuts, brown_io
 from np_mocks_analysis import gaussian
 
 #### set up colors and plot style
@@ -208,7 +208,7 @@ def specpar_pdf_distance(pinfo,alldata, delta_functions=True, center_obs=True):
 				truth_chain = threed_dutils.bdec_to_ext(np.random.choice(pinfo['obs']['pdf_ha'][kk],size=1000) / np.random.choice(pinfo['obs']['pdf_hb'][kk],size=1000))
 
 			if ii == 3: # met (MAKE SURE THIS WORKS)
-				chain = np.squeeze(dat['pquantiles']['random_chain'][:,dat['pquantiles']['parnames']=='logzsol'])
+				chain = np.squeeze(dat['pquantiles']['sample_chain'][:,dat['pquantiles']['parnames']=='logzsol'])
 				truth = truemet[np.sum(keep_idx[:kk])][0]
 				truth_chain = truemet_errs[np.sum(keep_idx[:kk])]
 
@@ -1121,7 +1121,7 @@ def fmt_emline_info(alldata,add_abs_err = True):
 		didx[ii,1] = dat['pquantiles']['q84'][dinx_idx]
 		didx[ii,2] = dat['pquantiles']['q16'][dinx_idx]
 
-		ratio = dat['pquantiles']['random_chain'][:,dust1_idx] / dat['pquantiles']['random_chain'][:,dust2_idx]
+		ratio = dat['pquantiles']['sample_chain'][:,dust1_idx] / dat['pquantiles']['sample_chain'][:,dust2_idx]
 		ratio[~np.isfinite(ratio)] = 2.0
 		d1_d2[ii,:] = corner.quantile(ratio, [0.5, 0.84, 0.16])
 
@@ -1134,9 +1134,9 @@ def fmt_emline_info(alldata,add_abs_err = True):
 		sfr_100[ii,2] = dat['pextras']['q16'][sfr_100_idx_p]
 
 		##### marginalized extinction at Halpha wavelengths
-		d1_chain = dat['pquantiles']['random_chain'][:,dust1_idx]
-		d2_chain = dat['pquantiles']['random_chain'][:,dust2_idx]
-		didx_chain = dat['pquantiles']['random_chain'][:,dinx_idx]
+		d1_chain = dat['pquantiles']['sample_chain'][:,dust1_idx]
+		d2_chain = dat['pquantiles']['sample_chain'][:,dust2_idx]
+		didx_chain = dat['pquantiles']['sample_chain'][:,dinx_idx]
 		ha_ext_chain = threed_dutils.charlot_and_fall_extinction(6563.0,d1_chain,d2_chain,-1.0,didx_chain,kriek=False)
 		ha_ext[ii,:] = corner.quantile(ha_ext_chain, [0.5, 0.84, 0.16])
 
@@ -1238,7 +1238,7 @@ def ionization_parameter(e_pinfo, hflag, alldata, outfolder=''):
 	sn_cut = 5
 	keep_idx = np.squeeze((sn_oiii > sn_cut) & (sn_oii > sn_cut))
 
-	sfing, composite, agn = return_agn_str(keep_idx)
+	sfing, composite, agn = brown_io.return_agn_str(keep_idx)
 	keys = [sfing, composite, agn]
 
 	### now calculate intrinsic ratio
@@ -1254,9 +1254,9 @@ def ionization_parameter(e_pinfo, hflag, alldata, outfolder=''):
 		out = []
 
 		#### draw dust choices
-		d1 = np.random.choice(dat['pquantiles']['random_chain'][:,d1_idx].squeeze(),size=ndraw)
-		d2 = np.random.choice(dat['pquantiles']['random_chain'][:,d2_idx].squeeze(),size=ndraw)
-		didx = np.random.choice(dat['pquantiles']['random_chain'][:,didx_idx].squeeze(),size=ndraw)
+		d1 = np.random.choice(dat['pquantiles']['sample_chain'][:,d1_idx].squeeze(),size=ndraw)
+		d2 = np.random.choice(dat['pquantiles']['sample_chain'][:,d2_idx].squeeze(),size=ndraw)
+		didx = np.random.choice(dat['pquantiles']['sample_chain'][:,didx_idx].squeeze(),size=ndraw)
 
 		#### draw OII, OIII fluxes from a Gaussian
 		# OII is 3278, OIII is 5007. convert to total flux in [OII] and [OIII]
@@ -1337,7 +1337,7 @@ def gas_phase_metallicity(e_pinfo, hflag, alldata, outfolder='',ssfr_cut=False):
 	qpah_errdo = np.array([x['pquantiles']['q16'][qpah_idx][0] for x in alldata])[keep_idx]
 
 	#### get BPT status
-	sfing, composite, agn = return_agn_str(keep_idx)
+	sfing, composite, agn = brown_io.return_agn_str(keep_idx)
 	keys = [sfing, composite, agn]
 
 	#### get gas-phase metallicity
@@ -1408,10 +1408,10 @@ def bpt_diagram(e_pinfo,hflag,outname=None):
 	sn_nii = e_pinfo['obs']['f_nii'][:,0] / np.abs(e_pinfo['obs']['err_nii'])
 
 	sn_cut=3.0
-	keep_idx = np.squeeze((sn_ha > 3.0) & \
-		                  (sn_hb > 3.0) & \
-		                  (sn_oiii > 3.0) & \
-		                  (sn_nii > 3.0))
+	keep_idx = np.squeeze((sn_ha > 2.0) & \
+		                  (sn_hb > 2.0) & \
+		                  (sn_oiii > 2.0) & \
+		                  (sn_nii > 2.0))
 
 	##### CREATE PLOT QUANTITIES
 	mod_oiii_hb = e_pinfo['prosp']['oiii_hb'][keep_idx,:]
@@ -1423,7 +1423,7 @@ def bpt_diagram(e_pinfo,hflag,outname=None):
 	obs_nii_ha_err = e_pinfo['obs']['nii_ha_err'][keep_idx]
 
 	##### AGN identifiers
-	sfing, composite, agn = return_agn_str(keep_idx)
+	sfing, composite, agn = brown_io.return_agn_str(keep_idx)
 	keys = [sfing, composite, agn]
 
 	##### herschel identifier
@@ -1476,7 +1476,6 @@ def bpt_diagram(e_pinfo,hflag,outname=None):
 		ax.plot(x1,0.61 / (x1 - 0.05) + 1.3 , linestyle='--',color='0.5')
 		ax.plot(x2,0.61 / (x2-0.47) + 1.19, linestyle='--',color='0.5')
 
-
 	#### determine BPT status based off my measurements
 	bpt_flag = np.empty(len(e_pinfo['obs']['f_ha'][:,0]),dtype='|S6')
 	bpt_flag_idx = np.empty(np.sum(keep_idx),dtype='|S6')
@@ -1487,9 +1486,10 @@ def bpt_diagram(e_pinfo,hflag,outname=None):
 	agn = np.log10(obs_oiii_hb) > sf_line2
 	bpt_flag_idx[composite] = 'SF/AGN'
 	bpt_flag_idx[agn] = 'AGN'
-	bpt_flag[:] = 'SF'
+	bpt_flag[:] = 'None'
 	bpt_flag[keep_idx] = bpt_flag_idx
 	pickle.dump(bpt_flag,open(os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/joel_bpt.pickle', "wb"))
+	print 1/0
 
 	ax1[0].text(0.04,0.1, r'S/N (H$\alpha$,H$\beta$,[OIII],[NII]) > '+str(int(e_pinfo['obs']['sn_cut'])), transform = ax1[0].transAxes,horizontalalignment='left')
 	ax1[0].set_xlabel(r'log([NII 6583]/H$_{\alpha}$) [observed]')
@@ -1562,7 +1562,7 @@ def obs_vs_kennicutt_ha(e_pinfo,hflag,outname_prosp='test.png',outname_mag='test
 	fit_and_save(pmet,pl_ha_ratio)
 
 	##### AGN identifiers
-	sfing, composite, agn = return_agn_str(keep_idx)
+	sfing, composite, agn = brown_io.return_agn_str(keep_idx)
 	keys = [sfing, composite, agn]
 
 	##### herschel identifier
@@ -1768,7 +1768,7 @@ def paper_summary_plot(e_pinfo, hflag, outname='test.png'):
 	keep_idx = brown_quality_cuts.halpha_cuts(e_pinfo)
 
 	##### AGN identifiers
-	sfing, composite, agn = return_agn_str(keep_idx)
+	sfing, composite, agn = brown_io.return_agn_str(keep_idx)
 	keys = [sfing, composite, agn]
 
 	##### halpha log tricks
@@ -1808,7 +1808,7 @@ def paper_summary_plot(e_pinfo, hflag, outname='test.png'):
 	dn4000_prosp = e_pinfo['prosp']['dn4000'][dn_idx,0]
 
 	##### AGN identifiers
-	sfing, composite, agn = return_agn_str(dn_idx)
+	sfing, composite, agn = brown_io.return_agn_str(dn_idx)
 	keys = [sfing, composite, agn]
 
 	#### plot dn4000
@@ -1848,7 +1848,7 @@ def balmlines_delta(e_pinfo,outname='test.png',model='obs',
 	keep_idx = brown_quality_cuts.halpha_cuts(e_pinfo)
 
 	##### AGN identifiers
-	sfing, composite, agn = return_agn_str(keep_idx)
+	sfing, composite, agn = brown_io.return_agn_str(keep_idx)
 	keys = [sfing, composite, agn]
 
 	##### plot!
@@ -1902,7 +1902,7 @@ def obs_vs_prosp_balmlines(e_pinfo,hflag,outname='test.png',outname_resid='test.
 	keep_idx = brown_quality_cuts.halpha_cuts(e_pinfo)
 
 	##### AGN identifiers
-	sfing, composite, agn = return_agn_str(keep_idx)
+	sfing, composite, agn = brown_io.return_agn_str(keep_idx)
 	keys = [sfing, composite, agn]
 
 	##### herschel identifier
@@ -2019,8 +2019,6 @@ def obs_vs_prosp_balmlines(e_pinfo,hflag,outname='test.png',outname_resid='test.
 			ax2.text(0.693, 0.12, 'model \n reddening \n error',transform = ax2.transAxes,horizontalalignment='right',fontsize=10,multialignment='center',weight='semibold')
 			bpt_legend(ax2,loc=2)
 
-			threed_dutils.return_n_outliers(np.log10(f_ha[:,0]),np.log10(model_ha[:,0]),e_pinfo['objnames'][keep_idx],10,cp_files='halpha')
-
 	fig1.tight_layout()
 	fig1.savefig(outname,dpi=dpi)
 
@@ -2092,7 +2090,7 @@ def obs_vs_model_hdelta(e_pinfo,hflag,outname=None,outname2=None,outname_dnplt=N
 	dn4000_prosp = e_pinfo['prosp']['dn4000'][good_idx,0]
 
 	##### AGN identifiers
-	sfing, composite, agn = return_agn_str(good_idx)
+	sfing, composite, agn = brown_io.return_agn_str(good_idx)
 	keys = [sfing, composite, agn]
 
 	##### herschel identifier
@@ -2185,8 +2183,6 @@ def obs_vs_model_hdelta(e_pinfo,hflag,outname=None,outname2=None,outname_dnplt=N
 		fig2.tight_layout()
 		fig2.savefig(outname_dnplt, dpi=dpi)
 
-		threed_dutils.return_n_outliers(np.log10(hdel_obs[:,0]),np.log10(hdel_prosp_marg[:,0]),e_pinfo['objnames'][good_idx],5,cp_files='hdelta_abs')
-
 	fig.tight_layout()
 	fig.savefig(outname, dpi=dpi)
 	fig3.tight_layout()
@@ -2201,7 +2197,7 @@ def obs_vs_model_dn(e_pinfo,hflag,outname=None):
 	dn_idx = e_pinfo['obs']['dn4000'] > 0.5
 
 	##### AGN identifiers
-	sfing, composite, agn = return_agn_str(dn_idx)
+	sfing, composite, agn = brown_io.return_agn_str(dn_idx)
 	keys = [sfing, composite, agn]
 
 	##### plot quantities
@@ -2249,7 +2245,6 @@ def obs_vs_model_dn(e_pinfo,hflag,outname=None):
 	ax.text(0.96,0.1, 'mean offset='+"{:.2f}".format(off), transform = ax.transAxes,horizontalalignment='right')
 	#ax.text(0.04,0.9, r'N = '+str(int(np.sum(dn_idx))), transform = ax.transAxes,horizontalalignment='left')
 
-	threed_dutils.return_n_outliers(dn4000_obs,dn4000_prosp,e_pinfo['objnames'][dn_idx],3,cp_files='dn4000')
 	plt.tight_layout()
 	plt.savefig(outname, dpi=dpi)
 	plt.close()
@@ -2480,7 +2475,7 @@ def obs_vs_model_bdec(e_pinfo,hflag,outname1='test.png',outname2='test.png'):
 	pl_bdec_measured = threed_dutils.bdec_to_ext(e_pinfo['obs']['bdec'][keep_idx])
 
 	##### BPT classifications, herschel flag
-	sfing, composite, agn = return_agn_str(keep_idx)
+	sfing, composite, agn = brown_io.return_agn_str(keep_idx)
 	keys = [sfing, composite, agn]
 	hflag = [hflag[keep_idx],~hflag[keep_idx]]
 
@@ -2571,7 +2566,7 @@ def obs_vs_prosp_sfr(e_pinfo,hflag,outname='test.png'):
 	bdec_mod = e_pinfo['prosp']['bdec_calc_marg'][keep_idx]
 
 	#### AGN+Herschel identifiers ######
-	sfing, composite, agn = return_agn_str(keep_idx)
+	sfing, composite, agn = brown_io.return_agn_str(keep_idx)
 	keys = [sfing, composite, agn]
 	hflag = [hflag[keep_idx],~hflag[keep_idx]]
 
@@ -2661,29 +2656,6 @@ def bpt_legend(ax, loc=1,size=14):
 
 	ax.legend(loc=loc, fontsize=size, prop={'size':size}, frameon=True, title='BPT location',numpoints=1)
 
-def return_agn_str(idx, string=False):
-
-	'''
-	# OLD VERSION
-	from astropy.io import fits
-	hdulist = fits.open(os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/table1.fits')
-	agn_str = hdulist[1].data['Class']
-	hdulist.close()
-	'''
-	# NEW VERSION, WITH MY FLUXES
-	with open(os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/joel_bpt.pickle', "rb") as f:
-		agn_str=pickle.load(f)
-
-	agn_str = agn_str[idx]
-	sfing = (agn_str == 'SF') | (agn_str == '---')
-	composite = (agn_str == 'SF/AGN')
-	agn = agn_str == 'AGN'
-
-	if string:
-		return agn_str
-	else:
-		return sfing, composite, agn
-
 def residual_plots(e_pinfo,hflag,outfolder):
 
 	fldr = outfolder+'residuals/'
@@ -2695,7 +2667,7 @@ def residual_plots(e_pinfo,hflag,outfolder):
 	inclination = e_pinfo['obs']['inclination'][keep_idx]
 
 	#### AGN+Herschel identifiers ######
-	sfing, composite, agn = return_agn_str(keep_idx)
+	sfing, composite, agn = brown_io.return_agn_str(keep_idx)
 	keys = [sfing, composite, agn]
 	hflag = [hflag[keep_idx],~hflag[keep_idx]]
 
@@ -2855,7 +2827,7 @@ def residual_plots(e_pinfo,hflag,outfolder):
 	tau2 = threed_dutils.chev_extinction(modtau, lam2_extdiff,ebars=True)
 	dtau_dlam_chev = ((tau2-tau1) / (lam2_extdiff-lam1_extdiff)) / modtau
 
-	sfingn, compositen, agnn = return_agn_str(np.ones_like(keep_idx))
+	sfingn, compositen, agnn = brown_io.return_agn_str(np.ones_like(keep_idx))
 	nkeys = [sfingn, compositen, agnn]
 	for ii in xrange(len(labels)): 
 		dtau_dlam_prosp_errors = threed_dutils.asym_errors(dtau_dlam_prosp[nkeys[ii],0],
@@ -3028,7 +3000,7 @@ def plot_emline_comp(alldata,outfolder,hflag):
 		flag.append(index_flags['flag'][match][0])
 		sfrfrac[i,:5] = dat['pquantiles']['q50'][sfrfrac_idx]
 		#sfrfrac[i,5] = 1-sfrfrac[i,:4].sum()
-		sfrfrac[i,5] = np.median(1-dat['pquantiles']['random_chain'][:,sfrfrac_idx].sum(axis=1))
+		sfrfrac[i,5] = np.median(1-dat['pquantiles']['sample_chain'][:,sfrfrac_idx].sum(axis=1))
 	halftime = np.array(halftime)
 	flag = np.array(flag,dtype=bool)
 
@@ -3336,7 +3308,7 @@ def prospector_comparison(alldata,outfolder,hflag):
 
 
 	#### agn flags
-	sfing, composite, agn = return_agn_str(np.ones_like(hflag,dtype=bool))
+	sfing, composite, agn = brown_io.return_agn_str(np.ones_like(hflag,dtype=bool))
 	agn_flags = [sfing,composite,agn]
 
 	#### best-fits

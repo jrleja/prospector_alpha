@@ -529,6 +529,9 @@ def update_model_info(alldata, sample_results, extra_output, magphys):
 	alldata['lir'] = extra_output['observables']['L_IR']
 	mask = sample_results['obs']['phot_mask']
 	alldata['model_maggies'] = extra_output['observables']['mags'][mask]
+	alldata['model_spec'] = np.median(extra_output['observables']['spec'],axis=1)
+	alldata['model_spec_lam'] = extra_output['observables']['lam_obs']
+
 	alldata['obs_maggies'] = sample_results['obs']['maggies'][mask]
 	alldata['filters'] = np.array(sample_results['obs']['filternames'])[mask]
 

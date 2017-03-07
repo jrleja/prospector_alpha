@@ -49,8 +49,8 @@ def collate_data(alldata,alldata_noagn):
 	### fill with data
 	for dat,datnoagn in zip(alldata,alldata_noagn):
 		for ii,par in enumerate(parnames):
-			p1 = np.random.choice(dat['pquantiles']['random_chain'][:,ii].squeeze(),size=size)
-			p2 = np.random.choice(datnoagn['pquantiles']['random_chain'][:,ii].squeeze(),size=size)
+			p1 = np.random.choice(dat['pquantiles']['sample_chain'][:,ii].squeeze(),size=size)
+			p2 = np.random.choice(datnoagn['pquantiles']['sample_chain'][:,ii].squeeze(),size=size)
 			ratio = p1 - p2
 			for q in outq[par].keys(): 
 				quant = float(q[1:])/100
@@ -118,9 +118,9 @@ def plot(runname='brownseds_agn',runname_noagn='brownseds_np',alldata=None,allda
 	#### collate data
 	pdata = collate_data(alldata,alldata_noagn)
 
-	### BPT PLOT
+	### delta parameters plot
 	fig,ax = plot_dpars(pdata,
-		                xpar='fagn',xparlabel=r'log(f$_{\mathrm{AGN}}$)',
+		                xpar='fagn',xparlabel=r'log(f$_{\mathrm{MIR}}$)',
 		                log_xpar=True)
 	plt.tight_layout()
 	plt.savefig(outfolder+'delta_fitpars.png',dpi=dpi)

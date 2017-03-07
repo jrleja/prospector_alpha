@@ -88,7 +88,7 @@ def plot_bpt(runname='brownseds_agn',alldata=None,outfolder=None):
 	pdata = collate_data(alldata)
 
 	### BPT PLOT
-	fig,ax = plot_scatterplot(pdata,colorpar='fagn',colorparlabel=r'log(f$_{\mathrm{AGN}}$)',
+	fig,ax = plot_scatterplot(pdata,colorpar='fagn',colorparlabel=r'log(f$_{\mathrm{MIR}}$)',
 		                             log_cpar=True, cpar_range=[-2,0])
 	add_kewley_classifications(ax)
 	plt.tight_layout()
