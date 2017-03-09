@@ -51,10 +51,10 @@ def build_massive_sample(rm_zp_offsets=True):
 	### output
 	field = 'COSMOS'
 	basename = 'td_massive'
-	fast_str_out = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_'+basename+'.fout'
-	ancil_str_out = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_'+basename+'.dat'
-	phot_str_out = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_'+basename+'.cat'
-	id_str_out   = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_'+basename+'.ids'
+	fast_str_out = '/Users/joel/code/python/threedhst_bsfh/data/3dhst/'+field+'_'+basename+'.fout'
+	ancil_str_out = '/Users/joel/code/python/threedhst_bsfh/data/3dhst/'+field+'_'+basename+'.dat'
+	phot_str_out = '/Users/joel/code/python/threedhst_bsfh/data/3dhst/'+field+'_'+basename+'.cat'
+	id_str_out   = '/Users/joel/code/python/threedhst_bsfh/data/3dhst/'+field+'_'+basename+'.ids'
 
 	### load data
 	phot = td_io.load_phot_v41(field)

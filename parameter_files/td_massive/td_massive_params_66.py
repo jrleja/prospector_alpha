@@ -32,9 +32,9 @@ run_params = {'verbose':True,
               'interp_type': 'logarithmic',
               'agelims': [0.0,8.0,8.5,9.0,9.5,9.8,10.0],
               # Data info
-              'photname':APPS+'/threedhst_bsfh/data/COSMOS_td_massive.cat',
-              'datname':APPS+'/threedhst_bsfh/data/COSMOS_td_massive.dat',
-              'fastname':APPS+'/threedhst_bsfh/data/COSMOS_td_massive.fout',
+              'photname':APPS+'/threedhst_bsfh/data/3dhst/COSMOS_td_massive.cat',
+              'datname':APPS+'/threedhst_bsfh/data/3dhst/COSMOS_td_massive.dat',
+              'fastname':APPS+'/threedhst_bsfh/data/3dhst/COSMOS_td_massive.fout',
               'objname':'19736',
               }
 run_params['outfile'] = run_params['outfile']+'_'+run_params['objname']

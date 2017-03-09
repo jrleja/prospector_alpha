@@ -1,6 +1,7 @@
 from astropy.io import ascii
 import numpy as np
 from astropy.table import Table, vstack
+import os
 
 def load_phot_v41(field):
 
@@ -32,7 +33,7 @@ def load_fast_v41(field):
 
 def load_zp_offsets(field):
 
-	filename = '/Users/joel/data/3d_hst/v4.1_cats/zp_offsets_tbl11_skel14.txt'
+	filename = os.getenv('APPS')+'/threedhst_bsfh/data/3dhst/zp_offsets_tbl11_skel14.txt'
 	with open(filename, 'r') as f:
 		for jj in range(1): hdr = f.readline().split()
 	dtype = [np.dtype((str, 35)),np.dtype((str, 35)),np.float,np.float]
