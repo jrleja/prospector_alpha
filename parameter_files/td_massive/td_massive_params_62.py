@@ -457,7 +457,7 @@ def load_model(objname='',datname='',fastname='', agelims=[], **extras):
     agelims = [agelims[0]] + np.linspace(agelims[1],np.log10(tuniv*1e9),6).tolist()
     agebins = np.array([agelims[:-1], agelims[1:]])
     ncomp = len(agelims) - 1
-    print 1/0
+
     #### ADJUST MODEL PARAMETERS #####
     n = [p['name'] for p in model_params]
 
