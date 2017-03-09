@@ -33,7 +33,7 @@ def generate_resp_curves_from_photometry_file(photfile=APPS+'/threedhst_bsfh/dat
 		# find filter number in FILTER.RES.LATEST
 		# we have a few more matches than we need here, ugly
 		try: # if it's in the EAZY filter file, pull it!
-			match = np.array([filtname in t[2:].lower() for t in trans[:,0]],dtype=bool)
+			match = np.array(['f_'+filtname == t.lower() for t in trans[:,0]],dtype=bool)
 			filtnum = int(trans[match,1][0][1:])
 			lam, res = read_threedhst_filters(filtnum)
 		except IndexError: # it's not in the EAZY filter file. pull it from FSPS.

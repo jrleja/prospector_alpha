@@ -96,6 +96,7 @@ def load_obs(photname, objname, err_floor=0.05, zperr=True, **extras):
 
 
     ### build output dictionary
+    obs = {}
     obs['filters'] = observate.load_filters(filters)
     obs['wave_effective'] = np.array([filt.wave_effective for filt in obs['filters']])
     obs['phot_mask'] = phot_mask
@@ -432,30 +433,31 @@ def load_model(objname='',datname='',fastname='', agelims=[], **extras):
     ###### REDSHIFT ######
     ### open file, load data
     '''
+    # this is zbest
     with open(datname, 'r') as f:
         hdr = f.readline().split()
     dtype = np.dtype([(hdr[1],'S20')] + [(n, np.float) for n in hdr[2:]])
     dat = np.loadtxt(datname, comments = '#', delimiter=' ',
                      dtype = dtype)
+    zred = dat['z_best'][dat['phot_id'] == float(objname)][0]
     '''
+    # this is zfast
+
     with open(fastname, 'r') as f:
         hdr = f.readline().split()
     dtype = np.dtype([(hdr[1],'S20')] + [(n, np.float) for n in hdr[2:]])
     fast = np.loadtxt(fastname, comments = '#', delimiter=' ', dtype = dtype)
     zred = fast['z'][fast['id'] == objname][0]
 
-    # compare dat['zbest'] to fast['z']
-    # they should be the same
-    # if not, consider using fast['z']
-
     #### CALCULATE TUNIV #####
     tuniv = WMAP9.age(zred).value
 
-    #### NONPARAMETRIC SFH ######
-    agelims[-1] = np.log10(tuniv*1e9)
+    #### NONPARAMETRIC SFH #####
+    # six bins, spaced equally in logarithmic space after t=100 Myr
+    agelims = [agelims[0]] + np.linspace(agelims[1],np.log10(tuniv*1e9),6).tolist()
     agebins = np.array([agelims[:-1], agelims[1:]])
     ncomp = len(agelims) - 1
-
+    print 1/0
     #### ADJUST MODEL PARAMETERS #####
     n = [p['name'] for p in model_params]
 
