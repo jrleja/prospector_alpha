@@ -11,7 +11,7 @@
 ### memory per cpu, in MB
 #SBATCH --mem-per-cpu=6500
 ### Job name
-#SBATCH -J 'bseds_np_sec'
+#SBATCH -J '3d_mass_sec'
 ### output and error logs
 #SBATCH -o td_massive_sec_%a.out
 #SBATCH -e td_massive_sec_%a.err

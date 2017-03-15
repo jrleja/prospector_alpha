@@ -137,7 +137,8 @@ def plot_dpars(pdata,xpar=None,xparlabel=None,log_xpar=False):
 		xpar_plot = np.log10(xpar_plot)
 
 	#### plot photometry
-	fig, ax = plt.subplots(4,5, figsize=(21,16))
+	#fig, ax = plt.subplots(4,5, figsize=(21,16))
+	fig, ax = plt.subplots(2,3, figsize=(15,10))
 	ax = np.ravel(ax)
 
 	opts = {
@@ -147,20 +148,28 @@ def plot_dpars(pdata,xpar=None,xparlabel=None,log_xpar=False):
 	        'fmt': 'o'
 	       }
 
+	toplot = ['logmass','logzsol','dust2','ssfr_100','half_time']
+
+	idx = 0
 	for ii, par in enumerate(pdata['ordered_labels']):
 
-			errs = pdata['errs'][par]
-			ax[ii].errorbar(xpar_plot,pdata['median'][par], yerr=errs, zorder=-3, **opts)
-			ax[ii].set_ylabel('AGN--no AGN')
-			ax[ii].set_xlabel(xparlabel)
-			ax[ii].set_title(pdata['labels'][par])
+		if par not in toplot:
+			continue
 
-			ax[ii].plot([ax[ii].get_xlim()[0],ax[ii].get_xlim()[1]],[0.0,0.0], linestyle='--',color='0.5',lw=1.5,zorder=-5)
-			ax[ii].xaxis.set_major_locator(MaxNLocator(5))
+		errs = pdata['errs'][par]
+		ax[idx].errorbar(xpar_plot,pdata['median'][par], yerr=errs, zorder=-3, **opts)
+		ax[idx].set_ylabel('AGN--no AGN')
+		ax[idx].set_xlabel(xparlabel)
+		ax[idx].set_title(pdata['labels'][par])
 
-			x, y = running_median(xpar_plot,pdata['median'][par],nbins=8,weights=1./(np.array(errs)[0]+np.array(errs)[1]),avg=True)
-			ax[ii].plot(x,y,color=red,lw=4,alpha=0.6)
-			ax[ii].plot(x,y,color=red,lw=4,alpha=0.6)
+		ax[idx].plot([ax[idx].get_xlim()[0],ax[idx].get_xlim()[1]],[0.0,0.0], linestyle='--',color='0.5',lw=1.5,zorder=-5)
+		ax[idx].xaxis.set_major_locator(MaxNLocator(5))
+
+		x, y = running_median(xpar_plot,pdata['median'][par],nbins=8,weights=1./(np.array(errs)[0]+np.array(errs)[1]),avg=True)
+		ax[idx].plot(x,y,color=red,lw=4,alpha=0.6)
+		ax[idx].plot(x,y,color=red,lw=4,alpha=0.6)
+
+		idx +=1
 
 	return fig, ax
 

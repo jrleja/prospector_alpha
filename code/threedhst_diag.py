@@ -491,7 +491,7 @@ def return_sedplot_vars(sample_results, extra_output, nufnu=True):
 	# here we want to return
 	# effective wavelength of photometric bands, observed maggies, observed uncertainty, model maggies, observed_maggies-model_maggies / uncertainties
 	# model maggies, observed_maggies-model_maggies/uncertainties
-	return wave_eff/1e4, obs_maggies, obs_maggies_unc, mu, (obs_maggies-mu)/obs_maggies_unc, spec, extra_output['observables']['lam_obs']/1e4
+	return wave_eff/1e4, obs_maggies, obs_maggies_unc, mu, (obs_maggies-mu)/obs_maggies_unc, spec/(sample_results['model'].params['zred'][0]+1), (1+sample_results['model'].params['zred'][0])*extra_output['observables']['lam_obs']/1e4
 
 def sed_figure(outname = None, truths = None,
 			   colors = ['#1974D2'], sresults = None, extra_output = None,
@@ -561,18 +561,21 @@ def sed_figure(outname = None, truths = None,
 		              color=colors[i], alpha=0.9,zorder=-1,label = labels[i],**kwargs)	
 
 		nz = spec_pdf[:,1] > 0
-		phot.fill_between(w/1e4, spec_pdf[:,0]*sfactor, 
-			                     spec_pdf[:,2]*sfactor,
-			                     color=colors[i],
-			                     alpha=0.3,zorder=-1)
+		phot.fill_between(w*(sample_results['model'].params['zred'][0]+1)/1e4, 
+			              spec_pdf[:,0]*sfactor/(sample_results['model'].params['zred'][0]+1), 
+			              spec_pdf[:,2]*sfactor/(sample_results['model'].params['zred'][0]+1),
+			              color=colors[i],
+			              alpha=0.3,zorder=-1)
 		### observations!
 		if i == 0:
 			xplot = wave_eff
 			yplot = obsmags
 			yerr = obsmags_unc
 
+			positive_flux = obsmags > 0
+
 		    # PLOT OBSERVATIONS + ERRORS 
-			phot.errorbar(xplot, yplot, yerr=yerr,
+			phot.errorbar(xplot[positive_flux], yplot[positive_flux], yerr=yerr[positive_flux],
 		                  color=obs_color, marker='o', label='observed', alpha=alpha, linestyle=' ',ms=ms,zorder=0)
 
 		#### calculate and show reduced chi-squared
@@ -583,7 +586,7 @@ def sed_figure(outname = None, truths = None,
 		phot.text(textx, texty+deltay*(i+1), r'best-fit $\chi^2$/N$_{\mathrm{phot}}$='+"{:.2f}".format(reduced_chisq),
 			  fontsize=10, ha='right',transform = phot.transAxes,color=main_color[i])
 
-	xlim = (min(xplot)*0.4,max(xplot)*1.5)
+	xlim = (min(xplot)*0.5,max(xplot)*3)
 
 	### FIR extras
 	if fir_extra:
@@ -622,7 +625,13 @@ def sed_figure(outname = None, truths = None,
 	### apply plot limits
 	phot.set_xlim(xlim)
 	res.set_xlim(xlim)
-	phot.set_ylim(min(yplot[np.isfinite(yplot)])*0.4,max(yplot[np.isfinite(yplot)])*5)
+	phot.set_ylim(yplot[positive_flux].min()*0.4, yplot[positive_flux].max()*10)
+
+	# if we have negatives:
+	if positive_flux.sum() != len(obsmags):
+		downarrow = [u'\u2193']
+		y0 = 10**((np.log10(phot.get_ylim()[1]) - np.log10(phot.get_ylim()[0]))/20.)*phot.get_ylim()[0]
+		for x0 in xplot[~positive_flux]: phot.plot(x0, y0, linestyle='none',marker=u'$\u2193$',markersize=16,alpha=alpha,mew=0.0,color=obs_color)
 
 	#### add SFH plot
 	add_sfh_plot(extra_output,fig,
@@ -687,7 +696,6 @@ def sed_figure(outname = None, truths = None,
 	fig.add_subplot(phot)
 	fig.add_subplot(res)
 	
-	'''
 	# set second x-axis
 	y1, y2=phot.get_ylim()
 	x1, x2=phot.get_xlim()
@@ -699,7 +707,7 @@ def sed_figure(outname = None, truths = None,
 	ax2.set_xscale('log',nonposx='clip',subsx=(2,5))
 	ax2.xaxis.set_minor_formatter(minorFormatter)
 	ax2.xaxis.set_major_formatter(majorFormatter)
-	'''
+
 	# remove ticks
 	phot.set_xticklabels([])
     
