@@ -193,10 +193,11 @@ def calc_extra_quantities(sample_results, ncalc=3000, ir_priors=True, opts=None)
 	mags = np.zeros(shape=(len(sample_results['obs']['filters']),ncalc))
 	spec = np.zeros(shape=(len(sps.wavelengths),ncalc))
 
-	##### modify nebon status
-	# don't cache
+	##### modify nebular status to ensure emission line production
+	# don't cache, and turn on
 	if sample_results['model'].params['add_neb_emission'] == 2:
 		sample_results['model'].params['add_neb_emission'] = np.array(True)
+	sample_results['model'].params['nebemlineinspec'] = True
 
 	######## posterior sampling #########
 	for jj,idx in enumerate(sample_idx):
