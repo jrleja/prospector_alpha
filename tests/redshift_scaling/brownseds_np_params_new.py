@@ -4,17 +4,9 @@ from prospect.models import priors, sedmodel
 from prospect.sources import FastStepBasis
 from sedpy import observate
 from astropy.cosmology import WMAP9
-from td_io import load_zp_offsets
+from astropy.io import fits
 tophat = priors.tophat
 logarithmic = priors.logarithmic
-APPS = os.getenv('APPS')
-
-lsun = 3.846e33
-pc = 3.085677581467192e18  # in cm
-
-lightspeed = 2.998e18  # AA/s
-to_cgs = lsun/(4.0 * np.pi * (pc*10)**2)
-jansky_mks = 1e-26
 
 #############
 # RUN_PARAMS
@@ -22,7 +14,7 @@ jansky_mks = 1e-26
 
 run_params = {'verbose':True,
               'debug': False,
-              'outfile': os.getenv('APPS')+'/threedhst_bsfh/results/td_massive/td_massive',
+              'outfile': os.getenv('APPS')+'/threedhst_bsfh/results/brownseds_np/brownseds_np',
               'nofork': True,
               # Optimizer params
               'ftol':0.5e-5, 
@@ -39,10 +31,11 @@ run_params = {'verbose':True,
               'interp_type': 'logarithmic',
               'agelims': [0.0,8.0,8.5,9.0,9.5,9.8,10.0],
               # Data info
-              'photname':APPS+'/threedhst_bsfh/data/3dhst/COSMOS_td_massive.cat',
-              'datname':APPS+'/threedhst_bsfh/data/3dhst/COSMOS_td_massive.dat',
-              'fastname':APPS+'/threedhst_bsfh/data/3dhst/COSMOS_td_massive.fout',
-              'objname':'26338',
+              'datname':os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/table1.fits',
+              'photname':os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/table3.txt',
+              'extinctname':os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/table4.fits',
+              'herschname':os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/kingfish.brownapertures.flux.fits',
+              'objname':'Arp 256 N',
               }
 run_params['outfile'] = run_params['outfile']+'_'+run_params['objname']
 
@@ -50,80 +43,214 @@ run_params['outfile'] = run_params['outfile']+'_'+run_params['objname']
 # OBS
 #############
 
-def load_obs(photname, objname, err_floor=0.05, zperr=True, **extras):
-
-    ''' 
-    photname: photometric file location
-    objname: number of object in the 3D-HST COSMOS photometric catalog
-    err_floor: the fractional error floor (0.05 = 5% floor)
-    zp_err: inflate the errors by the zeropoint offsets from Skelton+14
+def translate_filters(bfilters, full_list = False):
+    '''
+    translate filter names to FSPS standard
+    this is ALREADY a mess, clean up soon!
+    suspect there are smarter routines to do this in python-fsps
     '''
 
+    # this is necessary for my code
+    # to calculate effective wavelength
+    # in threed_dutils
+    translate = {
+    'FUV': 'GALEX FUV',
+    'UVW2': 'UVOT w2',
+    'UVM2': 'UVOT m2',
+    'NUV': 'GALEX NUV',
+    'UVW1': 'UVOT w1',
+    'Umag': np.nan,    # [11.9/15.7]? Swift/UVOT U AB band magnitude
+    'umag': 'SDSS Camera u Response Function, airmass = 1.3 (June 2001)',
+    'gmag': 'SDSS Camera g Response Function, airmass = 1.3 (June 2001)',
+    'Vmag': np.nan,    # [10.8/15.6]? Swift/UVOT V AB band magnitude
+    'rmag': 'SDSS Camera r Response Function, airmass = 1.3 (June 2001)',
+    'imag': 'SDSS Camera i Response Function, airmass = 1.3 (June 2001)',
+    'zmag': 'SDSS Camera z Response Function, airmass = 1.3 (June 2001)',
+    'Jmag': '2MASS J filter (total response w/atm)',
+    'Hmag': '2MASS H filter (total response w/atm)',
+    'Ksmag': '2MASS Ks filter (total response w/atm)',
+    'W1mag': 'WISE W1',
+    '[3.6]': 'IRAC Channel 1',
+    '[4.5]': 'IRAC Channel 2',
+    'W2mag': 'WISE W2',
+    '[5.8]': 'IRAC Channel 3',
+    '[8.0]': 'IRAC CH4',
+    'W3mag': 'WISE W3',
+    'PUIB': np.nan,    # [8.2/15.6]? Spitzer/IRS Blue Peak Up Imaging channel (13.3-18.7um) AB magnitude
+    'W4mag': np.nan,    # two WISE4 magnitudes, what is the correction?
+    "W4'mag": 'WISE W4',
+    'PUIR': np.nan,    # Spitzer/IRS Red Peak Up Imaging channel (18.5-26.0um) AB magnitude
+    '[24]': 'MIPS 24um',
+    'pacs70': 'Herschel PACS 70um',
+    'pacs100': 'Herschel PACS 100um',
+    'pacs160': 'Herschel PACS 160um',
+    'spire250': 'Herschel SPIRE 250um',
+    'spire350': 'Herschel SPIRE 350um',
+    'spire500': 'Herschel SPIRE 500um'
+    }
 
-    ### open file, load data
+    # this translates filter names
+    # to names that FSPS recognizes
+    translate_pfsps = {
+    'FUV': 'galex_FUV',
+    'UVW2': 'uvot_w2',
+    'UVM2': 'uvot_m2',
+    'NUV': 'galex_NUV',
+    'UVW1': 'uvot_w1',
+    'Umag': np.nan,    # [11.9/15.7]? Swift/UVOT U AB band magnitude
+    'umag': 'sdss_u0',
+    'gmag': 'sdss_g0',
+    'Vmag': np.nan,    # [10.8/15.6]? Swift/UVOT V AB band magnitude
+    'rmag': 'sdss_r0',
+    'imag': 'sdss_i0',
+    'zmag': 'sdss_z0',
+    'Jmag': 'twomass_J',
+    'Hmag': 'twomass_H',
+    'Ksmag': 'twomass_Ks',
+    'W1mag': 'wise_w1',
+    '[3.6]': 'spitzer_irac_ch1',
+    '[4.5]': 'spitzer_irac_ch2',
+    'W2mag': 'wise_w2',
+    '[5.8]': 'spitzer_irac_ch3',
+    '[8.0]': 'spitzer_irac_ch4',
+    'W3mag': 'wise_w3',
+    'PUIB': np.nan,    # [8.2/15.6]? Spitzer/IRS Blue Peak Up Imaging channel (13.3-18.7um) AB magnitude
+    'W4mag': np.nan,    # two WISE4 magnitudes, this one is "native" and must be corrected
+    "W4'mag": 'wise_w4',
+    'PUIR': np.nan,    # Spitzer/IRS Red Peak Up Imaging channel (18.5-26.0um) AB magnitude
+    '[24]': 'spitzer_mips_24',
+    'pacs70': 'herschel_pacs_70',
+    'pacs100': 'herschel_pacs_100',
+    'pacs160': 'herschel_pacs_160',
+    'spire250': 'herschel_spire_250',
+    'spire350': 'herschel_spire_350',
+    'spire500': 'herschel_spire_500'
+    }
+
+    if full_list:
+        return translate_pfsps.values()
+    else:
+        return np.array([translate[f] for f in bfilters]), np.array([translate_pfsps[f] for f in bfilters])
+
+def load_obs(photname='', extinctname='', herschname='', objname='', **extras):
+    """
+    let's do this
+    """
+    obs ={}
+
     with open(photname, 'r') as f:
         hdr = f.readline().split()
     dtype = np.dtype([(hdr[1],'S20')] + [(n, np.float) for n in hdr[2:]])
-    dat = np.loadtxt(photname, comments = '#', delimiter=' ',
+    dat = np.loadtxt(photname, comments = '#', delimiter='\t',
                      dtype = dtype)
+    obj_ind = np.where(dat['id'] == objname)[0][0]
 
-    ### extract filters, fluxes, errors for object
-    # from ReadMe: "All fluxes are normalized to an AB zeropoint of 25, such that: magAB = 25.0-2.5*log10(flux)
-    obj_idx = (dat['id'] == objname)
-    filters = np.array([f[2:] for f in dat.dtype.names if f[0:2] == 'f_'])
-    flux = np.squeeze([dat[obj_idx]['f_'+f] for f in filters])
-    unc = np.squeeze([dat[obj_idx]['e_'+f] for f in filters])
+    # extract fluxes+uncertainties for all objects and all filters
+    mag_fields = [f for f in dat.dtype.names if f[0:2] != 'e_' and (f != 'id')]
+    magunc_fields = [f for f in dat.dtype.names if f[0:2] == 'e_']
 
-    ### add correction to MIPS magnitudes (only MIPS 24 right now!)
-    # due to weird MIPS filter conventions
-    dAB_mips_corr = np.array([-0.03542,-0.07669,-0.03807]) # 24, 70, 160, in AB magnitudes
-    dflux = 10**(-dAB_mips_corr/2.5)
+    # extract fluxes for particular object, converting from record array to numpy array
+    mag = np.array([f for f in dat[mag_fields][obj_ind]])
+    magunc  = np.array([f for f in dat[magunc_fields][obj_ind]])
 
-    mips_idx = np.array(['mips_24um' in f for f in filters],dtype=bool)
-    flux[mips_idx] *= dflux[0]
-    unc[mips_idx] *= dflux[0]
+    # extinctions
+    extinct = fits.open(extinctname)
+    extinctions = np.array([np.squeeze(extinct[1].data[f][obj_ind]) for f in extinct[1].columns.names if f != 'Name'])
 
-    ### define photometric mask, convert to maggies
-    phot_mask = (flux != unc) & (flux != -99.0)
-    maggies = flux/(1e10)
-    maggies_unc = unc/(1e10)
+    # adjust fluxes for extinction
+    mag_adj = mag - extinctions
 
-    ### implement error floor
-    maggies_unc = np.clip(maggies_unc, maggies*err_floor, np.inf)
+    # add correction to MIPS magnitudes (only MIPS 24 right now!)
+    mips_corr = np.array([-0.03542,-0.07669,-0.03807]) # 24, 70, 160
+    mag_adj[mag_fields.index('[24]') ] += mips_corr[0]
 
-    ### inflate errors by zeropoint offsets from Table 11, Skelton+14
-    # ~5% to ~20% effect
-    if zperr:
-        zp_offsets = load_zp_offsets(None)
-        band_names = np.array([x['Band'].lower()+'_'+x['Field'].lower() for x in zp_offsets])
-        for ii,f in enumerate(filters):
-            match = band_names == f
-            if match.sum():
-                maggies_unc[ii] = ( (maggies_unc[ii]**2) + (maggies[ii]*(1-zp_offsets[match]['Flux-Correction'][0]))**2 ) **0.5
+    # then convert to maggies
+    flux = 10**((-2./5)*mag_adj)
 
+    # convert uncertainty to maggies
+    unc = magunc*flux/1.086
 
-    ### build output dictionary
-    obs = {}
-    obs['filters'] = observate.load_filters(filters)
+    #### Herschel photometry
+    # find fluxes + errors
+    herschel = fits.open(herschname)
+    hflux_fields = [f for f in herschel[1].columns.names if (('pacs' in f) or ('spire' in f)) and f[-3:] != 'unc']
+    hunc_fields = [f for f in herschel[1].columns.names if (('pacs' in f) or ('spire' in f)) and f[-3:] == 'unc']
+
+    # different versions if objname is passed or no
+    if objname is not None:
+        match = herschel[1].data['Name'] == objname.lower().replace(' ','')
+        
+        hflux = np.array([np.squeeze(herschel[1].data[match][hflux_fields[i]]) for i in xrange(len(hflux_fields))])
+        hunc = np.array([np.squeeze(herschel[1].data[match][f]) for f in hunc_fields])
+    else:
+        optnames = hdulist[1].data['Name']
+        hnames   = herschel[1].data['Name']
+
+        # non-pythonic, but why change if it works?
+        hflux,hunc = np.zeros(shape=(len(hflux_fields),len(hnames))), np.zeros(shape=(len(hflux_fields),len(hnames)))
+        for ii in xrange(len(optnames)):
+            match = hnames == optnames[ii].lower().replace(' ','')
+            for kk in xrange(len(hflux_fields)):
+                hflux[kk,ii] = herschel[1].data[match][hflux_fields[kk]]
+                hunc[kk,ii]  = herschel[1].data[match][hunc_fields[kk]]
+
+    #### combine with brown catalog
+    # convert from Jy to maggies
+    flux = np.concatenate((flux,hflux/3631.))   
+    unc = np.concatenate((unc, hunc/3631.))
+    mag_fields = np.append(mag_fields,hflux_fields)   
+
+    # phot mask
+    phot_mask_brown = mag != 0
+    phot_mask_hersch = hflux != 0
+    phot_mask = np.concatenate((phot_mask_brown,phot_mask_hersch))
+
+    # map brown filters to FSPS filters
+    # and remove fluxes where we don't have filter definitions
+    filters,fsps_filters = translate_filters(mag_fields)
+    have_definition = np.array(filters) != 'nan'
+
+    filters = filters[have_definition]
+    fsps_filters = fsps_filters[have_definition]
+    flux = flux[have_definition]
+    unc = unc[have_definition]
+    phot_mask = phot_mask[have_definition]
+
+    # implement error floor
+    unc = np.clip(unc, flux*0.05, np.inf)
+
+    # build output dictionary
+    obs['filters'] = observate.load_filters(fsps_filters)
     obs['wave_effective'] = np.array([filt.wave_effective for filt in obs['filters']])
     obs['phot_mask'] = phot_mask
-    obs['maggies'] = maggies
-    obs['maggies_unc'] =  maggies_unc
+    obs['maggies'] = flux
+    obs['maggies_unc'] =  unc
     obs['wavelength'] = None
     obs['spectrum'] = None
     obs['logify_spectrum'] = False
 
-    return obs
+    if objname is None:
+        obs['hnames'] = herschel[1].data['Name']
+        obs['names'] = hdulist[1].data['Name']
 
-##########################
-# TRANSFORMATION FUNCTIONS
-##########################
+    # tidy up
+    extinct.close()
+    herschel.close()
+    return obs
+        
+######################
+# GENERATING FUNCTIONS
+######################
 def transform_logmass_to_mass(mass=None, logmass=None, **extras):
 
     return 10**logmass
 
 def load_gp(**extras):
     return None, None
+
+def add_dust1(dust2=None, **extras):
+
+    return 0.86*dust2
 
 def tie_gas_logz(logzsol=None, **extras):
 
@@ -304,21 +431,17 @@ model_params.append({'name': 'duste_qpah', 'N': 1,
 model_params.append({'name': 'add_neb_emission', 'N': 1,
                         'isfree': False,
                         'init': True,
+                        'units': r'log Z/Z_\odot',
                         'prior_function_name': None,
                         'prior_args': None})
 
 model_params.append({'name': 'add_neb_continuum', 'N': 1,
                         'isfree': False,
                         'init': True,
+                        'units': r'log Z/Z_\odot',
                         'prior_function_name': None,
                         'prior_args': None})
-        
-model_params.append({'name': 'nebemlineinspec', 'N': 1,
-                        'isfree': False,
-                        'init': False,
-                        'prior_function_name': None,
-                        'prior_args': None})
-
+                        
 model_params.append({'name': 'gas_logz', 'N': 1,
                         'isfree': False,
                         'init': 0.0,
@@ -380,6 +503,13 @@ class BurstyModel(sedmodel.SedModel):
         """  
         lnp_prior = 0
 
+        # implement uniqueness of outliers
+        if 'gp_outlier_locs' in self.theta_index:
+            start,end = self.theta_index['gp_outlier_locs']
+            outlier_locs = theta[start:end]
+            if len(np.unique(np.round(outlier_locs))) != len(outlier_locs):
+                return -np.inf
+
         # dust1/dust2 ratio
         if 'dust1' in self.theta_index:
             if 'dust2' in self.theta_index:
@@ -408,34 +538,7 @@ class BurstyModel(sedmodel.SedModel):
         return lnp_prior
 
 class FracSFH(FastStepBasis):
-
-
-    @property
-    def emline_wavelengths(self):
-        return self.ssp.emline_wavelengths
-
-    @property
-    def get_nebline_luminosity(self):
-        """Emission line luminosities in units of Lsun per solar mass formed
-        """
-        return self.ssp.emline_luminosity/self.params['mass'].sum()
-
-    def nebline_photometry(self,filters,z):
-        """analytically calculate emission line contribution to photometry
-        """
-        emlams = self.emline_wavelengths * (1+z)
-        elums = self.get_nebline_luminosity # Lsun / solar mass formed
-        flux = np.empty(len(filters))
-        for i,filt in enumerate(filters):
-            # calculate transmission at nebular emission
-            trans = np.interp(emlams, filt.wavelength, filt.transmission, left=0., right=0.)
-            idx = (trans > 0)
-            if True in idx:
-                flux[i] = (trans[idx]*emlams[idx]*elums[idx]).sum()/filt.ab_zero_counts
-            else:
-                flux[i] = 0.0
-        return flux
-
+    
     def get_galaxy_spectrum(self, **params):
         self.update(**params)
 
@@ -457,119 +560,24 @@ class FracSFH(FastStepBasis):
 
         return wave, spec / mtot, self.ssp.stellar_mass / mtot
 
-    def get_spectrum(self, outwave=None, filters=None, peraa=False, **params):
-        """Get a spectrum and SED for the given params.
-        ripped from SSPBasis
-        addition: check for flag nebeminspec. if not true,
-        add emission lines directly to photometry
-        """
-
-        # Spectrum in Lsun/Hz per solar mass formed, restframe
-        wave, spectrum, mfrac = self.get_galaxy_spectrum(**params)
-
-        # Redshifting + Wavelength solution
-        # We do it ourselves.
-        a = 1 + self.params.get('zred', 0)
-        af = a
-        b = 0.0
-
-        if 'wavecal_coeffs' in self.params:
-            x = wave - wave.min()
-            x = 2.0 * (x / x.max()) - 1.0
-            c = np.insert(self.params['wavecal_coeffs'], 0, 0)
-            # assume coeeficients give shifts in km/s
-            b = chebval(x, c) / (lightspeed*1e-13)
-
-        wa, sa = wave * (a + b), spectrum * af  # Observed Frame
-        if outwave is None:
-            outwave = wa
-        
-        spec_aa = lightspeed/wa**2 * sa # convert to perAA
-        # Observed frame photometry, as absolute maggies
-        if filters is not None:
-            mags = observate.getSED(wa, spec_aa * to_cgs, filters)
-            phot = np.atleast_1d(10**(-0.4 * mags))
-        else:
-            phot = 0.0
-
-        ### if we don't have emission lines, add them
-        if (not self.params['nebemlineinspec']) and self.params['add_neb_emission']:
-            phot += self.nebline_photometry(filters,a-1)*to_cgs
-
-        # Spectral smoothing.
-        do_smooth = (('sigma_smooth' in self.params) and
-                     ('sigma_smooth' in self.reserved_params))
-        if do_smooth:
-            # We do it ourselves.
-            smspec = self.smoothspec(wa, sa, self.params['sigma_smooth'],
-                                     outwave=outwave, **self.params)
-        elif outwave is not wa:
-            # Just interpolate
-            smspec = np.interp(outwave, wa, sa, left=0, right=0)
-        else:
-            # no interpolation necessary
-            smspec = sa
-
-        # Distance dimming and unit conversion
-        zred = self.params.get('zred', 0.0)
-        if (zred == 0) or ('lumdist' in self.params):
-            # Use 10pc for the luminosity distance (or a number
-            # provided in the dist key in units of Mpc)
-            dfactor = (self.params.get('lumdist', 1e-5) * 1e5)**2
-        else:
-            lumdist = WMAP9.luminosity_distance(zred).value
-            dfactor = (lumdist * 1e5)**2
-        if peraa:
-            # spectrum will be in erg/s/cm^2/AA
-            smspec *= to_cgs / dfactor * lightspeed / outwave**2
-        else:
-            # Spectrum will be in maggies
-            smspec *= to_cgs / dfactor / 1e3 / (3631*jansky_mks)
-
-        # Convert from absolute maggies to apparent maggies
-        phot /= dfactor
-
-        # Mass normalization
-        mass = np.sum(self.params.get('mass', 1.0))
-        if np.all(self.params.get('mass_units', 'mstar') == 'mstar'):
-            # Convert from current stellar mass to mass formed
-            mass /= mfrac
-
-        return smspec * mass, phot * mass, mfrac
-
-
 def load_sps(**extras):
 
     sps = FracSFH(**extras)
     return sps
 
-def load_model(objname='',datname='',fastname='', agelims=[], **extras):
+def load_model(objname='',datname='', agelims=[], **extras):
 
     ###### REDSHIFT ######
-    ### open file, load data
-    '''
-    # this is zbest
-    with open(datname, 'r') as f:
-        hdr = f.readline().split()
-    dtype = np.dtype([(hdr[1],'S20')] + [(n, np.float) for n in hdr[2:]])
-    dat = np.loadtxt(datname, comments = '#', delimiter=' ',
-                     dtype = dtype)
-    zred = dat['z_best'][dat['phot_id'] == float(objname)][0]
-    '''
-    # this is zfast
-
-    with open(fastname, 'r') as f:
-        hdr = f.readline().split()
-    dtype = np.dtype([(hdr[1],'S20')] + [(n, np.float) for n in hdr[2:]])
-    fast = np.loadtxt(fastname, comments = '#', delimiter=' ', dtype = dtype)
-    zred = fast['z'][fast['id'] == objname][0]
+    hdulist = fits.open(datname)
+    idx = hdulist[1].data['Name'] == objname
+    zred =  hdulist[1].data['cz'][idx][0] / 3e5
+    hdulist.close()
 
     #### CALCULATE TUNIV #####
     tuniv = WMAP9.age(zred).value
 
-    #### NONPARAMETRIC SFH #####
-    # six bins, spaced equally in logarithmic space after t=100 Myr
-    agelims = [agelims[0]] + np.linspace(agelims[1],np.log10(tuniv*1e9),6).tolist()
+    #### NONPARAMETRIC SFH ######
+    agelims[-1] = np.log10(tuniv*1e9)
     agebins = np.array([agelims[:-1], agelims[1:]])
     ncomp = len(agelims) - 1
 
@@ -594,7 +602,6 @@ def load_model(objname='',datname='',fastname='', agelims=[], **extras):
     #### INSERT REDSHIFT INTO MODEL PARAMETER DICTIONARY ####
     zind = n.index('zred')
     model_params[zind]['init'] = zred
-
 
     #### CREATE MODEL
     model = BurstyModel(model_params)
