@@ -6,6 +6,7 @@ import magphys_plot_pref
 import matplotlib as mpl
 from magphys_plots import median_by_band
 from threed_dutils import running_median
+from composite_images import collate_spectra as stolen_collate_spectra
 
 '''
 plot 10 largest f_agn spectral comparisons, with two SFHs and two best-fit photometries! 
@@ -67,7 +68,7 @@ def collate_data(alldata, alldata_noagn):
 
 			#### photometric residuals
 			phot_residuals['resid'].append(dat['residuals']['phot']['frac_prosp'])
-			phot_residuals['lam_obs'].append(dat['residuals']['phot']['lam_obs'])
+			phot_residuals['lam_obs'].append(dat['residuals']['phot']['lam_obs']/(1+dat['residuals']['phot']['z']))
 
 			#### spectral residuals
 			for key in residuals.keys():
@@ -97,7 +98,8 @@ def collate_data(alldata, alldata_noagn):
 
 	return output
 
-def plot_comparison(runname='brownseds_agn',runname_noagn='brownseds_np',alldata=None,alldata_noagn=None,outfolder=None):
+def plot_comparison(idx_plot=None,outfolder=None,
+	                runname='brownseds_agn',runname_noagn='brownseds_np',alldata=None,alldata_noagn=None, **popts):
 
 	#### load alldata
 	if alldata is None:
@@ -115,19 +117,25 @@ def plot_comparison(runname='brownseds_agn',runname_noagn='brownseds_np',alldata
 	### collate data
 	### choose galaxies with largest 10 F_AGN
 	pdata = collate_data(alldata,alldata_noagn)
-	idx_plot = pdata['agn']['model_pars']['fagn']['q50'].argsort()[-10:]
-	colors = ['#9400D3','#FF420E']
-	for i,key in enumerate(pdata): pdata[key]['color'] = colors[i]
+	if idx_plot is None:
+		idx_plot = pdata['agn']['model_pars']['fagn']['q50'].argsort()[-10:]
+	
+	### take collate data from composite images
+	fig, sedax = plot_residuals(pdata,idx_plot,outfolder,**popts)
+	
+	pdata_stolen = {}
+	pdata_stolen = stolen_collate_spectra(alldata,alldata_noagn,idx_plot,pdata_stolen,runname,['WISE W1','WISE W2'])
+	sedfig(sedax,pdata_stolen,**popts)
+	fig.savefig(outfolder+'residuals.png',dpi=150)
+ 	plt.close()
+	plot_sfh(pdata,idx_plot,outfolder,**popts)
 
-	plot_residuals(pdata,idx_plot,outfolder)
-	plot_sfh(pdata,idx_plot,outfolder)
-
-def add_txt(ax,pdata,fs=12,x=0.05,y=0.88,dy=0.075,ha='left',**extras):
+def add_txt(ax,pdata,fs=12,x=0.05,y=0.88,dy=0.075,ha='left',color=None,**extras):
 
 	for i,key in enumerate(pdata.keys()):
-		ax.text(x,y-i*dy,key.replace('_',' ').upper(),fontsize=fs,transform=ax.transAxes,ha=ha,color=pdata[key]['color'],**extras)
+		ax.text(x,y-i*dy,key.replace('_',' ').upper(),fontsize=fs,transform=ax.transAxes,ha=ha,color=color[i],**extras)
 
-def add_identifier(ax,idx,pdata,fs=12,x=0.98,y=0.88,dy=0.08,weight='bold'):
+def add_identifier(ax,idx,pdata,fs=12,x=0.94,y=0.88,dy=0.08,weight='bold'):
 
 	ax.text(x,y,pdata['agn']['objname'][idx],fontsize=fs,transform=ax.transAxes,ha='right',weight=weight)
 
@@ -141,10 +149,11 @@ def add_identifier(ax,idx,pdata,fs=12,x=0.98,y=0.88,dy=0.08,weight='bold'):
 
 	ax.text(x,y-dy,text,fontsize=fs,transform=ax.transAxes,ha='right')
 
-def plot_sfh(pdata,idx_plot,outfolder):
+def plot_sfh(pdata,idx_plot,outfolder,**popts):
 
 	### open figure
-	fig, ax = plt.subplots(5,2, figsize=(7, 15))
+	#fig, ax = plt.subplots(5,2, figsize=(7, 15))
+	fig, ax = plt.subplots(5,4, figsize=(14, 15))
 
 	ax = np.ravel(ax)
 	fs = 10
@@ -159,10 +168,11 @@ def plot_sfh(pdata,idx_plot,outfolder):
 			#### load SFH properties
 			t = pdata[key]['sfh']['t_sfh'][idx]
 			perc = pdata[key]['sfh']['perc'][idx]
+			color = popts[key.replace('_','')+'_color']
 
 			### plot SFH
-			ax[ii].plot(t, perc[:,1],'-',color=pdata[key]['color'],lw=2.5,alpha=0.9)
-			ax[ii].fill_between(t, perc[:,0], perc[:,2], color=pdata[key]['color'], alpha=0.15)
+			ax[ii].plot(t, perc[:,1],'-',color=color,lw=2.5,alpha=0.9)
+			ax[ii].fill_between(t, perc[:,0], perc[:,2], color=color, alpha=0.15)
 
 			### labels and ranges
 			pmin,pmax = np.min([pmin,perc.min()]), np.max([pmax,perc.max()])
@@ -177,8 +187,8 @@ def plot_sfh(pdata,idx_plot,outfolder):
 			ax[ii].yaxis.set_minor_formatter(minorFormatter)
 			ax[ii].yaxis.set_major_formatter(majorFormatter)
 
-			add_identifier(ax[ii],idx,pdata, fs=fs,weight='bold')
-			add_txt(ax[ii],pdata,fs=fs,weight='bold')
+		add_identifier(ax[ii],idx,pdata, fs=fs,weight='bold')
+		add_txt(ax[ii],pdata,fs=fs,color=[popts['agn_color'],popts['noagn_color']],weight='bold')
 
 		ax[ii].set_ylim(pmin*0.2,pmax*8)
 		ax[ii].set_xlim(t.min()*30,t.max())
@@ -187,106 +197,157 @@ def plot_sfh(pdata,idx_plot,outfolder):
 	plt.savefig(outfolder+'sfh_comparison.png',dpi=150)
 	plt.close()
 
-def plot_residuals(pdata,idx_plot,outfolder):
+def plot_residuals(pdata,idx_plot,outfolder,avg=True,**popts):
 
 	#### plot geometry
-	fig, ax = plt.subplots(4,1, figsize=(7, 15))
-	plt.subplots_adjust(right=0.93,top=0.98,left=0.17,hspace=0.19,bottom=0.1)
-	#plt.subplots_adjust(right=0.75,top=0.98,left=0.17,hspace=0.17)
-	#cmap_ax = fig.add_axes([0.88,0.05,0.1,0.9])
+	fig, ax = plt.subplots(2,2, figsize=(17, 8))
+	left, right, bottom, top = 0.06,0.98,0.1,0.95 # margins
+	plt.subplots_adjust(right=right,top=top,left=0.54,hspace=0.23,wspace=0.37,bottom=bottom)
+	#sedax = [fig.add_axes([left,bottom,0.36,0.35]), fig.add_axes([left,0.55,0.36,0.35])]
+
+	import matplotlib.gridspec as gridspec
+	gs1= gridspec.GridSpec(2, 2)
+	gs1.update(left=left, right=left+0.41, bottom=bottom,wspace=0.185)
+	sedax = np.array([plt.subplot(gs1[0, 0]),plt.subplot(gs1[1, 0]),plt.subplot(gs1[0, 1]),plt.subplot(gs1[1, 1])])
+
 	ax = ax.ravel()
 	fs = 18
 
-	#### color by F_AGN
-	cquant = np.log10(pdata['agn']['model_pars']['fagn']['q50'][idx_plot])
-	vmin,vmax = cquant.min(),cquant.max()
-	cmap = mpl.colors.LinearSegmentedColormap('jet', mpl.cm.revcmap(mpl.cm.jet._segmentdata))
-	norm = mpl.colors.Normalize(vmin=vmin, vmax=vmax)
-	scalarMap = mpl.cm.ScalarMappable(norm=norm, cmap=cmap)
-
-	#### colorbar
-	'''
-	cb1 = mpl.colorbar.ColorbarBase(cmap_ax, cmap=cmap,
-                                	norm=norm,
-                                	orientation='vertical')
-	cb1.set_label(r'log(f$_{\mathrm{MIR}}$)')
-	cb1.ax.yaxis.set_ticks_position('left')
-	cb1.ax.yaxis.set_label_position('left')
-	'''
-
 	#### plot options
-	single_opts = {'alpha':0.5,'lw':1,'color':'0.5'}
-	median_opts = {'alpha':0.8,'lw':4,'color':'k'}
+	median_opts = {'alpha':0.8,'lw':3}
 
 	#### data holders
-	ymin,xmin = [np.repeat(np.inf,4) for i in range(2)]
-	ymax,xmax = [np.repeat(-np.inf,4) for i in range(2)]
+	photx, photy_noagn, photy_agn = [],[],[]
+	specx, specy_noagn, specy_agn = [[],[],[]], [[],[],[]], [[],[],[]]
 
-	photx, photy = [],[]
-	specx, specy = [[],[],[]], [[],[],[]]
+	xlim_phot = [0.2,30]
+	ylim_phot = [-0.4,0.4]
+	ylim_spec = [[-.4,.4],
+	             [-.4,.4],
+	             [-.4,.4]]
+	xlim_spec = [[0.35,0.7],
+	             [5,34],
+	             [2.4,4.84]]             
 
-	### begin loop
-	for ii,idx in enumerate(idx_plot):
+	### begin loop over galaxies
+	for idx in idx_plot:
 
-		color = scalarMap.to_rgba(cquant[ii])
+		#### include galaxy photometry
+		photx += (pdata['agn']['phot_residuals']['lam_obs'][idx]/1e4).tolist()
+		photy_noagn += pdata['no_agn']['phot_residuals']['resid'][idx].tolist()
+		photy_agn += pdata['agn']['phot_residuals']['resid'][idx].tolist()
 
-		xdat = pdata['agn']['phot_residuals']['lam_obs'][idx]/1e4
-		ydat = pdata['no_agn']['phot_residuals']['resid'][idx]**2-pdata['agn']['phot_residuals']['resid'][idx]**2
-		photx += xdat.tolist()
-		photy += ydat.tolist()
-
-		ax[0].plot(xdat,ydat,**single_opts)
-		ymin[0],ymax[0] = np.min([ydat.min(),ymin[0]]),np.max([ydat.max(),ymax[0]])
-		xmin[0],xmax[0] = np.min([xdat.min(),xmin[0]]),np.max([xdat.max(),xmax[0]])
-
-		# prospector_resid = np.log10(observed_flux) - np.log10(model_flux)
+		#### include galaxy spectroscopy
 		for i,key in enumerate(pdata['agn']['residuals'].keys()):
 			if pdata['agn']['residuals'][key]['resid'][idx] is not None:
-				ydat = np.sqrt(pdata['no_agn']['residuals'][key]['resid'][idx]**2) - np.sqrt(pdata['agn']['residuals'][key]['resid'][idx]**2)
-				xdat = pdata['agn']['residuals'][key]['lam'][idx]
-				specx[i] += xdat.tolist()
-				specy[i] += ydat.tolist()
+				specx[i] += pdata['agn']['residuals'][key]['lam'][idx].tolist()
+				specy_noagn[i] += pdata['no_agn']['residuals'][key]['resid'][idx].tolist()
+				specy_agn[i] += pdata['agn']['residuals'][key]['resid'][idx].tolist()
 
-				ax[i+1].plot(xdat,ydat,**single_opts)
-				ymin[i+1],ymax[i+1] = np.nanmin([ydat.min(),ymin[i+1]]),np.nanmax([ydat.max(),ymax[i+1]])
-				xmin[i+1],xmax[i+1] = np.nanmin([xdat.min(),xmin[i+1]]),np.nanmax([xdat.max(),xmax[i+1]])
-
-	#### plot medians
-	photx_median, photy_median = median_by_band(np.array(photx),np.array(photy))
-	ax[0].plot(photx_median, photy_median,**median_opts)
+	#### plot medians (AVERAGE?)
+	photx_median, photy_median_noagn = median_by_band(np.array(photx),np.array(photy_noagn),avg=avg)
+	photx_median, photy_median_agn = median_by_band(np.array(photx),np.array(photy_agn),avg=avg)
+	ax[0].plot(photx_median, photy_median_agn,color=popts['agn_color'],**median_opts)
+	ax[0].plot(photx_median, photy_median_noagn,color=popts['noagn_color'],**median_opts)
 
 	for i, key in enumerate(pdata['agn']['residuals'].keys()):
-		x, y = running_median(np.array(specx[i]),np.array(specy[i]),nbins=100)
-		ax[i+1].plot(x, y, **median_opts)
+		# horrible hack to pick out wavelengths. this preserves ~native spacing, downsampled by 3
+		bins = pdata['agn']['residuals'][key]['lam'][idx][::4]
+		bins[0] *= 0.96
+		bins[-1] *= 1.04
+
+		x, y_agn = running_median(np.array(specx[i]),np.array(specy_agn[i]),bins=bins,avg=avg)
+		x, y_noagn = running_median(np.array(specx[i]),np.array(specy_noagn[i]),bins=bins,avg=avg)
+
+		ax[i+1].plot(x, y_agn, color=popts['agn_color'],**median_opts)
+		ax[i+1].plot(x, y_noagn, color=popts['noagn_color'],**median_opts)
 
 	#### labels and scales
 	ymin, ymax = np.repeat(-0.3,4), np.repeat(0.3,4)
 	labelpad=-1.5
-	ax[0].set_xlabel(r'observed wavelength [$\mu$m]',labelpad=labelpad)
-	ax[0].set_ylabel(r'RMS$_{\mathrm{no-AGN}}$-RMS$_{\mathrm{MIR}}$ [dex]')
-	ax[0].set_ylim(ymin[0],ymax[0])
-	ax[0].set_xlim(xmin[0],xmax[0])
+	ax[0].set_xlabel(r'rest-frame wavelength [$\mu$m]',labelpad=labelpad)
+	ax[0].set_ylabel(r'mean (f$_{\mathrm{obs}}$-f$_{\mathrm{model}}$)/f$_{\mathrm{obs}}$')
+	#ax[0].set_ylim(ymin[0],ymax[0])
+	#ax[0].set_xlim(xmin[0],xmax[0])
 
 	ax[0].text(0.05,0.9,'photometry',fontsize=fs,transform=ax[0].transAxes)
-	ax[0].set_xscale('log',nonposx='clip',subsx=(1,2,4))
+	ax[0].set_xscale('log',nonposx='clip',subsx=(1,2,5))
 	ax[0].xaxis.set_minor_formatter(minorFormatter)
 	ax[0].xaxis.set_major_formatter(majorFormatter)
+	ax[0].set_xlim(xlim_phot)
+	ax[0].set_ylim(ylim_phot)
+	ax[0].axhline(0, linestyle='--', color='k',lw=2,zorder=-1)
 
 	for i, key in enumerate(pdata['agn']['residuals'].keys()):
-		ax[i+1].set_ylabel(r'RMS$_{\mathrm{no-AGN}}$-RMS$_{\mathrm{MIR}}$ [dex]')
-		ax[i+1].set_xlabel(r'observed wavelength [$\mu$m]',labelpad=labelpad)
-		ax[i+1].set_ylim(ymin[i+1],ymax[i+1])
-		ax[i+1].set_xlim(xmin[i+1],xmax[i+1])
+		sub = (1,2,3,4,5)
+		if i+1 == 1:
+			sub = (1,2,3,4,5,6)
+		ax[i+1].set_ylabel(r'mean log(f$_{\mathrm{obs}}$/f$_{\mathrm{model}}$)')
+		ax[i+1].set_xlabel(r'rest-frame wavelength [$\mu$m]',labelpad=labelpad)
+		ax[i+1].set_ylim(ylim_spec[i])
+		ax[i+1].set_xlim(xlim_spec[i])
 		ax[i+1].text(0.05,0.9,key,fontsize=fs,transform=ax[i+1].transAxes)
 
-		ax[i+1].set_xscale('log',nonposx='clip',subsx=(1,2,3,4,5,6))
+		ax[i+1].set_xscale('log',nonposx='clip',subsx=sub)
 		ax[i+1].xaxis.set_minor_formatter(minorFormatter)
 		ax[i+1].xaxis.set_major_formatter(majorFormatter)
+		ax[i+1].axhline(0, linestyle='--', color='k',lw=2,zorder=-1)
 
- 	plt.savefig(outfolder+'residuals.png',dpi=150)
- 	plt.close()
+	return fig, sedax
 
+def sedfig(sedax,pdata,**popts):
 
+	#### choose galaxies
+	# third one is just a misidentification due to bad 3.3um oscillator strength?
+	to_plot = ['IRAS 08572+3915','NGC 0695','NGC 3690','NGC 7674']
+	
+	wavlims = (1,30)
+	alpha = 0.55
+	lw = 2.5
+	for ii in range(len(sedax)):
+
+		idx = pdata['observables']['objname'].index(to_plot[ii])
+
+		#### now plot the SED
+		wav_idx = (pdata['observables']['wave'][idx]/1e4 > wavlims[0]) & (pdata['observables']['wave'][idx]/1e4 < wavlims[1])
+		yon, yoff = pdata['observables']['agn_on_spec'][idx][wav_idx], pdata['observables']['agn_off_spec'][idx][wav_idx]
+		sedax[ii].plot(pdata['observables']['wave'][idx][wav_idx]/1e4,yon, lw=lw, alpha=alpha, color=popts['agn_color'])
+		sedax[ii].plot(pdata['observables']['wave'][idx][wav_idx]/1e4,yoff, lw=lw, alpha=alpha, color=popts['noagn_color'])
+
+		min, max = np.min([yon.min(),yoff.min()]), np.max([yoff.max(),yon.max()])
+		if type(pdata['observables']['spit_lam'][idx]) is np.ndarray:
+			wav_idx = (pdata['observables']['spit_lam'][idx]/1e4 > wavlims[0]) & (pdata['observables']['spit_lam'][idx]/1e4 < wavlims[1])
+			sedax[ii].plot(pdata['observables']['spit_lam'][idx][wav_idx]/1e4,pdata['observables']['spit_flux'][idx][wav_idx], lw=lw, alpha=alpha, color='black')
+			min, max = np.min([min,pdata['observables']['spit_flux'][idx][wav_idx].min()]), np.max([max,pdata['observables']['spit_flux'][idx][wav_idx].max()])
+		if type(pdata['observables']['ak_lam'][idx]) is np.ndarray:
+			wav_idx = (pdata['observables']['ak_lam'][idx]/1e4 > wavlims[0]) & (pdata['observables']['ak_lam'][idx]/1e4 < wavlims[1])
+			sedax[ii].plot(pdata['observables']['ak_lam'][idx][wav_idx]/1e4,pdata['observables']['ak_flux'][idx][wav_idx], lw=lw, alpha=alpha, color='black')
+			min, max = np.min([min,pdata['observables']['ak_flux'][idx][wav_idx].min()]), np.max([max,pdata['observables']['ak_flux'][idx][wav_idx].max()])
+
+		### write down Vega colors
+		fs = 10
+		xs, ys, dely = 0.98, 0.03, 0.05
+		sedax[ii].text(xs,ys,'W1-W2(AGN ON)='+'{:.2f}'.format(pdata['observables']['agn_on_mag'][idx]),transform=sedax[ii].transAxes,color=popts['agn_color'],ha='right',fontsize=fs)
+		sedax[ii].text(xs,ys+dely,'W1-W2(AGN OFF)='+'{:.2f}'.format(pdata['observables']['agn_off_mag'][idx]),transform=sedax[ii].transAxes,color=popts['noagn_color'],ha='right',fontsize=fs)
+		sedax[ii].text(xs,ys+2*dely,'W1-W2(OBS)='+'{:.2f}'.format(pdata['observables']['obs_mag'][idx]),transform=sedax[ii].transAxes,color='black',ha='right',fontsize=fs)
+		sedax[ii].text(0.03,0.9,pdata['observables']['objname'][idx],transform=sedax[ii].transAxes,color='black',ha='left',fontsize=fs+4)
+
+		### scaling and labels
+		sedax[ii].set_yscale('log',nonposx='clip',subsx=(1,2,4))
+		sedax[ii].set_xscale('log',nonposx='clip',subsx=(1,2,4))
+		sedax[ii].xaxis.set_minor_formatter(minorFormatter)
+		sedax[ii].xaxis.set_major_formatter(majorFormatter)
+
+		if (ii == 1) or (ii == 3):
+			sedax[ii].set_xlabel(r'wavelength $\mu$m')
+		if (ii <= 1):
+			sedax[ii].set_ylabel(r'f$_{\nu}$')
+
+		sedax[ii].axvline(3.4, linestyle='--', color='0.5',lw=1.5,alpha=0.8,zorder=-5)
+		sedax[ii].axvline(4.6, linestyle='--', color='0.5',lw=1.5,alpha=0.8,zorder=-5)
+
+		sedax[ii].set_xlim(wavlims)
+		sedax[ii].set_ylim(min*0.5,max*2)
 
 
 

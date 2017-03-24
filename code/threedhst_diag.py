@@ -302,15 +302,21 @@ def add_sfh_plot(exout,fig,ax_loc=None,
 
 	axlim_sfh=[xmax, xmin, ymin*.7, ymax*1.4]
 	ax_inset.axis(axlim_sfh)
-
-	ax_inset.set_ylabel(r'SFR [M$_{\odot}$/yr]',fontsize=axfontsize,weight='bold',labelpad=3)
-	ax_inset.set_xlabel('t [Gyr]',fontsize=axfontsize,weight='bold',labelpad=2)
+	ax_inset.set_ylabel(r'SFR [M$_{\odot}$/yr]',fontsize=axfontsize*3,labelpad=3)
+	ax_inset.set_xlabel('t [Gyr]',fontsize=axfontsize*3,labelpad=2)
 	
-	for tick in ax_inset.xaxis.get_major_ticks(): tick.label.set_fontsize(axfontsize) 
+	'''
+	for xlabel_i in frame1.axes.get_xticklabels():
+    xlabel_i.set_visible(False)
+    xlabel_i.set_fontsize(0.0)
+	'''
 	ax_inset.set_xscale('log',nonposx='clip',subsx=([1]))
+	ax_inset.xaxis.set_major_formatter(majorFormatter)
+	ax_inset.xaxis.set_tick_params(labelsize=axfontsize*3)
 
-	for tick in ax_inset.yaxis.get_major_ticks(): tick.label.set_fontsize(axfontsize) 
-	ax_inset.set_yscale('log',nonposy='clip',subsy=(1,3))
+	ax_inset.set_yscale('log',nonposy='clip',subsy=(1,2,5))
+	ax_inset.yaxis.set_major_formatter(majorFormatter)
+	ax_inset.yaxis.set_tick_params(labelsize=axfontsize*3)
 
 def plot_sfh_fast(tau,tage,mass,tuniv=None):
 
@@ -517,7 +523,7 @@ def sed_figure(outname = None, truths = None,
 	gs = gridspec.GridSpec(2,1, height_ratios=[3,1])
 	gs.update(hspace=0)
 	phot, res = plt.Subplot(fig, gs[0]), plt.Subplot(fig, gs[1])
-	#sfh_loc = [0.19,0.4,0.14,0.17]
+	sfh_loc = [0.655,0.63,0.19,0.25]
 	sfh_ax = fig.add_axes(sfh_loc,zorder=32)
 
 	### diagnostic text
@@ -588,44 +594,10 @@ def sed_figure(outname = None, truths = None,
 
 	xlim = (min(xplot)*0.5,max(xplot)*3)
 
-	### FIR extras
-	if fir_extra:
-		# FIR photometry for IC 4553 / Arp 220
-		# from NED: http://ned.ipac.caltech.edu/cgi-bin/nph-objsearch?objname=IC%204553&extend=no&out_csys=Equatorial&out_equinox=J2000.0&obj_sort=RA+or+Longitude&of=pre_text&zv_breaker=30000.0&list_limit=5&img_stamp=YES
-		# FILTER FLUX UNCERTAINTY (jansky)
-		# 250 microns (SPIRE)	30.1 1.5
-		# 350 microns (SPIRE)	11.7 0.6
-		# 500 microns (SPIRE)	3.9 0.2
-		lam = np.array([250,350,500])*1e4
-		to_nufnu = 3e18/lam
-
-		fir_obs_phot = np.array([30.1,11.7,3.9]) / 3631. * to_nufnu # in maggies
-		fir_obs_err  = np.array([1.5,0.6,0.2]) / 3631. * to_nufnu # in maggies
-
-		fir_model_phot = np.zeros(shape=(3,3))
-		for i in range(3): fir_model_phot[i,:] = np.percentile(sample_results['hphot']['mags'][i,:],[50.0,84.0,16.0])*to_nufnu[i]
-		fir_model_err = threed_dutils.asym_errors(fir_model_phot[:,0],fir_model_phot[:,1],fir_model_phot[:,2],log=False)
-
-		#### plot points
-		phot.errorbar(lam/1e4, fir_obs_phot, yerr=fir_obs_err,
-	                  color='red', marker='o', label='observed [NOT FIT]', alpha=alpha, linestyle=' ',ms=ms,zorder=0)
-
-		phot.errorbar(lam/1e4, fir_model_phot[:,0], yerr=fir_model_err,
-	                  color=colors[0], 
-				      marker='o', ms=ms, linestyle=' ', alpha=alpha, 
-				      markeredgewidth=0.7,**kwargs)
-
-		chi_hersch = (fir_obs_phot-fir_model_phot[:,0])/fir_obs_err
-		res.plot(lam/1e4, chi_hersch, color='red',
-		         marker='o', linestyle=' ',
-			     ms=ms,alpha=alpha,markeredgewidth=0.7,**kwargs)
-
-		xlim = (xlim[0],750)
-
 	### apply plot limits
 	phot.set_xlim(xlim)
 	res.set_xlim(xlim)
-	phot.set_ylim(yplot[positive_flux].min()*0.4, yplot[positive_flux].max()*10)
+	phot.set_ylim(yplot[positive_flux].min()*0.2, yplot[positive_flux].max()*15)
 
 	# if we have negatives:
 	if positive_flux.sum() != len(obsmags):
@@ -637,7 +609,7 @@ def sed_figure(outname = None, truths = None,
 	add_sfh_plot(extra_output,fig,
 				 main_color = main_color,
                  truths=truths, ax_inset=sfh_ax,
-                 text_size=1.4)
+                 text_size=1)
 
 	#### add RGB image
 	try:
@@ -679,12 +651,12 @@ def sed_figure(outname = None, truths = None,
 	handles, labels = phot.get_legend_handles_labels()
 	by_label = OrderedDict(zip(labels, handles))
 	phot.legend(by_label.values(), by_label.keys(), 
-				loc=1, prop={'size':10},
+				loc=2, prop={'size':8},
 			    scatterpoints=1)
 			    
     # set labels
 	res.set_ylabel( r'$\chi$')
-	phot.set_ylabel(r'$\nu f_{\nu}$')
+	phot.set_ylabel(r'$\nu f_{\nu}$ [erg/s/cm$^2$]')
 	res.set_xlabel(r'$\lambda_{\mathrm{obs}}$ [$\mu$m]')
 	phot.set_yscale('log',nonposx='clip')
 	phot.set_xscale('log',nonposx='clip')
@@ -697,6 +669,7 @@ def sed_figure(outname = None, truths = None,
 	fig.add_subplot(res)
 	
 	# set second x-axis
+	'''
 	y1, y2=phot.get_ylim()
 	x1, x2=phot.get_xlim()
 	ax2=phot.twiny()
@@ -707,7 +680,7 @@ def sed_figure(outname = None, truths = None,
 	ax2.set_xscale('log',nonposx='clip',subsx=(2,5))
 	ax2.xaxis.set_minor_formatter(minorFormatter)
 	ax2.xaxis.set_major_formatter(majorFormatter)
-
+	'''
 	# remove ticks
 	phot.set_xticklabels([])
     

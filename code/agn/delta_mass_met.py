@@ -51,7 +51,7 @@ def collate_data(alldata, alldata_noagn):
 
 	return output
 
-def plot_comparison(runname='brownseds_agn',runname_noagn='brownseds_np',alldata=None,alldata_noagn=None,outfolder=None):
+def plot_comparison(runname='brownseds_agn',runname_noagn='brownseds_np',alldata=None,alldata_noagn=None,outfolder=None,plt_idx=None):
 
 	#### load alldata
 	if alldata is None:
@@ -66,50 +66,86 @@ def plot_comparison(runname='brownseds_agn',runname_noagn='brownseds_np',alldata
 		if not os.path.isdir(outfolder):
 			os.makedirs(outfolder)
 	
+	if plt_idx is None:
+		plt_idx = np.full(129,True,dtype=bool)
+
 	### collate data
 	### choose galaxies with largest 10 F_AGN
 	pdata = collate_data(alldata,alldata_noagn)
 
 	#### MASS-METALLICITY
-	fig,ax = plot_massmet(pdata)
+	fig,ax = plot_massmet(pdata,plt_idx)
 	fig.savefig(outfolder+'delta_massmet.png',dpi=150)
 	plt.close()
+	print 1/0
 
-def plot_massmet(pdata):
+def plot_massmet(pdata,plt_idx):
 
 	fig = plt.figure(figsize=(13, 6))
-	ax = [fig.add_axes([0.07, 0.1, 0.35, 0.8]), fig.add_axes([0.5, 0.1, 0.45, 0.8])]
+	ax = [fig.add_axes([0.085, 0.13, 0.35, 0.74]), fig.add_axes([0.52, 0.13, 0.43, 0.74])]
+	ylim = (-2.1,0.4)
+	xlabel = r'log(M$_*$/M$_{\odot}$)'
+	ylabel = r'log(Z/Z$_{\odot}$)'
 
 	### pull out fagn
-	fagn = np.log10(pdata['agn']['fagn']['q50'])
+	fagn = np.log10(pdata['agn']['fagn']['q50'][plt_idx])
 	ngal = 129
-	ylim = (-2.1,0.3)
+
 
 	### pick out errors
-	err_mass_agn = threed_dutils.asym_errors(pdata['agn']['stellar_mass']['q50'],pdata['agn']['stellar_mass']['q84'], pdata['agn']['stellar_mass']['q16'],log=True)
-	err_mass_noagn = threed_dutils.asym_errors(pdata['no_agn']['stellar_mass']['q50'],pdata['no_agn']['stellar_mass']['q84'], pdata['no_agn']['stellar_mass']['q16'],log=True)
-	err_met_agn = threed_dutils.asym_errors(pdata['agn']['logzsol']['q50'],pdata['agn']['logzsol']['q84'], pdata['agn']['logzsol']['q16'])
-	err_met_noagn = threed_dutils.asym_errors(pdata['no_agn']['logzsol']['q50'],pdata['no_agn']['logzsol']['q84'], pdata['no_agn']['logzsol']['q16'])
-	mass_agn = np.log10(pdata['agn']['stellar_mass']['q50'])
-	mass_noagn = np.log10(pdata['no_agn']['stellar_mass']['q50'])
+	err_mass_agn = threed_dutils.asym_errors(pdata['agn']['stellar_mass']['q50'][plt_idx],pdata['agn']['stellar_mass']['q84'][plt_idx], pdata['agn']['stellar_mass']['q16'][plt_idx],log=True)
+	err_mass_noagn = threed_dutils.asym_errors(pdata['no_agn']['stellar_mass']['q50'][plt_idx],pdata['no_agn']['stellar_mass']['q84'][plt_idx], pdata['no_agn']['stellar_mass']['q16'][plt_idx],log=True)
+	err_met_agn = threed_dutils.asym_errors(pdata['agn']['logzsol']['q50'][plt_idx],pdata['agn']['logzsol']['q84'][plt_idx], pdata['agn']['logzsol']['q16'][plt_idx])
+	err_met_noagn = threed_dutils.asym_errors(pdata['no_agn']['logzsol']['q50'][plt_idx],pdata['no_agn']['logzsol']['q84'][plt_idx], pdata['no_agn']['logzsol']['q16'][plt_idx])
+	mass_agn = np.log10(pdata['agn']['stellar_mass']['q50'][plt_idx])
+	mass_noagn = np.log10(pdata['no_agn']['stellar_mass']['q50'][plt_idx])
 
 	### plots
-	ax[0].errorbar(mass_noagn,pdata['no_agn']['logzsol']['q50'],xerr=err_mass_noagn,yerr=err_met_noagn,fmt='o', ecolor=blue, capthick=1,elinewidth=1,ms=0.0,alpha=0.5,zorder=-5)
-	pts = ax[0].scatter(mass_noagn,pdata['no_agn']['logzsol']['q50'], marker='o', c=fagn, cmap=plt.cm.plasma,s=50,zorder=10)
+	ax[0].errorbar(mass_noagn,pdata['no_agn']['logzsol']['q50'][plt_idx],xerr=err_mass_noagn,yerr=err_met_noagn,fmt='o', ecolor=blue, capthick=1,elinewidth=1,ms=0.0,alpha=0.5,zorder=-5)
+	pts = ax[0].scatter(mass_noagn,pdata['no_agn']['logzsol']['q50'][plt_idx], marker='o', c=fagn, cmap=plt.cm.plasma,s=50,zorder=10)
 
-	ax[0].set_title('No AGN template')
-	ax[0].set_xlabel(r'log(stellar mass)')
-	ax[0].set_ylabel(r'log(metallicity)')
+	ax[0].set_title('AGN off')
+	ax[0].set_xlabel(xlabel)
+	ax[0].set_ylabel(ylabel)
 	ax[0].set_ylim(ylim)
 
-	ax[1].errorbar(mass_agn,pdata['agn']['logzsol']['q50'],xerr=err_mass_agn,yerr=err_met_agn,fmt='o', ecolor=blue, capthick=1,elinewidth=1,ms=0.0,alpha=0.5,zorder=-5)
-	pts = ax[1].scatter(mass_agn,pdata['agn']['logzsol']['q50'], marker='o', c=fagn, cmap=plt.cm.plasma,s=50,zorder=10)
+	ax[1].errorbar(mass_agn,pdata['agn']['logzsol']['q50'][plt_idx],xerr=err_mass_agn,yerr=err_met_agn,fmt='o', ecolor=blue, capthick=1,elinewidth=1,ms=0.0,alpha=0.5,zorder=-5)
+	pts = ax[1].scatter(mass_agn,pdata['agn']['logzsol']['q50'][plt_idx], marker='o', c=fagn, cmap=plt.cm.plasma,s=50,zorder=10)
 
 	ax[1].set_title('AGN on')
-	ax[1].set_xlabel(r'log(stellar mass)')
-	ax[1].set_ylabel(r'log(metallicity)')
+	ax[1].set_xlabel(xlabel)
+	ax[1].set_ylabel(ylabel)
 	ax[1].set_ylim(ylim)
+ 
+	### mass-metallicity from Gallazzi+05
+	massmet = np.loadtxt(os.getenv('APPS')+'/threedhst_bsfh/data/gallazzi_05_massmet.txt')
+	for a in ax:
+		lw = 2.5
+		color = 'green'
+		a.plot(massmet[:,0], massmet[:,1],
+		       color=color,
+		       lw=lw,
+		       linestyle='--',
+		       zorder=-1)
+		a.plot(massmet[:,0],massmet[:,2],
+			   color=color,
+			   lw=lw,
+			   zorder=-1)
+		a.plot(massmet[:,0],massmet[:,3],
+			   color=color,
+			   lw=lw,
+			   zorder=-1)
 
+		'''
+		### mass-metallicity from Kirby+13
+		mstar = np.array([3,9])
+		logzsol_kirby = -1.69 + 0.3*np.log10((10**mstar)/1e6)
+		a.plot(mstar,logzsol_kirby,
+			   lw=lw,
+			   color='orange',
+			   linestyle='--',
+			   zorder=-1)
+		'''
 	### color bar
 	cb = fig.colorbar(pts, ax=ax[1], aspect=10)
 	cb.set_label(r'f$_{\mathrm{MIR}}$')

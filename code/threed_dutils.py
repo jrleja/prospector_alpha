@@ -410,6 +410,10 @@ def calc_balmer_dec(tau1, tau2, ind1, ind2,kriek=False):
 	                charlot_and_fall_extinction(hb_lam,tau1,tau2,ind1,ind2,kriek=kriek)
 	return balm_dec
 
+def exp_decl_sfh_half_time(tage,tau):
+	''' integrate SFR = Ae^(-t/tau)'''
+	return tau*np.log(2./(1+np.exp(-tage/tau)))
+
 def sfh_half_time(x,sfh_params,c):
 
 	'''
@@ -520,10 +524,13 @@ def load_truths(param_file,model=None,sps=None,obs=None, calc_prob = True):
 
 	return truths_dict
 
-def running_median(x,y,nbins=10,avg=False,weights=None):
+def running_median(x,y,nbins=10,avg=False,weights=None,bins=None):
 
-	bins = np.linspace(x.min(),x.max(), nbins+1)
-	delta = bins[1]-bins[0]
+	if bins is None:
+		bins = np.linspace(x.min(),x.max(), nbins+1)
+	else:
+		nbins = len(bins)-1
+		
 	idx  = np.digitize(x,bins,right=True)
 	if avg == False:
 		running_median = np.array([np.median(y[idx-1==k]) for k in range(nbins)])
@@ -533,15 +540,19 @@ def running_median(x,y,nbins=10,avg=False,weights=None):
 			if (idx-1==k).sum() == 0:
 				running_median.append(0.0)
 			else:
-				running_median.append(np.average(y[idx-1==k],weights=weights[idx-1==k]))
+				if weights is None:
+					weight = None
+				else:
+					weight = weights[idx-1==k]
+				running_median.append(np.average(y[idx-1==k],weights=weight))
 		running_median = np.array(running_median)
-	bins = bins[:-1]+delta/2.
+	outbins = (bins[:-1]+bins[1:])/2.
 
 	# remove empty
 	empty = np.isnan(running_median) == 1
 	running_median[empty] = 0
 
-	return bins,running_median
+	return outbins,running_median
 
 def generate_basenames(runname):
 
@@ -762,7 +773,7 @@ def gas_met(nii_ha,oiii_hb):
 	return closest
 	#return (closest+closest_niiha)/2.
 
-def equalize_axes(ax, x,y, dynrange=0.1, line_of_equality=True, log=False, axlims=None):
+def equalize_axes(ax, x,y, dynrange=0.1, line_of_equality=True, axlims=None, log_in_linear=False):
 	
 	''' 
 	sets up an equal x and y range that encompasses all of the data
@@ -771,11 +782,8 @@ def equalize_axes(ax, x,y, dynrange=0.1, line_of_equality=True, log=False, axlim
 	the plot limits are set
 	'''
 
-	if log:
-		dynx, dyny = (np.nanmin(x)*0.5, np.nanmin(y)*0.5) 
-	else:
-		dynx, dyny = (np.nanmax(x)-np.nanmin(x))*dynrange,\
-	                 (np.nanmax(y)-np.nanmin(y))*dynrange
+	dynx, dyny = (np.nanmax(x)-np.nanmin(x))*dynrange,\
+                 (np.nanmax(y)-np.nanmin(y))*dynrange
 	
 	if axlims is None:
 		if np.nanmin(x)-dynx > np.nanmin(y)-dyny:
@@ -789,6 +797,10 @@ def equalize_axes(ax, x,y, dynrange=0.1, line_of_equality=True, log=False, axlim
 	else:
 		min = axlims[0]
 		max = axlims[1]
+
+	if log_in_linear:
+		min = 10**min
+		max = 10**max
 
 	ax.set_xlim(min,max)
 	ax.set_ylim(min,max)
@@ -836,22 +848,6 @@ def create_prosp_filename(filebase):
 	model_filename=filebase+'_'+max(times)+"_model"
 
 	return mcmc_filename,model_filename
-
-def load_prospector_data(filebase,no_sample_results=False,objname=None,runname=None):
-
-	from prospect.io import read_results
-
-	#### shortcut: pass None to filebase and objname + runname keywords
-	if (objname is not None) & (runname is not None):
-		filebase = os.getenv('APPS')+'/threedhst_bsfh/results/'+runname+'/'+runname+'_'+objname
-	mcmc_filename, model_filename = create_prosp_filename(filebase)
-
-	if no_sample_results:
-		model, powell_results = read_results.read_model(model_filename)
-		return powell_results, model
-	else:
-		sample_results, powell_results, model = read_results.read_pickles(mcmc_filename, model_file=model_filename,inmod=None)
-		return sample_results, powell_results, model
 
 def av_to_dust2(av):
 	return av/1.086

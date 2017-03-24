@@ -103,7 +103,6 @@ def plot_comparison(runname='brownseds_agn',runname_noagn='brownseds_np',alldata
 	### collate data
 	### choose galaxies with largest 10 F_AGN
 	pdata = collate_data(alldata,alldata_noagn)
-	colors = ['#9400D3','#FF420E']
 
 	plot_rms(pdata,outfolder)
 

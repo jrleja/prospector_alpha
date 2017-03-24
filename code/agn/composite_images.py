@@ -118,10 +118,11 @@ def collate_spectra(alldata,alldata_noagn,idx_plot,pdata,runname,contours):
 	'''
 
 	filters = ['wise_w1', 'wise_w2']
-	agn_on_colors, agn_off_colors, obs_colors, agn_on_spec, agn_off_spec, lam, spit_flux, spit_lam, ak_flux, ak_lam = [],[],[],[],[],[],[],[],[],[]
+	agn_on_colors, agn_off_colors, obs_colors, agn_on_spec, agn_off_spec, lam, spit_flux, spit_lam, ak_flux, ak_lam, objname = [],[],[],[],[],[],[],[],[],[],[]
 	for ii,idx in enumerate(idx_plot):
 		dat = alldata[idx]
 		dat_noagn = alldata_noagn[idx]
+		objname.append(dat['objname'])
 		
 		f1_idx = dat['filters'] == filters[0]
 		f2_idx = dat['filters'] == filters[1]
@@ -163,66 +164,6 @@ def collate_spectra(alldata,alldata_noagn,idx_plot,pdata,runname,contours):
 			ak_lam.append(np.nan)
 			ak_flux.append(np.nan)
 
-		'''
-		### first, if AGN_off spectrum isn't there...
-		if 'no_agn' not in dat.keys():
-			
-			from prospect.models import model_setup
-			from threed_dutils import generate_basenames
-			
-			#### LOAD OBJECT PARAMETER FILE
-			filebase,parm,ancilname = generate_basenames(runname)
-			idx = np.array([True if dat['objname'] in name else False for name in filebase])
-			pfile = np.array(parm)[idx][0]
-			parmfile = model_setup.import_module_from_file(pfile)
-
-			##### MAKE THE THINGS
-			sps = model_setup.load_sps(param_file=pfile,**parmfile.run_params)
-			model = model_setup.load_model(param_file=pfile,**parmfile.run_params)
-			obs = model_setup.load_obs(param_file=pfile,**parmfile.run_params)
-
-			#### USE BESTFIT, TURN AGN STUFF OFF
-			theta = dat['bfit']['maxprob_params']
-			theta[dat['pquantiles']['parnames'] == 'fagn'] = 0.0
-			spec_noagn,mags_noagn,sm = model.mean_model(theta, obs, sps=sps)
-
-			dat['no_agn'] = {}
-			dat['no_agn']['spec'] = spec_noagn
-			dat['no_agn']['mags'] = mags_noagn
-			dat['no_agn']['wave'] = sps.wavelengths
-			dat['no_agn']['phot_mask'] = obs['phot_mask']
-
-		### maggies
-		mags, mags_noagn, mags_obs = [], [], []
-		for f in filters:
-			match = dat['filters'] == f
-
-			if match.sum() == 0:
-				noagn = np.nan
-				agn = np.nan
-				obs = np.nan
-			else:
-				noagn = dat['no_agn']['mags'][dat['no_agn']['phot_mask']][match][0]
-				agn = dat['bfit']['mags'][dat['no_agn']['phot_mask']][match][0]
-				obs = dat['obs_maggies'][match][0]
-
-			mags.append(agn)
-			mags_noagn.append(noagn)
-			mags_obs.append(obs)
-
-		agn_on_mag.append(mags)
-		agn_off_mag.append(mags_noagn)
-		obs_mag.append(mags_obs)
-
-		### spectra
-		agn_on_spec.append(dat['bfit']['spec'])
-		agn_off_spec.append(dat['no_agn']['spec'])
-	### if we generated spectra, save alldata
-	if sps is not None:
-		import brown_io
-		brown_io.save_alldata(alldata,runname=runname)
-		'''
-
 	out = {}
 	out['agn_on_mag'] = agn_on_colors
 	out['agn_off_mag'] = agn_off_colors
@@ -235,6 +176,7 @@ def collate_spectra(alldata,alldata_noagn,idx_plot,pdata,runname,contours):
 	out['spit_flux'] = spit_flux
 	out['ak_lam'] = ak_lam
 	out['ak_flux'] = ak_flux
+	out['objname'] = objname
 	pdata['observables'] = out
 	return pdata
 

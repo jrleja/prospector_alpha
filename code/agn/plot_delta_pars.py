@@ -6,6 +6,7 @@ from corner import quantile
 import os
 from threed_dutils import asym_errors, running_median
 from matplotlib.ticker import MaxNLocator
+from astropy.cosmology import WMAP9
 
 dpi = 150
 red = '#FF3D0D'
@@ -17,34 +18,28 @@ def collate_data(alldata,alldata_noagn):
 	size = 10000
 
 	### normal parameter labels
-	parnames = alldata_noagn[0]['pquantiles']['parnames']
+	parnames = alldata_noagn[0]['pquantiles']['parnames'].tolist()
 	parlabels = [r'log(M$_{\mathrm{form}}$/M$_{\odot}$)', 'SFH 0-100 Myr', 'SFH 100-300 Myr', 'SFH 300 Myr-1 Gyr', 
 	         'SFH 1-3 Gyr', 'SFH 3-6 Gyr', 'diffuse dust', r'log(Z/Z$_{\odot}$)', 'diffuse dust index',
 	         'birth-cloud dust', r'dust emission Q$_{\mathrm{PAH}}$',r'dust emission $\gamma$',r'dust emission U$_{\mathrm{min}}$']
 
 	### extra parameters
 	eparnames_all = alldata[0]['pextras']['parnames']
-	eparnames = ['sfr_100', 'ssfr_100', 'half_time']
-	eparlabels = ['log(SFR) [100 Myr]','log(sSFR) [100 Myr]', r"log(t$_{\mathrm{half-mass}})$ [Gyr]"]
+	eparnames = ['stellar_mass','sfr_100', 'ssfr_100', 'half_time']
+	eparlabels = [r'log(M$_{\mathrm{*}}$/M$_{\odot}$)','log(SFR) [100 Myr]','log(sSFR) [100 Myr]', r"log(t$_{\mathrm{half-mass}})$ [Gyr]"]
+
+	### let's do something special here
+	fparnames = ['halpha','m23_frac']
+	fparlabels = [r'log(H$_{\alpha}$ flux)',r'M$_*$(0.1-1 Gyr)/M$_*$']
 
 	### setup dictionary
 	outvals, outq, outerrs, outlabels = {},{},{},{}
-	for ii,par in enumerate(parnames): 
+	alllabels = parlabels + eparlabels + fparlabels
+	for ii,par in enumerate(parnames+eparnames+fparnames): 
 		outvals[par] = []
 		outq[par] = {}
 		outq[par]['q50'],outq[par]['q84'],outq[par]['q16'] = [],[],[]
-		outlabels[par] = parlabels[ii]
-	for ii,par in enumerate(eparnames):
-		outvals[par] = []
-		outq[par] = {}
-		outq[par]['q50'],outq[par]['q84'],outq[par]['q16'] = [],[],[]
-		outlabels[par] = eparlabels[ii]
-	
-	par = 'halpha'
-	outvals[par] = []
-	outq[par] = {}
-	outq[par]['q50'],outq[par]['q84'],outq[par]['q16'] = [],[],[]
-	outlabels[par] = r'log(H$_{\alpha}$ flux)'
+		outlabels[par] = alllabels[ii]
 
 	### fill with data
 	for dat,datnoagn in zip(alldata,alldata_noagn):
@@ -76,6 +71,35 @@ def collate_data(alldata,alldata_noagn):
 			outq[par][q].append(quantile(ratio, [quant])[0])
 		outvals[par].append(outq[par]['q50'][-1])
 
+		### this is super ugly but it works
+		# calculate tuniv, create agelim array
+		par = 'm23_frac'
+		sfrfrac_idx = np.array(['sfr_fraction' in p for p in parnames],dtype=bool)
+		tuniv = WMAP9.age(dat['residuals']['phot']['z']).value
+		agelims = [0.0,8.0,8.5,9.0,9.5,9.8,10.0]
+		agelims[-1] = np.log10(tuniv*1e9)
+		time_per_bin = []
+		for i in xrange(len(agelims)-1): time_per_bin.append(10**agelims[i+1]-10**agelims[i])
+
+		# now calculate fractions for each of them
+		sfrfrac = dat['pquantiles']['sample_chain'][:,sfrfrac_idx]
+		full = np.concatenate((sfrfrac,(1-sfrfrac.sum(axis=1))[:,None]),axis=1)
+		mass_fraction = full*np.array(time_per_bin)
+		mass_fraction /= mass_fraction.sum(axis=1)[:,None]
+		m23_agn = mass_fraction[:,1:3].sum(axis=1)
+
+		sfrfrac = datnoagn['pquantiles']['sample_chain'][:,sfrfrac_idx]
+		full = np.concatenate((sfrfrac,(1-sfrfrac.sum(axis=1))[:,None]),axis=1)
+		mass_fraction = full*np.array(time_per_bin)
+		mass_fraction /= mass_fraction.sum(axis=1)[:,None]
+		m23_noagn = mass_fraction[:,1:3].sum(axis=1)
+
+		ratio = np.random.choice(m23_agn,size=size) - np.random.choice(m23_noagn,size=size)
+		for q in outq[par].keys(): 
+			quant = float(q[1:])/100
+			outq[par][q].append(quantile(ratio, [quant])[0])
+		outvals[par].append(outq[par]['q50'][-1])
+
 	### do the errors
 	for par in outlabels.keys():
 		outerrs[par] = asym_errors(np.array(outq[par]['q50']), 
@@ -97,11 +121,11 @@ def collate_data(alldata,alldata_noagn):
 	out['median'] = outvals
 	out['errs'] = outerrs
 	out['labels'] = outlabels
-	out['ordered_labels'] = np.concatenate((parnames,eparnames,np.array(['halpha'])))
+	out['ordered_labels'] = np.concatenate((eparnames,np.array(parnames),np.array(fparnames)))
 	out['agn_pars'] = agn_pars
 	return out
 
-def plot(runname='brownseds_agn',runname_noagn='brownseds_np',alldata=None,alldata_noagn=None,outfolder=None):
+def plot(runname='brownseds_agn',runname_noagn='brownseds_np',alldata=None,alldata_noagn=None,outfolder=None,**popts):
 
 	#### load alldata
 	if alldata is None:
@@ -148,7 +172,7 @@ def plot_dpars(pdata,xpar=None,xparlabel=None,log_xpar=False):
 	        'fmt': 'o'
 	       }
 
-	toplot = ['logmass','logzsol','dust2','ssfr_100','half_time']
+	toplot = ['stellar_mass','logzsol','dust2','ssfr_100','half_time','m23_frac']
 
 	idx = 0
 	for ii, par in enumerate(pdata['ordered_labels']):
@@ -158,7 +182,7 @@ def plot_dpars(pdata,xpar=None,xparlabel=None,log_xpar=False):
 
 		errs = pdata['errs'][par]
 		ax[idx].errorbar(xpar_plot,pdata['median'][par], yerr=errs, zorder=-3, **opts)
-		ax[idx].set_ylabel('AGN--no AGN')
+		ax[idx].set_ylabel('AGN(on)-AGN(off)')
 		ax[idx].set_xlabel(xparlabel)
 		ax[idx].set_title(pdata['labels'][par])
 

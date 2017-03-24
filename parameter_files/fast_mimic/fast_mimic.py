@@ -200,7 +200,7 @@ model_params.append({'name': 'tage', 'N': 1,
                         'init': 1.0,
                         'units': 'Gyr',
                         'prior_function': tophat,
-                        'prior_args': {'mini':0.10001, 'maxi':14.0}})
+                        'prior_args': {'mini':0.01, 'maxi':14.0}})
 
 model_params.append({'name': 'tburst', 'N': 1,
                         'isfree': False,
