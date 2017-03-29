@@ -15,7 +15,7 @@ APPS = os.getenv('APPS')
 
 run_params = {'verbose':True,
               'debug': False,
-              'outfile': os.getenv('APPS')+'/threedhst_bsfh/results/td_massive/td_massive',
+              'outfile': os.getenv('APPS')+'/threedhst_bsfh/results/fast_mimic/fast_mimic',
               'nofork': True,
               # Optimizer params
               'ftol':0.5e-5, 
