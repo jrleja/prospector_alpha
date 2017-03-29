@@ -51,7 +51,7 @@ def collate_data(alldata, alldata_noagn):
 
 	return output
 
-def plot_comparison(runname='brownseds_agn',runname_noagn='brownseds_np',alldata=None,alldata_noagn=None,outfolder=None,plt_idx=None):
+def plot_comparison(runname='brownseds_agn',runname_noagn='brownseds_np',alldata=None,alldata_noagn=None,outfolder=None,plt_idx=None,**popts):
 
 	#### load alldata
 	if alldata is None:
@@ -74,12 +74,16 @@ def plot_comparison(runname='brownseds_agn',runname_noagn='brownseds_np',alldata
 	pdata = collate_data(alldata,alldata_noagn)
 
 	#### MASS-METALLICITY
-	fig,ax = plot_massmet(pdata,plt_idx)
+	fig,ax = plot_massmet(pdata,plt_idx,**popts)
 	fig.savefig(outfolder+'delta_massmet.png',dpi=150)
 	plt.close()
 	print 1/0
 
-def plot_massmet(pdata,plt_idx):
+def drawArrow(A, B, ax):
+    ax.arrow(A[0], A[1], B[0] - A[0], B[1] - A[1],
+              head_width=0.05, width=0.01,length_includes_head=True,color='grey',alpha=0.6)
+
+def plot_massmet(pdata,plt_idx,**popts):
 
 	fig = plt.figure(figsize=(13, 6))
 	ax = [fig.add_axes([0.085, 0.13, 0.35, 0.74]), fig.add_axes([0.52, 0.13, 0.43, 0.74])]
@@ -101,6 +105,60 @@ def plot_massmet(pdata,plt_idx):
 	mass_noagn = np.log10(pdata['no_agn']['stellar_mass']['q50'][plt_idx])
 
 	### plots
+	alpha = 0.7
+	pts = ax[0].scatter(mass_noagn,pdata['no_agn']['logzsol']['q50'][plt_idx], marker='o', color=popts['noagn_color'],s=50,zorder=10,alpha=alpha)
+	pts = ax[0].scatter(mass_agn,pdata['agn']['logzsol']['q50'][plt_idx], marker='o', color=popts['agn_color'],s=50,zorder=10,alpha=alpha)
+
+	for ii in xrange(len(plt_idx)):
+		old = (mass_noagn[ii],pdata['no_agn']['logzsol']['q50'][plt_idx[ii]])
+		new = (mass_agn[ii],pdata['agn']['logzsol']['q50'][plt_idx[ii]])
+		drawArrow(old,new,ax[0])
+
+	massmet = np.loadtxt(os.getenv('APPS')+'/threedhst_bsfh/data/gallazzi_05_massmet.txt')
+	lw = 2.5
+	color = 'green'
+	ax[0].plot(massmet[:,0], massmet[:,1],
+	       color=color,
+	       lw=lw,
+	       linestyle='--',
+	       zorder=-1)
+	ax[0].plot(massmet[:,0],massmet[:,2],
+		   color=color,
+		   lw=lw,
+		   zorder=-1)
+	ax[0].plot(massmet[:,0],massmet[:,3],
+		   color=color,
+		   lw=lw,
+		   zorder=-1)
+	ax[0].set_xlabel(xlabel)
+	ax[0].set_ylabel(ylabel)
+	ax[0].set_ylim(ylim)
+
+	### new plot
+	median_z_noagn = np.interp(mass_noagn, massmet[:,0], massmet[:,1])
+	lower_z_noagn = np.interp(mass_noagn, massmet[:,0], massmet[:,2])
+	upper_z_noagn = np.interp(mass_noagn, massmet[:,0], massmet[:,3])
+	median_z_agn = np.interp(mass_agn, massmet[:,0], massmet[:,1])
+	lower_z_agn = np.interp(mass_agn, massmet[:,0], massmet[:,2])
+	upper_z_agn = np.interp(mass_agn, massmet[:,0], massmet[:,3])
+	
+	deviation_noagn = pdata['no_agn']['logzsol']['q50'][plt_idx] - median_z_noagn 
+	up = deviation_noagn > 0
+	deviation_noagn[up] /= (upper_z_noagn[up]-median_z_noagn[up])
+	deviation_noagn[~up] /= (median_z_noagn[~up]-lower_z_noagn[~up])
+	
+	deviation_agn = pdata['agn']['logzsol']['q50'][plt_idx] - median_z_agn 
+	up = deviation_agn > 0
+	deviation_agn[up] /= (upper_z_agn[up]-median_z_agn[up])
+	deviation_agn[~up] /= (median_z_agn[~up]-lower_z_agn[~up])
+
+	ax[1].scatter(mass_noagn,deviation_noagn, marker='o', color=popts['noagn_color'],s=50,zorder=10,alpha=alpha)
+	ax[1].scatter(mass_agn,deviation_agn, marker='o', color=popts['agn_color'],s=50,zorder=10,alpha=alpha)
+
+	plt.show()
+	print 1/0
+
+	'''
 	ax[0].errorbar(mass_noagn,pdata['no_agn']['logzsol']['q50'][plt_idx],xerr=err_mass_noagn,yerr=err_met_noagn,fmt='o', ecolor=blue, capthick=1,elinewidth=1,ms=0.0,alpha=0.5,zorder=-5)
 	pts = ax[0].scatter(mass_noagn,pdata['no_agn']['logzsol']['q50'][plt_idx], marker='o', c=fagn, cmap=plt.cm.plasma,s=50,zorder=10)
 
@@ -116,7 +174,8 @@ def plot_massmet(pdata,plt_idx):
 	ax[1].set_xlabel(xlabel)
 	ax[1].set_ylabel(ylabel)
 	ax[1].set_ylim(ylim)
- 
+ 	'''
+
 	### mass-metallicity from Gallazzi+05
 	massmet = np.loadtxt(os.getenv('APPS')+'/threedhst_bsfh/data/gallazzi_05_massmet.txt')
 	for a in ax:

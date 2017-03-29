@@ -53,7 +53,7 @@ def plot(runname='brownseds_agn',runname_noagn='brownseds_np',
 	plot_delta_pars.plot(runname=runname,runname_noagn=runname_noagn,alldata=alldata_sub,alldata_noagn=alldata_noagn,outfolder=outfolder,**popts)
 	'''
 	print 'PLOTTING MASS-METALLICITY DIAGRAM'
-	delta_mass_met.plot_comparison(runname=runname,alldata=alldata_sub,alldata_noagn=alldata_noagn,outfolder=outfolder,plt_idx=agn_idx)
+	delta_mass_met.plot_comparison(runname=runname,alldata=alldata_sub,alldata_noagn=alldata_noagn,outfolder=outfolder,plt_idx=agn_idx,**popts)
 	print 1/0
 	print 'PLOTTING WISE COLORS'
 	wise_colors.plot_mir_colors(runname=runname,alldata=alldata_sub,outfolder=outfolder)

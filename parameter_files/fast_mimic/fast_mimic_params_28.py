@@ -21,9 +21,9 @@ run_params = {'verbose':True,
               'ftol':0.5e-5, 
               'maxfev':5000,
               # MCMC params
-              'nwalkers':620,
-              'nburn':[150,200,400,600], 
-              'niter': 2500,
+              'nwalkers':310,
+              'nburn':[100,150], 
+              'niter': 800,
               'interval': 0.2,
               # Model info
               'zcontinuous': 2,
@@ -32,17 +32,16 @@ run_params = {'verbose':True,
               'interp_type': 'logarithmic',
               'agelims': [0.0,8.0,8.5,9.0,9.5,9.8,10.0],
               # Data info
-              'photname':APPS+'/threedhst_bsfh/data/COSMOS_td_massive.cat',
-              'datname':APPS+'/threedhst_bsfh/data/COSMOS_td_massive.dat',
-              'fastname':APPS+'/threedhst_bsfh/data/COSMOS_td_massive.fout',
-              'objname':'579',
+              'photname':APPS+'/threedhst_bsfh/data/3dhst/COSMOS_td_massive.cat',
+              'datname':APPS+'/threedhst_bsfh/data/3dhst/COSMOS_td_massive.dat',
+              'fastname':APPS+'/threedhst_bsfh/data/3dhst/COSMOS_td_massive.fout',
+              'objname':'9667',
               }
 run_params['outfile'] = run_params['outfile']+'_'+run_params['objname']
 
 ############
 # OBS
 #############
-
 def load_obs(photname, objname, err_floor=0.05, zperr=True, **extras):
 
     ''' 
