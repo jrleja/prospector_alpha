@@ -200,8 +200,8 @@ def calc_extra_quantities(sample_results, ncalc=3000, **kwargs):
 	##### modify nebular status to ensure emission line production
 	# don't cache, and turn on
 	if sample_results['model'].params['add_neb_emission'] == 2:
-		sample_results['model'].params['add_neb_emission'] = np.array(True)
-	sample_results['model'].params['nebemlineinspec'] = True
+		sample_results['model'].params['add_neb_emission'] = np.array([True])
+	sample_results['model'].params['nebemlineinspec'] = np.array([True])
 
 	######## posterior sampling #########
 	for jj,idx in enumerate(sample_idx):

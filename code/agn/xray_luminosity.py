@@ -6,6 +6,7 @@ import os
 from astropy.cosmology import WMAP9
 import magphys_plot_pref
 from corner import quantile
+from matplotlib.ticker import MaxNLocator
 
 dpi = 150
 
@@ -179,7 +180,7 @@ def collate_data(alldata, **extras):
 
 	return out
 
-def make_plot(runname='brownseds_agn',alldata=None,outfolder=None,maxradius=30,idx=None,**popts):
+def make_plot(runname='brownseds_agn',alldata=None,outfolder=None,maxradius=30,idx=Ellipsis,**popts):
 
 	#### load alldata
 	if alldata is None:
@@ -220,19 +221,19 @@ def make_plot(runname='brownseds_agn',alldata=None,outfolder=None,maxradius=30,i
 	plt.close()
 
 	### SFR, sSFR, dust2, LUV/LIR versus FAGN
-	fig,ax = plot_model_corrs(pdata)
+	fig,ax = plot_model_corrs(pdata,idx=idx,**popts)
 	plt.tight_layout()
 	plt.savefig(outfolder+'fagn_versus_galaxy_properties.png',dpi=dpi)
 	plt.close()
 
-def plot_model_corrs(pdata,color_by=None,**popts):
+def plot_model_corrs(pdata,color_by=None,idx=None,**popts):
 
 	'''
-	color-by comparison, for dust and LIR / LUV
-	add in different looks (alpha + symbol?) for idx_on and idx_off
+	add color bar for dust2, to the right
+	change third plot to LMIR / LBOL (in observables; may have to add this to magphys_plots)
 	'''
 
-	fig, ax = plt.subplots(3,2, figsize=(10, 15))
+	fig, ax = plt.subplots(2,2, figsize=(10, 10))
 	ax = np.ravel(ax)
 
 	#### fagn labeling
@@ -243,31 +244,41 @@ def plot_model_corrs(pdata,color_by=None,**popts):
 		                              pdata['fagn_down'],log=True)
 
 	#### y-axis
-	ypar = ['sfr','ssfr','d2', 'fmir']
-	ylabels = [r'log(SFR) [M$_{\odot}$/yr]', r'log(sSFR) [yr$^{-1}$]', 'diffuse dust optical depth',\
-	           r'log(f$_{\mathrm{MIR}}$)']
+	ypar = ['sfr','ssfr','fmir']
+	ylabels = [r'log(SFR) [M$_{\odot}$/yr]', r'log(sSFR) [yr$^{-1}$]',r'log(L$_{\mathrm{MIR}}$/L$_{\mathrm{bol}}$)']
+	cb = np.log10(1/pdata['luv_lir'])
+	cb = pdata['d2']
 	for ii, yp in enumerate(ypar):
 
-		if 'd2' not in yp:
-			log = True
-			y = np.log10(pdata[yp])
-		else:
-			log = False
-			y = pdata[yp]
+		log = True
+		y = np.log10(pdata[yp])
+
+		# find the complement
+		cidx = np.ones_like(y,dtype=bool)
+		cidx[idx] = False
 
 		yerr =  threed_dutils.asym_errors(pdata[yp], 
 			                              pdata[yp+'_up'],
 			                              pdata[yp+'_down'],log=log)
 		ax[ii].errorbar(x,y,yerr=yerr, xerr=xerr, ms=0.0,zorder=-2,**plotopts)
-		ax[ii].plot(x,y, 'o',alpha=0.9,color = '#1C86EE')
+		#ax[ii].plot(x,y, 'o',alpha=0.9,color = '#1C86EE')
+		#ax[ii].plot(x[idx],y[idx], marker=popts['fmir_shape'],linestyle=' ',alpha=popts['fmir_alpha'],color = '#1C86EE')
+		#ax[ii].plot(x[cidx],y[cidx], marker=popts['nofmir_shape'],linestyle=' ',alpha=popts['nofmir_alpha'],color = '#1C86EE')
+
+		ax[ii].scatter(x[cidx],y[cidx], marker=popts['nofmir_shape'],alpha=popts['nofmir_alpha'],c=cb[cidx], cmap=popts['cmap'],s=56,zorder=10)
+		ax[ii].scatter(x[idx],y[idx], marker=popts['fmir_shape'],alpha=popts['fmir_alpha'],c=cb[idx], cmap=popts['cmap'],s=56,zorder=10)
+
 		ax[ii].set_xlabel(xlabel)
 		ax[ii].set_ylabel(ylabels[ii])
+		ax[ii].xaxis.set_major_locator(MaxNLocator(5))
 
 	#### luv / lir (no errors!)
-	y = 1/pdata['luv_lir']
-	ax[-1].errorbar(x, np.log10(y), xerr=xerr, ms=0.0, zorder=-2, **plotopts)
-	ax[-1].plot(x,np.log10(y), 'o',alpha=0.9,color = '#1C86EE')
+	y = np.log10(1/pdata['luv_lir'])
+	ax[-1].errorbar(x, y, xerr=xerr, ms=0.0, zorder=-2, **plotopts)
+	ax[-1].scatter(x[cidx],y[cidx], marker=popts['nofmir_shape'],alpha=popts['nofmir_alpha'],c=cb[cidx], cmap=popts['cmap'],s=56,zorder=10)
+	ax[-1].scatter(x[idx],y[idx], marker=popts['fmir_shape'],alpha=popts['fmir_alpha'],c=cb[idx], cmap=popts['cmap'],s=56,zorder=10)
 	ax[-1].set_xlabel(xlabel)
+	ax[-1].xaxis.set_major_locator(MaxNLocator(5))
 	ax[-1].set_ylabel(r'log(L$_{\mathrm{IR}}$/L$_{\mathrm{UV}}$)')
 
 	return fig, ax
