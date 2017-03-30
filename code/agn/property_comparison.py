@@ -327,8 +327,8 @@ def sedfig(sedax,pdata,**popts):
 		### write down Vega colors
 		fs = 10
 		xs, ys, dely = 0.98, 0.03, 0.05
-		sedax[ii].text(xs,ys,'W1-W2(AGN ON)='+'{:.2f}'.format(pdata['observables']['agn_on_mag'][idx]),transform=sedax[ii].transAxes,color=popts['agn_color'],ha='right',fontsize=fs)
-		sedax[ii].text(xs,ys+dely,'W1-W2(AGN OFF)='+'{:.2f}'.format(pdata['observables']['agn_off_mag'][idx]),transform=sedax[ii].transAxes,color=popts['noagn_color'],ha='right',fontsize=fs)
+		sedax[ii].text(xs,ys,'W1-W2(AGN on)='+'{:.2f}'.format(pdata['observables']['agn_on_mag'][idx]),transform=sedax[ii].transAxes,color=popts['agn_color'],ha='right',fontsize=fs)
+		sedax[ii].text(xs,ys+dely,'W1-W2(AGN off)='+'{:.2f}'.format(pdata['observables']['agn_off_mag'][idx]),transform=sedax[ii].transAxes,color=popts['noagn_color'],ha='right',fontsize=fs)
 		sedax[ii].text(xs,ys+2*dely,'W1-W2(OBS)='+'{:.2f}'.format(pdata['observables']['obs_mag'][idx]),transform=sedax[ii].transAxes,color='black',ha='right',fontsize=fs)
 		sedax[ii].text(0.03,0.9,pdata['observables']['objname'][idx],transform=sedax[ii].transAxes,color='black',ha='left',fontsize=fs+4)
 

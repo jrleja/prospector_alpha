@@ -453,19 +453,21 @@ def load_xray_cat(xmatch = True,maxradius=30):
 			if idx_cxo.sum() > 0:
 				### take brightest
 				idx = cxo['flux'][idx_cxo].argmax()
-				flux.append(cxo['flux'][idx_cxo][idx])
-				flux_err.append(cxo['flux'][idx_cxo][idx] * (cxo['counts_error'][idx_cxo][idx]/cxo['counts'][idx_cxo][idx]))
+				fac = correct_for_window('CXOXASSIST', targlow = 0.5, targhigh = 8)
+				flux.append(cxo['flux'][idx_cxo][idx]*fac)
+				flux_err.append(fac*cxo['flux'][idx_cxo][idx] * (cxo['counts_error'][idx_cxo][idx]/cxo['counts'][idx_cxo][idx]))
 				database.append('CXO')
 			elif idx_csc.sum() > 0:
 				### take brightest
 				idx = csc['fb_flux_ap'][idx_csc].argmax()
-				fac = correct_for_window('CSC', targlow = 0.3, targhigh = 8)
+				fac = correct_for_window('CSC', targlow = 0.5, targhigh = 8)
 				flux.append(csc['fb_flux_ap'][idx_csc][idx]*fac)
 				flux_err.append((csc['fb_flux_ap_upper'][idx_csc][idx]-csc['fb_flux_ap_lower'][idx_csc][idx])/2.*fac)
 				database.append('CSC')
 			elif idx_chng.sum() > 0:
 				idx = chng['flux'][idx_chng].argmax()
-				flux.append(chng['flux'][idx_chng][idx])
+				fac = correct_for_window('CHNGPSCLIU', targlow = 0.5, targhigh = 8)
+				flux.append(chng['flux'][idx_chng][idx]*fac)
 				flux_err.append(0.0)
 				database.append('CHNG')
 			### if no detections, give it a dummy number

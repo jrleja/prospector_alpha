@@ -59,6 +59,13 @@ def collate_data(runname, filename=None, regenerate=False):
 				pidx = prosp['extras']['parnames'] == par
 				loc = 'extras'
 			for q in ['q16','q50','q84']:
+
+				# if we don't have that variable in the Prospector file,
+				# zero it out
+				if np.sum(pidx) == 0:
+					outprosp[par][q].append(0.0)
+					continue
+
 				x = prosp[loc][q][pidx][0]
 				if par == 'stellar_mass' or par == 'ssfr_100':
 					x = np.log10(x)

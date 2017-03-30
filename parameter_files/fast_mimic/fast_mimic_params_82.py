@@ -382,6 +382,7 @@ def load_model(objname='',datname='',fastname='', agelims=[], **extras):
 
     #### CALCULATE TUNIV #####
     tuniv = WMAP9.age(zred).value
+    model_params[n.index('tage')]['prior_args']['maxi'] = tuniv
 
     #### INSERT REDSHIFT INTO MODEL PARAMETER DICTIONARY ####
     zind = n.index('zred')

@@ -77,7 +77,6 @@ def plot_comparison(runname='brownseds_agn',runname_noagn='brownseds_np',alldata
 	fig,ax = plot_massmet(pdata,plt_idx,**popts)
 	fig.savefig(outfolder+'delta_massmet.png',dpi=150)
 	plt.close()
-	print 1/0
 
 def drawArrow(A, B, ax):
     ax.arrow(A[0], A[1], B[0] - A[0], B[1] - A[1],
@@ -133,6 +132,7 @@ def plot_massmet(pdata,plt_idx,**popts):
 	ax[0].set_xlabel(xlabel)
 	ax[0].set_ylabel(ylabel)
 	ax[0].set_ylim(ylim)
+	ax[0].text(0.98,0.065,'SDSS\n(Gallazzi 2005)',transform=ax[0].transAxes,fontsize=20,color=color,ha='right')
 
 	### new plot
 	median_z_noagn = np.interp(mass_noagn, massmet[:,0], massmet[:,1])
@@ -155,60 +155,14 @@ def plot_massmet(pdata,plt_idx,**popts):
 	ax[1].scatter(mass_noagn,deviation_noagn, marker='o', color=popts['noagn_color'],s=50,zorder=10,alpha=alpha)
 	ax[1].scatter(mass_agn,deviation_agn, marker='o', color=popts['agn_color'],s=50,zorder=10,alpha=alpha)
 
-	plt.show()
-	print 1/0
+	max = np.max(np.abs(ax[1].get_ylim()))
+	ax[1].set_ylim(-max,max)
+	ax[1].axhline(0, linestyle='--', color='0.2',lw=2,zorder=-1)
 
-	'''
-	ax[0].errorbar(mass_noagn,pdata['no_agn']['logzsol']['q50'][plt_idx],xerr=err_mass_noagn,yerr=err_met_noagn,fmt='o', ecolor=blue, capthick=1,elinewidth=1,ms=0.0,alpha=0.5,zorder=-5)
-	pts = ax[0].scatter(mass_noagn,pdata['no_agn']['logzsol']['q50'][plt_idx], marker='o', c=fagn, cmap=plt.cm.plasma,s=50,zorder=10)
+	ax[1].text(0.05,0.90,'AGN-off mean offset: '+"{:.2f}".format(deviation_noagn.mean())+r"$\sigma$",transform=ax[1].transAxes,fontsize=20,color=popts['noagn_color'])
+	ax[1].text(0.05,0.83,'AGN-on mean offset: '+"{:.2f}".format(deviation_agn.mean())+r"$\sigma$",transform=ax[1].transAxes,fontsize=20,color=popts['agn_color'])
 
-	ax[0].set_title('AGN off')
-	ax[0].set_xlabel(xlabel)
-	ax[0].set_ylabel(ylabel)
-	ax[0].set_ylim(ylim)
-
-	ax[1].errorbar(mass_agn,pdata['agn']['logzsol']['q50'][plt_idx],xerr=err_mass_agn,yerr=err_met_agn,fmt='o', ecolor=blue, capthick=1,elinewidth=1,ms=0.0,alpha=0.5,zorder=-5)
-	pts = ax[1].scatter(mass_agn,pdata['agn']['logzsol']['q50'][plt_idx], marker='o', c=fagn, cmap=plt.cm.plasma,s=50,zorder=10)
-
-	ax[1].set_title('AGN on')
 	ax[1].set_xlabel(xlabel)
-	ax[1].set_ylabel(ylabel)
-	ax[1].set_ylim(ylim)
- 	'''
-
-	### mass-metallicity from Gallazzi+05
-	massmet = np.loadtxt(os.getenv('APPS')+'/threedhst_bsfh/data/gallazzi_05_massmet.txt')
-	for a in ax:
-		lw = 2.5
-		color = 'green'
-		a.plot(massmet[:,0], massmet[:,1],
-		       color=color,
-		       lw=lw,
-		       linestyle='--',
-		       zorder=-1)
-		a.plot(massmet[:,0],massmet[:,2],
-			   color=color,
-			   lw=lw,
-			   zorder=-1)
-		a.plot(massmet[:,0],massmet[:,3],
-			   color=color,
-			   lw=lw,
-			   zorder=-1)
-
-		'''
-		### mass-metallicity from Kirby+13
-		mstar = np.array([3,9])
-		logzsol_kirby = -1.69 + 0.3*np.log10((10**mstar)/1e6)
-		a.plot(mstar,logzsol_kirby,
-			   lw=lw,
-			   color='orange',
-			   linestyle='--',
-			   zorder=-1)
-		'''
-	### color bar
-	cb = fig.colorbar(pts, ax=ax[1], aspect=10)
-	cb.set_label(r'f$_{\mathrm{MIR}}$')
-	cb.solids.set_rasterized(True)
-	cb.solids.set_edgecolor("face")
+	ax[1].set_ylabel(r'log(Z$_{\mathrm{prosp}}$/Z$_{\mathrm{SDSS}}$)/$\sigma_{\mathrm{Z,SDSS}}$')
 
 	return fig,ax

@@ -141,7 +141,7 @@ def set_sfh_time_vector(sample_results,ncalc):
 		print 1/0
 	return t
 
-def calc_extra_quantities(sample_results, ncalc=3000, ir_priors=True, opts=None):
+def calc_extra_quantities(sample_results, ncalc=3000, **kwargs):
 
 	'''' 
 	CALCULATED QUANTITIES
@@ -149,16 +149,16 @@ def calc_extra_quantities(sample_results, ncalc=3000, ir_priors=True, opts=None)
 	model star formation history parameters (ssfr,sfr,half-mass time)
 	'''
 
-	'''
-	speedup is measured in runtime, where runtime = ncalc * model_call
-	'''
-
-	if opts is None:
-		opts = {
-		        'measure_restframe_optical_phot': False, # cost = 1 runtime
-		        'measure_spectral_features': False, # cost = 2 runtimes
-		        'mags_nodust': False # cost = 1 runtime
-		        }
+	# different options for what to calculate
+	# speedup is measured in runtime, where runtime = ncalc * model_call
+	opts = {
+	        'measure_restframe_optical_phot': False, # cost = 1 runtime
+	        'ir_priors': True, # no cost
+	        'measure_spectral_features': True, # cost = 2 runtimes
+	        'mags_nodust': True # cost = 1 runtime
+	        }
+	if kwargs:
+		for key in kwargs.keys(): opts[key] = kwargs[key]
 
 	parnames = np.array(sample_results['model'].theta_labels())
 
@@ -167,7 +167,7 @@ def calc_extra_quantities(sample_results, ncalc=3000, ir_priors=True, opts=None)
 
 	##### array indexes over which to sample the flatchain
 	sample_idx = sample_flatchain(sample_results['flatchain'], sample_results['flatprob'], 
-		                          parnames, ir_priors=ir_priors, include_maxlnprob=True, nsamp=ncalc)
+		                          parnames, ir_priors=opts['ir_priors'], include_maxlnprob=True, nsamp=ncalc)
 
     ##### initialize output arrays for SFH + emission line posterior draws
 	half_time,sfr_10,sfr_100,ssfr_100,stellar_mass,emp_ha,lir,luv, \
@@ -443,7 +443,7 @@ def update_all(runname, **kwargs):
 	for param in parm_basename:
 		post_processing(param, **kwargs)
 
-def post_processing(param_name, **extras):
+def post_processing(param_name, **kwargs):
 
 	'''
 	Driver. Loads output, runs post-processing routine.
@@ -471,7 +471,7 @@ def post_processing(param_name, **extras):
 	### create flatchain, run post-processing
 	sample_results['flatchain'] = threed_dutils.chop_chain(sample_results['chain'])
 	sample_results['flatprob'] = threed_dutils.chop_chain(sample_results['lnprobability'])
-	extra_output = calc_extra_quantities(sample_results,**extras)
+	extra_output = calc_extra_quantities(sample_results,**kwargs)
 	
 	### create post-processing name, dump info
 	mcmc_filename, model_filename, extra_filename = create_prosp_filename(outname)
@@ -486,5 +486,13 @@ def post_processing(param_name, **extras):
 		pass
 
 if __name__ == "__main__":
-	post_processing(sys.argv[1])
+	
+	# note that this only processes booleans!
+	kwargs = {}
+	for arg in sys.argv:
+		if arg[:2] == '--':
+			split = arg[2:].split('=')
+			kwargs[split[0]] = split[1].lower() in ['true', 't', 'yes']
+
+	post_processing(sys.argv[1],**kwargs)
 
