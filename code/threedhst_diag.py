@@ -65,7 +65,7 @@ def subcorner(sample_results,  sps, model, extra_output,
                         truths = ptruths, range = extents, truth_color='red',
                         show_titles = True, plot_datapoints=False, title_kwargs=title_kwargs,**kwargs)
 
-    fig = add_to_corner(fig, sample_results, extra_output, sps, model, 
+    fig = add_to_corner(fig, sample_results, extra_output, sps, model, outname=outname,
     	                truths=truths, maxprob=True, title_kwargs=title_kwargs,powell_results=powell_results)
     if outname is not None:
         fig.savefig('{0}.corner.png'.format(outname))
@@ -74,8 +74,8 @@ def subcorner(sample_results,  sps, model, extra_output,
         return fig
 
 
-def add_to_corner(fig, sample_results, extra_output, sps, model,truths=None,
-	              maxprob=True,powell_results=None,title_kwargs=None):
+def add_to_corner(fig, sample_results, extra_output, sps, model,truths=None,outname=None,
+	              maxprob=True,powell_results=None,title_kwargs=None,twofigure=False):
 
     '''
     adds in posterior distributions for 'select' parameters
@@ -85,9 +85,14 @@ def add_to_corner(fig, sample_results, extra_output, sps, model,truths=None,
     plotquant = extra_output['extras'].get('flatchain',None)
     plotname  = extra_output['extras'].get('parnames',None)
 
+    '''
     to_show = ['half_time','ssfr_100','sfr_100','stellar_mass']
     ptitle = [r't$_{\mathrm{half}}$ [Gyr]',r'log(sSFR) (100 Myr) [yr$^{-1}$]',
               r'log(SFR) (100 Myr) [M$_{\odot}$ yr$^{-1}$]',r'log(M$_*$) [M$_{\odot}$]']
+    '''
+    to_show = ['stellar_mass','sfr_100','ssfr_100','half_time']
+    ptitle = [r'log(M$_*$)',r'log(SFR$_{\mathrm{100 Myr}}$)',
+              r'log(sSFR$_{\mathrm{100 Myr}}$)',r't$_{\mathrm{half}}$']
 
     showing = np.array([x in to_show for x in plotname])
 
@@ -183,68 +188,95 @@ def add_to_corner(fig, sample_results, extra_output, sps, model,truths=None,
             plt.figtext(0.89, ttop-0.02*(kk+1), "{:.2f}".format(yplot),
                        horizontalalignment='left',fontsize=fs)
 
+    #### two options: add new figure, or combine with old
+    if (scale < 6) or twofigure:
 
-    #### create my own axes here
-    # size them using size of other windows
-    axis_size = fig.get_axes()[0].get_position().size
-    xs, ys = 0.4, 0.91
-    xdelta, ydelta = axis_size[0]*1.6, axis_size[1]*1.7
-    plotloc = 0
+        # need flatchain + extents, ordered by to_show
+        nshow = showing.sum()
+        nchain = extra_output['extras']['flatchain'].shape[0]
+        flatchain = np.empty(shape=(nchain,nshow))
+        for i in xrange(nshow): 
+        	the_chain = extra_output['extras']['flatchain'][:,plotname == to_show[i]].squeeze()
+        	if to_show[i] == 'half_time':
+        		flatchain[:,i] = the_chain
+        	else:
+        		flatchain[:,i] = np.log10(the_chain)
+        # extents
+        extents = []
+        for i in xrange(nshow):
+        	extents.append((np.percentile(flatchain[:,i],0.1),
+						    np.percentile(flatchain[:,i],99.9)))
 
-    for jj in xrange(len(plotname)):
+        fig2 = corner.corner(flatchain, labels = ptitle,
+                             quantiles=[0.16, 0.5, 0.84], verbose = False,
+                             range = extents, title_kwargs=title_kwargs,
+                             show_titles = True, plot_datapoints=False)
 
-		if showing[jj] == 0:
-		    continue
+        fig2.savefig('{0}.corner.extra.png'.format(outname))
+        plt.close(fig2)
 
-		ax = fig.add_axes([xs+(plotloc % 2)*xdelta, ys-(plotloc>1)*ydelta, axis_size[0], axis_size[1]])
-		plotloc+=1
+    else:
+	    #### create my own axes here
+	    # size them using size of other windows
+	    axis_size = fig.get_axes()[0].get_position().size
+	    xs, ys = 0.4, 0.91
+	    xdelta, ydelta = axis_size[0]*1.6, axis_size[1]*1.7
+	    plotloc = 0
 
-		if plotname[jj] == 'half_time':
-			plot = plotquant[:,jj]
-		else:
-			plot = np.log10(plotquant[:,jj])
+	    for jj in xrange(len(plotname)):
 
-		# Plot the histograms.
-		n, b, p = ax.hist(plot, bins=50,
-		                  histtype="step",color='k',
-		                  range=[np.min(plot),np.max(plot)])
+			if showing[jj] == 0:
+			    continue
 
-		# plot quantiles
-		qvalues = np.log10([extra_output['extras']['q16'][jj],
-				            extra_output['extras']['q50'][jj],
-				            extra_output['extras']['q84'][jj]])
+			ax = fig.add_axes([xs+(plotloc % 2)*xdelta, ys-(plotloc>1)*ydelta, axis_size[0], axis_size[1]])
+			plotloc+=1
 
-		if plotname[jj] == 'half_time':
-			qvalues = 10**qvalues
+			if plotname[jj] == 'half_time':
+				plot = plotquant[:,jj]
+			else:
+				plot = np.log10(plotquant[:,jj])
 
-		for q in qvalues:
-			ax.axvline(q, ls="dashed", color='k')
+			# Plot the histograms.
+			n, b, p = ax.hist(plot, bins=50,
+			                  histtype="step",color='k',
+			                  range=[np.min(plot),np.max(plot)])
 
-		# display quantiles
-		q_m = qvalues[1]-qvalues[0]
-		q_p = qvalues[2]-qvalues[1]
+			# plot quantiles
+			qvalues = np.log10([extra_output['extras']['q16'][jj],
+					            extra_output['extras']['q50'][jj],
+					            extra_output['extras']['q84'][jj]])
 
-		# format quantile display
-		fmt = "{{0:{0}}}".format(".2f").format
-		title = r"${{{0}}}_{{-{1}}}^{{+{2}}}$"
-		title = title.format(fmt(qvalues[1]), fmt(q_m), fmt(q_p))
-		ax.set_title(title, va='bottom')
-		ax.set_xlabel(ptitle[to_show.index(plotname[jj])],**title_kwargs)
+			if plotname[jj] == 'half_time':
+				qvalues = 10**qvalues
 
-		# axes
-		# set min/max
-		ax.set_xlim(np.percentile(plot,0.5),
-					np.percentile(plot,99.5))
-		ax.set_ylim(0, 1.1 * np.max(n))
-		ax.set_yticklabels([])
-		ax.xaxis.set_major_locator(MaxNLocator(5))
-		[l.set_rotation(45) for l in ax.get_xticklabels()]
+			for q in qvalues:
+				ax.axvline(q, ls="dashed", color='k')
 
-		# truths
-		if truths is not None:
-		    if plotname[jj] in parnames:
-		        plottruth = tvals[parnames == plotname[jj]]
-		        ax.axvline(x=plottruth,color='r')
+			# display quantiles
+			q_m = qvalues[1]-qvalues[0]
+			q_p = qvalues[2]-qvalues[1]
+
+			# format quantile display
+			fmt = "{{0:{0}}}".format(".2f").format
+			title = r"${{{0}}}_{{-{1}}}^{{+{2}}}$"
+			title = title.format(fmt(qvalues[1]), fmt(q_m), fmt(q_p))
+			ax.set_title(title, va='bottom')
+			ax.set_xlabel(ptitle[to_show.index(plotname[jj])],**title_kwargs)
+
+			# axes
+			# set min/max
+			ax.set_xlim(np.percentile(plot,0.5),
+						np.percentile(plot,99.5))
+			ax.set_ylim(0, 1.1 * np.max(n))
+			ax.set_yticklabels([])
+			ax.xaxis.set_major_locator(MaxNLocator(5))
+			[l.set_rotation(45) for l in ax.get_xticklabels()]
+
+			# truths
+			if truths is not None:
+			    if plotname[jj] in parnames:
+			        plottruth = tvals[parnames == plotname[jj]]
+			        ax.axvline(x=plottruth,color='r')
 
     return fig
 
@@ -281,10 +313,16 @@ def add_sfh_plot(exout,fig,ax_loc=None,
 		ax_inset.fill_between(t, perc[:,0], perc[:,2], color=main_color[i], alpha=0.3)
 
 		#### update plot ranges
-		xmin = np.min([xmin,t.min()])
-		xmax = np.max([xmax,t.max()])
-		ymin = np.min([ymin,perc.min()])
-		ymax = np.max([ymax,perc.max()])
+		if 'tage' in extra_output['quantiles']['parnames']:
+			xmin = np.min([xmin,t.min()])
+			xmax = np.max([xmax,t.max()])
+			ymax = np.max([ymax,perc.max()])
+			ymin = ymax*1e-4
+		else:
+			xmin = np.min([xmin,t.min()])
+			xmax = np.max([xmax,t.max()])
+			ymin = np.min([ymin,perc.min()])
+			ymax = np.max([ymax,perc.max()])
 
 	##### truths (THIS IS TRASH RIGHT NOW)
 	if truths is not None:
@@ -302,14 +340,9 @@ def add_sfh_plot(exout,fig,ax_loc=None,
 
 	axlim_sfh=[xmax, xmin, ymin*.7, ymax*1.4]
 	ax_inset.axis(axlim_sfh)
-	ax_inset.set_ylabel(r'SFR [M$_{\odot}$/yr]',fontsize=axfontsize*3,labelpad=3)
-	ax_inset.set_xlabel('t [Gyr]',fontsize=axfontsize*3,labelpad=2)
+	ax_inset.set_ylabel(r'SFR [M$_{\odot}$/yr]',fontsize=axfontsize*3,labelpad=2*text_size)
+	ax_inset.set_xlabel('t [Gyr]',fontsize=axfontsize*3,labelpad=2*text_size)
 	
-	'''
-	for xlabel_i in frame1.axes.get_xticklabels():
-    xlabel_i.set_visible(False)
-    xlabel_i.set_fontsize(0.0)
-	'''
 	ax_inset.set_xscale('log',nonposx='clip',subsx=([1]))
 	ax_inset.xaxis.set_major_formatter(majorFormatter)
 	ax_inset.xaxis.set_tick_params(labelsize=axfontsize*3)
@@ -502,7 +535,7 @@ def return_sedplot_vars(sample_results, extra_output, nufnu=True):
 def sed_figure(outname = None, truths = None,
 			   colors = ['#1974D2'], sresults = None, extra_output = None,
 			   labels = ['spectrum, best-fit'],
-			   sfh_loc = [0.19,0.7,0.14,0.17],
+			   sfh_loc = [0.205,0.67,0.155,0.2],
 			   model_photometry = True, main_color=['black'],
 			   fir_extra = False, ml_spec=True,
                **kwargs):
@@ -523,7 +556,7 @@ def sed_figure(outname = None, truths = None,
 	gs = gridspec.GridSpec(2,1, height_ratios=[3,1])
 	gs.update(hspace=0)
 	phot, res = plt.Subplot(fig, gs[0]), plt.Subplot(fig, gs[1])
-	sfh_loc = [0.655,0.63,0.19,0.25]
+	#sfh_loc = [0.655,0.63,0.19,0.25]
 	sfh_ax = fig.add_axes(sfh_loc,zorder=32)
 
 	### diagnostic text
@@ -609,7 +642,7 @@ def sed_figure(outname = None, truths = None,
 	add_sfh_plot(extra_output,fig,
 				 main_color = main_color,
                  truths=truths, ax_inset=sfh_ax,
-                 text_size=1)
+                 text_size=0.7)
 
 	#### add RGB image
 	try:
@@ -651,7 +684,7 @@ def sed_figure(outname = None, truths = None,
 	handles, labels = phot.get_legend_handles_labels()
 	by_label = OrderedDict(zip(labels, handles))
 	phot.legend(by_label.values(), by_label.keys(), 
-				loc=2, prop={'size':8},
+				loc=1, prop={'size':8},
 			    scatterpoints=1)
 			    
     # set labels
