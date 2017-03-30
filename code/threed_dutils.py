@@ -1145,6 +1145,25 @@ def integrate_sfh(t1,t2,sfh_params):
 
 	return tot_mformed
 
+def measure_lbol(sps,mass):
+
+	'''
+	requires mformed
+	return in Lsun
+	'''
+
+	## get SPS lbol, weighted by SSP weights
+	# two options due to very different meanings of ssp.log_lbol when using
+	# tabular or "regular" SSPs
+	if np.isscalar(sps.ssp.log_lbol):
+		weighted_lbol = 10**sps.ssp.log_lbol
+	else:
+		ssp_lbol = np.insert(10**sps.ssp.log_lbol, 0, 10**sps.ssp.log_lbol[0])
+		weights = sps.all_ssp_weights
+		weighted_lbol = (ssp_lbol * weights).sum() / weights.sum() * mass
+
+	return weighted_lbol
+
 def measure_agn_luminosity(fagn,sps,mass):
 
 	'''

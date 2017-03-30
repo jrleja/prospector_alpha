@@ -155,7 +155,7 @@ def calc_extra_quantities(sample_results, ncalc=3000, **kwargs):
 	        'measure_restframe_optical_phot': False, # cost = 1 runtime
 	        'ir_priors': True, # no cost
 	        'measure_spectral_features': True, # cost = 2 runtimes
-	        'mags_nodust': True # cost = 1 runtime
+	        'mags_nodust': False # cost = 1 runtime
 	        }
 	if kwargs:
 		for key in kwargs.keys(): opts[key] = kwargs[key]
@@ -170,8 +170,8 @@ def calc_extra_quantities(sample_results, ncalc=3000, **kwargs):
 		                          parnames, ir_priors=opts['ir_priors'], include_maxlnprob=True, nsamp=ncalc)
 
     ##### initialize output arrays for SFH + emission line posterior draws
-	half_time,sfr_10,sfr_100,ssfr_100,stellar_mass,emp_ha,lir,luv, \
-	bdec_calc,ext_5500,dn4000,ssfr_10,xray_lum = [np.zeros(shape=(ncalc)) for i in range(13)]
+	half_time,sfr_10,sfr_100,ssfr_100,stellar_mass,emp_ha,lir,luv,lmir,lbol, \
+	bdec_calc,ext_5500,dn4000,ssfr_10,xray_lum = [np.zeros(shape=(ncalc)) for i in range(15)]
 	if 'fagn' in parnames:
 		l_agn, fmir = [np.zeros(shape=(ncalc)) for i in range(2)]
 
@@ -260,6 +260,9 @@ def calc_extra_quantities(sample_results, ncalc=3000, **kwargs):
 		                                              dust_idx,
 		                                              kriek = (sample_results['model'].params['dust_type'] == 4)[0])
 
+		##### lbol
+		lbol[jj] = threed_dutils.measure_lbol(sps,sfh_params['mformed'])
+
 		##### spectral quantities (emission line flux, Balmer decrement, Hdelta absorption, Dn4000)
 		##### and magnitudes (LIR, LUV)
 		if opts['measure_spectral_features']:
@@ -289,14 +292,21 @@ def calc_extra_quantities(sample_results, ncalc=3000, **kwargs):
 
 			lir[jj]        = modelout['lir']
 			luv[jj]        = modelout['luv']
+			lmir[jj]       = modelout['lmir']
 			dn4000[jj]     = modelout['dn4000']
 
 			if 'fagn' in parnames:
-				fmir[jj] = l_agn[jj] / (modelout['lmir']*constants.L_sun.cgs.value)
+				#fmir[jj] = l_agn[jj] / (modelout['lmir']*constants.L_sun.cgs.value)
+				nagn_thetas = copy(thetas)
+				nagn_thetas[parnames == 'fagn'] = np.array([0.0])
+				modelout = threed_dutils.measure_emline_lum(sps, thetas = nagn_thetas,
+	 										model=sample_results['model'], obs = sample_results['obs'],
+									        measure_ir=False, measure_luv=False, measure_mir=True)
+				fmir[jj] = (1 - modelout['lmir']/lmir[jj])
 
 		#### no dust
 		if opts['mags_nodust']:
-			if i == 0:
+			if jj == 0:
 				mags_nodust = np.zeros(shape=(len(sample_results['obs']['filters']),ncalc))
 
 			nd_thetas = copy(thetas)
@@ -311,7 +321,7 @@ def calc_extra_quantities(sample_results, ncalc=3000, **kwargs):
 	
 	##### CALCULATE Q16,Q50,Q84 FOR EXTRA PARAMETERS
 	extra_output = {}
-	extra_flatchain = np.dstack((half_time, sfr_10, sfr_100, ssfr_10, ssfr_100, stellar_mass, emp_ha, bdec_calc, ext_5500, xray_lum))[0]
+	extra_flatchain = np.dstack((half_time, sfr_10, sfr_100, ssfr_10, ssfr_100, stellar_mass, emp_ha, bdec_calc, ext_5500, xray_lum,lbol))[0]
 	if 'fagn' in parnames:
 		extra_flatchain = np.append(extra_flatchain, np.hstack((l_agn[:,None], fmir[:,None])), axis=1)
 	nextra = extra_flatchain.shape[1]
@@ -320,7 +330,7 @@ def calc_extra_quantities(sample_results, ncalc=3000, **kwargs):
 
 	#### EXTRA PARAMETER OUTPUTS 
 	extras = {'flatchain': extra_flatchain,
-			  'parnames': np.array(['half_time','sfr_10','sfr_100','ssfr_10','ssfr_100','stellar_mass','emp_ha','bdec_calc','total_ext5500', 'xray_lum']),
+			  'parnames': np.array(['half_time','sfr_10','sfr_100','ssfr_10','ssfr_100','stellar_mass','emp_ha','bdec_calc','total_ext5500', 'xray_lum','lbol']),
 			  'q16': q_16e,
 			  'q50': q_50e,
 			  'q84': q_84e,
@@ -353,6 +363,7 @@ def calc_extra_quantities(sample_results, ncalc=3000, **kwargs):
 	             'sfr_10': sfr_10[0],
 	             'sfr_100':sfr_100[0],
 	             'bdec_calc':bdec_calc[0],
+	             'lbol': lbol[0],
 	             'spec':spec[:,0],
 	             'mags':mags[:,0]}
 	extra_output['bfit'] = bfit
@@ -421,10 +432,12 @@ def calc_extra_quantities(sample_results, ncalc=3000, **kwargs):
 		### LUV + LIR
 		extra_output['observables']['L_IR'] = lir
 		extra_output['observables']['L_UV'] = luv
+		extra_output['observables']['L_MIR'] = lmir
 
 		### bfits
 		extra_output['bfit']['lir'] = lir[0]
 		extra_output['bfit']['luv'] = luv[0]
+		extra_output['bfit']['lmir'] = lmir[0]
 		extra_output['bfit']['halpha_flux'] = emflux[0,emnames == 'Halpha']
 		extra_output['bfit']['hbeta_flux'] = emflux[0,emnames == 'Hbeta']   
 		extra_output['bfit']['hdelta_flux'] = emflux[0,emnames == 'Hdelta']
@@ -432,6 +445,8 @@ def calc_extra_quantities(sample_results, ncalc=3000, **kwargs):
 		extra_output['bfit']['hbeta_abs'] = absflux[0,absnames == 'hbeta']
 		extra_output['bfit']['hdelta_abs'] = absflux[0,absnames == 'hdelta_wide']
 		extra_output['bfit']['dn4000'] = dn4000[0]
+	
+	print 1/0
 	return extra_output
 
 def update_all(runname, **kwargs):

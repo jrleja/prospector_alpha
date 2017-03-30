@@ -702,7 +702,6 @@ def sed_figure(outname = None, truths = None,
 	fig.add_subplot(res)
 	
 	# set second x-axis
-	'''
 	y1, y2=phot.get_ylim()
 	x1, x2=phot.get_xlim()
 	ax2=phot.twiny()
@@ -713,7 +712,7 @@ def sed_figure(outname = None, truths = None,
 	ax2.set_xscale('log',nonposx='clip',subsx=(2,5))
 	ax2.xaxis.set_minor_formatter(minorFormatter)
 	ax2.xaxis.set_major_formatter(majorFormatter)
-	'''
+
 	# remove ticks
 	phot.set_xticklabels([])
     
