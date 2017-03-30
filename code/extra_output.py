@@ -98,7 +98,7 @@ def sample_flatchain(chain, lnprob, parnames, ir_priors=True, include_maxlnprob=
 		qpah_prior = 7
 		in_priors = (chain[:,gamma_idx] < gamma_prior) & (chain[:,umin_idx] < umin_prior) & (chain[:,qpah_idx] < qpah_prior) & good[:,None]
 		if in_priors.sum() < nsamp:
-			print 'Insufficient number samples within the IR priors! Not applying IR priors.'
+			print 'Insufficient number of samples within the IR priors! Not applying IR priors.'
 		else:
 			good = in_priors
 
@@ -121,7 +121,7 @@ def autocorrelation_time():
 	for l, t1, t0 in zip(lag, tau1, tau0):
 		print('maxlag:{}, tau0:{}, tau1:{}'.format(l, t0, t1))
 
-def set_sfh_time_vector(sample_results):
+def set_sfh_time_vector(sample_results,ncalc):
 
 	# if parameterized, calculate linearly in 100 steps from t=0 to t=tage
 	# if nonparameterized, calculate at bin edges.
@@ -155,8 +155,8 @@ def calc_extra_quantities(sample_results, ncalc=3000, ir_priors=True, opts=None)
 
 	if opts is None:
 		opts = {
-		        'measure_restframe_optical_phot': True, # cost = 1 runtime
-		        'measure_spectral_features': True, # cost = 2 runtimes
+		        'measure_restframe_optical_phot': False, # cost = 1 runtime
+		        'measure_spectral_features': False, # cost = 2 runtimes
 		        'mags_nodust': False # cost = 1 runtime
 		        }
 
@@ -170,8 +170,8 @@ def calc_extra_quantities(sample_results, ncalc=3000, ir_priors=True, opts=None)
 		                          parnames, ir_priors=ir_priors, include_maxlnprob=True, nsamp=ncalc)
 
     ##### initialize output arrays for SFH + emission line posterior draws
-	half_time,sfr_10,sfr_100,sfr_1000,ssfr_100,stellar_mass,emp_ha,lir,luv, \
-	bdec_calc,ext_5500,dn4000,ssfr_10,xray_lum = [np.zeros(shape=(ncalc)) for i in range(14)]
+	half_time,sfr_10,sfr_100,ssfr_100,stellar_mass,emp_ha,lir,luv, \
+	bdec_calc,ext_5500,dn4000,ssfr_10,xray_lum = [np.zeros(shape=(ncalc)) for i in range(13)]
 	if 'fagn' in parnames:
 		l_agn, fmir = [np.zeros(shape=(ncalc)) for i in range(2)]
 
@@ -181,7 +181,7 @@ def calc_extra_quantities(sample_results, ncalc=3000, ir_priors=True, opts=None)
 	didx = parnames == 'dust_index'
 
 	##### set up time vector for full SFHs
-	t = set_sfh_time_vector(sample_results)
+	t = set_sfh_time_vector(sample_results,ncalc)
 	intsfr = np.zeros(shape=(t.shape[0],ncalc))
 
 	##### initialize sps, calculate maxprob
@@ -191,7 +191,11 @@ def calc_extra_quantities(sample_results, ncalc=3000, ir_priors=True, opts=None)
 
 	##### set up model flux vectors
 	mags = np.zeros(shape=(len(sample_results['obs']['filters']),ncalc))
-	spec = np.zeros(shape=(len(sps.wavelengths),ncalc))
+	try:
+		wavelengths = sps.wavelengths
+	except AttributeError:
+		wavelengths = sps.csp.wavelengths
+	spec = np.zeros(shape=(wavelengths.shape[0],ncalc))
 
 	##### modify nebular status to ensure emission line production
 	# don't cache, and turn on
@@ -205,6 +209,15 @@ def calc_extra_quantities(sample_results, ncalc=3000, ir_priors=True, opts=None)
 		##### model call, to set parameters
 		thetas = copy(sample_results['flatchain'][idx])
 		spec[:,jj],mags[:,jj],sm = sample_results['model'].mean_model(thetas, sample_results['obs'], sps=sps)
+
+		##### if we don't use these parameters, set them to defaults
+		dust1 = thetas[d1_idx]
+		if dust1.shape[0] == 0:
+			dust1 = sps.csp.params['dust1']
+		dust_idx = thetas[didx]
+		if dust_idx.shape[0] == 0:
+			dust_idx = sps.csp.params['dust_index']
+
 
 		##### extract sfh parameters
 		# pass stellar mass to avoid extra model call
@@ -222,7 +235,6 @@ def calc_extra_quantities(sample_results, ncalc=3000, ir_priors=True, opts=None)
 		##### calculate time-averaged SFR
 		sfr_10[jj]   = threed_dutils.calculate_sfr(sfh_params, 0.01, minsfr=-np.inf, maxsfr=np.inf)
 		sfr_100[jj]  = threed_dutils.calculate_sfr(sfh_params, 0.1,  minsfr=-np.inf, maxsfr=np.inf)
-		sfr_1000[jj] = threed_dutils.calculate_sfr(sfh_params, 1.0,  minsfr=-np.inf, maxsfr=np.inf)
 
 		##### calculate mass, sSFR
 		stellar_mass[jj] = sfh_params['mass']
@@ -235,17 +247,17 @@ def calc_extra_quantities(sample_results, ncalc=3000, ir_priors=True, opts=None)
 		xray_lum[jj] = threed_dutils.estimate_xray_lum(sfr_100[jj])
 
 		##### empirical halpha HERE
-		emp_ha[jj] = threed_dutils.synthetic_halpha(sfr_10[jj],thetas[d1_idx],
+		emp_ha[jj] = threed_dutils.synthetic_halpha(sfr_10[jj],dust1,
 			                                        thetas[d2_idx],-1.0,
-			                                        thetas[didx],
+			                                        dust_idx,
 			                                        kriek = (sample_results['model'].params['dust_type'] == 4)[0])
 
 		##### dust extinction at 5500 angstroms
-		ext_5500[jj] = thetas[d1_idx] + thetas[d2_idx]
+		ext_5500[jj] = dust1 + thetas[d2_idx]
 
 		##### empirical Balmer decrement
-		bdec_calc[jj] = threed_dutils.calc_balmer_dec(thetas[d1_idx], thetas[d2_idx], -1.0, 
-		                                              thetas[didx],
+		bdec_calc[jj] = threed_dutils.calc_balmer_dec(dust1, thetas[d2_idx], -1.0, 
+		                                              dust_idx,
 		                                              kriek = (sample_results['model'].params['dust_type'] == 4)[0])
 
 		##### spectral quantities (emission line flux, Balmer decrement, Hdelta absorption, Dn4000)
@@ -299,7 +311,7 @@ def calc_extra_quantities(sample_results, ncalc=3000, ir_priors=True, opts=None)
 	
 	##### CALCULATE Q16,Q50,Q84 FOR EXTRA PARAMETERS
 	extra_output = {}
-	extra_flatchain = np.dstack((half_time, sfr_10, sfr_100, sfr_1000, ssfr_10, ssfr_100, stellar_mass, emp_ha, bdec_calc, ext_5500, xray_lum))[0]
+	extra_flatchain = np.dstack((half_time, sfr_10, sfr_100, ssfr_10, ssfr_100, stellar_mass, emp_ha, bdec_calc, ext_5500, xray_lum))[0]
 	if 'fagn' in parnames:
 		extra_flatchain = np.append(extra_flatchain, np.hstack((l_agn[:,None], fmir[:,None])), axis=1)
 	nextra = extra_flatchain.shape[1]
@@ -308,7 +320,7 @@ def calc_extra_quantities(sample_results, ncalc=3000, ir_priors=True, opts=None)
 
 	#### EXTRA PARAMETER OUTPUTS 
 	extras = {'flatchain': extra_flatchain,
-			  'parnames': np.array(['half_time','sfr_10','sfr_100','sfr_1000','ssfr_10','ssfr_100','stellar_mass','emp_ha','bdec_calc','total_ext5500', 'xray_lum']),
+			  'parnames': np.array(['half_time','sfr_10','sfr_100','ssfr_10','ssfr_100','stellar_mass','emp_ha','bdec_calc','total_ext5500', 'xray_lum']),
 			  'q16': q_16e,
 			  'q50': q_50e,
 			  'q84': q_84e,
@@ -321,7 +333,7 @@ def calc_extra_quantities(sample_results, ncalc=3000, ir_priors=True, opts=None)
 	#### OBSERVABLES
 	observables = {'spec': spec,
 	               'mags': mags,
-	               'lam_obs': sps.wavelengths}
+	               'lam_obs': wavelengths}
 	extra_output['observables'] = observables
 
 	#### QUANTILE OUTPUTS #
@@ -340,7 +352,6 @@ def calc_extra_quantities(sample_results, ncalc=3000, ir_priors=True, opts=None)
 	             'half_time': half_time[0],
 	             'sfr_10': sfr_10[0],
 	             'sfr_100':sfr_100[0],
-	             'sfr_1000':sfr_1000[0],     
 	             'bdec_calc':bdec_calc[0],
 	             'spec':spec[:,0],
 	             'mags':mags[:,0]}
@@ -421,7 +432,6 @@ def calc_extra_quantities(sample_results, ncalc=3000, ir_priors=True, opts=None)
 		extra_output['bfit']['hbeta_abs'] = absflux[0,absnames == 'hbeta']
 		extra_output['bfit']['hdelta_abs'] = absflux[0,absnames == 'hdelta_wide']
 		extra_output['bfit']['dn4000'] = dn4000[0]
-
 	return extra_output
 
 def update_all(runname, **kwargs):

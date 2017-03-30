@@ -411,8 +411,11 @@ def calc_balmer_dec(tau1, tau2, ind1, ind2,kriek=False):
 	return balm_dec
 
 def exp_decl_sfh_half_time(tage,tau):
-	''' integrate SFR = Ae^(-t/tau)'''
-	return tau*np.log(2./(1+np.exp(-tage/tau)))
+	''' integrate SFR = Ae^(-t/tau)
+	note that this returns YEARS AGO that the half mass was reached
+	so a larger half-mass time is an OLDER galaxy
+	'''
+	return tage-tau*np.log(2./(1+np.exp(-tage/tau)))
 
 def sfh_half_time(x,sfh_params,c):
 
@@ -980,10 +983,15 @@ def calculate_sfr(sfh_params, timescale, tcalc = None,
 
 	return sfr
 
+def integrate_exp_tau(t1,t2,sfh):
+
+	return sfh['tau']*(np.exp(-t1/sfh['tau'])-np.exp(-t2/sfh['tau']))
+
 def integrate_delayed_tau(t1,t2,sfh):
 
 	return (np.exp(-t1/sfh['tau'])*(1+t1/sfh['tau']) - \
 	       np.exp(-t2/sfh['tau'])*(1+t2/sfh['tau']))*sfh['tau']**2
+
 
 def integrate_linramp(t1,t2,sfh):
 
@@ -1005,7 +1013,7 @@ def integrate_linramp(t1,t2,sfh):
 def integrate_sfh(t1,t2,sfh_params):
 	
 	'''
-	integrate a delayed tau SFH from t1 to t2
+	integrate an SFH from t1 to t2
 	sfh = dictionary of SFH parameters
 	returns FRACTION OF TOTAL MASS FORMED in given time inteval
 	'''
@@ -1028,7 +1036,7 @@ def integrate_sfh(t1,t2,sfh_params):
 			t1 = np.zeros(ndim)+t1
 
 		# redefine sf_trunc, if not being used for sfh=5 purposes
-		if sfh['sf_trunc'] == 0.0:
+		if (sfh['sf_trunc'] == 0.0) or sfh['sf_trunc'].shape[0] == 0:
 			sfh['sf_trunc'] = sfh['tage']
 
 		# if we're outside of the time boundaries, clip to boundary values
@@ -1036,13 +1044,21 @@ def integrate_sfh(t1,t2,sfh_params):
 		t1 = np.clip(t1,0,sfh['tage']-sfh['sf_start'])
 		t2 = np.clip(t2,0,sfh['tage']-sfh['sf_start'])
 
-	  	# if we're using delayed tau
-	  	if (sfh['sfh'] == 1) or (sfh['sfh'] == 4):
+		# if we're using normal tau
+		if (sfh['sfh'] == 1):
 
-	  			# add tau model
-				intsfr =  integrate_delayed_tau(t1,t2,sfh)
-				norm =    1.0- np.exp(-(sfh['sf_trunc']-sfh['sf_start'])/sfh['tau'])*(1+(sfh['sf_trunc']-sfh['sf_start'])/sfh['tau'])
-				intsfr = intsfr/(norm*sfh['tau']**2)
+			# add tau model
+			intsfr =  integrate_exp_tau(t1,t2,sfh)
+			norm =    sfh['tau']*(1-np.exp(-(sfh['sf_trunc']-sfh['sf_start'])/sfh['tau']))
+			intsfr = intsfr/norm
+
+	  	# if we're using delayed tau
+	  	elif (sfh['sfh'] == 4):
+
+  			# add tau model
+			intsfr =  integrate_delayed_tau(t1,t2,sfh)
+			norm =    1.0-np.exp(-(sfh['sf_trunc']-sfh['sf_start'])/sfh['tau'])*(1+(sfh['sf_trunc']-sfh['sf_start'])/sfh['tau'])
+			intsfr = intsfr/(norm*sfh['tau']**2)
 
 		# else, add lin-ramp
 		elif (sfh['sfh'] == 5):
