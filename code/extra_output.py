@@ -446,7 +446,6 @@ def calc_extra_quantities(sample_results, ncalc=3000, **kwargs):
 		extra_output['bfit']['hdelta_abs'] = absflux[0,absnames == 'hdelta_wide']
 		extra_output['bfit']['dn4000'] = dn4000[0]
 	
-	print 1/0
 	return extra_output
 
 def update_all(runname, **kwargs):
