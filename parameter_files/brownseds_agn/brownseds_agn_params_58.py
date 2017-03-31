@@ -8,6 +8,13 @@ from astropy.io import fits
 tophat = priors.tophat
 logarithmic = priors.logarithmic
 
+lsun = 3.846e33
+pc = 3.085677581467192e18  # in cm
+
+lightspeed = 2.998e18  # AA/s
+to_cgs = lsun/(4.0 * np.pi * (pc*10)**2)
+jansky_mks = 1e-26
+
 #############
 # RUN_PARAMS
 #############
@@ -446,7 +453,7 @@ model_params.append({'name': 'nebemlineinspec', 'N': 1,
                         'init': False,
                         'prior_function_name': None,
                         'prior_args': None})
-                        
+
 model_params.append({'name': 'gas_logz', 'N': 1,
                         'isfree': False,
                         'init': 0.0,
