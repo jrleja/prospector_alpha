@@ -16,6 +16,14 @@ plot RMS for spectral quantities as a function of f_agn
 minorFormatter = magphys_plot_pref.jLogFormatter(base=10, labelOnlyBase=False)
 majorFormatter = magphys_plot_pref.jLogFormatter(base=10, labelOnlyBase=True)
 
+ebaropts = {
+		 'fmt':'o',
+		 'ecolor':'k',
+		 'capthick':0.4,
+		 'elinewidth':0.4,
+		 'alpha':0.55
+        } 
+
 def collate_data(alldata, alldata_noagn):
 
 	'''
@@ -50,10 +58,6 @@ def collate_data(alldata, alldata_noagn):
 		#### load model information
 		for dat in the_data[ii]:
 
-			# if we don't measure spectral parameters, we don't want that shit here
-			if dat['residuals']['emlines'] is None:
-				continue
-
 			#### model parameters [NEW MODEL ONLY]
 			objname.append(dat['objname'])
 			if data_label[ii] == 'agn':
@@ -61,6 +65,20 @@ def collate_data(alldata, alldata_noagn):
 					model_pars[key]['q50'].append(dat['pquantiles']['q50'][parnames==key][0])
 					model_pars[key]['q84'].append(dat['pquantiles']['q84'][parnames==key][0])
 					model_pars[key]['q16'].append(dat['pquantiles']['q16'][parnames==key][0])
+
+
+			# if we don't measure spectral parameters, put a confusing filler value
+			if dat['residuals']['emlines'] is None:
+				rms['obs']['halpha'].append(np.array([np.nan]))
+				rms['obs']['hbeta'].append(np.array([np.nan]))
+				rms['obs']['bdec'].append(np.array([np.nan]))
+				rms['obs']['dn4000'].append(np.array([np.nan]))
+
+				rms['mod']['halpha'].append(np.array([np.nan]))
+				rms['mod']['hbeta'].append(np.array([np.nan]))
+				rms['mod']['bdec'].append(np.array([np.nan]))
+				rms['mod']['dn4000'].append(np.array([np.nan]))
+				continue
 
 			#### pull the chain for spectral quantities
 			rms['obs']['halpha'].append(np.log10(dat['residuals']['emlines']['obs']['lum_chain'][:,obs_eline_names=='H$\\alpha$'].squeeze() / constants.L_sun.cgs.value))
@@ -85,7 +103,7 @@ def collate_data(alldata, alldata_noagn):
 
 	return output
 
-def plot_comparison(runname='brownseds_agn',runname_noagn='brownseds_np',alldata=None,alldata_noagn=None,outfolder=None):
+def plot_comparison(runname='brownseds_agn',runname_noagn='brownseds_np',alldata=None,alldata_noagn=None,outfolder=None,idx=Ellipsis,**popts):
 
 	#### load alldata
 	if alldata is None:
@@ -104,16 +122,23 @@ def plot_comparison(runname='brownseds_agn',runname_noagn='brownseds_np',alldata
 	### choose galaxies with largest 10 F_AGN
 	pdata = collate_data(alldata,alldata_noagn)
 
-	plot_rms(pdata,outfolder)
+	plot_rms(pdata,outfolder,agn_idx=idx,**popts)
 
-def plot_rms(pdata,outfolder):
+def drawArrow(A, B, ax, scale=1):
+    ax.arrow(A[0], A[1], B[0] - A[0], B[1] - A[1],
+              head_width=0.03*scale, width=0.005*scale,length_includes_head=True,color='grey',alpha=0.6)
+
+
+def plot_rms(pdata,outfolder,agn_idx=None,**popts):
 
 	#### plot geometry
 	fig, ax = plt.subplots(2,2, figsize=(10, 10))
 	fig2, ax2 = plt.subplots(4,2, figsize=(12, 20))
+	fig3, ax3 = plt.subplots(2,2, figsize=(10, 10))
 
 	ax = ax.ravel()
 	ax2 = ax2.ravel()
+	ax3 = ax3.ravel()
 	red = '#FF3D0D'
 	blue = '#1C86EE' 
 
@@ -126,7 +151,8 @@ def plot_rms(pdata,outfolder):
 	        }
 	lims = [(-2,2), (-2,2), (-0.3,0.3), (-0.15,0.15)]
 	lims2 = [(3,10),(4.5,9),(-0.2,0.8),(0.6,2.0)]
-	
+	lims3 = [(5.5,9.3),(4.5,8.5),(-0.05,0.5),(1.0,1.5)]
+
 	### for each observable, pull out RMS
 	ndraw = int(1e5)
 	fagn = np.log10(pdata['agn']['model_pars']['fagn']['q50'])
@@ -207,18 +233,18 @@ def plot_rms(pdata,outfolder):
                      transform = ax2[p2].transAxes,horizontalalignment='left')
 
 		#### now no-AGN (same code)
-		q16o, q50o, q84o, q16m, q50m, q84m = [np.zeros(ngal) for i in range(6)]
+		q16o_no, q50o_no, q84o_no, q16m_no, q50m_no, q84m_no = [np.zeros(ngal) for i in range(6)]
 		for jj in xrange(ngal):
-			q50o[jj],q84o[jj],q16o[jj] = np.nanpercentile(obs_noagn[jj],[50.0,84.0,16.0])
-			q50m[jj],q84m[jj],q16m[jj] = np.nanpercentile(mod_noagn[jj],[50.0,84.0,16.0])
+			q50o_no[jj],q84o_no[jj],q16o_no[jj] = np.nanpercentile(obs_noagn[jj],[50.0,84.0,16.0])
+			q50m_no[jj],q84m_no[jj],q16m_no[jj] = np.nanpercentile(mod_noagn[jj],[50.0,84.0,16.0])
 		
-		errs_obs = threed_dutils.asym_errors(q50o[idx], q84o[idx], q16o[idx])
-		errs_mod = threed_dutils.asym_errors(q50m[idx], q84m[idx], q16m[idx])
+		errs_obs = threed_dutils.asym_errors(q50o_no[idx], q84o_no[idx], q16o_no[idx])
+		errs_mod = threed_dutils.asym_errors(q50m_no[idx], q84m_no[idx], q16m_no[idx])
 
 		p2+=1
-		ax2[p2].errorbar(q50o[idx],q50m[idx],xerr=errs_obs,yerr=errs_mod,fmt='o', 
+		ax2[p2].errorbar(q50o_no[idx],q50m_no[idx],xerr=errs_obs,yerr=errs_mod,fmt='o', 
 			            ecolor=blue, capthick=1,elinewidth=1,ms=0.0,alpha=0.5,zorder=-5)
-		pts = ax2[p2].scatter(q50o[idx], q50m[idx], marker='o', c=fagn[idx], cmap=plt.cm.plasma,s=70,zorder=10)
+		pts = ax2[p2].scatter(q50o_no[idx], q50m_no[idx], marker='o', c=fagn[idx], cmap=plt.cm.plasma,s=70,zorder=10)
 		ax2[p2].set_title(trans[key])
 		ax2[p2].set_xlabel(r'observed')
 		ax2[p2].set_ylabel(r'model (no AGN)')
@@ -227,7 +253,7 @@ def plot_rms(pdata,outfolder):
 		ax2[p2].set_xlim(lims2[ii][0],lims2[ii][1])
 		ax2[p2].set_ylim(lims2[ii][0],lims2[ii][1])
 		ax2[p2].plot(lims2[ii],lims2[ii],'--',color='0.5',alpha=0.5)
-		off,scat = threed_dutils.offset_and_scatter(q50o[idx],q50m[idx],biweight=True)
+		off,scat = threed_dutils.offset_and_scatter(q50o_no[idx],q50m_no[idx],biweight=True)
 		ax2[p2].text(0.05,0.94, 'biweight scatter='+"{:.2f}".format(scat),
                      transform = ax2[p2].transAxes,horizontalalignment='left')
 		ax2[p2].text(0.05,0.89, 'mean offset='+"{:.2f}".format(off),
@@ -239,11 +265,50 @@ def plot_rms(pdata,outfolder):
 		cb.solids.set_rasterized(True)
 		cb.solids.set_edgecolor("face")
 
+		####### NEW FINAL PLOT OF AWESOMENESS
+		alpha = 0.7
+		ax3[ii].scatter(q50o_no[agn_idx], q50m_no[agn_idx], marker='o', color=popts['noagn_color'],s=50,zorder=10,alpha=alpha)
+		ax3[ii].scatter(q50o[agn_idx], q50m[agn_idx], marker='o', color=popts['agn_color'],s=50,zorder=10,alpha=alpha)
+
+		'''
+		errs_obs = threed_dutils.asym_errors(q50o[agn_idx], q84o[agn_idx], q16o[agn_idx])
+		errs_mod = threed_dutils.asym_errors(q50m[agn_idx], q84m[agn_idx], q16m[agn_idx])
+		ax3[ii].errorbar(q50o[agn_idx], q50m[agn_idx], xerr=errs_obs,yerr=errs_mod, ms=0.0, zorder=-2,**ebaropts)
+
+		errs_obs = threed_dutils.asym_errors(q50o_no[agn_idx], q84o_no[agn_idx], q16o_no[agn_idx])
+		errs_mod = threed_dutils.asym_errors(q50m_no[agn_idx], q84m_no[agn_idx], q16m_no[agn_idx])
+		ax3[ii].errorbar(q50o_no[agn_idx], q50m_no[agn_idx], xerr=errs_obs,yerr=errs_mod, ms=0.0, zorder=-2,**ebaropts)
+		'''
+
+		### draw in some SICK arrows
+		for kk in xrange(len(agn_idx)):
+			old = (q50o_no[agn_idx][kk],q50m_no[agn_idx][kk])
+			new = (q50o[agn_idx][kk],q50m[agn_idx][kk])
+			drawArrow(old,new,ax3[ii],scale=lims3[ii][1]-lims3[ii][0])
+
+		### labels and lines
+		ax3[ii].set_xlabel('observed '+trans[key])
+		ax3[ii].set_ylabel('model '+trans[key])
+		ax3[ii].xaxis.set_major_locator(MaxNLocator(5))
+		ax3[ii].yaxis.set_major_locator(MaxNLocator(5))
+		ax3[ii].set_xlim(lims3[ii][0],lims3[ii][1])
+		ax3[ii].set_ylim(lims3[ii][0],lims3[ii][1])
+		ax3[ii].plot(lims3[ii],lims3[ii],'--',color='0.5',alpha=0.5,zorder=-15)
+
+		good = ((np.isfinite(q50o)) & (np.isfinite(q50m)) & (np.isfinite(q50o_no)) & (np.isfinite(q50m_no)))[agn_idx]
+		off_agn,scat_agn = threed_dutils.offset_and_scatter(q50o[agn_idx][good],q50m[agn_idx][good],biweight=True)
+		off_noagn,scat_noagn = threed_dutils.offset_and_scatter(q50o_no[agn_idx][good],q50m_no[agn_idx][good],biweight=True)
+		ax3[ii].text(0.96,0.12,'scatter, offset: '+"{:.2f}".format(scat_noagn)+","+"{:.2f}".format(off_noagn),transform=ax3[ii].transAxes,fontsize=20,color=popts['noagn_color'],ha='right')
+		ax3[ii].text(0.96,0.06,'scatter, offset: '+"{:.2f}".format(scat_agn)+","+"{:.2f}".format(off_agn),transform=ax3[ii].transAxes,fontsize=20,color=popts['agn_color'],ha='right')
+
 	fig.tight_layout()
 	fig.savefig(outfolder+'delta_observables.png',dpi=120)
 
 	fig2.tight_layout()
 	fig2.savefig(outfolder+'obs_vs_mod.png',dpi=120)
+
+	fig3.tight_layout()
+	fig3.savefig(outfolder+'obs_vs_mod_arrows.png',dpi=120)
 
 	plt.close()
 

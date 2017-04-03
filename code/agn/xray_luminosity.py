@@ -18,7 +18,7 @@ plotopts = {
 		 'ecolor':'k',
 		 'capthick':0.4,
 		 'elinewidth':0.4,
-		 'alpha':0.6
+		 'alpha':0.55
         } 
 
 def get_cmap(N):
@@ -222,7 +222,7 @@ def make_plot(runname='brownseds_agn',alldata=None,outfolder=None,maxradius=30,i
 
 	### SFR, sSFR, dust2, LUV/LIR versus FAGN
 	fig,ax = plot_model_corrs(pdata,idx=idx,**popts)
-	plt.tight_layout()
+	#plt.tight_layout()
 	plt.savefig(outfolder+'fagn_versus_galaxy_properties.png',dpi=dpi)
 	plt.close()
 
@@ -230,10 +230,13 @@ def plot_model_corrs(pdata,color_by=None,idx=None,**popts):
 
 	'''
 	add color bar for dust2, to the right
-	change third plot to LMIR / LBOL (in observables; may have to add this to magphys_plots)
+	-- change third plot to LMIR / LBOL (in observables; may have to add this to magphys_plots)
+	-- properly calculate LUV / LIR
 	'''
 
-	fig, ax = plt.subplots(2,2, figsize=(10, 10))
+	fig, ax = plt.subplots(2,2, figsize=(11, 10))
+	cb_ax = fig.add_axes([0.88, 0.15, 0.05, 0.7])
+	fig.subplots_adjust(right=0.85,wspace=0.3,hspace=0.3,left=0.12)
 	ax = np.ravel(ax)
 
 	#### fagn labeling
@@ -265,8 +268,11 @@ def plot_model_corrs(pdata,color_by=None,idx=None,**popts):
 		#ax[ii].plot(x[idx],y[idx], marker=popts['fmir_shape'],linestyle=' ',alpha=popts['fmir_alpha'],color = '#1C86EE')
 		#ax[ii].plot(x[cidx],y[cidx], marker=popts['nofmir_shape'],linestyle=' ',alpha=popts['nofmir_alpha'],color = '#1C86EE')
 
-		ax[ii].scatter(x[cidx],y[cidx], marker=popts['nofmir_shape'],alpha=popts['nofmir_alpha'],c=cb[cidx], cmap=popts['cmap'],s=56,zorder=10)
-		ax[ii].scatter(x[idx],y[idx], marker=popts['fmir_shape'],alpha=popts['fmir_alpha'],c=cb[idx], cmap=popts['cmap'],s=56,zorder=10)
+		vmin, vmax = cb.min(), cb.max()
+		ax[ii].scatter(x[cidx],y[cidx], marker=popts['nofmir_shape'],alpha=popts['nofmir_alpha'],c=cb[cidx], cmap=popts['cmap'],
+			           s=59,zorder=10, vmin=vmin, vmax=vmax)
+		pts = ax[ii].scatter(x[idx],y[idx], marker=popts['fmir_shape'],alpha=popts['fmir_alpha'],c=cb[idx], cmap=popts['cmap'],
+			           s=50,zorder=10, vmin=vmin, vmax=vmax)
 
 		ax[ii].set_xlabel(xlabel)
 		ax[ii].set_ylabel(ylabels[ii])
@@ -280,6 +286,11 @@ def plot_model_corrs(pdata,color_by=None,idx=None,**popts):
 	ax[-1].set_xlabel(xlabel)
 	ax[-1].xaxis.set_major_locator(MaxNLocator(5))
 	ax[-1].set_ylabel(r'log(L$_{\mathrm{IR}}$/L$_{\mathrm{UV}}$)')
+
+	cb = fig.colorbar(pts, cax=cb_ax)
+	cb.ax.set_title(r'$\tau_{v}$', fontdict={'fontweight':'bold','verticalalignment':'bottom'})
+	cb.solids.set_rasterized(True)
+	cb.solids.set_edgecolor("face")
 
 	return fig, ax
 

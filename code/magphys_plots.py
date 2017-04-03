@@ -527,6 +527,8 @@ def update_model_info(alldata, sample_results, extra_output, magphys):
 	alldata['spec_info'] = extra_output['spec_info']
 	alldata['model_emline'] = extra_output['model_emline']
 	alldata['lir'] = extra_output['observables']['L_IR']
+	alldata['luv'] = extra_output['observables']['L_UV']
+	alldata['lmir'] = extra_output['observables']['L_MIR']
 	mask = sample_results['obs']['phot_mask']
 	alldata['model_maggies'] = extra_output['observables']['mags'][mask]
 	alldata['model_spec'] = np.median(extra_output['observables']['spec'],axis=1)

@@ -32,6 +32,7 @@ def plot(runname='brownseds_agn',runname_noagn='brownseds_np',
 			dat['pquantiles']['q16'][fidx] = dat['pextras']['q16'][midx].squeeze()
 			dat['pquantiles']['sample_chain'][:,fidx] = dat['pextras']['flatchain'][:,midx]
 
+			'''
 			### FMIR ---> L_MIR
 			fmir50 = alldata[i]['pquantiles']['q50'][fidx].squeeze() / dat['pquantiles']['q50'][fidx].squeeze()
 			fmir84 = alldata[i]['pquantiles']['q84'][fidx].squeeze() / dat['pquantiles']['q84'][fidx].squeeze()
@@ -42,6 +43,7 @@ def plot(runname='brownseds_agn',runname_noagn='brownseds_np',
 			dat['pextras']['q84'][midx] = dat['pextras']['q84'][lidx].squeeze() / (fmir84*constants.L_sun.cgs.value)
 			dat['pextras']['q16'][midx] = dat['pextras']['q16'][lidx].squeeze() / (fmir16*constants.L_sun.cgs.value)
 			dat['pextras']['flatchain'][:,midx] = dat['pextras']['flatchain'][:,lidx] / (fmir_chain*constants.L_sun.cgs.value)
+			'''
 
 	else:
 		alldata_sub = deepcopy(alldata)
@@ -59,8 +61,8 @@ def plot(runname='brownseds_agn',runname_noagn='brownseds_np',
 			'noagn_color': '#FF420E',
 			'fmir_shape': '^',
 			'nofmir_shape': 'o',
-			'fmir_alpha': 0.9,
-			'nofmir_alpha': 0.9,
+			'fmir_alpha': 0.8,
+			'nofmir_alpha': 0.8,
 			'cmap': plt.cm.plasma
 	        }
 
@@ -78,14 +80,12 @@ def plot(runname='brownseds_agn',runname_noagn='brownseds_np',
 	bpt.plot_bpt(runname=runname,alldata=alldata_sub,outfolder=outfolder,**popts)
 	#print 'PLOTTING OPTICAL COLOR COLOR DIAGRAM'
 	#optical_color_color.plot(runname=runname,alldata=alldata_sub,outfolder=outfolder)
-	'''
 	print 'PLOTTING XRAY LUMINOSITY'
 	xray_luminosity.make_plot(runname=runname,alldata=alldata_sub,outfolder=outfolder,idx=agn_idx,**popts)
-	print 1/0
-
+	'''
 	print 'PLOTTING DELTA OBSERVABLES'
-	plot_spec_rms.plot_comparison(runname=runname,alldata=alldata_sub,alldata_noagn=alldata_noagn,outfolder=outfolder)
-
+	plot_spec_rms.plot_comparison(runname=runname,alldata=alldata_sub,alldata_noagn=alldata_noagn,outfolder=outfolder,idx=agn_idx,**popts)
+	print 1/0
 	### check out what you've made
 	if open_all:
 		os.system('open '+outfolder+'*.png')
