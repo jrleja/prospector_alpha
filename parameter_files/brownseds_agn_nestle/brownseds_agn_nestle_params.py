@@ -5,8 +5,6 @@ from prospect.sources import FastStepBasis
 from sedpy import observate
 from astropy.cosmology import WMAP9
 from astropy.io import fits
-tophat = priors.tophat
-logarithmic = priors.logarithmic
 
 lsun = 3.846e33
 pc = 3.085677581467192e18  # in cm
@@ -295,12 +293,12 @@ model_params.append({'name': 'pmetals', 'N': 1,
 
 model_params.append({'name': 'logzsol', 'N': 1,
                         'isfree': True,
-                        'init': -0.5,
+                        'init': -0.3,
                         'init_disp': 0.25,
                         'disp_floor': 0.2,
                         'units': r'$\log (Z/Z_\odot)$',
                         'prior': priors.TopHat(mini=-1.98, maxi=0.19)})
-                        
+
 ###### SFH   ########
 model_params.append({'name': 'sfh', 'N':1,
                         'isfree': False,
@@ -481,7 +479,6 @@ model_params.append({'name': 'phot_jitter', 'N': 1,
                         'init': 0.0,
                         'init_disp': 0.5,
                         'units': 'fractional maggies (mags/1.086)',
-                        'prior_function':tophat,
                         'prior': priors.TopHat(mini=0.0, maxi=0.5)})
 
 ####### Units ##########
@@ -519,7 +516,7 @@ class BurstyModel(sedmodel.SedModel):
             The log of the product of the prior probabilities for
             these parameter values.
         """  
-        
+
         # dust1/dust2 ratio
         if 'dust1' in self.theta_index:
             if 'dust2' in self.theta_index:

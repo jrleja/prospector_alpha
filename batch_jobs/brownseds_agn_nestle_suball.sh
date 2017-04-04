@@ -18,4 +18,4 @@
 ### mail
 #SBATCH --mail-type=END
 #SBATCH --mail-user=joel.leja@gmail.com
-srun -n $SLURM_NTASKS --mpi=pmi2 python $APPS/bsfh/scripts/prospector_nest.py --param_file=$APPS/threedhst_bsfh/parameter_files/brownseds_agn_nestle/brownseds_agn_nestle_params_$SLURM_ARRAY_TASK_ID.py 
+srun -n $SLURM_NTASKS --mpi=pmi2 python $APPS/bsfh/scripts/prospector_nest.py --param_file=$APPS/threedhst_bsfh/parameter_files/brownseds_agn_nestle/brownseds_agn_nestle_params.py 
