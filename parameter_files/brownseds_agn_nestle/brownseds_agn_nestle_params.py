@@ -503,7 +503,7 @@ model_params = tparams
 ###### REDEFINE MODEL FOR MY OWN NEFARIOUS PURPOSES ######
 class BurstyModel(sedmodel.SedModel):
 
-    def prior_product(self, theta):
+    def prior_product(self, theta, **extras):
         """
         Return a scalar which is the ln of the product of the prior
         probabilities for each element of theta.  Requires that the
