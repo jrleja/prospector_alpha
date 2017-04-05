@@ -40,8 +40,6 @@ def construct_mocks(basename,outname=None,add_zp_err=False, plot_mock=False):
 	outname = '/Users/joel/code/python/threedhst_bsfh/data/'+basename
 
 	#### basic parameters ####
-	# hack to make it run 100x times in for-loop
-	# so i can calculate sfr each time
 	noise               = 0.05            # perturb fluxes
 	reported_noise      = 0.05            # reported noise
 	ntest               = 250             # number of mock galaxies to generate
