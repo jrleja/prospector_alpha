@@ -25,10 +25,7 @@ run_params = {'verbose':True,
               'ftol':0.5e-5, 
               'maxfev':5000,
               # MCMC params
-              'nwalkers':620,
-              'nburn':[150,200,400,600], 
-              'niter': 2500,
-              'interval': 0.2,
+              'nestle_maxcall': 1e2,
               # Model info
               'zcontinuous': 2,
               'compute_vega_mags': False,

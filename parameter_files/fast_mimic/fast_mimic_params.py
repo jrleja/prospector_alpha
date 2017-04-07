@@ -226,7 +226,6 @@ model_params.append({'name': 'fconst', 'N': 1,
 
 model_params.append({'name': 'sf_start', 'N': 1,
                         'isfree': False,
-                        'reinit': True,
                         'init': 0.0,
                         'units': 'Gyr',
                         'prior_function': tophat,
@@ -372,7 +371,7 @@ def load_model(objname='',datname='',fastname='', agelims=[], **extras):
     tau = 10**fast['ltau'][idx][0]/1e9
     tage = 10**fast['lage'][idx][0]/1e9
     logmass = fast['lmass'][idx][0]
-    dust2 = fast['Av'][0] / 1.086
+    dust2 = fast['Av'][idx][0]/1.086
 
     n = [p['name'] for p in model_params]
     model_params[n.index('tau')]['init'] = tau

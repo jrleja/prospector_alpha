@@ -29,8 +29,14 @@ run_params = {'verbose':True,
               # MCMC params
               'nwalkers':620,
               'nburn':[150,200,400,600], 
-              'niter': 2500,
+              'niter': 5000,
               'interval': 0.2,
+              # Convergence parameters
+              'convergence_check_interval': 50,
+              'convergence_chunks': 325,
+              'convergence_kl_threshold': 0.018,
+              'convergence_stable_points_criteria': 4, 
+              'convergence_nhist': 50,
               # Model info
               'zcontinuous': 2,
               'compute_vega_mags': False,

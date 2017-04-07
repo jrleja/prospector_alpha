@@ -427,7 +427,6 @@ def show_chain(sample_results,plotnames=None,chain=None,outname=None,alpha=0.6,t
 	parnames = np.array(sample_results['model'].theta_labels())
 	nwalkers = chain.shape[0]
 	nsteps = chain.shape[1]
-
 	
 	# plot geometry
 	ndim = len(parnames)
