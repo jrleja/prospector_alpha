@@ -522,34 +522,23 @@ class BurstyModel(sedmodel.SedModel):
         """  
         lnp_prior = 0
 
-        # implement uniqueness of outliers
-        if 'gp_outlier_locs' in self.theta_index:
-            start,end = self.theta_index['gp_outlier_locs']
-            outlier_locs = theta[start:end]
-            if len(np.unique(np.round(outlier_locs))) != len(outlier_locs):
-                return -np.inf
-
         # dust1/dust2 ratio
         if 'dust1' in self.theta_index:
             if 'dust2' in self.theta_index:
-                start,end = self.theta_index['dust1']
-                dust1 = theta[start:end]
-                start,end = self.theta_index['dust2']
-                dust2 = theta[start:end]
+                dust1 = theta[self.theta_index['dust1']]
+                dust2 = theta[self.theta_index['dust2']]
                 if dust1/2. > dust2:
                     return -np.inf
 
         # sum of SFH fractional bins <= 1.0
         if 'sfr_fraction' in self.theta_index:
-            start,end = self.theta_index['sfr_fraction']
-            sfr_fraction = theta[start:end]
+            sfr_fraction = theta[self.theta_index['sfr_fraction']]
             if np.sum(sfr_fraction) > 1.0:
                 return -np.inf
 
         for k, v in self.theta_index.iteritems():
-            start, end = v
             this_prior = np.sum(self._config_dict[k]['prior_function']
-                                (theta[start:end], **self._config_dict[k]['prior_args']))
+                                (theta[v], **self._config_dict[k]['prior_args']))
 
             if (not np.isfinite(this_prior)):
                 print('WARNING: ' + k + ' is out of bounds')
