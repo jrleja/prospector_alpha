@@ -111,19 +111,19 @@ def load_obs(photname, objname, err_floor=0.05, zperr=True, **extras):
 # TRANSFORMATION FUNCTIONS
 ##########################
 def transform_logmass_to_mass(mass=None, logmass=None, **extras):
-
     return 10**logmass
 
 def load_gp(**extras):
     return None, None
 
 def add_dust1(dust2=None, **extras):
-
     return 0.86*dust2
 
 def tie_gas_logz(logzsol=None, **extras):
-
     return logzsol
+
+def transform_logtau_to_tau(tau=None, logtau=None, **extras):
+    return 10**logtau
 
 #############
 # MODEL_PARAMS
@@ -186,13 +186,23 @@ model_params.append({'name': 'sfh', 'N': 1,
                         'prior_args': None})
 
 model_params.append({'name': 'tau', 'N': 1,
-                        'isfree': True,
+                        'isfree': False,
                         'init': 10,
+                        'depends_on': transform_logtau_to_tau,
                         'init_disp': 0.5,
                         'units': 'Gyr',
                         'prior_function':tophat,
                         'prior_args': {'mini':0.1,
                                        'maxi':100.0}})
+
+model_params.append({'name': 'logtau', 'N': 1,
+                        'isfree': True,
+                        'init': 1,
+                        'init_disp': 0.5,
+                        'units': 'Gyr',
+                        'prior_function':tophat,
+                        'prior_args': {'mini':-1,
+                                       'maxi':2}})
 
 model_params.append({'name': 'tage', 'N': 1,
                         'isfree': True,
@@ -309,7 +319,7 @@ model_params.append({'name': 'mass_units', 'N': 1,
 #### resort list of parameters 
 #### so that major ones are fit first
 parnames = [m['name'] for m in model_params]
-fit_order = ['logmass','tage', 'tau', 'dust2']
+fit_order = ['logmass','tage', 'logtau', 'dust2']
 tparams = [model_params[parnames.index(i)] for i in fit_order]
 for param in model_params: 
     if param['name'] not in fit_order:
@@ -335,9 +345,8 @@ class BurstyModel(sedmodel.SedModel):
         lnp_prior = 0
 
         for k, v in self.theta_index.iteritems():
-            start, end = v
             this_prior = np.sum(self._config_dict[k]['prior_function']
-                                (theta[start:end], **self._config_dict[k]['prior_args']))
+                                (theta[v], **self._config_dict[k]['prior_args']))
 
             if (not np.isfinite(this_prior)):
                 print('WARNING: ' + k + ' is out of bounds')
@@ -368,13 +377,13 @@ def load_model(objname='',datname='',fastname='', agelims=[], **extras):
     zred = fast['z'][idx][0]
 
     #### INITIAL VALUES
-    tau = 10**fast['ltau'][idx][0]/1e9
+    logtau = np.log10(10**fast['ltau'][idx][0]/1e9)
     tage = 10**fast['lage'][idx][0]/1e9
     logmass = fast['lmass'][idx][0]
     dust2 = fast['Av'][idx][0]/1.086
 
     n = [p['name'] for p in model_params]
-    model_params[n.index('tau')]['init'] = tau
+    model_params[n.index('logtau')]['init'] = logtau
     model_params[n.index('tage')]['init'] = tage
     model_params[n.index('logmass')]['init'] = logmass
     model_params[n.index('dust2')]['init'] = dust2
