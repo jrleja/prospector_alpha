@@ -1,14 +1,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import corner, os, math, copy, threed_dutils
+import corner, os, copy, threed_dutils
 from prospect.io import read_results
-import matplotlib.image as mpimg
 import matplotlib as mpl
-from astropy.cosmology import WMAP9
-import fsps
 from matplotlib.ticker import MaxNLocator
 from prospect.models import model_setup
-import copy
 from magphys_plot_pref import jLogFormatter
 from brown_io import load_prospector_data
 
@@ -417,82 +413,115 @@ def return_extent(sample_results):
 	
 	return extents
 
-def show_chain(sample_results,plotnames=None,chain=None,outname=None,alpha=0.6,truths=None,extents=None):
+def get_cmap(N,cmap='nipy_spectral'):
+	'''Returns a function that maps each index in 0, 1, ... N-1 to a distinct 
+	RGB color.'''
+
+	import matplotlib.cm as cmx
+	import matplotlib.colors as colors
+
+	color_norm  = colors.Normalize(vmin=0, vmax=N-1)
+	scalar_map = cmx.ScalarMappable(norm=color_norm, cmap=cmap) 
+	def map_index_to_rgb_color(index):
+		return scalar_map.to_rgba(index)
+	return map_index_to_rgb_color
+
+
+def show_chain(sample_results,legend=True, outname=None):
 	
 	'''
 	plot the MCMC chain for all parameters
 	'''
 	
-	# set + load variables
+	### names and dimensions
 	parnames = np.array(sample_results['model'].theta_labels())
-	nwalkers = chain.shape[0]
-	nsteps = chain.shape[1]
-	
-	# plot geometry
+	chain = sample_results['chain']
+	lnprob = sample_results['lnprobability']
+	nwalkers, nsteps, npars = chain.shape
+	nplot = npars+2 # also plot lnprob
+
+	### plot preferences
+	nboldchain = 3
+	alpha_bold = 0.9
+	alpha = 0.05
+	lw_bold = 2
+	lw = 1
+	cmap = get_cmap(nboldchain,cmap='brg')
+
+	### plot geometry
 	ndim = len(parnames)
-	nwalkers_per_column = 128
-	nx = int(math.ceil(nwalkers/float(nwalkers_per_column)))
-	ny = ndim+1
+	ny = 4
+	nx = int(np.ceil(nplot/float(ny)))
+	nx = 5
 	sz = np.array([nx,ny])
-	factor = 3.0           # size of one side of one panel
+	factor = 3.2           # size of one side of one panel
 	lbdim = 0.0 * factor   # size of margins
-	whspace = 0.00*factor         # w/hspace size
+	whspace = 0.0 * factor         # w/hspace size
 	plotdim = factor * sz + factor *(sz-1)* whspace
 	dim = 2*lbdim + plotdim
 
-	fig, axarr = plt.subplots(ny, nx, figsize = (dim[0], dim[1]))
-	fig.subplots_adjust(wspace=0.000,hspace=0.000)
+	### create plots
+	fig, axarr = plt.subplots(ny, nx, figsize = (dim[0]*1.2, dim[1]))
+	fig.subplots_adjust(wspace=0.4,hspace=0.3)
+	axarr = np.ravel(axarr)
 	
-	# plot chain in each parameter
-	# sample_results['chain']: nwalkers, nsteps, nparams
-	for ii in xrange(nx):
-		walkerstart = nwalkers_per_column*ii
-		walkerend   = np.clip(nwalkers_per_column*(ii+1),0,chain.shape[0])
-		for jj in xrange(len(parnames)):
-			for kk in xrange(walkerstart,walkerend):
-				axarr[jj,ii].plot(chain[kk,:,jj],'-',
-						   	      alpha=alpha)
-				
-			# fiddle with x-axis
-			axarr[jj,ii].axis('tight')
-			axarr[jj,ii].set_xticklabels([])
-				
-			# fiddle with y-axis
-			if ii == 0:
-				axarr[jj,ii].set_ylabel(plotnames[jj])
-			else:
-				axarr[jj,ii].set_yticklabels([])
-			axarr[jj,ii].set_ylim(extents[jj])
-			axarr[jj,ii].yaxis.get_major_ticks()[0].label1On = False # turn off bottom ticklabel
+	### remove some plots to make room for KL divergence
+	off = [13,14,18,19]
+	#off = [7,8]
+	[axarr[o].axis('off') for o in off] # turn off 
+	axarr = np.delete(axarr,off) # remove from array
 
-			# add truths
-			if truths is not None and parnames[jj] == truths['parnames'][jj]:
-				axarr[jj,ii].axhline(truths['plot_truths'][jj], linestyle='-',color='r')
+	### check for stuck walkers
+	# must visit at least 10 unique points in lnprobability
+	outliers = np.full(nwalkers,False,dtype=bool)
+	for k in xrange(nwalkers):
+		ncall = np.unique(sample_results['lnprobability'][k,:]).shape[0]
+		if ncall <= 10:
+			outliers[k] = True
 
-		# plot lnprob
-		for kk in xrange(walkerstart,walkerend): 
-			axarr[jj+1,ii].plot(sample_results['lnprobability'][kk,:],'-',
-						      color='black',
-						      alpha=alpha)
-		# axis
-		axarr[jj+1,ii].axis('tight')
-		axarr[jj+1,ii].set_xlabel('number of steps')
-		# fiddle with y-axis
-		if ii == 0:
-			axarr[jj+1,ii].set_ylabel('lnprob')
-		else:
-			axarr[jj+1,ii].set_yticklabels([])
+	# remove stuck walkers
+	nstuck = outliers.sum()
+	print str(nstuck)+' stuck walkers found for '+sample_results['run_params'].get('objname','object')
+	if nstuck:
+		chain = chain[~outliers,:,:]
+		lnprob = lnprob[~outliers,:]
+		nwalkers = chain.shape[0]
 
-		finite = np.isfinite(sample_results['lnprobability'])
-		max = np.max(sample_results['lnprobability'][finite])
-		min = np.percentile(sample_results['lnprobability'][finite],10)
-		axarr[jj+1,ii].set_ylim(min, max+np.abs(max)*0.01)
-		
-		axarr[jj+1,ii].yaxis.get_major_ticks()[0].label1On = False # turn off bottom ticklabel
+	### plot chain in each parameter
+	for i, ax in enumerate(axarr):
+		if i < npars: # we're plotting variables
+			for k in xrange(nboldchain,nwalkers): ax.plot(chain[k,:,i],'-', alpha=alpha, lw=lw,zorder=-1)
+			for k in xrange(nboldchain): ax.plot(chain[k,:,i],'-', alpha=alpha_bold, lw=lw_bold, color=cmap(k),zorder=1)
 
+			ax.set_ylabel(parnames[i])
+			ax.set_ylim(chain[:,:,i].min()*0.95,chain[:,:,i].max()*1.05)
+
+		elif i == npars: # we're plotting lnprob
+			for k in xrange(nboldchain,nwalkers): ax.plot(lnprob[k,:],'-', alpha=alpha, lw=lw,zorder=-1)
+			for k in xrange(nboldchain): ax.plot(lnprob[k,:],'-', alpha=alpha_bold, lw=lw_bold, color=cmap(k),zorder=1)
+
+			ax.set_ylabel('ln(probability)')
+			ax.set_ylim(lnprob.min()*0.95,lnprob.max()*1.05)
+
+		ax.xaxis.set_major_locator(MaxNLocator(4))
+		ax.set_xlabel('iteration')
+
+	### add KL divergence
+	kl_ax = fig.add_axes([0.65, 0.1, 0.27, 0.38])
+	cmap = get_cmap(npars)
+	for i in xrange(npars): 
+		kl_ax.plot(sample_results['kl_iteration'],sample_results['kl_divergence'][:,i],
+			       'o',label=parnames[i],color=cmap(i),lw=1.5,linestyle='-',alpha=0.6)
+
+	kl_ax.set_ylabel('KL divergence')
+	kl_ax.set_xlabel('iteration')
+	kl_ax.set_xlim(0,nsteps*1.1)
+
+	if legend:
+		kl_ax.legend(prop={'size':5},ncol=2,numpoints=1,markerscale=0.7)
 
 	if outname is not None:
-		plt.savefig(outname, bbox_inches='tight',dpi=100)
+		plt.savefig(outname+'.corner.png', bbox_inches='tight',dpi=110)
 		plt.close()
 
 def return_sedplot_vars(sample_results, extra_output, nufnu=True):
@@ -646,6 +675,7 @@ def sed_figure(outname = None, truths = None,
 	#### add RGB image
 	try:
 		imgname = os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/rgb/'+sresults[0]['run_params']['objname'].replace(' ','_')+'.png'
+		import matplotlib.image as mpimg
 		img = mpimg.imread(imgname)
 		ax_inset2 = fig.add_axes([0.46,0.34,0.15,0.15],zorder=32)
 		ax_inset2.imshow(img)
@@ -740,7 +770,7 @@ def make_all_plots(filebase=None,
 
 	if sample_results is None:
 		try:
-			sample_results, powell_results, model, extra_output = load_prospector_data(filebase, hdf5=True)
+			sample_results, powell_results, model, extra_output = load_prospector_data(filebase, hdf5=True, load_extra_output=False)
 		except TypeError:
 			return
 	else: # if we already have sample results, but want powell results
@@ -768,9 +798,7 @@ def make_all_plots(filebase=None,
 	if plt_chain: 
 		print 'MAKING CHAIN PLOT'
 
-		show_chain(sample_results, plotnames=sample_results['model'].theta_labels(),chain=sample_results['chain'],
-	               outname=outfolder+objname+'.chain.png', extents=extents,
-			       alpha=0.3,truths=truths)
+		show_chain(sample_results,outname=outfolder+objname)
 
 	# corner plot
 	if plt_corner: 

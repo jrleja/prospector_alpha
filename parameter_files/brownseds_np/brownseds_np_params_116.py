@@ -35,7 +35,7 @@ run_params = {'verbose':True,
               'convergence_check_interval': 50,
               'convergence_chunks': 325,
               'convergence_kl_threshold': 0.018,
-              'convergence_stable_points_criteria': 4, 
+              'convergence_stable_points_criteria': 5, 
               'convergence_nhist': 50,
               # Model info
               'zcontinuous': 2,
