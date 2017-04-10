@@ -32,18 +32,11 @@ def subcorner(sample_results,  sps, model, extra_output,
 
     # pull out the parameter names and flatten the thinned chains
     parnames = np.array(sample_results['model'].theta_labels())
-    flatchain = threed_dutils.chop_chain(sample_results['chain'])
+    flatchain = threed_dutils.chop_chain(sample_results['chain'],**sample_results['run_params'])
 
     # the line below uses the posterior draws in extra_output
     # which INCLUDE IR PRIORS but are LIMITED IN SAMPLING. tradeoff!
     # flatchain = extra_output['quantiles']['sample_chain']
-
-    # restrict to parameters you want to show
-    if showpars is not None:
-        ind_show = np.array([p in showpars for p in parnames], dtype= bool)
-        flatchain = flatchain[:,ind_show]
-        truths = truths[ind_show]
-        parnames= parnames[ind_show]
 
     # plot truths
     if truths is not None:

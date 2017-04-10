@@ -686,7 +686,8 @@ def generate_basenames(runname):
 
 	return filebase,parm,ancilname
 
-def chop_chain(chain,nochop=False):
+def chop_chain(chain,convergence_check_interval=None, convergence_chunks=325,
+               convergence_stable_points_criteria=3, **extras):
 	'''
 	simple placeholder
 	will someday replace with a test for convergence to determine where to chop
@@ -695,16 +696,18 @@ def chop_chain(chain,nochop=False):
 	... haha
 	JRL 6/8/15
 	'''
-	nchop=4./3
-	if nochop:
-		nchop=np.inf
+	
+	if convergence_check_interval is None:
+		nchop= int(chain.shape[1]/nchop)
+	else:
+		nchop = convergence_stable_points_criteria+(convergence_check_interval)*(convergence_stable_points_criteria-1)
 
 	if len(chain.shape) == 3:
-		flatchain = chain[:,int(chain.shape[1]/nchop):,:]
+		flatchain = chain[:,nchop:,:]
 		flatchain = flatchain.reshape(flatchain.shape[0] * flatchain.shape[1],
 		                              flatchain.shape[2])
 	else:
-		flatchain = chain[:,int(chain.shape[1]/nchop):]
+		flatchain = chain[:,nchop:]
 		flatchain = flatchain.reshape(flatchain.shape[0] * flatchain.shape[1])
 
 	return flatchain

@@ -97,7 +97,7 @@ def sample_flatchain(chain, lnprob, parnames, ir_priors=True, include_maxlnprob=
 		umin_prior = 15
 		qpah_prior = 7
 		in_priors = (chain[:,gamma_idx] < gamma_prior) & (chain[:,umin_idx] < umin_prior) & (chain[:,qpah_idx] < qpah_prior) & good[:,None]
-		if in_priors.sum() < nsamp:
+		if in_priors.sum() < 2*nsamp:
 			print 'Insufficient number of samples within the IR priors! Not applying IR priors.'
 		else:
 			good = in_priors
@@ -483,8 +483,8 @@ def post_processing(param_name, **kwargs):
 	print 'Performing post-processing on ' + sample_results['run_params']['objname']
 
 	### create flatchain, run post-processing
-	sample_results['flatchain'] = threed_dutils.chop_chain(sample_results['chain'])
-	sample_results['flatprob'] = threed_dutils.chop_chain(sample_results['lnprobability'])
+	sample_results['flatchain'] = threed_dutils.chop_chain(sample_results['chain'],**sample_results['run_params'])
+	sample_results['flatprob'] = threed_dutils.chop_chain(sample_results['lnprobability'],**sample_results['run_params'])
 	extra_output = calc_extra_quantities(sample_results,**kwargs)
 	
 	### create post-processing name, dump info
