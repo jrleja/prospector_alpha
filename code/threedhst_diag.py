@@ -503,12 +503,15 @@ def show_chain(sample_results,legend=True, outname=None):
 	kl_ax = fig.add_axes([0.65, 0.1, 0.27, 0.38])
 	cmap = get_cmap(npars)
 	for i in xrange(npars): 
-		kl_ax.plot(sample_results['kl_iteration'],sample_results['kl_divergence'][:,i],
+		kl_ax.plot(np.log10(sample_results['kl_iteration']),sample_results['kl_divergence'][:,i],
 			       'o',label=parnames[i],color=cmap(i),lw=1.5,linestyle='-',alpha=0.6)
 
-	kl_ax.set_ylabel('KL divergence')
+	kl_ax.set_ylabel('log(KL divergence)')
 	kl_ax.set_xlabel('iteration')
 	kl_ax.set_xlim(0,nsteps*1.1)
+
+	kl_div_lim = sample_results['run_params'].get('convergence_kl_threshold',0.018)
+	kl_ax.axhline(np.log10(kl_div_lim), linestyle='--', color='red',lw=2,zorder=1)
 
 	if legend:
 		kl_ax.legend(prop={'size':5},ncol=2,numpoints=1,markerscale=0.7)
