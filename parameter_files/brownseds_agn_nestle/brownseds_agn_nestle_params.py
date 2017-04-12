@@ -25,7 +25,10 @@ run_params = {'verbose':True,
               'ftol':0.5e-5, 
               'maxfev':5000,
               # MCMC params
-              'nestle_maxcall': 1e2,
+              'nestle_method': 'multi',
+              'nestle_npoints': 1000,
+              'nestle_maxcall': int(1e6),
+              'nestle_update_interval': None,
               # Model info
               'zcontinuous': 2,
               'compute_vega_mags': False,
