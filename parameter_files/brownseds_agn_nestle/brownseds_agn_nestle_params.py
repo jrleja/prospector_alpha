@@ -500,6 +500,27 @@ model_params = tparams
 ###### REDEFINE MODEL FOR MY OWN NEFARIOUS PURPOSES ######
 class BurstyModel(sedmodel.SedModel):
 
+    def prior_transform(self, unit_coords):
+        """Go from unit cube to parameter space, for nested sampling.
+        """
+        theta = np.zeros(len(unit_coords))
+        for k, inds in list(self.theta_index.items()):
+            func = self._config_dict[k]['prior'].unit_transform
+            kwargs = self._config_dict[k].get('prior_args', {})
+            theta[inds] = func(unit_coords[inds], **kwargs)
+
+        if ('dust1' in self.theta_index) & ('dust2' in self.theta_index):
+            dust2 = theta[self.theta_index['dust2']]
+
+            kwargs = self._config_dict['dust1'].get('prior_args', {})
+            kwargs.update(maxi=2*dust2)
+
+            d1ind = self.theta_index['dust1']
+            func = self._config_dict['dust1']['prior'].unit_transform
+            theta[d1ind] = func(unit_coords[d1ind], **kwargs)
+        return theta
+
+
     def prior_product(self, theta, **extras):
         """
         Return a scalar which is the ln of the product of the prior
