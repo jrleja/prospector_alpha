@@ -503,7 +503,7 @@ def show_chain(sample_results,legend=True, outname=None):
 	kl_ax = fig.add_axes([0.65, 0.1, 0.27, 0.38])
 	cmap = get_cmap(npars)
 	for i in xrange(npars): 
-		kl_ax.plot(np.log10(sample_results['kl_iteration']),sample_results['kl_divergence'][:,i],
+		kl_ax.plot(sample_results['kl_iteration'],np.log10(sample_results['kl_divergence'][:,i]),
 			       'o',label=parnames[i],color=cmap(i),lw=1.5,linestyle='-',alpha=0.6)
 
 	kl_ax.set_ylabel('log(KL divergence)')
@@ -517,7 +517,7 @@ def show_chain(sample_results,legend=True, outname=None):
 		kl_ax.legend(prop={'size':5},ncol=2,numpoints=1,markerscale=0.7)
 
 	if outname is not None:
-		plt.savefig(outname+'.corner.png', bbox_inches='tight',dpi=110)
+		plt.savefig(outname+'.chain.png', bbox_inches='tight',dpi=110)
 		plt.close()
 
 def return_sedplot_vars(sample_results, extra_output, nufnu=True):
@@ -766,7 +766,7 @@ def make_all_plots(filebase=None,
 
 	if sample_results is None:
 		try:
-			sample_results, powell_results, model, extra_output = load_prospector_data(filebase, hdf5=True, load_extra_output=False)
+			sample_results, powell_results, model, extra_output = load_prospector_data(filebase, hdf5=True, load_extra_output=True)
 		except TypeError:
 			return
 	else: # if we already have sample results, but want powell results
@@ -800,7 +800,6 @@ def make_all_plots(filebase=None,
 	if plt_corner: 
 		print 'MAKING CORNER PLOT'
 		chopped_sample_results = copy.deepcopy(sample_results)
-
 		subcorner(sample_results, sps, copy.deepcopy(sample_results['model']),
 				  extra_output,outname=outfolder+objname,
 				  extents=extents, truths=truths, powell_results=powell_results)
