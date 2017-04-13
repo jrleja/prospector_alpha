@@ -548,7 +548,7 @@ class BurstyModel(sedmodel.SedModel):
 
         # sum of SFH fractional bins <= 1.0
         if 'sfr_fraction' in self.theta_index:
-            sfr_fraction = theta[self.theta_index['dust2']]
+            sfr_fraction = theta[self.theta_index['sfr_fraction']]
             if np.sum(sfr_fraction) > 1.0:
                 return -np.inf
 
