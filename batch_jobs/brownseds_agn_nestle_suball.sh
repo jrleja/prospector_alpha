@@ -19,7 +19,6 @@
 #SBATCH --mail-type=END
 #SBATCH --mail-user=joel.leja@gmail.com
 IDFILE=$APPS"/threedhst_bsfh/data/brownseds_agn.ids"
-SLURM_ARRAY_TASK_ID=2 # kill me
 OBJID=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$IDFILE")
 srun -n $SLURM_NTASKS --mpi=pmi2 \
 python $APPS/bsfh/scripts/prospector_nest.py \ 
