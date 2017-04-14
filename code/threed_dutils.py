@@ -1180,7 +1180,7 @@ def measure_agn_luminosity(fagn,sps,mass):
 	# tabular or "regular" SSPs
 	if np.isscalar(sps.ssp.log_lbol):
 		weighted_lbol = 10**sps.ssp.log_lbol
-		lagn = weighted_lbol*fagn*constants.L_sun.cgs.value
+		lagn = weighted_lbol*fagn[0]*float(constants.L_sun.cgs.value)
 	else:
 		ssp_lbol = np.insert(10**sps.ssp.log_lbol, 0, 10**sps.ssp.log_lbol[0])
 		weights = sps.all_ssp_weights
