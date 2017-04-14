@@ -690,11 +690,8 @@ def load_sps(**extras):
 def load_model(objname='',datname='', agelims=[], **extras):
 
     ###### REDSHIFT ######
-    print objname
-    print datname
     hdulist = fits.open(datname)
     idx = hdulist[1].data['Name'] == objname
-    print idx
     zred =  hdulist[1].data['cz'][idx][0] / 3e5
     hdulist.close()
 
