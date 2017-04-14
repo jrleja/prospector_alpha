@@ -19,7 +19,7 @@ jansky_mks = 1e-26
 
 run_params = {'verbose':True,
               'debug': False,
-              'outfile': os.getenv('APPS')+'/threedhst_bsfh/results/brownseds_agn_nestle/brownseds_agn_nestle',
+              'outfile': os.getenv('APPS')+'/threedhst_bsfh/results/brownseds_agn_nestle/brownseds_agn_nestle_Arp 256 N',
               'nofork': True,
               # Optimizer params
               'ftol':0.5e-5, 
@@ -42,7 +42,6 @@ run_params = {'verbose':True,
               'herschname':os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/kingfish.brownapertures.flux.fits',
               'objname':'Arp 256 N',
               }
-run_params['outfile'] = run_params['outfile']+'_'+run_params['objname']
 
 ############
 # OBS
