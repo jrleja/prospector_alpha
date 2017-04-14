@@ -26,7 +26,7 @@ run_params = {'verbose':True,
               'maxfev':5000,
               # MCMC params
               'nestle_method': 'multi',
-              'nestle_npoints': 1000,
+              'nestle_npoints': 2000,
               'nestle_maxcall': int(1e6),
               'nestle_update_interval': None,
               # Model info
