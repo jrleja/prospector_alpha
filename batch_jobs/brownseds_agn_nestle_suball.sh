@@ -22,8 +22,8 @@ IDFILE=$APPS"/threedhst_bsfh/data/brownseds_agn.ids"
 OBJID=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$IDFILE")
 echo $OBJID
 echo IDFILE
-echo $APPS/threedhst_bsfh/results/brownseds_agn_nestle/brownseds_agn_nestle_$OBJID
+echo $APPS/threedhst_bsfh/results/brownseds_agn_nestle/brownseds_agn_nestle_"$OBJID"
 python $APPS/bsfh/scripts/prospector_nest.py \
---param_file=$APPS/threedhst_bsfh/parameter_files/brownseds_agn_nestle/brownseds_agn_nestle_params.py \
---objname=$OBJID \
---outfile=$APPS/threedhst_bsfh/results/brownseds_agn_nestle/brownseds_agn_nestle_$OBJID
+--param_file="$APPS"/threedhst_bsfh/parameter_files/brownseds_agn_nestle/brownseds_agn_nestle_params.py \
+--objname="$OBJID" \
+--outfile="$APPS"/threedhst_bsfh/results/brownseds_agn_nestle/brownseds_agn_nestle_"$OBJID"
