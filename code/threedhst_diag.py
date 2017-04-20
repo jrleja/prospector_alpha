@@ -778,6 +778,8 @@ def make_all_plots(filebase=None,
 	run_params = model_setup.get_run_params(param_file=param_name)
 	sps = model_setup.load_sps(**run_params)
 
+	print 1/0
+
 	# BEGIN PLOT ROUTINE
 	print 'MAKING PLOTS FOR ' + filebase.split('/')[-1] + ' in ' + outfolder
 	
@@ -830,6 +832,10 @@ def plot_all_driver(runname=None,**extras):
 	filebase, parm_basename, ancilname=threed_dutils.generate_basenames(runname)
 	for jj in xrange(len(filebase)):
 		print 'iteration '+str(jj) 
+
+		if 'UGCA 166' not in filebase[jj]:
+			continue
+		print filebase[jj]
 
 		make_all_plots(filebase=filebase[jj],\
 		               outfolder=os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/',

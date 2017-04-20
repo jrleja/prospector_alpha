@@ -30,7 +30,8 @@ def collate_data(alldata,alldata_noagn):
 
 	### let's do something special here
 	fparnames = ['halpha','m23_frac']
-	fparlabels = [r'log(H$_{\alpha}$ flux)',r'M$_*$(0.1-1 Gyr)/M$_*$']
+	fparlabels = [r'log(H$_{\alpha}$ flux)',r'M$_{\mathrm{formed}}$(0.1-1 Gyr)/M$_{\mathrm{formed}}$(total)']
+	objname = []
 
 	### setup dictionary
 	outvals, outq, outerrs, outlabels = {},{},{},{}
@@ -43,6 +44,7 @@ def collate_data(alldata,alldata_noagn):
 
 	### fill with data
 	for dat,datnoagn in zip(alldata,alldata_noagn):
+		objname.append(dat['objname'])
 		for ii,par in enumerate(parnames):
 			p1 = np.random.choice(dat['pquantiles']['sample_chain'][:,ii].squeeze(),size=size)
 			p2 = np.random.choice(datnoagn['pquantiles']['sample_chain'][:,ii].squeeze(),size=size)
@@ -123,9 +125,10 @@ def collate_data(alldata,alldata_noagn):
 	out['labels'] = outlabels
 	out['ordered_labels'] = np.concatenate((eparnames,np.array(parnames),np.array(fparnames)))
 	out['agn_pars'] = agn_pars
+	out['objname'] = objname
 	return out
 
-def plot(runname='brownseds_agn',runname_noagn='brownseds_np',alldata=None,alldata_noagn=None,outfolder=None,**popts):
+def plot(runname='brownseds_agn',runname_noagn='brownseds_np',alldata=None,alldata_noagn=None,outfolder=None,idx=None,**popts):
 
 	#### load alldata
 	if alldata is None:
@@ -145,12 +148,14 @@ def plot(runname='brownseds_agn',runname_noagn='brownseds_np',alldata=None,allda
 	### delta parameters plot
 	fig,ax = plot_dpars(pdata,
 		                xpar='fagn',xparlabel=r'log(f$_{\mathrm{MIR}}$)',
-		                log_xpar=True)
+		                log_xpar=True,
+		                agn_idx=idx,
+		                **popts)
 	plt.tight_layout()
 	plt.savefig(outfolder+'delta_fitpars.png',dpi=dpi)
 	plt.close()
 
-def plot_dpars(pdata,xpar=None,xparlabel=None,log_xpar=False):
+def plot_dpars(pdata,xpar=None,xparlabel=None,log_xpar=False, agn_idx=None, **popts):
 	'''
 	plots a scatterplot
 	'''
@@ -158,7 +163,9 @@ def plot_dpars(pdata,xpar=None,xparlabel=None,log_xpar=False):
 	#### generate color mapping
 	xpar_plot = np.array(pdata['agn_pars'][xpar])
 	if log_xpar:
-		xpar_plot = np.log10(xpar_plot)
+		# add minimum
+		min_xpar = (xpar_plot[xpar_plot > 0]).min()
+		xpar_plot = np.log10(np.clip(xpar_plot,min_xpar,np.inf))
 
 	#### plot photometry
 	#fig, ax = plt.subplots(4,5, figsize=(21,16))
@@ -169,7 +176,6 @@ def plot_dpars(pdata,xpar=None,xparlabel=None,log_xpar=False):
 	        'color': blue,
 	        'mew': 1.5,
 	        'alpha': 0.6,
-	        'fmt': 'o'
 	       }
 
 	toplot = ['stellar_mass','logzsol','dust2','ssfr_100','half_time','m23_frac']
@@ -180,8 +186,14 @@ def plot_dpars(pdata,xpar=None,xparlabel=None,log_xpar=False):
 		if par not in toplot:
 			continue
 
+		# find the complement
+		cidx = np.ones_like(xpar_plot,dtype=bool)
+		cidx[agn_idx] = False
+
 		errs = pdata['errs'][par]
-		ax[idx].errorbar(xpar_plot,pdata['median'][par], yerr=errs, zorder=-3, **opts)
+		ax[idx].errorbar(xpar_plot[cidx],pdata['median'][par][cidx], yerr=[errs[0][cidx],errs[1][cidx]], zorder=-3, fmt=popts['nofmir_shape'],**opts)
+		ax[idx].errorbar(xpar_plot[agn_idx],pdata['median'][par][agn_idx], yerr=[errs[0][agn_idx],errs[1][agn_idx]], zorder=-3, fmt=popts['fmir_shape'],**opts)
+
 		ax[idx].set_ylabel('AGN(on)-AGN(off)')
 		ax[idx].set_xlabel(xparlabel)
 		ax[idx].set_title(pdata['labels'][par])
@@ -190,8 +202,10 @@ def plot_dpars(pdata,xpar=None,xparlabel=None,log_xpar=False):
 		ax[idx].xaxis.set_major_locator(MaxNLocator(5))
 
 		x, y = running_median(xpar_plot,pdata['median'][par],nbins=8,weights=1./(np.array(errs)[0]+np.array(errs)[1]),avg=True)
-		ax[idx].plot(x,y,color=red,lw=4,alpha=0.6)
-		ax[idx].plot(x,y,color=red,lw=4,alpha=0.6)
+		ax[idx].plot(x,y,color=red,lw=4,alpha=0.9)
+
+		ylim = np.abs(ax[idx].get_ylim()).max()
+		ax[idx].set_ylim(-ylim,ylim)
 
 		idx +=1
 

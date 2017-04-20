@@ -187,7 +187,7 @@ def offset_and_scatter(x,y,biweight=True):
 		scat      = np.sqrt(siggma)
 
 	else:
-		scat=np.sqrt(np.sum((x-y-mean_offset)**2.)/(n-2))
+		scat=np.sqrt(np.sum((y-x-mean_offset)**2.)/(n-2))
 
 	return mean_offset,scat
 

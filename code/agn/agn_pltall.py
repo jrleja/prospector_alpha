@@ -49,11 +49,18 @@ def plot(runname='brownseds_agn',runname_noagn='brownseds_np',
 		alldata_sub = deepcopy(alldata)
 
 	### what are we calling "AGN" ?
-	twosigma_fmir = np.array([np.percentile(dat['pquantiles']['sample_chain'][:,fidx].squeeze(),5) for dat in alldata_sub])
-	agn_idx = np.where(twosigma_fmir > 0.1)[0]
+	twosigma_fmir = np.array([np.percentile(dat['pquantiles']['sample_chain'][:,fidx].squeeze(),2.5) for dat in alldata_sub])
+	agn_idx = np.where(twosigma_fmir > 0.05)[0]
+
 	### resort from largest to smallest
 	fmir = np.array([dat['pquantiles']['q50'][fidx][0] for dat in alldata_sub])
 	agn_idx = agn_idx[fmir[agn_idx].argsort()]
+
+	print 'the following are identified AGN: '
+	names = [alldata[idx]['objname'] for idx in agn_idx]
+	print ', '.join(names)
+
+	print fmir[agn_idx]
 
 	### global plot color scheme
 	popts = {
@@ -67,25 +74,22 @@ def plot(runname='brownseds_agn',runname_noagn='brownseds_np',
 	        }
 
 	#### PLOT ALL
-	'''
 	print 'PLOTTING PROPERTY COMPARISON'
 	property_comparison.plot_comparison(idx_plot=agn_idx,runname=runname,runname_noagn=runname_noagn,alldata=alldata_sub,alldata_noagn=alldata_noagn,outfolder=outfolder,**popts)
 	print 'PLOTTING DELTA PARS'
-	plot_delta_pars.plot(runname=runname,runname_noagn=runname_noagn,alldata=alldata_sub,alldata_noagn=alldata_noagn,outfolder=outfolder,**popts)
+	plot_delta_pars.plot(runname=runname,runname_noagn=runname_noagn,alldata=alldata_sub,alldata_noagn=alldata_noagn,outfolder=outfolder,idx=agn_idx,**popts)
 	print 'PLOTTING MASS-METALLICITY DIAGRAM'
 	delta_mass_met.plot_comparison(runname=runname,alldata=alldata_sub,alldata_noagn=alldata_noagn,outfolder=outfolder,plt_idx=agn_idx,**popts)
-		print 'PLOTTING WISE COLORS'
-	wise_colors.plot_mir_colors(runname=runname,alldata=alldata_sub,outfolder=outfolder,**popts)
+	print 'PLOTTING WISE COLORS'
+	wise_colors.plot_mir_colors(runname=runname,alldata=alldata_sub,outfolder=outfolder,idx=agn_idx,**popts)
 	print 'PLOTTING BPT DIAGRAM'
-	bpt.plot_bpt(runname=runname,alldata=alldata_sub,outfolder=outfolder,**popts)
+	bpt.plot_bpt(runname=runname,alldata=alldata_sub,outfolder=outfolder,idx=agn_idx,**popts)
 	#print 'PLOTTING OPTICAL COLOR COLOR DIAGRAM'
 	#optical_color_color.plot(runname=runname,alldata=alldata_sub,outfolder=outfolder)
 	print 'PLOTTING XRAY LUMINOSITY'
 	xray_luminosity.make_plot(runname=runname,alldata=alldata_sub,outfolder=outfolder,idx=agn_idx,**popts)
-	'''
 	print 'PLOTTING DELTA OBSERVABLES'
 	plot_spec_rms.plot_comparison(runname=runname,alldata=alldata_sub,alldata_noagn=alldata_noagn,outfolder=outfolder,idx=agn_idx,**popts)
-	print 1/0
 	### check out what you've made
 	if open_all:
 		os.system('open '+outfolder+'*.png')

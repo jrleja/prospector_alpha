@@ -84,7 +84,7 @@ def collate_data(alldata):
 	out['model_pars'] = model_pars
 	return out
 
-def plot_mir_colors(runname='brownseds_agn',alldata=None,outfolder=None, vega=True):
+def plot_mir_colors(runname='brownseds_agn',alldata=None,outfolder=None, vega=True, idx=None, **opts):
 
 	#### load alldata
 	if alldata is None:
@@ -105,38 +105,14 @@ def plot_mir_colors(runname='brownseds_agn',alldata=None,outfolder=None, vega=Tr
 	if vega:
 		system = '(Vega)'
 
-
-	'''
-	### temporary plot
-	from threed_dutils import asym_errors
-	xfilt = ['wise_w2','wise_w3']
-	good = (pdata['obs_phot'][xfilt[0]] != 0) & (pdata['obs_phot'][xfilt[1]] != 0)
-	xplot = -2.5*np.log10(pdata['obs_phot'][xfilt[0]][good])+2.5*np.log10(pdata['obs_phot'][xfilt[1]][good])
-	yplot = pdata['model_pars']['duste_qpah']['q50'][good]
-	yerr = asym_errors(yplot,pdata['model_pars']['duste_qpah']['q84'][good],pdata['model_pars']['duste_qpah']['q16'][good])
-
-	opts = {
-	        'color': '#1C86EE',
-	        'mew': 1.5,
-	        'alpha': 0.6,
-	        'fmt': 'o'
-	       }
-
-	plt.errorbar(xplot,yplot,yerr=yerr,**opts)
-	plt.xlabel('WISE [4.6]-[12] (AB)')
-	plt.ylabel(r'Q$_{\mathrm{PAH}}$')
-
-	plt.ylim(-0.1,7)
-	plt.show()
-	'''
-
 	#### colored scatterplots
 	### IRAC
 	cpar_range = [-2,0]
 	xfilt, yfilt = ['spitzer_irac_ch3','spitzer_irac_ch4'], ['spitzer_irac_ch1','spitzer_irac_ch2']
 	fig,ax = plot_color_scatterplot(pdata,xfilt=xfilt,yfilt=yfilt,
 		                   xlabel='IRAC [5.8]-[8.0] (AB)', ylabel='IRAC [3.6]-[4.5] (AB)',
-		                   colorpar='fagn',colorparlabel=r'log(f$_{\mathrm{MIR}}$)',log_cpar=True, cpar_range=cpar_range)
+		                   colorpar='fagn',colorparlabel=r'log(f$_{\mathrm{MIR}}$)',log_cpar=True, cpar_range=cpar_range,
+		                   idx=idx,**opts)
 	plot_nenkova_templates(ax, xfilt=xfilt,yfilt=yfilt)
 	#plot_prospector_templates(ax, xfilt=xfilt,yfilt=yfilt,outfolder=outfolder)
 	plt.savefig(outfolder+'irac_colors.png',dpi=dpi)
@@ -147,7 +123,8 @@ def plot_mir_colors(runname='brownseds_agn',alldata=None,outfolder=None, vega=Tr
 	fig, ax = plot_color_scatterplot(pdata,xfilt=xfilt,yfilt=yfilt,
 		                             xlabel='WISE [4.6]-[12] '+system,ylabel='WISE [3.4]-[4.6] '+system,
 		                             colorpar='fagn',colorparlabel=r'log(f$_{\mathrm{MIR}}$)',
-		                             log_cpar=True, cpar_range=cpar_range,vega=vega)
+		                             log_cpar=True, cpar_range=cpar_range,vega=vega,
+		                   			 idx=idx,**opts)
 	plot_nenkova_templates(ax, xfilt=xfilt,yfilt=yfilt,vega=vega)
 	#plot_prospector_templates(ax, xfilt=xfilt,yfilt=yfilt,outfolder=outfolder,vega=vega)
 	outstring = 'wise_hotcolors'
@@ -164,7 +141,8 @@ def plot_mir_colors(runname='brownseds_agn',alldata=None,outfolder=None, vega=Tr
 
 	fig,ax = plot_color_scatterplot(pdata,xfilt=xfilt,yfilt=yfilt,
 		                   xlabel='WISE [4.6]-[12] '+system,ylabel='WISE [12]-[22] '+system,
-		                   colorpar='fagn',colorparlabel=r'log(f$_{\mathrm{MIR}}$)',log_cpar=True, cpar_range=cpar_range,vega=vega)
+		                   colorpar='fagn',colorparlabel=r'log(f$_{\mathrm{MIR}}$)',log_cpar=True, cpar_range=cpar_range,vega=vega,
+		                   idx=idx,**opts)
 	plot_nenkova_templates(ax, xfilt=xfilt,yfilt=yfilt,vega=vega)
 	#plot_prospector_templates(ax, xfilt=xfilt,yfilt=yfilt,outfolder=outfolder,vega=vega)
 
@@ -251,7 +229,7 @@ def plot_prospector_templates(ax, xfilt=None, yfilt=None, outfolder=None, vega=F
 
 def plot_color_scatterplot(pdata,xfilt=None,yfilt=None,xlabel=None,ylabel=None,
 	                       colorpar=None,colorparlabel=None,log_cpar=False,cpar_range=None,
-	                       outname=None, vega=False):
+	                       outname=None, vega=False, idx=None, **popts):
 	'''
 	plots a color-color scatterplot in AB magnitudes
 
@@ -267,6 +245,10 @@ def plot_color_scatterplot(pdata,xfilt=None,yfilt=None,xlabel=None,ylabel=None,
 	xplot = -2.5*np.log10(pdata['obs_phot'][xfilt[0]][good])+2.5*np.log10(pdata['obs_phot'][xfilt[1]][good])
 	yplot = -2.5*np.log10(pdata['obs_phot'][yfilt[0]][good])+2.5*np.log10(pdata['obs_phot'][yfilt[1]][good])
 	
+	cidx = np.ones_like(good,dtype=bool)
+	cidx[idx] = False
+	cidx = cidx[good]
+
 	### convert to vega magnitudes
 	if vega:
 		xplot += vega_conversions(xfilt[0]) - vega_conversions(xfilt[1])
@@ -281,7 +263,11 @@ def plot_color_scatterplot(pdata,xfilt=None,yfilt=None,xlabel=None,ylabel=None,
 
 	#### plot photometry
 	fig, ax = plt.subplots(1,1, figsize=(8, 6))
-	pts = ax.scatter(xplot, yplot, marker='o', c=cpar_plot, cmap=plt.cm.plasma,s=70,alpha=0.6)
+	ax.scatter(xplot[cidx], yplot[cidx], marker=popts['nofmir_shape'], c=cpar_plot[cidx],
+		       vmin=cpar_plot.min(), vmax=cpar_plot.max(), cmap=plt.cm.plasma,s=70,alpha=0.7)
+	ax.scatter(xplot[~cidx], yplot[~cidx], marker=popts['fmir_shape'], c=cpar_plot[~cidx], 
+			   vmin=cpar_plot.min(), vmax=cpar_plot.max(), cmap=plt.cm.plasma,s=70,alpha=0.7)
+	pts = ax.scatter(xplot, yplot, marker='o', c=cpar_plot, cmap=plt.cm.plasma,s=0.0,alpha=0.7)
 
 	#### label and add colorbar
 	ax.set_xlabel(xlabel)
@@ -324,8 +310,7 @@ def generate_dl07_models(outfolder='/Users/joel/code/python/threedhst_bsfh/plots
 	to_vary = ['duste_gamma','duste_qpah','duste_umin','logzsol']
 	grid = []
 	for l in to_vary:
-		start,end = model.theta_index[l]
-		bounds = model.theta_bounds()[start:end][0]
+		bounds = model.theta_bounds()[model.theta_index[l]][0]
 		grid.append(np.linspace(bounds[0],bounds[1],ngrid))
 
 	outdict = {}
@@ -345,7 +330,6 @@ def generate_dl07_models(outfolder='/Users/joel/code/python/threedhst_bsfh/plots
 	indices = [i for i, s in enumerate(pnames) if ('sfr_fraction' in s)]
 	theta[indices] = 0.0
 	theta[pnames.index('sfr_fraction_4')] = 1.0
-	print theta
 
 	for logzsol in grid[3]:
 		for gamma in grid[0]:

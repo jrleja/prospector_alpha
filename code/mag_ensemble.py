@@ -1356,7 +1356,7 @@ def gas_phase_metallicity(e_pinfo, hflag, alldata, outfolder='',ssfr_cut=False):
 	ax.set_xlabel('log(Z$_{\mathrm{gas}}$/Z$_{\odot}$)')
 	ax.set_ylabel('log(Z$_{*}$/Z$_{\odot}$)')
 
-	ax = threed_dutils.equalize_axes(ax, logzgas,logzsol, dynrange=0.1, line_of_equality=True, log=False)
+	ax = threed_dutils.equalize_axes(ax, logzgas,logzsol, dynrange=0.1, line_of_equality=True)
 
 	ax.text(0.03,0.93, r'S/N (H$\alpha$,H$\beta$,[OIII],[NII]) > '+str(int(sn_cut)), transform = ax.transAxes,horizontalalignment='left')
 	ax.text(0.03,0.87, r'N = '+str(np.sum(keep_idx)), transform = ax.transAxes,horizontalalignment='left')

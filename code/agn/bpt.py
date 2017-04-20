@@ -72,7 +72,7 @@ def collate_data(alldata):
 	out['nii_ha'] = nii_ha
 	return out
 
-def plot_bpt(runname='brownseds_agn',alldata=None,outfolder=None):
+def plot_bpt(runname='brownseds_agn',alldata=None,outfolder=None,idx=None,**popts):
 
 	#### load alldata
 	if alldata is None:
@@ -89,7 +89,7 @@ def plot_bpt(runname='brownseds_agn',alldata=None,outfolder=None):
 
 	### BPT PLOT
 	fig,ax = plot_scatterplot(pdata,colorpar='fagn',colorparlabel=r'log(f$_{\mathrm{MIR}}$)',
-		                             log_cpar=True, cpar_range=[-2,0])
+		                             log_cpar=True, cpar_range=[-2,0], idx=idx, **popts)
 	add_kewley_classifications(ax)
 	plt.tight_layout()
 	plt.savefig(outfolder+'bpt_fagn.png',dpi=dpi)
@@ -107,7 +107,7 @@ def add_kewley_classifications(ax):
 	ax.plot(x1,0.61 / (x1 - 0.05) + 1.3 , linestyle='--',color='0.5',lw=1.5)
 	ax.plot(x2,0.61 / (x2-0.47) + 1.19, linestyle='--',color='0.5',lw=1.5)
 
-def plot_scatterplot(pdata,colorpar=None,colorparlabel=None,log_cpar=False,cpar_range=None,):
+def plot_scatterplot(pdata,colorpar=None,colorparlabel=None,log_cpar=False,cpar_range=None,idx=None,**popts):
 	'''
 	plots a color-color BPT scatterplot
 	'''
@@ -118,6 +118,10 @@ def plot_scatterplot(pdata,colorpar=None,colorparlabel=None,log_cpar=False,cpar_
 	       (pdata['nii_ha'][:,0]/pdata['nii_ha'][:,1] > sncut) & \
 	       (pdata['nii_ha'][:,0] > 0) & \
 	       (pdata['oiii_hb'][:,0] > 0)
+
+	cidx = np.ones_like(good,dtype=bool)
+	cidx[idx] = False
+	cidx = cidx[good]
 
 	#### generate x, y values
 	xerr = asym_errors(pdata['nii_ha'][good,0],pdata['nii_ha'][good,0]+pdata['nii_ha'][good,1],pdata['nii_ha'][good,0]-pdata['nii_ha'][good,1],log=True)
@@ -137,7 +141,10 @@ def plot_scatterplot(pdata,colorpar=None,colorparlabel=None,log_cpar=False,cpar_
 
 	ax.errorbar(xplot, yplot, yerr=yerr, xerr=xerr,
 	            fmt='o', ecolor='k', capthick=2,elinewidth=2,ms=0.0,alpha=0.5,zorder=-5)
-	pts = ax.scatter(xplot, yplot, marker='o', c=cpar_plot, cmap=plt.cm.plasma,s=70,zorder=10)
+	pts = ax.scatter(xplot[cidx], yplot[cidx], marker=popts['nofmir_shape'], c=cpar_plot[cidx], vmin=cpar_plot.min(), vmax=cpar_plot.max(),
+	                 cmap=plt.cm.plasma,s=70,zorder=10)
+	pts = ax.scatter(xplot[~cidx], yplot[~cidx], marker=popts['fmir_shape'], c=cpar_plot[~cidx], vmin=cpar_plot.min(), vmax=cpar_plot.max(),
+		             cmap=plt.cm.plasma,s=70,zorder=10)
 
 	ax.set_xlabel(r'log([NII 6583]/H$_{\alpha}$)')
 	ax.set_ylabel(r'log([OIII 5007]/H$_{\beta}$)')

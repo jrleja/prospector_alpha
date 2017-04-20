@@ -41,10 +41,11 @@ def collate_data(alldata, **extras):
 	eparnames = alldata[0]['pextras']['parnames']
 	xr_idx = eparnames == 'xray_lum'
 	xray = brown_io.load_xray_cat(xmatch = True, **extras)
+	nsamp = 100000 # for newly defined variables
 
 	#### for each object
-	fagn, fagn_up, fagn_down, mass, luv_lir, xray_lum, xray_lum_err, database, observatory = [], [], [], [], [], [], [], [], []
-	fagn_obs, fagn_obs_up, fagn_obs_down = [], [], []
+	fagn, fagn_up, fagn_down, mass, lir_luv, lir_luv_up, lir_luv_down, xray_lum, xray_lum_err, database, observatory = [[] for i in range(11)]
+	fagn_obs, fagn_obs_up, fagn_obs_down, lmir_lbol, lmir_lbol_up, lmir_lbol_down = [[] for i in range(6)]
 	lagn, lagn_up, lagn_down, lsfr, lsfr_up, lsfr_down = [], [], [], [], [], []
 	sfr, sfr_up, sfr_down, ssfr, ssfr_up, ssfr_down, d2, d2_up, d2_down = [[] for i in range(9)]
 	fmir, fmir_up, fmir_down = [], [], []
@@ -73,8 +74,18 @@ def collate_data(alldata, **extras):
 		fmir_up.append(dat['pextras']['q84'][eparnames=='fmir'][0])
 		fmir_down.append(dat['pextras']['q16'][eparnames=='fmir'][0])
 
-		#### L_UV / L_IR
-		luv_lir.append(dat['bfit']['luv']/dat['bfit']['lir'])
+		#### L_UV / L_IR, LMIR/LBOL
+		cent, eup, edo = quantile(np.random.choice(dat['lir'],nsamp) / np.random.choice(dat['luv'],nsamp), [0.5, 0.84, 0.16])
+
+		lir_luv.append(cent)
+		lir_luv_up.append(eup)
+		lir_luv_down.append(edo)
+
+		cent, eup, edo = quantile(np.random.choice(dat['lmir'],nsamp) / np.random.choice(dat['pextras']['flatchain'][:,dat['pextras']['parnames'] == 'lbol'].squeeze(),nsamp), [0.5, 0.84, 0.16])
+
+		lmir_lbol.append(cent)
+		lmir_lbol_up.append(eup)
+		lmir_lbol_down.append(edo)
 
 		#### x-ray fluxes
 		# match
@@ -111,7 +122,6 @@ def collate_data(alldata, **extras):
 
 		##### L_OBS / L_SFR(MODEL)
 		# sample from the chain, assume gaussian errors for x-ray fluxes
-		nsamp = 10000
 		chain = dat['pextras']['flatchain'][:,xr_idx].squeeze()
 
 		if scale <= 0:
@@ -147,7 +157,12 @@ def collate_data(alldata, **extras):
 	out['d2'] = d2
 	out['d2_up'] = d2_up
 	out['d2_down'] = d2_down
-	out['luv_lir'] = luv_lir
+	out['lir_luv'] = lir_luv
+	out['lir_luv_up'] = lir_luv_up
+	out['lir_luv_down'] = lir_luv_down
+	out['lmir_lbol'] = lmir_lbol
+	out['lmir_lbol_up'] = lmir_lbol_up
+	out['lmir_lbol_down'] = lmir_lbol_down
 	out['fagn'] = fagn
 	out['fagn_up'] = fagn_up
 	out['fagn_down'] = fagn_down
@@ -201,7 +216,7 @@ def make_plot(runname='brownseds_agn',alldata=None,outfolder=None,maxradius=30,i
 	### PLOT VERSUS OBSERVED X-RAY FLUX
 	outname = 'xray_lum_fagn_model.png'
 	fig,ax = plot(pdata,color_by_observatory=cbo,color_by_database=cbd,color_by_wise=cbw,
-		          ypar='fagn',ylabel = r'f$_{\mathrm{MIR}}$',sf_flag=True)
+		          ypar='fagn',ylabel = r'f$_{\mathrm{MIR}}$',sf_flag=True, idx=idx, **popts)
 	plt.savefig(outfolder+outname,dpi=dpi)
 	plt.close()
 
@@ -209,16 +224,19 @@ def make_plot(runname='brownseds_agn',alldata=None,outfolder=None,maxradius=30,i
 	outname = 'xray_lum_sfrcorr_fagn_model.png'
 	fig,ax = plot(pdata,color_by_observatory=cbo,color_by_database=cbd,color_by_wise=cbw,
 		          ypar='fagn',ylabel = r'f$_{\mathrm{MIR}}$',
-		          xpar='lsfr',xlabel = r'L$_{\mathrm{X}}$(observed)/L$_{\mathrm{XRB}}$(model)')
+		          xpar='lsfr',xlabel = r'L$_{\mathrm{X}}$(observed)/L$_{\mathrm{XRB}}$(model)',
+		          idx = idx, **popts)
 	plt.savefig(outfolder+outname,dpi=dpi)
 	plt.close()
 
+	'''
 	outname = 'xray_lum_sfrcorr_lagn.png'
 	fig,ax = plot(pdata,color_by_observatory=cbo,color_by_database=cbd,color_by_wise=cbw,
 		          ypar='lagn',ylabel = r'model L$_{\mathrm{MIR}}$ [erg/s]',
 		          xpar='lsfr',xlabel = r'L$_{\mathrm{X}}$(observed)/L$_{\mathrm{XRB}}$(model)')
 	plt.savefig(outfolder+outname,dpi=dpi)
 	plt.close()
+	'''
 
 	### SFR, sSFR, dust2, LUV/LIR versus FAGN
 	fig,ax = plot_model_corrs(pdata,idx=idx,**popts)
@@ -227,12 +245,6 @@ def make_plot(runname='brownseds_agn',alldata=None,outfolder=None,maxradius=30,i
 	plt.close()
 
 def plot_model_corrs(pdata,color_by=None,idx=None,**popts):
-
-	'''
-	add color bar for dust2, to the right
-	-- change third plot to LMIR / LBOL (in observables; may have to add this to magphys_plots)
-	-- properly calculate LUV / LIR
-	'''
 
 	fig, ax = plt.subplots(2,2, figsize=(11, 10))
 	cb_ax = fig.add_axes([0.88, 0.15, 0.05, 0.7])
@@ -247,9 +259,9 @@ def plot_model_corrs(pdata,color_by=None,idx=None,**popts):
 		                              pdata['fagn_down'],log=True)
 
 	#### y-axis
-	ypar = ['sfr','ssfr','fmir']
-	ylabels = [r'log(SFR) [M$_{\odot}$/yr]', r'log(sSFR) [yr$^{-1}$]',r'log(L$_{\mathrm{MIR}}$/L$_{\mathrm{bol}}$)']
-	cb = np.log10(1/pdata['luv_lir'])
+	ypar = ['sfr','ssfr','lmir_lbol','lir_luv']
+	ylabels = [r'log(SFR) [M$_{\odot}$/yr]', r'log(sSFR) [yr$^{-1}$]',
+	           r'log(L$_{\mathrm{MIR}}$/L$_{\mathrm{bol}}$)',r'log(L$_{\mathrm{IR}}$/L$_{\mathrm{UV}}$)']
 	cb = pdata['d2']
 	for ii, yp in enumerate(ypar):
 
@@ -264,28 +276,16 @@ def plot_model_corrs(pdata,color_by=None,idx=None,**popts):
 			                              pdata[yp+'_up'],
 			                              pdata[yp+'_down'],log=log)
 		ax[ii].errorbar(x,y,yerr=yerr, xerr=xerr, ms=0.0,zorder=-2,**plotopts)
-		#ax[ii].plot(x,y, 'o',alpha=0.9,color = '#1C86EE')
-		#ax[ii].plot(x[idx],y[idx], marker=popts['fmir_shape'],linestyle=' ',alpha=popts['fmir_alpha'],color = '#1C86EE')
-		#ax[ii].plot(x[cidx],y[cidx], marker=popts['nofmir_shape'],linestyle=' ',alpha=popts['nofmir_alpha'],color = '#1C86EE')
 
 		vmin, vmax = cb.min(), cb.max()
 		ax[ii].scatter(x[cidx],y[cidx], marker=popts['nofmir_shape'],alpha=popts['nofmir_alpha'],c=cb[cidx], cmap=popts['cmap'],
-			           s=59,zorder=10, vmin=vmin, vmax=vmax)
-		pts = ax[ii].scatter(x[idx],y[idx], marker=popts['fmir_shape'],alpha=popts['fmir_alpha'],c=cb[idx], cmap=popts['cmap'],
 			           s=50,zorder=10, vmin=vmin, vmax=vmax)
+		pts = ax[ii].scatter(x[idx],y[idx], marker=popts['fmir_shape'],alpha=popts['fmir_alpha'],c=cb[idx], cmap=popts['cmap'],
+			                 s=50,zorder=10, vmin=vmin, vmax=vmax)
 
 		ax[ii].set_xlabel(xlabel)
 		ax[ii].set_ylabel(ylabels[ii])
 		ax[ii].xaxis.set_major_locator(MaxNLocator(5))
-
-	#### luv / lir (no errors!)
-	y = np.log10(1/pdata['luv_lir'])
-	ax[-1].errorbar(x, y, xerr=xerr, ms=0.0, zorder=-2, **plotopts)
-	ax[-1].scatter(x[cidx],y[cidx], marker=popts['nofmir_shape'],alpha=popts['nofmir_alpha'],c=cb[cidx], cmap=popts['cmap'],s=56,zorder=10)
-	ax[-1].scatter(x[idx],y[idx], marker=popts['fmir_shape'],alpha=popts['fmir_alpha'],c=cb[idx], cmap=popts['cmap'],s=56,zorder=10)
-	ax[-1].set_xlabel(xlabel)
-	ax[-1].xaxis.set_major_locator(MaxNLocator(5))
-	ax[-1].set_ylabel(r'log(L$_{\mathrm{IR}}$/L$_{\mathrm{UV}}$)')
 
 	cb = fig.colorbar(pts, cax=cb_ax)
 	cb.ax.set_title(r'$\tau_{v}$', fontdict={'fontweight':'bold','verticalalignment':'bottom'})
@@ -297,14 +297,16 @@ def plot_model_corrs(pdata,color_by=None,idx=None,**popts):
 def plot(pdata,color_by_observatory=False,color_by_database=False,color_by_wise=False,
 	     ypar=None, ylabel=None, 
 	     xpar='xray_luminosity', xlabel=r'L$_{\mathrm{X}}$(observed) [erg/s]',idx=Ellipsis,
-	     sf_flag=False):
+	     sf_flag=False, **popts):
 	'''
 	plots a color-color BPT scatterplot
 	'''
 
-	#### generate x, y values
-	yplot = pdata[ypar][idx]
-	xplot = pdata[xpar][idx]
+	red = '#FF3D0D'
+	blue = '#1C86EE'
+
+	xplot = pdata[xpar]
+	yplot = pdata[ypar]
 
 	if xpar == 'xray_luminosity':
 		xmin, xmax = 1e36,1e44
@@ -323,23 +325,23 @@ def plot(pdata,color_by_observatory=False,color_by_database=False,color_by_wise=
 		fig, ax = plt.subplots(1,1, figsize=(9.5, 8))
 	else:
 		fig, ax = plt.subplots(1,1, figsize=(8, 8))
-
+	'''
 	if color_by_observatory:
 		observatories = np.unique(pdata['observatory'])
 		cmap = get_cmap(observatories.shape[0])
 		for i,obs in enumerate(observatories):
 			idx = pdata['observatory'] == obs
 
-			yerr =  threed_dutils.asym_errors(pdata[ypar][idx], 
-				                              pdata[ypar+'_up'][idx],
-				                              pdata[ypar+'_down'][idx])
+			yerr =  threed_dutils.asym_errors(pdata[ypar], 
+				                              pdata[ypar+'_up'],
+				                              pdata[ypar+'_down'])
 			if xpar == 'xray_luminosity':
-				xerr = xerr_1d[idx]
+				xerr = xerr_1d
 			else:
-				xerr =  threed_dutils.asym_errors(np.clip(pdata[xpar][idx],xmin,xmax), 
-					                              np.clip(pdata[xpar+'_up'][idx],xmin,xmax),
-					                              np.clip(pdata[xpar+'_down'][idx],xmin,xmax))
-			ax.errorbar(xplot[idx], yplot[idx], yerr=yerr, xerr=xerr, label=obs, color=cmap(i),
+				xerr =  threed_dutils.asym_errors(np.clip(pdata[xpar],xmin,xmax), 
+					                              np.clip(pdata[xpar+'_up'],xmin,xmax),
+					                              np.clip(pdata[xpar+'_down'],xmin,xmax))
+			ax.errorbar(xplot, yplot, yerr=yerr, xerr=xerr, label=obs, color=cmap(i),
 			            **plotopts)
 	elif color_by_database:
 		database = np.unique(pdata['database'])
@@ -347,25 +349,25 @@ def plot(pdata,color_by_observatory=False,color_by_database=False,color_by_wise=
 		for i,data in enumerate(database):
 			idx = pdata['database'] == data
 
-			yerr =  threed_dutils.asym_errors(pdata[ypar][idx], 
-				                              pdata[ypar+'_up'][idx],
-				                              pdata[ypar+'_down'][idx])
+			yerr =  threed_dutils.asym_errors(pdata[ypar], 
+				                              pdata[ypar+'_up'],
+				                              pdata[ypar+'_down'])
 
 			if xpar == 'xray_luminosity':
-				xerr = xerr_1d[idx]
+				xerr = xerr_1d
 			else:
-				xerr =  threed_dutils.asym_errors(np.clip(pdata[xpar][idx],xmin,xmax), 
-					                              np.clip(pdata[xpar+'_up'][idx],xmin,xmax),
-					                              np.clip(pdata[xpar+'_down'][idx],xmin,xmax))
+				xerr =  threed_dutils.asym_errors(np.clip(pdata[xpar],xmin,xmax), 
+					                              np.clip(pdata[xpar+'_up'],xmin,xmax),
+					                              np.clip(pdata[xpar+'_down'],xmin,xmax))
 
-			ax.errorbar(xplot[idx], yplot[idx], yerr=yerr, xerr=xerr, label=data,color=cmap(i),
+			ax.errorbar(xplot, yplot, yerr=yerr, xerr=xerr, label=data,color=cmap(i),
 			            **plotopts)
 
 	elif color_by_wise:
 
-		yerr =  threed_dutils.asym_errors(pdata[ypar][idx], 
-			                              pdata[ypar+'_up'][idx],
-			                              pdata[ypar+'_down'][idx])
+		yerr =  threed_dutils.asym_errors(pdata[ypar], 
+			                              pdata[ypar+'_up'],
+			                              pdata[ypar+'_down'])
 
 		if xpar == 'xray_luminosity':
 			xerr = xerr_1d
@@ -385,42 +387,48 @@ def plot(pdata,color_by_observatory=False,color_by_database=False,color_by_wise=
 		cb.solids.set_edgecolor("face")
 
 	else: 
-		yerr =  threed_dutils.asym_errors(pdata[ypar][idx], 
-			                              pdata[ypar+'_up'][idx],
-			                              pdata[ypar+'_down'][idx])
+	'''
+	yerr =  threed_dutils.asym_errors(pdata[ypar], 
+		                              pdata[ypar+'_up'],
+		                              pdata[ypar+'_down'])
 
-		if xpar == 'xray_luminosity':
-			xerr = xerr_1d[idx]
-		else:
-			xerr =  threed_dutils.asym_errors(pdata[xpar][idx],
-				                              pdata[xpar+'_up'][idx],
-				                              pdata[xpar+'_down'][idx])
+	if xpar == 'xray_luminosity':
+		xerr = xerr_1d
+	else:
+		xerr =  threed_dutils.asym_errors(pdata[xpar],
+			                              pdata[xpar+'_up'],
+			                              pdata[xpar+'_down'])
 
-		if sf_flag:
-			lower_sigma = pdata['lsfr_down'][idx]
+	cidx = np.ones_like(pdata[xpar],dtype=bool)
+	cidx[idx] = False
+
+	if sf_flag:
+
+		for ind, shape in zip([cidx,~cidx],[popts['nofmir_shape'],popts['fmir_shape']]):
+			lower_sigma = pdata['lsfr_down'][ind]
 			significant = lower_sigma > 1
-			red = '#FF3D0D'
-			blue = '#1C86EE'
 
-			ax.errorbar(xplot[significant], yplot[significant], 
-				        yerr=[yerr[0][significant],yerr[1][significant]], xerr=xerr[significant],
+			ax.errorbar(xplot[ind][significant], yplot[ind][significant], 
+				        yerr=[yerr[0][ind][significant],yerr[1][ind][significant]], xerr=xerr[ind][significant],
 				        zorder=-5,ms=0.0,
 			            **plotopts)
-			ax.scatter(xplot[significant], yplot[significant], marker='o', color=red,s=70,zorder=11)
-			ax.errorbar(xplot[~significant], yplot[~significant], 
-				        yerr=[yerr[0][~significant],yerr[1][~significant]], xerr=xerr[~significant],
+			ax.scatter(xplot[ind][significant], yplot[ind][significant], marker=shape, color=red,s=70,zorder=11,alpha=0.9)
+			ax.errorbar(xplot[ind][~significant], yplot[ind][~significant], 
+				        yerr=[yerr[0][ind][~significant],yerr[1][ind][~significant]], xerr=xerr[ind][~significant],
 				        zorder=-5,ms=0.0,
 			            **plotopts)
-			ax.scatter(xplot[~significant], yplot[~significant], marker='o', color=blue,s=70,zorder=10)
+			ax.scatter(xplot[ind][~significant], yplot[ind][~significant], marker=shape, color=blue,s=70,zorder=10,alpha=0.9)
 
- 
 			ax.text(0.98,0.18,r'L$_{\mathrm{X}}$ consistent',transform=ax.transAxes,color=blue,ha='right')
 			ax.text(0.98,0.14,'with XRBs',transform=ax.transAxes,color=blue,ha='right')
 			ax.text(0.98,0.10,r'L$_{\mathrm{X}}$ inconsistent',transform=ax.transAxes,color=red,ha='right')
 			ax.text(0.98,0.06,'with XRBs',transform=ax.transAxes,color=red,ha='right')
-		else:
-			ax.errorbar(xplot, yplot, yerr=yerr, xerr=xerr,
-			            **plotopts)
+	else:
+		ax.errorbar(xplot, yplot, yerr=yerr, xerr=xerr,ms=0.0,zorder=-2,
+		            **plotopts)
+		ax.scatter(xplot[cidx], yplot[cidx], marker=popts['nofmir_shape'], color=blue,s=70,zorder=10,alpha=0.9)
+		ax.scatter(xplot[~cidx], yplot[~cidx], marker=popts['fmir_shape'], color=blue,s=70,zorder=10,alpha=0.9)
+
 
 	ax.set_ylabel(ylabel)
 	ax.set_xlabel(xlabel)
@@ -431,7 +439,10 @@ def plot(pdata,color_by_observatory=False,color_by_database=False,color_by_wise=
 	else:
 		ax.set_xscale('log',nonposx='clip',subsx=([1]))
 		loc = 4
-	ax.set_yscale('log',nonposy='clip',subsy=([1]))
+	try:
+		ax.set_yscale('log',nonposy='clip',subsy=([1]))
+	except ValueError:
+		print 1/0
 
 	if color_by_observatory or color_by_database:
 		if color_by_observatory:

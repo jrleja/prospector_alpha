@@ -110,17 +110,6 @@ def sample_flatchain(chain, lnprob, parnames, ir_priors=True, include_maxlnprob=
 
 	return sample_idx
 
-def autocorrelation_time():
-
-	# https://github.com/bd-j/squish/blob/master/squish/test.py
-	ss = test_rosenbrock(niter=int(1e6))
-	import acor
-	lag = 10 **(np.arange(4)+1)
-	tau1 = [acor.acor(ss.chain[:,1], maxlag=l)[0] for l in lag]
-	tau0 = [acor.acor(ss.chain[:,0], maxlag=l)[0] for l in lag]
-	for l, t1, t0 in zip(lag, tau1, tau0):
-		print('maxlag:{}, tau0:{}, tau1:{}'.format(l, t0, t1))
-
 def set_sfh_time_vector(sample_results,ncalc):
 
 	# if parameterized, calculate linearly in 100 steps from t=0 to t=tage

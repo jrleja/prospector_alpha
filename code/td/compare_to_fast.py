@@ -26,10 +26,10 @@ def collate_data(runname, filename=None, regenerate=False):
 	### define output containers
 	fnames = ['']
 	parlabels = [r'log(M$_{\mathrm{stellar}}$/M$_{\odot}$)', 'SFR [M$_{\odot}$/yr]',
-	             r'diffuse dust optical depth', r"t$_{\mathrm{half-mass}}$ [Gyr]",
-	             r'log(sSFR) [yr$^-1$]', r'log(Z/Z$_{\odot}$)']
-	pnames = ['stellar_mass','sfr_100','dust2','half_time','ssfr_100','logzsol']
-	source = ['FAST', 'FAST', 'FAST', 'FAST']
+	             r'diffuse dust optical depth', r'log(sSFR) [yr$^-1$]',
+	             r"t$_{\mathrm{half-mass}}$ [Gyr]", r'log(Z/Z$_{\odot}$)']
+	pnames = ['stellar_mass','sfr_100','dust2','ssfr_100','half_time','logzsol']
+	source = ['FAST', 'FAST', 'FAST', 'FAST', 'UV+IR']
 	outprosp, outlabels, outfast = {},{},{}
 	for i,par in enumerate(parlabels):
 		try:
@@ -126,15 +126,22 @@ def fast_comparison(data,outname):
 	i = -1
 	for par in data['pnames']:
 
-		try:
-			xfast = data['fast'][par]
-		except KeyError:
-			print par + ' is not in FAST, skipping'
-			continue
+		# well, it's super messy...
+		if par == 'ssfr_100':
+			xfast = np.clip(data['fast']['sfr_100_uvir'] / 10**data['fast']['stellar_mass'],1e-13,np.inf)
+			xfast = np.log10(xfast)
+		else:
+			try:
+				xfast = data['fast'][par]
+			except KeyError:
+				print par + ' is not in FAST, skipping'
+				continue
+
 		i+=1
 		### clip FAST SFRs
 		if par[:3] == 'sfr':
 			xfast = np.clip(xfast,0.01,np.inf)
+			
 
 		### hack to plot UV+IR SFRs
 		if par == 'sfr_100_uvir':
@@ -144,6 +151,12 @@ def fast_comparison(data,outname):
 		yerr = asym_errors(yprosp, yprosp_up, yprosp_down, log=False)
 
 		axes[i].errorbar(xfast,yprosp,yerr=yerr,**popts)
+
+		### if we have some enforced minimum, don't include in scatter calculation
+		if (xfast == xfast.min()).sum()-1:
+			good = xfast != xfast.min()
+		else:
+			good = np.ones_like(xfast,dtype=bool)
 
 		## log axes & range
 		if par[:3] == 'sfr' or par == 'half_time':
@@ -159,15 +172,17 @@ def fast_comparison(data,outname):
 			axes[i].xaxis.set_minor_formatter(minorFormatter)
 
 			axes[i] = equalize_axes(axes[i], np.log10(xfast), np.log10(yprosp), dynrange=0.1, line_of_equality=True, log_in_linear=True)
-			off,scat = offset_and_scatter(np.log10(xfast),np.log10(yprosp),biweight=True)
-			scatunits = ' dex'
+			off,scat = offset_and_scatter(np.log10(xfast[good]),np.log10(yprosp[good]),biweight=True)
 
 		else:
 			axes[i] = equalize_axes(axes[i], xfast, yprosp, dynrange=0.2, line_of_equality=True)
-			off,scat = offset_and_scatter(xfast,yprosp,biweight=True)
+			off,scat = offset_and_scatter(xfast[good],yprosp[good],biweight=True)
+		
+		if par == 'dust2':
 			scatunits = ''
-			if par == 'stellar_mass':
-				scatunits = ' dex'
+		else:
+			scatunits = ' dex'
+
 
 		
 		### labels
@@ -178,7 +193,7 @@ def fast_comparison(data,outname):
                      transform = axes[i].transAxes,horizontalalignment='right')
 		axes[i].set_xlabel(data['source'][i]+' '+data['labels'][data['pnames'] == par][0])
 		axes[i].set_ylabel('Prospector '+data['labels'][data['pnames'] == par][0])
-	axes[-1].axis('off')
+
 	plt.tight_layout()
 	plt.savefig(outname,dpi=dpi)
 	plt.close()

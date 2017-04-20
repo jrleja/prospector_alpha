@@ -126,7 +126,7 @@ def plot_comparison(runname='brownseds_agn',runname_noagn='brownseds_np',alldata
 
 def drawArrow(A, B, ax, scale=1):
     ax.arrow(A[0], A[1], B[0] - A[0], B[1] - A[1],
-              head_width=0.03*scale, width=0.005*scale,length_includes_head=True,color='grey',alpha=0.6)
+              head_width=0.025*scale, width=0.005*scale,length_includes_head=True,color='grey',alpha=0.6)
 
 
 def plot_rms(pdata,outfolder,agn_idx=None,**popts):
@@ -134,7 +134,7 @@ def plot_rms(pdata,outfolder,agn_idx=None,**popts):
 	#### plot geometry
 	fig, ax = plt.subplots(2,2, figsize=(10, 10))
 	fig2, ax2 = plt.subplots(4,2, figsize=(12, 20))
-	fig3, ax3 = plt.subplots(2,2, figsize=(10, 10))
+	fig3, ax3 = plt.subplots(2,2, figsize=(11, 11))
 
 	ax = ax.ravel()
 	ax2 = ax2.ravel()
@@ -151,7 +151,7 @@ def plot_rms(pdata,outfolder,agn_idx=None,**popts):
 	        }
 	lims = [(-2,2), (-2,2), (-0.3,0.3), (-0.15,0.15)]
 	lims2 = [(3,10),(4.5,9),(-0.2,0.8),(0.6,2.0)]
-	lims3 = [(5.5,9.3),(4.5,8.5),(-0.05,0.5),(1.0,1.5)]
+	lims3 = [(6,9.3),(5,8.5),(-0.1,0.6),(1.0,1.45)]
 
 	### for each observable, pull out RMS
 	ndraw = int(1e5)
@@ -267,8 +267,8 @@ def plot_rms(pdata,outfolder,agn_idx=None,**popts):
 
 		####### NEW FINAL PLOT OF AWESOMENESS
 		alpha = 0.7
-		ax3[ii].scatter(q50o_no[agn_idx], q50m_no[agn_idx], marker='o', color=popts['noagn_color'],s=50,zorder=10,alpha=alpha)
-		ax3[ii].scatter(q50o[agn_idx], q50m[agn_idx], marker='o', color=popts['agn_color'],s=50,zorder=10,alpha=alpha)
+		ax3[ii].scatter(q50o_no[agn_idx], q50m_no[agn_idx], marker='o', color=popts['noagn_color'],s=70,zorder=10,alpha=alpha)
+		ax3[ii].scatter(q50o[agn_idx], q50m[agn_idx], marker='o', color=popts['agn_color'],s=70,zorder=10,alpha=alpha)
 
 		'''
 		errs_obs = threed_dutils.asym_errors(q50o[agn_idx], q84o[agn_idx], q16o[agn_idx])
@@ -296,10 +296,15 @@ def plot_rms(pdata,outfolder,agn_idx=None,**popts):
 		ax3[ii].plot(lims3[ii],lims3[ii],'--',color='0.5',alpha=0.5,zorder=-15)
 
 		good = ((np.isfinite(q50o)) & (np.isfinite(q50m)) & (np.isfinite(q50o_no)) & (np.isfinite(q50m_no)))[agn_idx]
-		off_agn,scat_agn = threed_dutils.offset_and_scatter(q50o[agn_idx][good],q50m[agn_idx][good],biweight=True)
-		off_noagn,scat_noagn = threed_dutils.offset_and_scatter(q50o_no[agn_idx][good],q50m_no[agn_idx][good],biweight=True)
-		ax3[ii].text(0.96,0.12,'scatter, offset: '+"{:.2f}".format(scat_noagn)+","+"{:.2f}".format(off_noagn),transform=ax3[ii].transAxes,fontsize=20,color=popts['noagn_color'],ha='right')
-		ax3[ii].text(0.96,0.06,'scatter, offset: '+"{:.2f}".format(scat_agn)+","+"{:.2f}".format(off_agn),transform=ax3[ii].transAxes,fontsize=20,color=popts['agn_color'],ha='right')
+		off_agn,scat_agn = threed_dutils.offset_and_scatter(q50o[agn_idx][good],q50m[agn_idx][good],biweight=False)
+		off_noagn,scat_noagn = threed_dutils.offset_and_scatter(q50o_no[agn_idx][good],q50m_no[agn_idx][good],biweight=False)
+		topts = {'transform':ax3[ii].transAxes,'fontsize':13,'verticalalignment':'top'}
+		ax3[ii].text(0.04,0.95,'AGN-off', color=popts['noagn_color'],weight='bold', **topts)
+		ax3[ii].text(0.04,0.9,'scatter, offset=', color=popts['noagn_color'], **topts)
+		ax3[ii].text(0.04,0.85,"{:.2f}".format(scat_noagn)+", "+"{:.2f}".format(off_noagn), color=popts['noagn_color'], **topts)
+		ax3[ii].text(0.04,0.77,'AGN-on', color=popts['agn_color'], weight='semibold', **topts)
+		ax3[ii].text(0.04,0.72,'scatter, offset=', color=popts['agn_color'], **topts)
+		ax3[ii].text(0.04,0.67,"{:.2f}".format(scat_agn)+", "+"{:.2f}".format(off_agn), color=popts['agn_color'], **topts)
 
 	fig.tight_layout()
 	fig.savefig(outfolder+'delta_observables.png',dpi=120)

@@ -193,6 +193,9 @@ def plot_sfh(pdata,idx_plot,outfolder,**popts):
 		ax[ii].set_ylim(pmin*0.2,pmax*8)
 		ax[ii].set_xlim(t.min()*30,t.max())
 
+	# turn off unused plots
+	for i in xrange(ii+1,ax.shape[0]): ax[i].axis('off')
+
 	plt.tight_layout(w_pad=0.5,h_pad=0.3)
 	plt.savefig(outfolder+'sfh_comparison.png',dpi=150)
 	plt.close()
@@ -300,7 +303,10 @@ def sedfig(sedax,pdata,**popts):
 	#### choose galaxies
 	# third one is just a misidentification due to bad 3.3um oscillator strength?
 	to_plot = ['IRAS 08572+3915','NGC 0695','NGC 3690','NGC 7674']
-	
+	# to_plot = ['IRAS 08572+3915','NGC 1068','NGC 3690','NGC 7674']
+	# to_plot = ['IRAS 08572+3915','IC 0691','UGC 05101','NGC 7674']
+	to_plot = ['IRAS 08572+3915','NGC 1275','NGC 3690','NGC 7674']
+
 	wavlims = (1,30)
 	alpha = 0.55
 	lw = 2.5
