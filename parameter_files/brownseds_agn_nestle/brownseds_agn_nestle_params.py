@@ -272,6 +272,13 @@ model_params.append({'name': 'zred', 'N': 1,
                         'units': '',
                         'prior': priors.TopHat(mini=0.0, maxi=4.0)})
 
+model_params.append({'name': 'lumdist', 'N': 1,
+                        'isfree': False,
+                        'init': 0.0,
+                        'units': 'Mpc',
+                        'prior_function': None,
+                        'prior_args': None})
+
 model_params.append({'name': 'add_igm_absorption', 'N': 1,
                         'isfree': False,
                         'init': 1,
@@ -693,6 +700,7 @@ def load_model(objname='',datname='', agelims=[], **extras):
     hdulist = fits.open(datname)
     idx = hdulist[1].data['Name'] == objname
     zred =  hdulist[1].data['cz'][idx][0] / 3e5
+    lumdist = hdulist[1].data['Dist'][idx][0]
     hdulist.close()
 
     #### CALCULATE TUNIV #####
@@ -722,8 +730,8 @@ def load_model(objname='',datname='', agelims=[], **extras):
     model_params[n.index('sfr_fraction')]['init_disp'] = 0.02
 
     #### INSERT REDSHIFT INTO MODEL PARAMETER DICTIONARY ####
-    zind = n.index('zred')
-    model_params[zind]['init'] = zred
+    model_params[n.index('zred')]['init'] = zred
+    model_params[n.index('lumdist')]['init'] = lumdist
 
     #### CREATE MODEL
     model = BurstyModel(model_params)
