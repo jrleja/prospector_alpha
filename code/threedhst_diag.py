@@ -554,7 +554,9 @@ def return_sedplot_vars(sample_results, extra_output, nufnu=True):
 	# here we want to return
 	# effective wavelength of photometric bands, observed maggies, observed uncertainty, model maggies, observed_maggies-model_maggies / uncertainties
 	# model maggies, observed_maggies-model_maggies/uncertainties
-	return wave_eff/1e4, obs_maggies, obs_maggies_unc, mu, (obs_maggies-mu)/obs_maggies_unc, spec/(sample_results['model'].params['zred'][0]+1), (1+sample_results['model'].params['zred'][0])*extra_output['observables']['lam_obs']/1e4
+	return wave_eff/1e4, obs_maggies, obs_maggies_unc, mu, 
+			(obs_maggies-mu)/obs_maggies_unc, spec/(sample_results['model'].params['zred'][0]+1), 
+			(1+sample_results['model'].params['zred'][0])*extra_output['observables']['lam_obs']/1e4
 
 def sed_figure(outname = None, truths = None,
 			   colors = ['#1974D2'], sresults = None, extra_output = None,

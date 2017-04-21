@@ -41,7 +41,9 @@ def measure_model_phot(sample_results, sample_idx, sps):
 	filters = ['bessell_U','bessell_V','twomass_J','bessell_B','bessell_R','twomass_Ks']
 	obs = {'filters': load_filters(filters), 'wavelength': None}
 	zsave = sample_results['model'].params['zred']
+	lumdist_save = sample_results['model'].params['lumdist']
 	sample_results['model'].params['zred'] = np.array([0.0])
+	sample_results['model'].params['lumdist'] = np.array([1e-5]) # 10 pc
 
 	ncalc = sample_idx.shape[0]
 	mags = np.zeros(shape=(len(filters),ncalc))
@@ -49,6 +51,8 @@ def measure_model_phot(sample_results, sample_idx, sps):
 	for i,idx in enumerate(sample_idx):
 		_,mags[:,i],sm = sample_results['model'].mean_model(sample_results['flatchain'][idx], obs, sps=sps)
 	sample_results['model'].params['zred'] = zsave
+	sample_results['model'].params['lumdist'] = lumdist_save
+
 	out = {}
 	out['mags'] = mags
 	out['name'] = np.array(filters)

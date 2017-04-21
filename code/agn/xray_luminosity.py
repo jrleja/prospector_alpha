@@ -96,8 +96,8 @@ def collate_data(alldata, **extras):
 		xflux_err = xray['flux_err'][idx][0]
 
 		# flux is in ergs / cm^2 / s, convert to erg /s 
-		z = dat['residuals']['phot']['z']
-		dfactor = 4*np.pi*(WMAP9.luminosity_distance(z).cgs.value)**2
+		pc2cm =  3.08568E18
+		dfactor = 4*np.pi*(dat['residuals']['phot']['lumdist']*1e6*pc2cm)**2
 		xray_lum.append(xflux * dfactor)
 		xray_lum_err.append(xflux_err * dfactor)
 

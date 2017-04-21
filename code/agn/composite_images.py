@@ -15,7 +15,6 @@ from astropy.convolution import convolve, convolve_fft
 from wise_colors import vega_conversions
 from magphys_plot_pref import jLogFormatter
 import brown_io
-from astropy.cosmology import WMAP9
 from corner import quantile
 from threed_dutils import smooth_spectrum
 
@@ -70,8 +69,8 @@ def collate_data(alldata):
 		xflux_err = xray['flux_err'][idx][0]
 
 		# flux is in ergs / cm^2 / s, convert to erg /s 
-		z = dat['residuals']['phot']['z']
-		dfactor = 4*np.pi*(WMAP9.luminosity_distance(z).cgs.value)**2
+		pc2cm =  3.08568E18
+		dfactor = 4*np.pi*(dat['residuals']['phot']['lumdist']*1e6*pc2cm)**2
 		xray_lum.append(xflux * dfactor)
 		xray_lum_err.append(xflux_err * dfactor)
 

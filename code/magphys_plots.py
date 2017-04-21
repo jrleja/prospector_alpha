@@ -800,7 +800,8 @@ def sed_comp_figure(sample_results, extra_output, sps, model, magphys,
 	       'chisq_prosp': chisq,
 	       'chisq_magphys': chisq_magphys,
 	       'lam_obs': wave_eff,
-	       'z': magphys['metadata']['redshift']
+	       'z': magphys['metadata']['redshift'],
+	       'lumdist': model.params['lumdist'][0]
 	       }
 	residuals['phot'] = out
 	return residuals
@@ -939,8 +940,9 @@ def compute_specmags(runname=None, outfolder=None):
 	future steps: don't use super low-res spectra
 	'''
 
+
+	print 'THIS FUNCTION IS BROKEN, UNTIL YOU LET THREED_DUTILS USE LUMDIST'
 	from bsfh import model_setup
-	from astropy.cosmology import WMAP9
 
 	if runname == None:
 		runname = 'brownseds'
@@ -1021,7 +1023,7 @@ def compute_specmags(runname=None, outfolder=None):
 
 		#### convert combspec from maggies to Lsun/Hz
 		pc2cm =  3.08568E18
-		dfactor = (1+z) / ( 4.0 * np.pi * (WMAP9.luminosity_distance(z).value*1e6*pc2cm)**2)
+		dfactor = (1+z) / ( 4.0 * np.pi * (dat['residuals']['phot']['lumdist']*1e6*pc2cm)**2)
 		combspec *= 3631*1e-23 / constants.L_sun.cgs.value / dfactor # to Jy, to erg/s/cm^2/Hz, to Lsun/cm^2/Hz, to Lsun/Hz
 
 		#### integrate spectra, save mags
@@ -1069,6 +1071,7 @@ def add_sfr_info(runname=None, outfolder=None):
 	This calculates UV + IR SFRs based on the Dale & Helou IR templates & MIPS flux
 	'''
 
+	print 'THIS FUNCTION IS BROKEN, UNTIL YOU LET THREED_DUTILS USE LUMDIST'
 	if runname == None:
 		runname = 'brownseds'
 
@@ -1085,6 +1088,7 @@ def add_sfr_info(runname=None, outfolder=None):
 		sample_results, powell_results, model = brown_io.load_prospector_data(filebase[ii])
 		maxprob = sample_results['bfit']['maxprob_params']
 		sample_results['model'].params['zred'] = np.array(0.0)
+		sample_results['model'].params['lumdist'] = np.array(1e-5)
 		spec,mags,sm = sample_results['model'].mean_model(maxprob, sample_results['obs'], sps=sps) # Lsun / Hz
 
 		mips_idx = sample_results['obs']['filters'] == 'MIPS_24'
@@ -1142,6 +1146,34 @@ def add_sfr_info(runname=None, outfolder=None):
 
 	plt.tight_layout()
 	plt.savefig(outname, dpi=dpi)
+
+def mips_to_lir(mips_flux,z):
+
+	'''
+	input flux must be in mJy
+	output is in Lsun
+	L_IR [Lsun] = fac_<band>(redshift) * flux [milliJy]
+	'''
+
+	dale_helou_txt = '/Users/joel/code/python/threedhst_bsfh/data/MIPS/dale_helou.txt'
+	with open(dale_helou_txt, 'r') as f: hdr = f.readline().split()[1:]
+	conversion = np.loadtxt(dale_helou_txt, comments = '#', dtype = np.dtype([(n, np.float) for n in hdr]))
+	
+	# if we're at higher redshift, interpolate
+	# it decrease error due to redshift relative to rest-frame template (good)
+	# but adds nonlinear error due to distances (bad)
+	# else, scale the nearest conversion factor by the 
+	# ratio of luminosity distances, since nonlinear error due to distances will dominate
+	if z > 0.1:
+		intfnc = interp1d(conversion['redshift'],conversion['fac_MIPS24um'], bounds_error = True, fill_value = 0)
+		fac = intfnc(z)
+	else:
+		near_idx = np.abs(conversion['redshift']-z).argmin()
+		lumdist_ratio = (WMAP9.luminosity_distance(z).value / WMAP9.luminosity_distance(conversion['redshift'][near_idx]).value)**2
+		zfac_ratio = (1.+conversion['redshift'][near_idx]) / (1.+z)
+		fac = conversion['fac_MIPS24um'][near_idx]*lumdist_ratio*zfac_ratio
+
+	return fac*mips_flux
 
 
 def add_prosp_mag_info(runname='brownseds_np'):

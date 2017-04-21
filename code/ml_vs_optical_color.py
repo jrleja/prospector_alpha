@@ -3,7 +3,6 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 import magphys_plot_pref
-from astropy.cosmology import WMAP9 as cosmo
 
 def collate_data(alldata):
 
@@ -84,8 +83,7 @@ def collate_data(alldata):
 		### from observed distance to 10pc
 		# divide by 1+z since we're in fnu
 		z = dat['residuals']['phot']['z']
-		lumdist = cosmo.luminosity_distance(z).value
-		dfactor = (lumdist*1e5)**2 / (1+z) 
+		dfactor = (dat['residuals']['phot']['lumdist']*1e5)**2 / (1+z) 
 
 		### sample random flux
 		gmag = dat['obs_maggies'][g_idx]

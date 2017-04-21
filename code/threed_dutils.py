@@ -1221,9 +1221,11 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None,
 	pc = 3.085677581467192e18  # in cm
 	dfactor_10pc = 4*np.pi*(10*pc)**2
 
-	# save redshift
+	# save redshift, lumdist
 	z      = model.params.get('zred', np.array(0.0))
+	lumdist = model.params.get('lumdist', np.array(0.0))
 	model.params['zred'] = np.array(0.0)
+	model.params['lumdist'] = np.array(1e-5)
 
 	# nebon, comes out in erg/s/cm^2/AA at 10pc
 	model.params['add_neb_emission'] = np.array(True)
@@ -1253,6 +1255,7 @@ def measure_emline_lum(sps, model = None, obs = None, thetas = None,
 	spec_neboff_fnu = spec_neboff_flam * to_fnu
 
 	model.params['zred'] = z
+	model.params['lumdist'] = lumdist
 
 	##### measure absorption lines and Dn4000
 	out['dn4000'] = measure_Dn4000(w,spec_nebon_flam)

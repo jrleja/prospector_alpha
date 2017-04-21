@@ -16,6 +16,7 @@ from corner import quantile
 from photutils import CircularAperture, CircularAnnulus, find_peaks
 from astropy.cosmology import WMAP9
 import pickle
+from scipy.optimize import brentq
 
 plt.ioff()
 
@@ -25,6 +26,11 @@ majorFormatter = jLogFormatter(base=10, labelOnlyBase=True)
 
 # https://arxiv.org/pdf/1603.05664.pdf
 px_scale = 2.75
+
+def test_z(x,c):
+	# c = true lumdist
+	# x = redshift
+	return WMAP9.luminosity_distance(x).value-c
 
 def collate_data(alldata):
 
@@ -64,15 +70,21 @@ def collate_data(alldata):
 
 	lsfr, lsfr_up, lsfr_down, xray_lum, xray_lum_err = [], [], [], [], []
 	for dat in alldata:
-		z.append(dat['residuals']['phot']['z'])
 		idx = xray['objname'] == dat['objname']
 		if idx.sum() != 1:
 			print 1/0
 		xflux = xray['flux'][idx][0]
 		xflux_err = xray['flux_err'][idx][0]
 
+
+		#### convert lumdist to redshift for distance calculations
+		lumdist = dat['residuals']['phot']['lumdist']
+		zred = brentq(test_z, 0, 0.2, args=(lumdist), rtol=1.48e-08, maxiter=1000)
+		z.append(zred)
+
 		# flux is in ergs / cm^2 / s, convert to erg /s 
-		dfactor = 4*np.pi*(WMAP9.luminosity_distance(z[-1]).cgs.value)**2
+		pc2cm =  3.08568E18
+		dfactor = 4*np.pi*(lumdist*1e6*pc2cm)**2
 		xray_lum.append(xflux * dfactor)
 		xray_lum_err.append(xflux_err * dfactor)
 

@@ -429,7 +429,9 @@ def measure(sample_results, extra_output, obs_spec, magphys, sps, sigsmooth=None
 	# with z=0.0, it arrives in Lsun/Hz, and rest lambda
 	# save redshift, restore at end
 	z = sample_results['model'].params.get('zred', np.array(0.0))
+	lumdist = sample_results['model'].params.get('lumdist', np.array(0.0))
 	sample_results['model'].params['zred'] = np.array(0.0)
+	sample_results['model'].params['lumdist'] = np.array(1e-5)
 	prospflux_em,mags_em,sm = sample_results['model'].mean_model(extra_output['bfit']['maxprob_params'], sample_results['obs'], sps=sps)
 	sample_results['model'].params['add_neb_emission'] = np.array(False)
 	sample_results['model'].params['add_neb_continuum'] = np.array(False)
@@ -438,6 +440,7 @@ def measure(sample_results, extra_output, obs_spec, magphys, sps, sigsmooth=None
 	sample_results['model'].params['add_neb_emission'] = np.array(2)
 	sample_results['model'].params['add_neb_continuum'] = np.array(True)
 	sample_results['model'].params['zred'] = z
+	sample_results['model'].params['lumdist'] = lumdist
 	factor = 3e18 / wav**2
 	prospflux *= factor
 	prospflux_em *= factor
@@ -445,7 +448,7 @@ def measure(sample_results, extra_output, obs_spec, magphys, sps, sigsmooth=None
 	# observed spectra arrive in Lsun/cm^2/AA
 	# convert distance factor
 	pc = 3.085677581467192e18  # cm
-	dfactor = 4*np.pi*(pc*cosmo.luminosity_distance(magphys['metadata']['redshift']).value *
+	dfactor = 4*np.pi*(pc*lumdist *
                     1e6)**2 * (1+magphys['metadata']['redshift']) 
 	obsflux = obs_spec['flux_lsun']*dfactor
 	obslam = obs_spec['rest_lam']
