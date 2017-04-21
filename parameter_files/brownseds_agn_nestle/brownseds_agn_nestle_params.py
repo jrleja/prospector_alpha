@@ -27,7 +27,7 @@ run_params = {'verbose':True,
               # MCMC params
               'nestle_method': 'multi',
               'nestle_npoints': 1000,
-              'nestle_maxcall': int(4e6),
+              'nestle_maxcall': int(1e6),
               'nestle_update_interval': None,
               # Model info
               'zcontinuous': 2,
@@ -245,19 +245,24 @@ def load_obs(photname='', extinctname='', herschname='', objname='', **extras):
 # GENERATING FUNCTIONS
 ######################
 def transform_logmass_to_mass(mass=None, logmass=None, **extras):
-
     return 10**logmass
 
 def load_gp(**extras):
     return None, None
 
-def add_dust1(dust2=None, **extras):
-
-    return 0.86*dust2
-
 def tie_gas_logz(logzsol=None, **extras):
-
     return logzsol
+
+def transform_zfraction_to_sfrfraction(sfr_fraction=None, z_fraction=None, **extras):
+
+    import operator
+    def prod(factors):
+        return reduce(operator.mul, factors, 1)
+
+    sfr_fraction[0] = 1-z_fraction[0]
+    for i in xrange(1,sfr_fraction.shape[0]): sfr_fraction[i] =  prod(z_fraction[:i])*(1-z_fraction[i])
+    #sfr_fraction[-1] = prod(z)  #### THIS IS SET IMPLICITLY
+    return sfr_fraction
 
 #############
 # MODEL_PARAMS
@@ -331,10 +336,17 @@ model_params.append({'name': 'agebins', 'N': 1,
                         'prior': priors.TopHat(mini=0.1, maxi=15.0)})
 
 model_params.append({'name': 'sfr_fraction', 'N': 1,
+                        'isfree': False,
+                        'init': [],
+                        'depends_on': transform_zfraction_to_sfrfraction,
+                        'units': '',
+                        'prior': priors.TopHat(mini=0.0, maxi=1.0)})
+
+model_params.append({'name': 'z_fraction', 'N': 1,
                         'isfree': True,
                         'init': [],
-                        'units': 'Msun',
-                        'prior': priors.TopHat(mini=0.0, maxi=1.0)})
+                        'units': '',
+                        'prior': priors.Beta(alpha=1.0, beta=1.0)})
 
 ########    IMF  ##############
 model_params.append({'name': 'imf_type', 'N': 1,
@@ -499,7 +511,7 @@ model_params.append({'name': 'mass_units', 'N': 1,
 #### resort list of parameters 
 #### so that major ones are fit first
 parnames = [m['name'] for m in model_params]
-fit_order = ['logmass','sfr_fraction', 'dust2', 'logzsol', 'dust_index', 'dust1', 'duste_qpah', 'duste_gamma', 'duste_umin']
+fit_order = ['logmass','z_fraction', 'dust2', 'logzsol', 'dust_index', 'dust1', 'duste_qpah', 'duste_gamma', 'duste_umin']
 tparams = [model_params[parnames.index(i)] for i in fit_order]
 for param in model_params: 
     if param['name'] not in fit_order:
@@ -543,20 +555,6 @@ class BurstyModel(sedmodel.SedModel):
             The log of the product of the prior probabilities for
             these parameter values.
         """  
-
-        # dust1/dust2 ratio
-        if 'dust1' in self.theta_index:
-            if 'dust2' in self.theta_index:
-                dust1 = theta[self.theta_index['dust1']]
-                dust2 = theta[self.theta_index['dust2']]
-                if dust1/2.0 > dust2:
-                    return -np.inf
-
-        # sum of SFH fractional bins <= 1.0
-        if 'sfr_fraction' in self.theta_index:
-            sfr_fraction = theta[self.theta_index['sfr_fraction']]
-            if np.sum(sfr_fraction) > 1.0:
-                return -np.inf
 
         return 0.0
 
@@ -720,12 +718,14 @@ def load_model(objname='',datname='', agelims=[], **extras):
 
     #### FRACTIONAL MASS INITIALIZATION
     # N-1 bins, last is set by x = 1 - np.sum(sfr_fraction)
+    model_params[n.index('z_fraction')]['N'] = ncomp-1
+    tilde_alpha = np.array([ncomp-i for i in xrange(1,ncomp)])
+    model_params[n.index('z_fraction')]['prior'] = priors.Beta(alpha=tilde_alpha, beta=np.ones_like(tilde_alpha))
+    model_params[n.index('z_fraction')]['init'] =  model_params[n.index('z_fraction')]['prior'].sample()
+    model_params[n.index('z_fraction')]['init_disp'] = 0.02
+
     model_params[n.index('sfr_fraction')]['N'] = ncomp-1
-    model_params[n.index('sfr_fraction')]['prior_args'] = {
-                                                           'maxi':np.full(ncomp-1,1.0), 
-                                                           'mini':np.full(ncomp-1,0.0),
-                                                           # NOTE: ncomp instead of ncomp-1 makes the prior take into account the implicit Nth variable too
-                                                          }
+    model_params[n.index('sfr_fraction')]['prior'] = priors.TopHat(maxi=np.full(ncomp-1,1.0), mini=np.full(ncomp-1,0.0))
     model_params[n.index('sfr_fraction')]['init'] =  np.zeros(ncomp-1)+1./ncomp
     model_params[n.index('sfr_fraction')]['init_disp'] = 0.02
 
