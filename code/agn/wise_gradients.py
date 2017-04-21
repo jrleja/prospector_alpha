@@ -12,15 +12,19 @@ from astropy.convolution import convolve, convolve_fft
 from wise_colors import vega_conversions
 from magphys_plot_pref import jLogFormatter
 import brown_io
-from astropy.cosmology import WMAP9
 from corner import quantile
-from photutils import SkyCircularAnnulus, CircularAnnulus, find_peaks
+from photutils import CircularAperture, CircularAnnulus, find_peaks
+from astropy.cosmology import WMAP9
+import pickle
 
 plt.ioff()
 
 c = 3e18   # angstroms per second
 minorFormatter = jLogFormatter(base=10, labelOnlyBase=False)
 majorFormatter = jLogFormatter(base=10, labelOnlyBase=True)
+
+# https://arxiv.org/pdf/1603.05664.pdf
+px_scale = 2.75
 
 def collate_data(alldata):
 
@@ -35,7 +39,7 @@ def collate_data(alldata):
 		model_phot[f] = []
 
 	# model parameters
-	objname = []
+	z,objname = [], []
 	model_pars = {}
 	pnames = ['fagn', 'agn_tau']
 	for p in pnames: 
@@ -60,6 +64,7 @@ def collate_data(alldata):
 
 	lsfr, lsfr_up, lsfr_down, xray_lum, xray_lum_err = [], [], [], [], []
 	for dat in alldata:
+		z.append(dat['residuals']['phot']['z'])
 		idx = xray['objname'] == dat['objname']
 		if idx.sum() != 1:
 			print 1/0
@@ -67,8 +72,7 @@ def collate_data(alldata):
 		xflux_err = xray['flux_err'][idx][0]
 
 		# flux is in ergs / cm^2 / s, convert to erg /s 
-		z = dat['residuals']['phot']['z']
-		dfactor = 4*np.pi*(WMAP9.luminosity_distance(z).cgs.value)**2
+		dfactor = 4*np.pi*(WMAP9.luminosity_distance(z[-1]).cgs.value)**2
 		xray_lum.append(xflux * dfactor)
 		xray_lum_err.append(xflux_err * dfactor)
 
@@ -97,6 +101,7 @@ def collate_data(alldata):
 
 	out = {'pars':model_pars,'objname':objname}
 
+	out['z'] = np.array(z)
 	out['lsfr'] = np.array(lsfr)
 	out['lsfr_up'] = np.array(lsfr_up)
 	out['lsfr_down'] = np.array(lsfr_down)
@@ -126,7 +131,15 @@ def plot_all(runname='brownseds_agn',runname_noagn='brownseds_np',alldata=None,
 	#### plot data
 	plot_composites(pdata,agn_idx,outfolder,['WISE W1','WISE W2'])
 
-def plot_composites(pdata,idx_plot,outfolder,contours,contour_colors=True,calibration_plot=True):
+def plot_composites(pdata,idx_plot,outfolder,contours,contour_colors=True,
+	                calibration_plot=True,brown_data=False):
+
+	'''
+	TO DO:
+		(2) evaluate: 1 kpc gradient ok?
+		(3) manually check for point sources, remove [NGC 1068]
+		(2) test NOT convolving the data
+	'''
 
 	### image qualities
 	fs = 10 # fontsize
@@ -134,8 +147,13 @@ def plot_composites(pdata,idx_plot,outfolder,contours,contour_colors=True,calibr
 
 	### contour color limits (customized for W1-W2)
 	color_limits = [-1.0,2.6]
+	kpc_lim = 1
 
 	kernel = None
+
+	### output blobs
+	gradient, gradient_error, arcsec, kpc,objname_out = [], [], [], [], []
+	outfile = '/Users/joel/code/python/threedhst_bsfh/data/brownseds_data/fits/unWISE/gradients.pickle'
 
 	### begin loop
 	for ii,idx in enumerate(idx_plot):
@@ -146,56 +164,119 @@ def plot_composites(pdata,idx_plot,outfolder,contours,contour_colors=True,calibr
 		ra, dec = load_coordinates(objname)
 		phot_size = load_structure(objname,long_axis=True) # in arcseconds
 
-		### set up figure
-		fig, ax = plt.subplots(1,2, figsize=(12,6))
-		ax = np.ravel(ax)
-
 		### load image and WCS
-		hdu = load_image(objname,contours[0])
-		wcs = WCS(hdu.header)
+		try:
+			if brown_data:
+				### convert from DN to flux in Janskies, from this table: 
+				# http://wise2.ipac.caltech.edu/docs/release/allsky/expsup/sec2_3f.html
+				img1, noise1 = load_image(objname,contours[0]), None
+				img1, noise1 = img1*1.9350E-06, noise1*(1.9350e-06)**-2
+				img2, noise2 = load_image(objname,contours[1]), None
+				img2, noise2 = img2*2.7048E-06, noise2*(2.7048E-06)**-2
 
-		### translate object location into pixels using WCS coordinates
-		pix_center = wcs.all_world2pix([[ra[0],dec[0]]],1)
-		size = calc_dist(wcs, pix_center, phot_size, hdu.data.shape)
-		data_to_plot = hdu.data
+				### translate object location into pixels using WCS coordinates
+				wcs = WCS(img1.header)
+				pix_center = wcs.all_world2pix([[ra[0],dec[0]]],1)
+			else:
+				img1, noise1 = load_wise_data(objname,contours[0].split(' ')[1])
+				img2, noise2 = load_wise_data(objname,contours[1].split(' ')[1])
+
+				### translate object location into pixels using WCS coordinates
+				wcs = WCS(img1.header)
+				pix_center = wcs.all_world2pix([[ra[0],dec[0]]],1)
+
+				if (pix_center.squeeze()[0]+1 > img1.shape[0]) or \
+					(pix_center.squeeze()[1]+1 > img1.shape[1]) or \
+					(np.any(pix_center < 0)):
+					print 'object not in image, checking for additional image'
+					print pix_center, img1.shape
+					img1, noise1 = load_wise_data(objname,contours[0].split(' ')[1],load_other = True)
+					img2, noise2 = load_wise_data(objname,contours[1].split(' ')[1],load_other = True)
+
+					wcs = WCS(img1.header)
+					pix_center = wcs.all_world2pix([[ra[0],dec[0]]],1)
+					print pix_center, img1.shape
+
+		except error as e:
+			print 'fail'
+			print 1/0
+			gradient.append(None)
+			gradient_error.append(None)
+			arcsec.append(None)
+			kpc.append(None)
+			objname_out.append(None)
+			continue
+
+		size = calc_dist(wcs, pix_center, phot_size, img1.data.shape)
+
+		### convert inverse variance to noise
+		noise1.data = (1./noise1.data)**0.5
+		noise2.data = (1./noise2.data)**0.5
 
 		### build image extents
 		extent = image_extent(size,pix_center,wcs)
 
-		#### load up HDU for WISE 1 + convert to physical units
-		# also convolve to W2 resolution
-		hdu.data *= 1.9350E-06 ### convert from DN to flux in Janskies, from this table: http://wise2.ipac.caltech.edu/docs/release/allsky/expsup/sec2_3f.html
-		#hdu.data -= np.median(hdu.data) ### subtract background as median
-		data_convolved, kernel = match_resolution(hdu.data,contours[0],contours[1],kernel=kernel,data1_res=hdu.header['PXSCAL1']) # convolve to W2 resolution
-
-		### load up HDU for WISE 2 + convert to physical units
-		hdu2 = load_image(objname,contours[1])
-		#hdu2.data -= np.median(hdu2.data) ### subtract background as median
-		hdu2.data *= 2.7048E-06 ### convert from DN to flux in Janskies, from this table: http://wise2.ipac.caltech.edu/docs/release/allsky/expsup/sec2_3f.html
+		### convolve W1 to W2 resolution
+		w1_convolved, kernel = match_resolution(img1.data,contours[0],contours[1],
+													kernel=kernel,data1_res=px_scale)
+		w1_convolved_noise, kernel = match_resolution(noise1.data,contours[0],contours[1],
+													  kernel=kernel,data1_res=px_scale)
 
 		#### put onto same scale, and grab slices
-		data2, footprint = reproject_exact(hdu2, hdu.header)
-		data1_slice = data_convolved[size[2]:size[3],size[0]:size[1]]
-		data2_slice = data2[size[2]:size[3],size[0]:size[1]]
+		data2, footprint = reproject_exact(img2, img1.header)
+		noise2, footprint = reproject_exact(noise2, img1.header)
+
+		img1_slice = w1_convolved[size[2]:size[3],size[0]:size[1]]
+		img2_slice = data2[size[2]:size[3],size[0]:size[1]]
+		noise1_slice = w1_convolved_noise[size[2]:size[3],size[0]:size[1]]
+		noise2_slice = noise2[size[2]:size[3],size[0]:size[1]]
+
+		### subtract background from both images
+		mean1, median1, std1 = sigma_clipped_stats(w1_convolved, sigma=3.0,iters=10)
+		img1_slice -= median1
+		mean2, median2, std2 = sigma_clipped_stats(data2, sigma=3.0, iters=10)
+		img2_slice -= median2
 
 		#### calculate the color
-		flux_color = convert_to_color(data1_slice, data2_slice,contours[0],contours[1],minflux=1e-10)
+		flux_color  = convert_to_color(img1_slice, img2_slice,None,None,contours[0],contours[1],
+			                           minflux=-np.inf, vega_conversions=brown_data)
 
-		### don't trust anything less than X times the max!
-		max1 = np.nanmax(data1_slice)
-		max2 = np.nanmax(data2_slice)
-		background = (data1_slice < max1*maxlim) | (data2_slice < max2*maxlim)
+		### don't show anything with S/N < 2!
+		sigmask = 2
+		background = (img2_slice/noise2_slice < sigmask) | (img1_slice/noise1_slice < sigmask)
 		flux_color[background] = np.nan
 
 		### plot colormap
+		fig, ax = plt.subplots(1,2, figsize=(12,6))
+		ax = np.ravel(ax)
 		img = ax[0].imshow(flux_color, origin='lower',extent=extent,vmin=color_limits[0],vmax=color_limits[1])
+
 		cbar = fig.colorbar(img, ax=ax[0])
 		cbar.formatter.set_powerlimits((0, 0))
 		cbar.update_ticks()
 		ax[0].set_title(contours[0]+'-'+contours[1]+' color')
 
 		### plot W2 contours
-		plot_contour(ax[0],np.log10(data2_slice),ncontours=20)
+		plot_contour(ax[0],np.log10(img2_slice),ncontours=20)
+
+		### find image center in W2 image, and mark it
+		# do this by finding the source closest to center
+
+		tbl = []
+		nthresh = 20
+		fake_noise1_error = copy.copy(noise1_slice)
+		bad = np.logical_or(np.isinf(noise1_slice),np.isnan(noise1_slice))
+		fake_noise1_error[bad] = fake_noise1_error[~bad].max()
+		while len(tbl) < 1:
+			threshold = nthresh * std1 # peak threshold, @ 20 sigma
+			tbl = find_peaks(img1_slice, threshold, box_size=5, subpixel=True, border_width=4,
+								error = fake_noise1_error)
+			nthresh -=1
+		center = np.array(img2_slice.shape)/2.
+		idxmax = ((center[0]-tbl['x_centroid'])**2 + (center[1]-tbl['y_centroid'])**2).argmin()
+		xarcsec = (extent[1]-extent[0])*(tbl['x_centroid'][idxmax])/float(img2_slice.shape[0]) + extent[0]
+		yarcsec = (extent[3]-extent[2])*(tbl['y_centroid'][idxmax])/float(img2_slice.shape[1]) + extent[2]
+		ax[0].scatter(xarcsec,yarcsec,color='black',marker='x',s=50,linewidth=2)
 
 		### add in WISE PSF
 		wise_psf = 6 # in arcseconds
@@ -207,59 +288,113 @@ def plot_composites(pdata,idx_plot,outfolder,contours,contour_colors=True,calibr
 		ax[0].set_ylim(extent[2],extent[3])
 
 		### gradient
-		measure_gradient(data1_slice,data2_slice, ax, pix_center)
+		phys_scale = float(1./WMAP9.arcsec_per_kpc_proper(pdata['z'][idx]).value)
+		if phys_scale < 0:
+			print 1/0
+		grad, graderr, x_arcsec = measure_gradient(img1_slice,img2_slice, 
+								  noise1_slice, noise2_slice, 
+								  ax, 
+								  (tbl['x_centroid'][idxmax], tbl['y_centroid'][idxmax]),
+								  phys_scale,kpc_lim=kpc_lim)
 
+		### add text
+		ax[1].text(0.05,0.86,r'$\nabla$('+str(int(kpc_lim))+' kpc)='+"{:.3f}".format(grad)+r'$\pm$'+"{:.3f}".format(graderr),
+							transform=ax[1].transAxes,color='red')
+		ax[1].text(0.05,0.93,r'f$_{\mathrm{MIR}}$='+"{:.2f}".format(pdata['pars']['fagn']['q50'][idx])+\
+								' ('+"{:.2f}".format(pdata['pars']['fagn']['q84'][idx]) +
+								') ('+"{:.2f}".format(pdata['pars']['fagn']['q16'][idx])+')',
+								transform=ax[1].transAxes,color='black')
+
+		gradient.append(grad)
+		gradient_error.append(graderr)
+		arcsec.append(x_arcsec)
+		kpc.append(phys_scale*x_arcsec)
+		objname_out.append(objname)
+
+		plt.tight_layout()
 		plt.savefig(outfolder+'/'+objname+'.png',dpi=150)
 		plt.close()
-		print 1/0
 
-def measure_gradient(flux1, flux2, ax, center):
+	out = {
+			'gradient': np.array(gradient),
+			'gradient_error': np.array(gradient_error),
+			'arcsec': np.array(arcsec),
+			'kpc': np.array(kpc),
+			'objname': objname_out
+		  }
+
+	pickle.dump(out,open(outfile, "wb"))
+
+def measure_gradient(flux1, flux2, noise1, noise2, ax, center, phys_scale,kpc_lim=1):
 	# http://photutils.readthedocs.io/en/stable/api/photutils.aperture.SkyCircularAnnulus.html#photutils.aperture.SkyCircularAnnulus
 	# http://photutils.readthedocs.io/en/stable/photutils/aperture.html
-
-	### need errors
-	### need to confirm pixscale 
-	### need to recenter image
-	pixscale = 0.5 # 0.5" / pixel (approximately) (RIGHT?)
-
-	### subtract background from both images
-	mean1, median1, std1 = sigma_clipped_stats(flux1, sigma=3.0)
-	flux1 -= median1
-	mean2, median2, std2 = sigma_clipped_stats(flux2, sigma=3.0)
-	flux2 -= median2
-
-	### find image center in W2 image, and mark it
-	# do this by finding the source closest to center
-	threshold = median2 + (20 * std2) # peak threshold, @ 20 sigma
-	tbl = find_peaks(flux2, threshold, box_size=5)
-	center = np.array(flux1.shape)/2.
-	idx = ((center[0]-tbl['x_peak'])**2 + (center[1]-tbl['y_peak'])**2).argmin()
-	ax[0].scatter(tbl['x_peak'][idx],tbl['y_peak'][idx],color='red',marker='x',s=50)
 
 	### define circular (hm) annuli for calculation of gradient
 	# do this in pixel space because the sky coordinate transformations are insane
 	# and change the distance calculation by << 1%
-	r_in = np.arange(1,201)
+	r_in = np.arange(1,50)
 	r_out = r_in+1
-	apertures = [CircularAnnulus([tbl['x_peak'][idx],tbl['y_peak'][idx]],r_in=ri,r_out=ro) for ri,ro in zip(r_in,r_out)]
+	apertures = [CircularAnnulus(center,r_in=ri,r_out=ro) for ri,ro in zip(r_in,r_out)]
+
+	# add most important apertures: 0-1 kpc, 1-2 kpc (so gradient at 2kpc)
+	r_in = np.append(r_in, np.array([0, kpc_lim/phys_scale/px_scale]))
+	r_out = np.append(r_out, np.array([kpc_lim/phys_scale/px_scale,kpc_lim*2./phys_scale/px_scale]))
+	apertures.append(CircularAperture(center,r_out[-2]))
+	apertures.append(CircularAnnulus(center,r_in=r_in[-1],r_out=r_out[-1]))
+
 
 	### photometer
 	from photutils import aperture_photometry
-	phot1 = aperture_photometry(flux1,apertures)
-	phot2 = aperture_photometry(flux2,apertures)
+	phot1 = aperture_photometry(flux1,apertures,error=noise1, mask=np.logical_or(np.isinf(noise1),np.isnan(noise1)))
+	phot2 = aperture_photometry(flux2,apertures,error=noise2, mask=np.logical_or(np.isinf(noise2),np.isnan(noise2)))
 	f1 = np.array([phot1['aperture_sum_'+str(i)][0] for i in xrange(r_in.shape[0])])
+	e1 = np.array([phot1['aperture_sum_err_'+str(i)][0] for i in xrange(r_in.shape[0])])
 	f2 = np.array([phot2['aperture_sum_'+str(i)][0] for i in xrange(r_in.shape[0])])
+	e2 = np.array([phot2['aperture_sum_err_'+str(i)][0] for i in xrange(r_in.shape[0])])
 
 	### turn into gradient
-	color = convert_to_color(f1,f2,'WISE W1', 'WISE W2',minflux=1e-20)
+	color, err = convert_to_color(f1,f2,e1,e2,'WISE W1', 'WISE W2',minflux=1e-20,vega_conversions=False)
 	r_avg = (r_in+r_out)/2.
-	gradient = (color[1:]-color[:-1]) / ((r_avg[1:]-r_avg[:-1])*0.5)
+	gradient = (color[1:]-color[:-1]) / ((r_avg[1:]-r_avg[:-1])*px_scale)
+	gradient_err = np.sqrt(err[1:]**2+err[:-1]**2) / ((r_avg[1:]-r_avg[:-1])*px_scale)
 
-	ax[1].plot(r_avg[:20],gradient[:20])
+	### what to plot?
+	grad_plot = gradient[:-2]
+	graderr_plot = gradient_err[:-2]
+	x_arcsec = r_out[:-3]*px_scale
+
+	### limit. when you first dip below s/n = 10, don't plot the remainder
+	sn_lim = 10
+	good = ((f1/e1) > sn_lim) & ((f2/e2) > sn_lim)
+	good[np.where(good == False)[0].min():] = False
+	### account for gradient + extra apertures at end
+	# require BOTH ENDS of gradient have S/N > x
+	good = good[1:-2]
+
+	### plot
+	ax[1].errorbar(x_arcsec[good],grad_plot[good],yerr=graderr_plot[good], 
+		           fmt='o',ms=8,elinewidth=1.5,color='k',ecolor='k',linestyle='-')
+	ax[1].axhline(0, linestyle='--', color='0.2',lw=2,zorder=-1)
 	ax[1].set_xlabel('arcseconds from center')
 	ax[1].set_ylabel(r'$\nabla$(W1-W2) [magnitude/arcsecond]')
-	plt.show()
-	print 1/0
+
+	### add in 2kpc gradient
+	ax[1].errorbar(r_out[-2]*px_scale,gradient[-1],yerr=gradient_err[-1],
+		           fmt='o',ms=10,elinewidth=2.0,color='red',ecolor='red',linestyle='-')
+
+	### symmetric y-axis
+	ymax = np.abs(ax[1].get_ylim()).max()
+	ax[1].set_ylim(-ymax,ymax)
+
+	### second axis
+	y1, y2 = ax[1].get_ylim()
+	x1, x2 = ax[1].get_xlim()
+	ax2 = ax[1].twiny()
+	ax2.set_xlim(x1*phys_scale, x2*phys_scale)
+	ax2.set_xlabel(r'kpc from center')
+	ax2.set_ylim(y1, y2)
+
+	return gradient[-1], gradient_err[-1], r_out[-2]*px_scale
 
 def calc_dist(wcs, pix_center, size, im_shape):
 
@@ -344,6 +479,43 @@ def load_image(objname,filter):
 
 	return hdu
 
+def download_wise_data(alldata, idx=Ellipsis):
+
+	# unWISE images (http://unwise.me/imgsearch/)
+
+	dir = '/Users/joel/code/python/threedhst_bsfh/data/brownseds_data/fits/unWISE/'
+	url = '"http://unwise.me/cutout_fits?version=neo1&size=60&bands=12&file_img_m=on&file_invvar_m=on&'
+	ra,dec,objnames = brown_io.load_coordinates()
+	with open(dir+'download.sh', 'w') as f:
+
+		for dat in np.array(alldata)[idx]:
+			match = dat['objname'] == objnames
+
+			folder = dir+dat['objname'].replace(' ','_')
+			if not os.path.isdir(folder):
+				os.makedirs(folder)
+
+			ra_string = 'ra={0}'.format(float(ra[match]))
+			dec_string =  'dec={0}'.format(float(dec[match]))
+			str = url + ra_string + '&' + dec_string
+			filename = dat['objname'].replace(' ','_')+'.tar.gz'
+			f.write('wget '+str+'" -O '+filename+'\n')
+			f.write('mv '+filename+' '+folder+'/'+'\n')
+			f.write('tar -xvf '+folder+'/'+filename+' -C '+folder+'\n')
+			f.write('rm '+folder+'/'+filename+'\n')
+
+def	load_wise_data(objname,filter,load_other=False):
+
+	dir = '/Users/joel/code/python/threedhst_bsfh/data/brownseds_data/fits/unWISE/'+objname.replace(' ','_')+'/'
+	files = [f for f in os.listdir(dir) if filter.lower() in f]
+	if load_other:
+		files = files[2:]
+
+	img = fits.open(dir+files[0])[0]
+	ivar = fits.open(dir+files[1])[0]
+
+	return img, ivar
+
 def load_structure(objname,long_axis=False):
 
 	'''
@@ -383,7 +555,7 @@ def plot_contour(ax,cont,ncontours=10):
 	#### set levels
 	cs = ax.contour(x,y, cont, linewidths=0.7,zorder=2, ncontours=ncontours, cmap='Greys')
 
-def convert_to_color(flux1,flux2,filter1,filter2,minflux=1e-10):
+def convert_to_color(flux1,flux2,err1,err2,filter1,filter2,minflux=1e-10,vega_conversions=False):
 
 	'''
 	convert fluxes in fnu into Vega-scale colors
@@ -391,11 +563,21 @@ def convert_to_color(flux1,flux2,filter1,filter2,minflux=1e-10):
 
 	flux1_clip = np.clip(flux1,minflux,np.inf)
 	flux2_clip = np.clip(flux2,minflux,np.inf)
-	vega_conv = (vega_conversions(filter1) - vega_conversions(filter2))
+	if vega_conversions:
+		vega_conv = (vega_conversions(filter1) - vega_conversions(filter2))
+	else:
+		vega_conv = 0.0
 
-	flux_color = -2.5*np.log10(flux1_clip/flux2_clip)+vega_conv
+	x = flux1_clip/flux2_clip
+	flux_color = -2.5*np.log10(x)+vega_conv
 
-	return flux_color
+	dc_df1 = (-2.5 / (np.log(10)*flux1_clip))
+	dc_df2 = (-2.5 / (np.log(10)*flux2_clip))
+	if err1 is not None:
+		flux_color_err = np.sqrt( dc_df1**2 * (err1)**2 + dc_df2**2 * (err2)**2 )
+	else:
+		return flux_color
+	return flux_color, flux_color_err
 
 def load_wise_psf(filter):
 	'''
