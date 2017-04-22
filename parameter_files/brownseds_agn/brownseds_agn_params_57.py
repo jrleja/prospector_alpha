@@ -717,6 +717,7 @@ def load_model(objname='',datname='', agelims=[], **extras):
     hdulist = fits.open(datname)
     idx = hdulist[1].data['Name'] == objname
     zred =  hdulist[1].data['cz'][idx][0] / 3e5
+    lumdist = hdulist[1].data['Dist'][idx][0]
     hdulist.close()
 
     #### CALCULATE TUNIV #####
