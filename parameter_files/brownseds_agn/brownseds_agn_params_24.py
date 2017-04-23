@@ -29,7 +29,7 @@ run_params = {'verbose':True,
               # MCMC params
               'nwalkers':620,
               'nburn':[150,200,200], 
-              'niter': 5000,
+              'niter': 6500,
               'interval': 0.2,
               # Convergence parameters
               'convergence_check_interval': 50,
