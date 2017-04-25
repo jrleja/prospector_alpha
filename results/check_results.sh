@@ -14,8 +14,8 @@ do
   # read id
   LINE=$(sed -n "${i}p" "$IDFILE")
   mod=${LINE//[ ]/*}
-  if ls $runname/*$mod* 1> /dev/null 2>&1; then
-    echo $i
+  if ! ls $runname/*$mod* 1> /dev/null 2>&1; then
+    echo $i" not done!"
   fi
 
 done
