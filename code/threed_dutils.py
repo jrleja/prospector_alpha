@@ -73,34 +73,6 @@ def return_lmir(lam,spec,z=None,alt_file=None):
 
 	return luv
 
-def mips_to_lir(mips_flux,z):
-
-	'''
-	input flux must be in mJy
-	output is in Lsun
-	L_IR [Lsun] = fac_<band>(redshift) * flux [milliJy]
-	'''
-
-	dale_helou_txt = '/Users/joel/code/python/threedhst_bsfh/data/MIPS/dale_helou.txt'
-	with open(dale_helou_txt, 'r') as f: hdr = f.readline().split()[1:]
-	conversion = np.loadtxt(dale_helou_txt, comments = '#', dtype = np.dtype([(n, np.float) for n in hdr]))
-	
-	# if we're at higher redshift, interpolate
-	# it decrease error due to redshift relative to rest-frame template (good)
-	# but adds nonlinear error due to distances (bad)
-	# else, scale the nearest conversion factor by the 
-	# ratio of luminosity distances, since nonlinear error due to distances will dominate
-	if z > 0.1:
-		intfnc = interp1d(conversion['redshift'],conversion['fac_MIPS24um'], bounds_error = True, fill_value = 0)
-		fac = intfnc(z)
-	else:
-		near_idx = np.abs(conversion['redshift']-z).argmin()
-		lumdist_ratio = (WMAP9.luminosity_distance(z).value / WMAP9.luminosity_distance(conversion['redshift'][near_idx]).value)**2
-		zfac_ratio = (1.+conversion['redshift'][near_idx]) / (1.+z)
-		fac = conversion['fac_MIPS24um'][near_idx]*lumdist_ratio*zfac_ratio
-
-	return fac*mips_flux
-
 def sfr_uvir(lir,luv):
 
 	# inputs in Lsun
@@ -438,7 +410,7 @@ def halfmass_assembly_time(sfh_params):
 	try:
 		half_time = brentq(sfh_half_time, 0,14,
 	                       args=(sfh_params,0.5),
-	                       rtol=1.48e-08, maxiter=100)
+	                       rtol=1.48e-08, maxiter=1000)
 	except ValueError:
 		
 		# make error only pop up once
@@ -614,9 +586,14 @@ def generate_basenames(runname):
 		parm_basename = basename+"_params"
 		ancilname=None
 
-		for jj in xrange(ngals):
-			filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+basename+'_'+ids[jj])
-			parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py')	
+		for jj in xrange(ngals): filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+basename+'_'+ids[jj])
+		
+		# check for multiple parameter files
+		parbase = os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename
+		if os.path.isfile(parbase+'_1.py'):
+			for jj in xrange(ngals): parm.append(parbase+'_'+str(jj+1)+'.py')
+		else:
+			parm = parbase+'.py'
 
 	elif 'virgo' in runname:
 

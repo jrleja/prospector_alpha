@@ -278,10 +278,10 @@ def plot_model_corrs(pdata,color_by=None,idx=None,**popts):
 		ax[ii].errorbar(x,y,yerr=yerr, xerr=xerr, ms=0.0,zorder=-2,**plotopts)
 
 		vmin, vmax = cb.min(), cb.max()
-		ax[ii].scatter(x[cidx],y[cidx], marker=popts['nofmir_shape'],alpha=popts['nofmir_alpha'],c=cb[cidx], cmap=popts['cmap'],
-			           s=50,zorder=10, vmin=vmin, vmax=vmax)
-		pts = ax[ii].scatter(x[idx],y[idx], marker=popts['fmir_shape'],alpha=popts['fmir_alpha'],c=cb[idx], cmap=popts['cmap'],
-			                 s=50,zorder=10, vmin=vmin, vmax=vmax)
+		ax[ii].scatter(x[cidx],y[cidx], marker=popts['nofmir_shape'],c=cb[cidx], cmap=popts['cmap'], \
+			           s=90,zorder=10, vmin=vmin, vmax=vmax)
+		pts = ax[ii].scatter(x[idx],y[idx], marker=popts['fmir_shape'],c=cb[idx], cmap=popts['cmap'], \
+			                 s=90,zorder=10, vmin=vmin, vmax=vmax)
 
 		ax[ii].set_xlabel(xlabel)
 		ax[ii].set_ylabel(ylabels[ii])
@@ -401,10 +401,11 @@ def plot(pdata,color_by_observatory=False,color_by_database=False,color_by_wise=
 
 	cidx = np.ones_like(pdata[xpar],dtype=bool)
 	cidx[idx] = False
+	s = 120
 
 	if sf_flag:
 
-		for ind, shape in zip([cidx,~cidx],[popts['nofmir_shape'],popts['fmir_shape']]):
+		for ind, shape, alph in zip([cidx,~cidx],[popts['nofmir_shape'],popts['fmir_shape']],[popts['nofmir_alpha'],popts['fmir_alpha']]):
 			lower_sigma = pdata['lsfr_down'][ind]
 			significant = lower_sigma > 1
 
@@ -412,12 +413,12 @@ def plot(pdata,color_by_observatory=False,color_by_database=False,color_by_wise=
 				        yerr=[yerr[0][ind][significant],yerr[1][ind][significant]], xerr=xerr[ind][significant],
 				        zorder=-5,ms=0.0,
 			            **plotopts)
-			ax.scatter(xplot[ind][significant], yplot[ind][significant], marker=shape, color=red,s=70,zorder=11,alpha=0.9)
+			ax.scatter(xplot[ind][significant], yplot[ind][significant], marker=shape, color=red,s=s,zorder=11,alpha=alph,edgecolors='k')
 			ax.errorbar(xplot[ind][~significant], yplot[ind][~significant], 
 				        yerr=[yerr[0][ind][~significant],yerr[1][ind][~significant]], xerr=xerr[ind][~significant],
 				        zorder=-5,ms=0.0,
 			            **plotopts)
-			ax.scatter(xplot[ind][~significant], yplot[ind][~significant], marker=shape, color=blue,s=70,zorder=10,alpha=0.9)
+			ax.scatter(xplot[ind][~significant], yplot[ind][~significant], marker=shape, color=blue,s=s,zorder=10,alpha=alph,edgecolors='k')
 
 			ax.text(0.98,0.18,r'L$_{\mathrm{X}}$ consistent',transform=ax.transAxes,color=blue,ha='right')
 			ax.text(0.98,0.14,'with XRBs',transform=ax.transAxes,color=blue,ha='right')
@@ -426,13 +427,15 @@ def plot(pdata,color_by_observatory=False,color_by_database=False,color_by_wise=
 	else:
 		ax.errorbar(xplot, yplot, yerr=yerr, xerr=xerr,ms=0.0,zorder=-2,
 		            **plotopts)
-		ax.scatter(xplot[cidx], yplot[cidx], marker=popts['nofmir_shape'], color=blue,s=70,zorder=10,alpha=0.9)
-		ax.scatter(xplot[~cidx], yplot[~cidx], marker=popts['fmir_shape'], color=blue,s=70,zorder=10,alpha=0.9)
+		ax.scatter(xplot[cidx], yplot[cidx], marker=popts['nofmir_shape'], alpha=popts['nofmir_alpha'], color=blue,s=s,zorder=10,edgecolors='k')
+		ax.scatter(xplot[~cidx], yplot[~cidx], marker=popts['fmir_shape'], alpha=popts['fmir_alpha'], color=blue,s=s,zorder=10,edgecolors='k')
 
 
 	ax.set_ylabel(ylabel)
 	ax.set_xlabel(xlabel)
 	ax.set_xlim(xmin*0.5,xmax*2)
+	ax.set_ylim(1e-3,2e0)
+
 	if xpar == 'xray_luminosity':
 		ax.set_xscale('log',nonposx='clip',subsx=([1]))
 		loc = 2

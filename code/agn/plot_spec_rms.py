@@ -267,8 +267,8 @@ def plot_rms(pdata,outfolder,agn_idx=None,**popts):
 
 		####### NEW FINAL PLOT OF AWESOMENESS
 		alpha = 0.7
-		ax3[ii].scatter(q50o_no[agn_idx], q50m_no[agn_idx], marker='o', color=popts['noagn_color'],s=70,zorder=10,alpha=alpha)
-		ax3[ii].scatter(q50o[agn_idx], q50m[agn_idx], marker='o', color=popts['agn_color'],s=70,zorder=10,alpha=alpha)
+		ax3[ii].scatter(q50o_no[agn_idx], q50m_no[agn_idx], marker='o', color=popts['noagn_color'],s=70,zorder=10,alpha=alpha,edgecolors='k')
+		ax3[ii].scatter(q50o[agn_idx], q50m[agn_idx], marker='o', color=popts['agn_color'],s=70,zorder=10,alpha=alpha,edgecolors='k')
 
 		'''
 		errs_obs = threed_dutils.asym_errors(q50o[agn_idx], q84o[agn_idx], q16o[agn_idx])

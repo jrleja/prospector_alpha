@@ -60,8 +60,8 @@ def load_prospector_data(filebase,no_sample_results=False,objname=None,runname=N
 		filebase = os.getenv('APPS')+'/threedhst_bsfh/results/'+runname+'/'+runname+'_'+objname
 	mcmc_filename, model_filename, extra_name = create_prosp_filename(filebase)
 
-	if hdf5:
-		mcmc_filename += '.h5'
+	if not hdf5:
+		mcmc_filename = mcmc_filename[-3:]
 
 	if load_extra_output:
 		extra_output = load_prospector_extra(filebase,objname=objname,runname=runname)
@@ -72,8 +72,12 @@ def load_prospector_data(filebase,no_sample_results=False,objname=None,runname=N
 		model, powell_results = read_results.read_model(model_filename)
 		sample_results = None
 	else:
-		sample_results, powell_results, model = read_results.results_from(mcmc_filename, model_file=model_filename,inmod=None)
-	
+		try:
+			sample_results, powell_results, model = read_results.results_from(mcmc_filename, model_file=model_filename,inmod=None)
+		except KeyError:
+			print 'failed to load file '+str(mcmc_filename)+' for object '+filebase.split('/')[-1]
+			sample_results, powell_results, model = None, None, None
+
 	return sample_results, powell_results, model, extra_output
 
 def load_prospector_extra(filebase,objname=None,runname=None):
@@ -105,9 +109,16 @@ def create_prosp_filename(filebase):
 		return None,None,None
 
 	# generate output
-	mcmc_filename=filebase+'_'+max(times)+"_mcmc"
+	mcmc_filename=filebase+'_'+max(times)+"_mcmc.h5"
 	model_filename=filebase+'_'+max(times)+"_model"
-	postname = mcmc_filename[:-4]+'post'
+	postname = mcmc_filename[:-7]+'post'
+
+	if not os.path.isfile(model_filename):
+		print 'no model file for ' + mcmc_filename
+		model_filename = None
+	if not os.path.isfile(mcmc_filename):
+		print 'no sampling file for ' + model_filename
+		mcmc_filename = None
 
 	return mcmc_filename, model_filename, postname
 

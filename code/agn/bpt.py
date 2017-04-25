@@ -140,15 +140,15 @@ def plot_scatterplot(pdata,colorpar=None,colorparlabel=None,log_cpar=False,cpar_
 	fig, ax = plt.subplots(1,1, figsize=(8, 6))
 
 	ax.errorbar(xplot, yplot, yerr=yerr, xerr=xerr,
-	            fmt='o', ecolor='k', capthick=2,elinewidth=2,ms=0.0,alpha=0.5,zorder=-5)
+	            fmt='o', ecolor='0.2', capthick=0.6,elinewidth=0.6,ms=0.0,alpha=0.5,zorder=-5)
 	pts = ax.scatter(xplot[cidx], yplot[cidx], marker=popts['nofmir_shape'], c=cpar_plot[cidx], vmin=cpar_plot.min(), vmax=cpar_plot.max(),
-	                 cmap=plt.cm.plasma,s=70,zorder=10)
+	                 cmap=plt.cm.plasma,s=75,zorder=10)
 	pts = ax.scatter(xplot[~cidx], yplot[~cidx], marker=popts['fmir_shape'], c=cpar_plot[~cidx], vmin=cpar_plot.min(), vmax=cpar_plot.max(),
-		             cmap=plt.cm.plasma,s=70,zorder=10)
+		             cmap=plt.cm.plasma,s=75,zorder=10)
 
 	ax.set_xlabel(r'log([NII 6583]/H$_{\alpha}$)')
 	ax.set_ylabel(r'log([OIII 5007]/H$_{\beta}$)')
-	axlim = (-2.2,0.5,-1.0,1.0)
+	axlim = (-1.5,0.5,-0.8,1.0)
 	ax.axis(axlim)
 
 	#### label and add colorbar
@@ -156,10 +156,6 @@ def plot_scatterplot(pdata,colorpar=None,colorparlabel=None,log_cpar=False,cpar_
 	cb.set_label(colorparlabel)
 	cb.solids.set_rasterized(True)
 	cb.solids.set_edgecolor("face")
-
-	#### text
-	ax.text(0.05,0.92,'N='+str(good.sum()),transform=ax.transAxes,fontsize=16)
-
 	return fig, ax
 
 

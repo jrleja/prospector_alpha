@@ -264,10 +264,10 @@ def plot_color_scatterplot(pdata,xfilt=None,yfilt=None,xlabel=None,ylabel=None,
 	#### plot photometry
 	fig, ax = plt.subplots(1,1, figsize=(8, 6))
 	ax.scatter(xplot[cidx], yplot[cidx], marker=popts['nofmir_shape'], c=cpar_plot[cidx],
-		       vmin=cpar_plot.min(), vmax=cpar_plot.max(), cmap=plt.cm.plasma,s=70,alpha=0.7)
+		       vmin=cpar_plot.min(), vmax=cpar_plot.max(), cmap=plt.cm.plasma,s=70,alpha=0.9)
 	ax.scatter(xplot[~cidx], yplot[~cidx], marker=popts['fmir_shape'], c=cpar_plot[~cidx], 
-			   vmin=cpar_plot.min(), vmax=cpar_plot.max(), cmap=plt.cm.plasma,s=70,alpha=0.7)
-	pts = ax.scatter(xplot, yplot, marker='o', c=cpar_plot, cmap=plt.cm.plasma,s=0.0,alpha=0.7)
+			   vmin=cpar_plot.min(), vmax=cpar_plot.max(), cmap=plt.cm.plasma,s=70,alpha=0.9)
+	pts = ax.scatter(xplot, yplot, marker='o', c=cpar_plot, cmap=plt.cm.plasma,s=0.0,alpha=0.9)
 
 	#### label and add colorbar
 	ax.set_xlabel(xlabel)

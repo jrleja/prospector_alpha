@@ -30,7 +30,7 @@ def collate_data(alldata,alldata_noagn):
 
 	### let's do something special here
 	fparnames = ['halpha','m23_frac']
-	fparlabels = [r'log(H$_{\alpha}$ flux)',r'M$_{\mathrm{formed}}$(0.1-1 Gyr)/M$_{\mathrm{formed}}$(total)']
+	fparlabels = [r'log(H$_{\alpha}$ flux)',r'M$_{\mathrm{form}}$(0.1-1 Gyr)/M$_{\mathrm{form}}$(all)']
 	objname = []
 
 	### setup dictionary
@@ -175,7 +175,7 @@ def plot_dpars(pdata,xpar=None,xparlabel=None,log_xpar=False, agn_idx=None, **po
 	opts = {
 	        'color': blue,
 	        'mew': 1.5,
-	        'alpha': 0.6,
+	        'ms': 10
 	       }
 
 	toplot = ['stellar_mass','logzsol','dust2','ssfr_100','half_time','m23_frac']
@@ -191,8 +191,10 @@ def plot_dpars(pdata,xpar=None,xparlabel=None,log_xpar=False, agn_idx=None, **po
 		cidx[agn_idx] = False
 
 		errs = pdata['errs'][par]
-		ax[idx].errorbar(xpar_plot[cidx],pdata['median'][par][cidx], yerr=[errs[0][cidx],errs[1][cidx]], zorder=-3, fmt=popts['nofmir_shape'],**opts)
-		ax[idx].errorbar(xpar_plot[agn_idx],pdata['median'][par][agn_idx], yerr=[errs[0][agn_idx],errs[1][agn_idx]], zorder=-3, fmt=popts['fmir_shape'],**opts)
+		ax[idx].errorbar(xpar_plot[cidx],pdata['median'][par][cidx], yerr=[errs[0][cidx],errs[1][cidx]], zorder=-3, 
+			             fmt=popts['nofmir_shape'],alpha=popts['nofmir_alpha'],**opts)
+		ax[idx].errorbar(xpar_plot[agn_idx],pdata['median'][par][agn_idx], yerr=[errs[0][agn_idx],errs[1][agn_idx]], zorder=-3, 
+			             fmt=popts['fmir_shape'],alpha=popts['fmir_alpha'],**opts)
 
 		ax[idx].set_ylabel('AGN(on)-AGN(off)')
 		ax[idx].set_xlabel(xparlabel)

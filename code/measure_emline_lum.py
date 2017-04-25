@@ -448,8 +448,7 @@ def measure(sample_results, extra_output, obs_spec, magphys, sps, sigsmooth=None
 	# observed spectra arrive in Lsun/cm^2/AA
 	# convert distance factor
 	pc = 3.085677581467192e18  # cm
-	dfactor = 4*np.pi*(pc*lumdist *
-                    1e6)**2 * (1+magphys['metadata']['redshift']) 
+	dfactor = 4*np.pi*(pc*lumdist[0] * 1e6)**2 * (1+magphys['metadata']['redshift']) 
 	obsflux = obs_spec['flux_lsun']*dfactor
 	obslam = obs_spec['rest_lam']
 
@@ -550,7 +549,8 @@ def measure(sample_results, extra_output, obs_spec, magphys, sps, sigsmooth=None
 		#### mod_abs_lamcont and the ordered em_bbox vector.
 		if kk == 2:
 			blue = (model_lam > 3652.) & (model_lam < 3802.)
-			norm_factor = np.mean(obsflux[blue])/np.mean(prospflux_em[blue])
+			blue_obs = (obslam > 3652.) & (obslam < 3802.)
+			norm_factor = np.mean(obsflux[blue_obs])/np.mean(prospflux_em[blue])
 			model_norm[m_idx] = model_flux[m_idx]*norm_factor
 		else:
 			mod_abs_idx = mod_abs_mapping[kk]

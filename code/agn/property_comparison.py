@@ -153,7 +153,7 @@ def plot_sfh(pdata,idx_plot,outfolder,**popts):
 
 	### open figure
 	#fig, ax = plt.subplots(5,2, figsize=(7, 15))
-	fig, ax = plt.subplots(5,4, figsize=(14, 15))
+	fig, ax = plt.subplots(4,4, figsize=(14, 12.5))
 
 	ax = np.ravel(ax)
 	fs = 10

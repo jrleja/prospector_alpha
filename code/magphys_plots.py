@@ -522,7 +522,7 @@ def update_model_info(alldata, sample_results, extra_output, magphys):
 	alldata['magphys'] = magphys['pdfs']
 	alldata['model'] = magphys['model']
 	alldata['pquantiles'] = extra_output['quantiles']
-	npars = len(sample_results['initial_theta'])
+	npars = sample_results['chain'].shape[-1]
 	
 	alldata['spec_info'] = extra_output['spec_info']
 	alldata['model_emline'] = extra_output['model_emline']
@@ -873,13 +873,7 @@ def plt_all(runname=None,startup=True,**extras):
 	if startup == True:
 		filebase, parm_basename, ancilname=threed_dutils.generate_basenames(runname)
 		alldata = []
-
 		for jj in xrange(len(filebase)):
-			'''
-			if (filebase[jj].split('_')[-1] != 'NGC 4125') & \
-			   (filebase[jj].split('_')[-1] != 'NGC 6090'):
-				continue
-			'''
 			dictionary = collate_data(filebase=filebase[jj],\
 			                           outfolder=outfolder,
 			                           **extras)

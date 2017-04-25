@@ -2,6 +2,7 @@ from matplotlib import pyplot as plt
 from astropy.io import fits
 from astropy.wcs import WCS
 from astropy.stats import sigma_clipped_stats
+from astropy.modeling import models, fitting
 import os
 import numpy as np
 from astropy.coordinates import SkyCoord  # High-level coordinates
@@ -13,9 +14,10 @@ from wise_colors import vega_conversions
 from magphys_plot_pref import jLogFormatter
 import brown_io
 from corner import quantile
-from photutils import CircularAperture, CircularAnnulus, find_peaks
+from photutils import CircularAperture, CircularAnnulus, find_peaks, aperture_photometry
 from astropy.cosmology import WMAP9
 import pickle
+from threed_dutils import asym_errors
 from scipy.optimize import brentq
 
 plt.ioff()
@@ -26,13 +28,15 @@ majorFormatter = jLogFormatter(base=10, labelOnlyBase=True)
 
 # https://arxiv.org/pdf/1603.05664.pdf
 px_scale = 2.75
+outfile = '/Users/joel/code/python/threedhst_bsfh/data/brownseds_data/fits/unWISE/gradients.pickle'
+wise_psf = 6
 
 def test_z(x,c):
 	# c = true lumdist
 	# x = redshift
 	return WMAP9.luminosity_distance(x).value-c
 
-def collate_data(alldata):
+def collate_data(alldata,alldata_noagn):
 
 	#### generate containers
 	# photometry
@@ -69,7 +73,7 @@ def collate_data(alldata):
 	xray = brown_io.load_xray_cat(xmatch = True)
 
 	lsfr, lsfr_up, lsfr_down, xray_lum, xray_lum_err = [], [], [], [], []
-	for dat in alldata:
+	for i, dat in enumerate(alldata):
 		idx = xray['objname'] == dat['objname']
 		if idx.sum() != 1:
 			print 1/0
@@ -78,7 +82,8 @@ def collate_data(alldata):
 
 
 		#### convert lumdist to redshift for distance calculations
-		lumdist = dat['residuals']['phot']['lumdist']
+		# only in alldata_noagn for now...
+		lumdist = alldata_noagn[i]['residuals']['phot']['lumdist']
 		zred = brentq(test_z, 0, 0.2, args=(lumdist), rtol=1.48e-08, maxiter=1000)
 		z.append(zred)
 
@@ -124,7 +129,7 @@ def collate_data(alldata):
 	return out
 
 def plot_all(runname='brownseds_agn',runname_noagn='brownseds_np',alldata=None,
-	         alldata_noagn=None,agn_idx=None,outfolder=None):
+	         alldata_noagn=None,agn_idx=None,outfolder=None,regenerate=False, **popts):
 
 	#### load alldata
 	if alldata is None:
@@ -132,26 +137,82 @@ def plot_all(runname='brownseds_agn',runname_noagn='brownseds_np',alldata=None,
 		alldata_noagn = brown_io.load_alldata(runname=runname_noagn)
 
 	#### make output folder if necessary
-	if outfolder is None:
-		outfolder = os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/agn_plots/sdss_overlays'
-		if not os.path.isdir(outfolder):
-			os.makedirs(outfolder)
+	outfolder_overlays = os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/agn_plots/sdss_overlays'
+	if not os.path.isdir(outfolder_overlays):
+		os.makedirs(outfolder_overlays)
 
 	#### collate data
-	pdata = collate_data(alldata)
+	pdata = collate_data(alldata,alldata_noagn)
 
 	#### plot data
-	plot_composites(pdata,agn_idx,outfolder,['WISE W1','WISE W2'])
+	if regenerate:
+		plot_composites(pdata,outfolder_overlays,['WISE W1','WISE W2'])
+	plot_summary(pdata,outfolder,agn_idx=agn_idx,**popts)
 
-def plot_composites(pdata,idx_plot,outfolder,contours,contour_colors=True,
+def plot_summary(pdata, outfolder, agn_idx=Ellipsis, **popts):
+
+	'''
+	(2) evaluate: 1 kpc gradient ok?
+	(3) manually check for point sources, remove [NGC 1068, NGC 3690, UGC 05101]
+	'''
+
+	#### load data
+	with open(outfile, "rb") as f:
+		outdict=pickle.load(f)
+
+	#### plot options
+	blue = '#1C86EE' 
+	opts = {
+	        'color': blue,
+	        'mew': 1.5,
+		 	'capthick':0.6,
+		 	'elinewidth':0.6,
+		 	'ecolor':'0.2',
+		 	'ms': 12
+        } 
+
+	fig, ax = plt.subplots(1,1, figsize=(7, 7))
+	idx = 1 # 1 kpc. change to 1 ---> 2 kpc.
+	arcsec_lim = wise_psf # one PSF FWHM
+
+	#### pick out good measurements, and figure out AGN indexes
+	# could be more aggressive
+	resolved = (outdict['arcsec'][:,idx] > 3) &  (outdict['gradient_error'][:,idx] < 0.25) & (outdict['obj_size_brown_kpc'] > (idx+1)*2)
+	cidx = np.ones_like(resolved,dtype=bool)
+	cidx[agn_idx] = False
+	cidx = cidx[resolved]
+
+	#### plot
+	xp = np.log10(pdata['pars']['fagn']['q50'][resolved])
+	xerr = asym_errors(pdata['pars']['fagn']['q50'][resolved],
+		               pdata['pars']['fagn']['q84'][resolved],
+		               pdata['pars']['fagn']['q16'][resolved],log=True) 
+	yp = outdict['gradient'][resolved,idx].squeeze()
+	yerr = outdict['gradient_error'][resolved,idx].squeeze()
+
+	ax.errorbar(xp[cidx],yp[cidx], 
+		        xerr=[xerr[0][cidx],xerr[1][cidx]],
+		        yerr=yerr[cidx],
+		        zorder=-3, fmt=popts['nofmir_shape'],
+		        alpha=popts['nofmir_alpha'],**opts)
+	ax.errorbar(xp[~cidx],yp[~cidx], 
+		        xerr=[xerr[0][~cidx],xerr[1][~cidx]],
+		        yerr=yerr[~cidx],
+		        zorder=-3, fmt=popts['fmir_shape'],
+		        alpha=popts['fmir_alpha'],**opts)
+
+	ax.set_xlabel(r'f$_{\mathrm{MIR}}$')
+	ax.set_ylabel(r'$\nabla$(W1-W2) at r=2 kpc [mag/kpc]')
+
+	ax.axhline(0, linestyle='--', color='0.2',lw=2,zorder=-1,alpha=0.4)
+	#ax.set_ylim(-.2,.2)
+	ax.set_xlim(-4,1)
+
+	plt.tight_layout()
+	plt.savefig(outfolder+'wise_gradient.png',dpi=150)
+
+def plot_composites(pdata,outfolder,contours,contour_colors=True,
 	                calibration_plot=True,brown_data=False):
-
-	'''
-	TO DO:
-		(2) evaluate: 1 kpc gradient ok?
-		(3) manually check for point sources, remove [NGC 1068]
-		(2) test NOT convolving the data
-	'''
 
 	### image qualities
 	fs = 10 # fontsize
@@ -159,16 +220,13 @@ def plot_composites(pdata,idx_plot,outfolder,contours,contour_colors=True,
 
 	### contour color limits (customized for W1-W2)
 	color_limits = [-1.0,2.6]
-	kpc_lim = 1
-
 	kernel = None
 
 	### output blobs
-	gradient, gradient_error, arcsec, kpc,objname_out = [], [], [], [], []
-	outfile = '/Users/joel/code/python/threedhst_bsfh/data/brownseds_data/fits/unWISE/gradients.pickle'
+	gradient, gradient_error, arcsec, obj_size,objname_out,obj_size_gauss, obj_size_kpc = [], [], [], [], [], [], []
 
 	### begin loop
-	for ii,idx in enumerate(idx_plot):
+	for idx in xrange(len(pdata['objname'])):
 
 		### load object information
 		objname = pdata['objname'][idx]
@@ -197,9 +255,9 @@ def plot_composites(pdata,idx_plot,outfolder,contours,contour_colors=True,
 				wcs = WCS(img1.header)
 				pix_center = wcs.all_world2pix([[ra[0],dec[0]]],1)
 
-				if (pix_center.squeeze()[0]+1 > img1.shape[0]) or \
-					(pix_center.squeeze()[1]+1 > img1.shape[1]) or \
-					(np.any(pix_center < 0)):
+				if (pix_center.squeeze()[0]-4 > img1.shape[1]) or \
+					(pix_center.squeeze()[1]-4 > img1.shape[0]) or \
+					(np.any(pix_center < 4)):
 					print 'object not in image, checking for additional image'
 					print pix_center, img1.shape
 					img1, noise1 = load_wise_data(objname,contours[0].split(' ')[1],load_other = True)
@@ -208,9 +266,7 @@ def plot_composites(pdata,idx_plot,outfolder,contours,contour_colors=True,
 					wcs = WCS(img1.header)
 					pix_center = wcs.all_world2pix([[ra[0],dec[0]]],1)
 					print pix_center, img1.shape
-
-		except error as e:
-			print 'fail'
+		except:
 			print 1/0
 			gradient.append(None)
 			gradient_error.append(None)
@@ -220,6 +276,7 @@ def plot_composites(pdata,idx_plot,outfolder,contours,contour_colors=True,
 			continue
 
 		size = calc_dist(wcs, pix_center, phot_size, img1.data.shape)
+		print pix_center, img1.data.shape
 
 		### convert inverse variance to noise
 		noise1.data = (1./noise1.data)**0.5
@@ -273,19 +330,33 @@ def plot_composites(pdata,idx_plot,outfolder,contours,contour_colors=True,
 
 		### find image center in W2 image, and mark it
 		# do this by finding the source closest to center
-
 		tbl = []
-		nthresh = 20
+		nthresh, box_size = 20, 5
 		fake_noise1_error = copy.copy(noise1_slice)
 		bad = np.logical_or(np.isinf(noise1_slice),np.isnan(noise1_slice))
 		fake_noise1_error[bad] = fake_noise1_error[~bad].max()
 		while len(tbl) < 1:
 			threshold = nthresh * std1 # peak threshold, @ 20 sigma
-			tbl = find_peaks(img1_slice, threshold, box_size=5, subpixel=True, border_width=4,
-								error = fake_noise1_error)
+			tbl = find_peaks(img1_slice, threshold, box_size=box_size, subpixel=True, border_width=4, error = fake_noise1_error)
 			nthresh -=1
+		
+			if nthresh < 2:
+				nthresh = 20
+				box_size = 3
+
+		### find size of biggest one
 		center = np.array(img2_slice.shape)/2.
 		idxmax = ((center[0]-tbl['x_centroid'])**2 + (center[1]-tbl['y_centroid'])**2).argmin()
+		ginit = models.Gaussian2D(amplitude=tbl['fit_peak_value'][idxmax],  x_mean=tbl['x_centroid'][idxmax],  y_mean=tbl['y_centroid'][idxmax], x_stddev=1,y_stddev=1)
+		fit_g = fitting.LevMarLSQFitter()
+		tx, ty = np.mgrid[:img1_slice.shape[0], :img1_slice.shape[1]]
+		ginit.x_mean.fixed=True
+		ginit.y_mean.fixed=True
+		ginit.amplitude.fixed=True
+		g = fit_g(ginit, tx, ty, img1_slice)
+		size_twosig = np.sqrt(g.x_stddev.value**2+g.y_stddev.value**2)*2*px_scale
+
+		### find center in arcseconds
 		xarcsec = (extent[1]-extent[0])*(tbl['x_centroid'][idxmax])/float(img2_slice.shape[0]) + extent[0]
 		yarcsec = (extent[3]-extent[2])*(tbl['y_centroid'][idxmax])/float(img2_slice.shape[1]) + extent[2]
 		ax[0].scatter(xarcsec,yarcsec,color='black',marker='x',s=50,linewidth=2)
@@ -301,26 +372,27 @@ def plot_composites(pdata,idx_plot,outfolder,contours,contour_colors=True,
 
 		### gradient
 		phys_scale = float(1./WMAP9.arcsec_per_kpc_proper(pdata['z'][idx]).value)
-		if phys_scale < 0:
-			print 1/0
-		grad, graderr, x_arcsec = measure_gradient(img1_slice,img2_slice, 
+		grad, graderr, x_arcsec, size_arcsec = measure_gradient(img1_slice,img2_slice, 
 								  noise1_slice, noise2_slice, 
 								  ax, 
 								  (tbl['x_centroid'][idxmax], tbl['y_centroid'][idxmax]),
-								  phys_scale,kpc_lim=kpc_lim)
+								  tbl['fit_peak_value'][idxmax], (xarcsec,yarcsec), size_twosig,
+								  phys_scale)
 
-		### add text
-		ax[1].text(0.05,0.86,r'$\nabla$('+str(int(kpc_lim))+' kpc)='+"{:.3f}".format(grad)+r'$\pm$'+"{:.3f}".format(graderr),
-							transform=ax[1].transAxes,color='red')
-		ax[1].text(0.05,0.93,r'f$_{\mathrm{MIR}}$='+"{:.2f}".format(pdata['pars']['fagn']['q50'][idx])+\
+		ax[1].text(0.05,0.06,r'f$_{\mathrm{MIR}}$='+"{:.2f}".format(pdata['pars']['fagn']['q50'][idx])+\
 								' ('+"{:.2f}".format(pdata['pars']['fagn']['q84'][idx]) +
 								') ('+"{:.2f}".format(pdata['pars']['fagn']['q16'][idx])+')',
-								transform=ax[1].transAxes,color='black')
+								transform=ax[1].transAxes,color='black',fontsize=9)
+
+		obj_size_phys = phot_size*phys_scale
+		ax[1].axvline(phot_size, linestyle='--', color='0.2',lw=2,zorder=-1)
 
 		gradient.append(grad)
 		gradient_error.append(graderr)
 		arcsec.append(x_arcsec)
-		kpc.append(phys_scale*x_arcsec)
+		obj_size.append(size_arcsec)
+		obj_size_gauss.append(size_twosig)
+		obj_size_kpc.append(obj_size_phys)
 		objname_out.append(objname)
 
 		plt.tight_layout()
@@ -331,13 +403,15 @@ def plot_composites(pdata,idx_plot,outfolder,contours,contour_colors=True,
 			'gradient': np.array(gradient),
 			'gradient_error': np.array(gradient_error),
 			'arcsec': np.array(arcsec),
-			'kpc': np.array(kpc),
+			'obj_size': np.array(obj_size),
+			'obj_size_gauss': np.array(obj_size_gauss),
+			'obj_size_brown_kpc': np.array(obj_size_kpc),
 			'objname': objname_out
 		  }
 
 	pickle.dump(out,open(outfile, "wb"))
 
-def measure_gradient(flux1, flux2, noise1, noise2, ax, center, phys_scale,kpc_lim=1):
+def measure_gradient(flux1, flux2, noise1, noise2, ax, center, peakflux, center_arcsec, gauss_size, phys_scale):
 	# http://photutils.readthedocs.io/en/stable/api/photutils.aperture.SkyCircularAnnulus.html#photutils.aperture.SkyCircularAnnulus
 	# http://photutils.readthedocs.io/en/stable/photutils/aperture.html
 
@@ -347,52 +421,93 @@ def measure_gradient(flux1, flux2, noise1, noise2, ax, center, phys_scale,kpc_li
 	r_in = np.arange(1,50)
 	r_out = r_in+1
 	apertures = [CircularAnnulus(center,r_in=ri,r_out=ro) for ri,ro in zip(r_in,r_out)]
+	pdict = {'r_in':r_in,'r_out':r_out,'apertures':apertures}
 
 	# add most important apertures: 0-1 kpc, 1-2 kpc (so gradient at 2kpc)
-	r_in = np.append(r_in, np.array([0, kpc_lim/phys_scale/px_scale]))
-	r_out = np.append(r_out, np.array([kpc_lim/phys_scale/px_scale,kpc_lim*2./phys_scale/px_scale]))
-	apertures.append(CircularAperture(center,r_out[-2]))
-	apertures.append(CircularAnnulus(center,r_in=r_in[-1],r_out=r_out[-1]))
+	r_in_calc = np.array([0.,1.,0.,2.])/phys_scale/px_scale
+	r_out_calc = np.array([1.,2.,2.,4.])/phys_scale/px_scale
+	apertures_calc = [CircularAperture(center,r_out_calc[0]), 
+					  CircularAnnulus(center,r_in_calc[1],r_out=r_out_calc[1]),
+					  CircularAperture(center,r_out_calc[2]),
+					  CircularAnnulus(center,r_in_calc[3],r_out=r_out_calc[3])]
+	calcdict = {'r_in':r_in_calc,'r_out':r_out_calc,'apertures':apertures_calc}
 
+	for dic in [pdict, calcdict]:
 
-	### photometer
-	from photutils import aperture_photometry
-	phot1 = aperture_photometry(flux1,apertures,error=noise1, mask=np.logical_or(np.isinf(noise1),np.isnan(noise1)))
-	phot2 = aperture_photometry(flux2,apertures,error=noise2, mask=np.logical_or(np.isinf(noise2),np.isnan(noise2)))
-	f1 = np.array([phot1['aperture_sum_'+str(i)][0] for i in xrange(r_in.shape[0])])
-	e1 = np.array([phot1['aperture_sum_err_'+str(i)][0] for i in xrange(r_in.shape[0])])
-	f2 = np.array([phot2['aperture_sum_'+str(i)][0] for i in xrange(r_in.shape[0])])
-	e2 = np.array([phot2['aperture_sum_err_'+str(i)][0] for i in xrange(r_in.shape[0])])
+		### photometer
+		phot1 = aperture_photometry(flux1,dic['apertures'],error=noise1, mask=np.logical_or(np.isinf(noise1),np.isnan(noise1)))
+		phot2 = aperture_photometry(flux2,dic['apertures'],error=noise2, mask=np.logical_or(np.isinf(noise2),np.isnan(noise2)))
 
-	### turn into gradient
-	color, err = convert_to_color(f1,f2,e1,e2,'WISE W1', 'WISE W2',minflux=1e-20,vega_conversions=False)
-	r_avg = (r_in+r_out)/2.
-	gradient = (color[1:]-color[:-1]) / ((r_avg[1:]-r_avg[:-1])*px_scale)
-	gradient_err = np.sqrt(err[1:]**2+err[:-1]**2) / ((r_avg[1:]-r_avg[:-1])*px_scale)
+		nap = len(dic['apertures'])
+		f1 = np.array([phot1['aperture_sum_'+str(i)][0] for i in xrange(nap)])
+		e1 = np.array([phot1['aperture_sum_err_'+str(i)][0] for i in xrange(nap)])
+		f2 = np.array([phot2['aperture_sum_'+str(i)][0] for i in xrange(nap)])
+		e2 = np.array([phot2['aperture_sum_err_'+str(i)][0] for i in xrange(nap)])
 
-	### what to plot?
-	grad_plot = gradient[:-2]
-	graderr_plot = gradient_err[:-2]
-	x_arcsec = r_out[:-3]*px_scale
+		### turn into gradient
+		color, err = convert_to_color(f1,f2,e1,e2,'WISE W1', 'WISE W2',minflux=1e-20,vega_conversions=False)
+		r_avg = (dic['r_in']+dic['r_out'])/2.
+		gradient = (color[1:]-color[:-1]) / ((r_avg[1:]-r_avg[:-1])*px_scale)
+		gradient_err = np.sqrt(err[1:]**2+err[:-1]**2) / ((r_avg[1:]-r_avg[:-1])*px_scale)
 
-	### limit. when you first dip below s/n = 10, don't plot the remainder
-	sn_lim = 10
-	good = ((f1/e1) > sn_lim) & ((f2/e2) > sn_lim)
-	good[np.where(good == False)[0].min():] = False
-	### account for gradient + extra apertures at end
-	# require BOTH ENDS of gradient have S/N > x
-	good = good[1:-2]
+		### plotting
+		if nap > 10:
 
-	### plot
-	ax[1].errorbar(x_arcsec[good],grad_plot[good],yerr=graderr_plot[good], 
-		           fmt='o',ms=8,elinewidth=1.5,color='k',ecolor='k',linestyle='-')
+			### what to plot?
+			grad_plot = gradient
+			graderr_plot = gradient_err
+			x_arcsec = dic['r_out'][:-1]*px_scale
+
+			### limit. when you first dip below s/n = 10, don't plot the remainder
+			sn_lim = 10
+			good = ((f1/e1) > sn_lim) & ((f2/e2) > sn_lim)
+			good[np.where(good == False)[0].min():] = False
+			### account for gradient
+			# require BOTH ENDS of gradient have S/N > x
+			good = good[1:]
+
+			### plot
+			ax[1].errorbar(x_arcsec[good],grad_plot[good],yerr=graderr_plot[good], 
+				           fmt='o',ms=8,elinewidth=1.5,color='k',ecolor='k',linestyle='-')
+
+			### show object size
+			# find FIRST TIME it dips below 5% of peak
+			avg_pix_flux = f1 / (np.pi*(r_out**2 - r_in**2))
+			lim = np.where(avg_pix_flux / peakflux < 0.05)[0].min()+1
+
+			obj_size = np.interp(0.1,avg_pix_flux[:lim]/peakflux,r_avg[:lim]*px_scale)
+
+			circ=plt.Circle(center_arcsec, radius=gauss_size, fill=False,lw=2,color='red',alpha=0.8,zorder=5)
+			ax[0].add_patch(circ)
+			ax[1].text(0.95,0.05,r'size='+"{:.2f}".format(obj_size)+'"',transform=ax[1].transAxes,color='red',ha='right',fontsize=9)
+			ax[1].text(0.95,0.1,r'gauss size='+"{:.2f}".format(gauss_size)+'"',transform=ax[1].transAxes,color='red',ha='right',fontsize=9)
+
+		else:
+
+			### what to plot?
+			grad_calc = [gradient[0], gradient[2]]
+			graderr_calc = [gradient_err[0], gradient_err[2]]
+			arcsec_calc = np.array([dic['r_out'][0],dic['r_out'][2]])*px_scale
+
+			### what to save?
+			grad_kpc = np.array([color[1]-color[0],(color[3]-color[2])/2.])
+			graderr_kpc = np.array([np.sqrt(err[1]**2+err[0]**2),
+				                    np.sqrt(err[2]**2+err[3]**2)/2.])
+
+			### add in important gradients
+			ax[1].errorbar(arcsec_calc,grad_calc,yerr=graderr_calc,
+				           fmt='o',ms=10,elinewidth=2.0,color='red',ecolor='red',linestyle=' ')
+
+			### add text
+			ax[1].text(0.05,0.93,r'$\nabla$(1 kpc)='+"{:.3f}".format(grad_kpc[0])+r'$\pm$'+"{:.3f}".format(graderr_kpc[0]),
+								transform=ax[1].transAxes,color='red')
+			ax[1].text(0.05,0.86,r'$\nabla$(2 kpc)='+"{:.3f}".format(grad_kpc[1])+r'$\pm$'+"{:.3f}".format(graderr_kpc[1]),
+								transform=ax[1].transAxes,color='red')
+
+	### labels
 	ax[1].axhline(0, linestyle='--', color='0.2',lw=2,zorder=-1)
 	ax[1].set_xlabel('arcseconds from center')
 	ax[1].set_ylabel(r'$\nabla$(W1-W2) [magnitude/arcsecond]')
-
-	### add in 2kpc gradient
-	ax[1].errorbar(r_out[-2]*px_scale,gradient[-1],yerr=gradient_err[-1],
-		           fmt='o',ms=10,elinewidth=2.0,color='red',ecolor='red',linestyle='-')
 
 	### symmetric y-axis
 	ymax = np.abs(ax[1].get_ylim()).max()
@@ -405,8 +520,8 @@ def measure_gradient(flux1, flux2, noise1, noise2, ax, center, phys_scale,kpc_li
 	ax2.set_xlim(x1*phys_scale, x2*phys_scale)
 	ax2.set_xlabel(r'kpc from center')
 	ax2.set_ylim(y1, y2)
-
-	return gradient[-1], gradient_err[-1], r_out[-2]*px_scale
+	
+	return grad_kpc, graderr_kpc, arcsec_calc, obj_size
 
 def calc_dist(wcs, pix_center, size, im_shape):
 
@@ -618,7 +733,6 @@ def psf_match(f1,f2, test=False, data1_res=1.375):
 	# WARNING: this is sensitive to the windowing!
 	# how to properly choose smoothing?
 
-	from astropy.modeling.models import Gaussian2D
 	from photutils import create_matching_kernel, CosineBellWindow, TopHatWindow
 
 	#### how large do we want our kernel?

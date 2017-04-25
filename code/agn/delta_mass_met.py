@@ -105,8 +105,8 @@ def plot_massmet(pdata,plt_idx,**popts):
 
 	### plots
 	alpha = 0.7
-	pts = ax[0].scatter(mass_noagn,pdata['no_agn']['logzsol']['q50'][plt_idx], marker='o', color=popts['noagn_color'],s=50,zorder=10,alpha=alpha)
-	pts = ax[0].scatter(mass_agn,pdata['agn']['logzsol']['q50'][plt_idx], marker='o', color=popts['agn_color'],s=50,zorder=10,alpha=alpha)
+	pts = ax[0].scatter(mass_noagn,pdata['no_agn']['logzsol']['q50'][plt_idx], marker='o', color=popts['noagn_color'],s=50,zorder=10,alpha=alpha,edgecolors='k')
+	pts = ax[0].scatter(mass_agn,pdata['agn']['logzsol']['q50'][plt_idx], marker='o', color=popts['agn_color'],s=50,zorder=10,alpha=alpha,edgecolors='k')
 
 	for ii in xrange(len(plt_idx)):
 		old = (mass_noagn[ii],pdata['no_agn']['logzsol']['q50'][plt_idx[ii]])
@@ -132,7 +132,8 @@ def plot_massmet(pdata,plt_idx,**popts):
 	ax[0].set_xlabel(xlabel)
 	ax[0].set_ylabel(ylabel)
 	ax[0].set_ylim(ylim)
-	ax[0].text(0.98,0.065,'SDSS\n(Gallazzi 2005)',transform=ax[0].transAxes,fontsize=20,color=color,ha='right')
+	ax[0].set_xlim(9,11.5)
+	ax[0].text(0.98,0.065,'SDSS\n(Gallazzi 2005)',transform=ax[0].transAxes,fontsize=16,color=color,ha='right')
 
 	### new plot
 	median_z_noagn = np.interp(mass_noagn, massmet[:,0], massmet[:,1])
@@ -152,8 +153,8 @@ def plot_massmet(pdata,plt_idx,**popts):
 	deviation_agn[up] /= (upper_z_agn[up]-median_z_agn[up])
 	deviation_agn[~up] /= (median_z_agn[~up]-lower_z_agn[~up])
 
-	ax[1].scatter(mass_noagn,deviation_noagn, marker='o', color=popts['noagn_color'],s=50,zorder=10,alpha=alpha)
-	ax[1].scatter(mass_agn,deviation_agn, marker='o', color=popts['agn_color'],s=50,zorder=10,alpha=alpha)
+	ax[1].scatter(mass_noagn,deviation_noagn, marker='o', color=popts['noagn_color'],s=50,zorder=10,alpha=alpha,edgecolors='k')
+	ax[1].scatter(mass_agn,deviation_agn, marker='o', color=popts['agn_color'],s=50,zorder=10,alpha=alpha,edgecolors='k')
 
 	max = np.max(np.abs(ax[1].get_ylim()))
 	ax[1].set_ylim(-max,max)
@@ -164,5 +165,5 @@ def plot_massmet(pdata,plt_idx,**popts):
 
 	ax[1].set_xlabel(xlabel)
 	ax[1].set_ylabel(r'log(Z$_{\mathrm{prosp}}$/Z$_{\mathrm{SDSS}}$)/$\sigma_{\mathrm{Z,SDSS}}$')
-
+	print 1/0
 	return fig,ax
