@@ -254,6 +254,9 @@ def load_gp(**extras):
 def tie_gas_logz(logzsol=None, **extras):
     return logzsol
 
+def to_dust1(dust1_fraction=None, dust2=None, **extras):
+    return dust1_fraction*dust2
+
 def transform_zfraction_to_sfrfraction(sfr_fraction=None, z_fraction=None, **extras):
 
     import operator
@@ -321,14 +324,14 @@ model_params.append({'name': 'logmass', 'N': 1,
                         'isfree': True,
                         'init': 10.0,
                         'units': 'Msun',
-                        'prior': priors.TopHat(mini=1.0, maxi=14.0)})
+                        'prior': priors.TopHat(mini=5.0, maxi=13.0)})
 
 model_params.append({'name': 'mass', 'N': 1,
                         'isfree': False,
                         'init': 1e10,
                         'depends_on': transform_logmass_to_mass,
                         'units': 'Msun',
-                        'prior': priors.TopHat(mini=1e1, maxi=1e14)})
+                        'prior': priors.TopHat(mini=1e5, maxi=1e13)})
 
 model_params.append({'name': 'agebins', 'N': 1,
                         'isfree': False,
@@ -364,15 +367,22 @@ model_params.append({'name': 'dust_type', 'N': 1,
                         'units': 'index',
                         'prior': None})
 
-                        
 model_params.append({'name': 'dust1', 'N': 1,
+                        'isfree': False,
+                        'init': 1.0,
+                        'depends_on': to_dust1,
+                        'init_disp': 0.8,
+                        'disp_floor': 0.5,
+                        'units': '',
+                        'prior': priors.TopHat(mini=0.0, maxi=6.0)})
+
+model_params.append({'name': 'dust1_fraction', 'N': 1,
                         'isfree': True,
                         'init': 1.0,
                         'init_disp': 0.8,
                         'disp_floor': 0.5,
                         'units': '',
-                        'prior': priors.TopHat(mini=0.0, maxi=4.0)})
-
+                        'prior': priors.TopHat(mini=0.0, maxi=2.0)})
 
 model_params.append({'name': 'dust2', 'N': 1,
                         'isfree': True,
@@ -380,8 +390,7 @@ model_params.append({'name': 'dust2', 'N': 1,
                         'init_disp': 0.25,
                         'disp_floor': 0.15,
                         'units': '',
-                        'prior': priors.TopHat(mini=0.0, maxi=4.0)})
-
+                        'prior': priors.TopHat(mini=0.0, maxi=3.0)})
 
 model_params.append({'name': 'dust_index', 'N': 1,
                         'isfree': True,
@@ -397,13 +406,11 @@ model_params.append({'name': 'dust1_index', 'N': 1,
                         'units': '',
                         'prior': priors.TopHat(mini=-1.5, maxi=-0.5)})
 
-
 model_params.append({'name': 'dust_tesc', 'N': 1,
                         'isfree': False,
                         'init': 7.0,
                         'units': 'log(Gyr)',
                         'prior': None})
-
 
 ###### Dust Emission ##############
 model_params.append({'name': 'add_dust_emission', 'N': 1,
@@ -419,7 +426,6 @@ model_params.append({'name': 'duste_gamma', 'N': 1,
                         'disp_floor': 0.15,
                         'units': None,
                         'prior': priors.TopHat(mini=0.0, maxi=1.0)})
-
 
 model_params.append({'name': 'duste_umin', 'N': 1,
                         'isfree': True,
@@ -443,7 +449,6 @@ model_params.append({'name': 'add_neb_emission', 'N': 1,
                         'init': True,
                         'units': r'log Z/Z_\odot',
                         'prior': None})
-
 
 model_params.append({'name': 'add_neb_continuum', 'N': 1,
                         'isfree': False,
@@ -482,7 +487,7 @@ model_params.append({'name': 'fagn', 'N': 1,
                         'init_disp': 0.2,
                         'disp_floor': 0.1,
                         'units': '',
-                        'prior': priors.TopHat(mini=0.0, maxi=5.0)})
+                        'prior': priors.LogUniform(mini=1e-5, maxi=3.0)})
 
 model_params.append({'name': 'agn_tau', 'N': 1,
                         'isfree': True,
@@ -512,7 +517,7 @@ model_params.append({'name': 'mass_units', 'N': 1,
 #### resort list of parameters 
 #### so that major ones are fit first
 parnames = [m['name'] for m in model_params]
-fit_order = ['logmass','z_fraction', 'dust2', 'logzsol', 'dust_index', 'dust1', 'duste_qpah', 'duste_gamma', 'duste_umin']
+fit_order = ['logmass','z_fraction', 'dust2', 'logzsol', 'dust_index', 'dust1_fraction', 'duste_qpah', 'duste_gamma', 'duste_umin']
 tparams = [model_params[parnames.index(i)] for i in fit_order]
 for param in model_params: 
     if param['name'] not in fit_order:
@@ -531,15 +536,6 @@ class BurstyModel(sedmodel.SedModel):
             kwargs = self._config_dict[k].get('prior_args', {})
             theta[inds] = func(unit_coords[inds], **kwargs)
 
-        if ('dust1' in self.theta_index) & ('dust2' in self.theta_index):
-            dust2 = theta[self.theta_index['dust2']]
-
-            kwargs = self._config_dict['dust1'].get('prior_args', {})
-            kwargs.update(maxi=2*dust2)
-
-            d1ind = self.theta_index['dust1']
-            func = self._config_dict['dust1']['prior'].unit_transform
-            theta[d1ind] = func(unit_coords[d1ind], **kwargs)
         return theta
 
 
