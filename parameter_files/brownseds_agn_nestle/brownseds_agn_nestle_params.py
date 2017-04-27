@@ -28,7 +28,7 @@ run_params = {'verbose':True,
               'nestle_method': 'multi',
               'nestle_npoints': 1000,
               'nestle_maxcall': int(2e6),
-              'nestle_update_interval': None,
+              'nestle_update_interval': 50,
               'nestle_enlarge': 1.5,
               # Model info
               'zcontinuous': 2,
