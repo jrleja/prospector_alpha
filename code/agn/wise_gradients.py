@@ -171,13 +171,15 @@ def plot_summary(pdata, outfolder, agn_idx=Ellipsis, **popts):
 		 	'ms': 12
         } 
 
-	fig, ax = plt.subplots(1,1, figsize=(7, 7))
+	fig, ax = plt.subplots(1,1, figsize=(7.5, 7))
 	idx = 1 # 1 kpc. change to 1 ---> 2 kpc.
 	arcsec_lim = wise_psf # one PSF FWHM
 
 	#### pick out good measurements, and figure out AGN indexes
 	# could be more aggressive
-	resolved = (outdict['arcsec'][:,idx] > 3) &  (outdict['gradient_error'][:,idx] < 0.25) & (outdict['obj_size_brown_kpc'] > (idx+1)*2)
+	resolved = (outdict['arcsec'][:,idx] > 3) & \
+	           (outdict['gradient_error'][:,idx] < 0.25) & \
+	           (outdict['obj_size_brown_kpc'] > (idx+1)*2)
 	cidx = np.ones_like(resolved,dtype=bool)
 	cidx[agn_idx] = False
 	cidx = cidx[resolved]
@@ -201,7 +203,7 @@ def plot_summary(pdata, outfolder, agn_idx=Ellipsis, **popts):
 		        zorder=-3, fmt=popts['fmir_shape'],
 		        alpha=popts['fmir_alpha'],**opts)
 
-	ax.set_xlabel(r'f$_{\mathrm{MIR}}$')
+	ax.set_xlabel(r'log(f$_{\mathrm{MIR}}$)')
 	ax.set_ylabel(r'$\nabla$(W1-W2) at r=2 kpc [mag/kpc]')
 
 	ax.axhline(0, linestyle='--', color='0.2',lw=2,zorder=-1,alpha=0.4)

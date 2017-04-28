@@ -75,6 +75,7 @@ def plot_comparison(runname='brownseds_agn',runname_noagn='brownseds_np',alldata
 
 	#### MASS-METALLICITY
 	fig,ax = plot_massmet(pdata,plt_idx,**popts)
+	fig.tight_layout()
 	fig.savefig(outfolder+'delta_massmet.png',dpi=150)
 	plt.close()
 
@@ -84,16 +85,13 @@ def drawArrow(A, B, ax):
 
 def plot_massmet(pdata,plt_idx,**popts):
 
-	fig = plt.figure(figsize=(13, 6))
-	ax = [fig.add_axes([0.085, 0.13, 0.35, 0.74]), fig.add_axes([0.52, 0.13, 0.43, 0.74])]
+	fig, ax = plt.subplots(1,2,figsize=(12,6))
 	ylim = (-2.1,0.4)
 	xlabel = r'log(M$_*$/M$_{\odot}$)'
 	ylabel = r'log(Z/Z$_{\odot}$)'
 
 	### pull out fagn
 	fagn = np.log10(pdata['agn']['fagn']['q50'][plt_idx])
-	ngal = 129
-
 
 	### pick out errors
 	err_mass_agn = threed_dutils.asym_errors(pdata['agn']['stellar_mass']['q50'][plt_idx],pdata['agn']['stellar_mass']['q84'][plt_idx], pdata['agn']['stellar_mass']['q16'][plt_idx],log=True)
@@ -165,5 +163,5 @@ def plot_massmet(pdata,plt_idx,**popts):
 
 	ax[1].set_xlabel(xlabel)
 	ax[1].set_ylabel(r'log(Z$_{\mathrm{prosp}}$/Z$_{\mathrm{SDSS}}$)/$\sigma_{\mathrm{Z,SDSS}}$')
-	print 1/0
+
 	return fig,ax
