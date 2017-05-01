@@ -28,37 +28,6 @@ def maxprob_model(sample_results,sps):
 
     return maxtheta, maxprob
 
-def measure_model_phot(sample_results, sample_idx, sps):
-
-    '''
-    measure rest-frame optical colors
-    must be done separately since we want them in the rest-frame
-    a potential speedup is to do a separate filter convolution after requesting the observed spectrum
-    in the main loop
-    '''
-
-    from sedpy.observate import load_filters
-    filters = ['bessell_U','bessell_V','twomass_J','bessell_B','bessell_R','twomass_Ks']
-    obs = {'filters': load_filters(filters), 'wavelength': None}
-    zsave = sample_results['model'].params['zred']
-    lumdist_save = sample_results['model'].params['lumdist']
-    sample_results['model'].params['zred'] = np.array([0.0])
-    sample_results['model'].params['lumdist'] = np.array([1e-5]) # 10 pc
-
-    ncalc = sample_idx.shape[0]
-    mags = np.zeros(shape=(len(filters),ncalc))
-
-    for i,idx in enumerate(sample_idx):
-        _,mags[:,i],sm = sample_results['model'].mean_model(sample_results['flatchain'][idx], obs, sps=sps)
-    sample_results['model'].params['zred'] = zsave
-    sample_results['model'].params['lumdist'] = lumdist_save
-
-    out = {}
-    out['mags'] = mags
-    out['name'] = np.array(filters)
-
-    return out
-
 def measure_spire_phot(sample_results, flatchain, sps):
 
     '''
@@ -144,7 +113,7 @@ def calc_extra_quantities(sample_results, ncalc=3000, **kwargs):
     # different options for what to calculate
     # speedup is measured in runtime, where runtime = ncalc * model_call
     opts = {
-            'measure_restframe_optical_phot': False, # cost = 1 runtime
+            'restframe_optical_photometry': False, # currently deprecated! but framework exists in restframe_optical_properties
             'ir_priors': True, # no cost
             'measure_spectral_features': True, # cost = 2 runtimes
             'mags_nodust': False # cost = 1 runtime
@@ -260,7 +229,7 @@ def calc_extra_quantities(sample_results, ncalc=3000, **kwargs):
             modelout = threed_dutils.measure_restframe_properties(sps, thetas = thetas,
                                                         model=sample_results['model'], obs = sample_results['obs'],
                                                         measure_ir=True, measure_luv=True, measure_mir=True, 
-                                                        emlines=True, abslines=True)
+                                                        emlines=True, abslines=True, restframe_optical_photometry = False)
             #### initialize arrays
             if jj == 0:
                 emnames = np.array(modelout['emlines'].keys())
@@ -352,10 +321,6 @@ def calc_extra_quantities(sample_results, ncalc=3000, **kwargs):
                  'spec':spec[:,0],
                  'mags':mags[:,0]}
     extra_output['bfit'] = bfit
-
-    ##### model photometry
-    if opts['measure_restframe_optical_phot']:
-        extra_output['mphot'] = measure_model_phot(sample_results, sample_idx, sps)
 
     ##### filters with no dust
     if opts['mags_nodust']:

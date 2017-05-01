@@ -592,15 +592,15 @@ def generate_basenames(runname,ancilname=None):
     return filebase,parm,ancilname
 
 def chop_chain(chain,convergence_check_interval=None, convergence_chunks=325,
-               convergence_stable_points_criteria=3, **extras):
+               convergence_stable_points_criteria=3, nchop=1.33, weights=None,size=3e5,**extras):
     '''
-    simple placeholder
-    will someday replace with a test for convergence to determine where to chop
-    JRL 1/5/15
+    if we used emcee, either (a) use the final 1/4th of the chain, or (b) use KL divergence convergence criteria
+    if we used nestle, sample chain nestle_nsample times according to weights
+    '''
 
-    ... haha
-    JRL 6/8/15
-    '''
+    if weights is not None:
+        flatchain = np.random.choice(chain, size=size, p=weights)
+        return flatchain
     
     if convergence_check_interval is None:
         nchop= int(chain.shape[1]/nchop)
@@ -1104,7 +1104,7 @@ def estimate_xray_lum(sfr):
 
 def measure_restframe_properties(sps, model = None, obs = None, thetas = None, emlines = False,
                                  measure_ir = False, measure_luv = False, measure_mir = False,
-                                 abslines = False):
+                                 abslines = False, restframe_optical_photometry = False):
     '''
     takes spec(on)-spec(off) to measure emission line luminosity
     sideband is defined for each emission line after visually 
@@ -1126,6 +1126,15 @@ def measure_restframe_properties(sps, model = None, obs = None, thetas = None, e
     lumdist = model.params.get('lumdist', np.array(0.0))
     model.params['zred'] = np.array(0.0)
     model.params['lumdist'] = np.array(1e-5)
+
+    ### if we want restframe optical photometry, generate fake obs file
+    ### else generate NO obs file (don't do extra filter convolutions if not necessary)
+    if restframe_optical_photometry:
+        from sedpy.observate import load_filters
+        filters = ['bessell_U','bessell_V','twomass_J','bessell_B','bessell_R','twomass_Ks']
+        obs = {'filters': load_filters(filters), 'wavelength': None}
+    else:
+        obs = {'filters': None, 'wavelength': None}
 
     ### calculate SED. comes out as maggies per Hz, @ 10pc
     spec,mags,sm = model.mean_model(thetas, obs, sps=sps)
@@ -1161,6 +1170,9 @@ def measure_restframe_properties(sps, model = None, obs = None, thetas = None, e
         out['luv'] = return_luv(w,spec, z=None, alt_file=None)/constants.L_sun.cgs.value # comes out in ergs/s, convert to Lsun
     if measure_mir:
         out['lmir'] = return_lmir(w,spec, z=None, alt_file=None)/constants.L_sun.cgs.value # comes out in ergs/s, convert to Lsun
+    if restframe_optical_photometry:
+        out['mags'] = mags
+        out['photname'] = np.array(filters)
 
     return out
 
@@ -1213,8 +1225,8 @@ def measure_emlines(smooth_spec,sps):
 
         ### draw line between two continuua to define continuum(lambda=lambda_emission_line)
         m = (high_flux-low_flux)/(high_lam-low_lam)
-        b = high_flux - m*high_lam
-        continuum_flux = m*elam+b
+        br = high_flux - m*high_lam
+        continuum_flux = m*elam+br
         eqw = eflux / continuum_flux
 
         out[lines[jj]] = {'flux':eflux[0],'eqw':eqw[0]}
