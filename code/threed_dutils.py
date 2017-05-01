@@ -1231,8 +1231,6 @@ def measure_emlines(smooth_spec,sps):
 
         out[lines[jj]] = {'flux':eflux[0],'eqw':eqw[0]}
 
-    print 1/0
-
     return out
 
 def measure_abslines(lam,flux,plot=False, alt_plot=False):

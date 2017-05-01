@@ -1,6 +1,6 @@
 from prospect.models import model_setup
 from prospect.io import read_results
-import os, threed_dutils, hickle, sys
+import os, threed_dutils, hickle, sys, time
 import numpy as np
 from copy import copy
 from astropy import constants
@@ -166,7 +166,8 @@ def calc_extra_quantities(sample_results, ncalc=3000, **kwargs):
 
     ######## posterior sampling #########
     for jj,idx in enumerate(sample_idx):
-        
+        t1 = time.time()
+
         ##### model call, to set parameters
         thetas = copy(sample_results['flatchain'][idx])
         spec[:,jj],mags[:,jj],sm = sample_results['model'].mean_model(thetas, sample_results['obs'], sps=sps)
@@ -267,6 +268,8 @@ def calc_extra_quantities(sample_results, ncalc=3000, **kwargs):
             nd_thetas[d1_idx] = np.array([0.0])
             nd_thetas[d2_idx] = np.array([0.0])
             _,mags_nodust[:,jj],sm = sample_results['model'].mean_model(nd_thetas, sample_results['obs'], sps=sps)
+
+        print('loop {0} took {1}s'.format(jj,time.time() - t1))
 
     ##### CALCULATE Q16,Q50,Q84 FOR MODEL PARAMETERS
     ntheta = len(sample_results['initial_theta'])
