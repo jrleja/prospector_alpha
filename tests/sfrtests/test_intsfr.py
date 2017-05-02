@@ -1,6 +1,6 @@
 import numpy as np
 from scipy.special import gamma, gammainc
-import threed_dutils
+import prosp_dutils
 
 def int_sfh_2(t1, t2, tage, tau, sf_start, tburst=0, fburst=0):
     """Use Gamma functions
@@ -30,13 +30,13 @@ if __name__ == "__main__":
     
     # calculate sfr from SFH integration
     for i in xrange(ntest):
-        mf1[i] = threed_dutils.integrate_sfh(tage-delta_t, 
+        mf1[i] = prosp_dutils.integrate_sfh(tage-delta_t, 
                                              tage, 
                                              np.array([1.0,1.0]), 
                                              tage, 
                                              tau, 
                                              sf_start[:,i])/(1e9*delta_t)
-        mf2[i] = threed_dutils.integrate_sfh_old(tage-delta_t, 
+        mf2[i] = prosp_dutils.integrate_sfh_old(tage-delta_t, 
                                                  tage, 
                                                  np.array([1.0,1.0]), 
                                                  tage, 

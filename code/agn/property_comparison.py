@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import magphys_plot_pref
 import matplotlib as mpl
 from magphys_plots import median_by_band
-from threed_dutils import running_median
+from prosp_dutils import running_median
 from composite_images import collate_spectra as stolen_collate_spectra
 
 '''

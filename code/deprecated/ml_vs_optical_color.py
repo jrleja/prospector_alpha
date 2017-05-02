@@ -1,4 +1,4 @@
-import threed_dutils
+import prosp_dutils
 import os
 import numpy as np
 import matplotlib.pyplot as plt
@@ -120,25 +120,25 @@ def collate_data(alldata):
 
 	out = {}
 	out['ml_b'] = np.log10(ml_b[:,0])
-	out['ml_b_err'] = threed_dutils.asym_errors(ml_b[:,0], ml_b[:,1], ml_b[:,2], log=True)
+	out['ml_b_err'] = prosp_dutils.asym_errors(ml_b[:,0], ml_b[:,1], ml_b[:,2], log=True)
 
 	out['ml_k'] = np.log10(ml_k[:,0])
-	out['ml_k_err'] = threed_dutils.asym_errors(ml_k[:,0], ml_k[:,1], ml_k[:,2], log=True)
+	out['ml_k_err'] = prosp_dutils.asym_errors(ml_k[:,0], ml_k[:,1], ml_k[:,2], log=True)
 
 	out['br_color'] = br_color[:,0]
-	out['br_color_err'] = threed_dutils.asym_errors(br_color[:,0], br_color[:,1], br_color[:,2], log=False)
+	out['br_color_err'] = prosp_dutils.asym_errors(br_color[:,0], br_color[:,1], br_color[:,2], log=False)
 
 	out['ml_g'] = np.log10(ml_g[:,0])
-	out['ml_g_err'] = threed_dutils.asym_errors(ml_g[:,0], ml_g[:,1], ml_g[:,2], log=True)
+	out['ml_g_err'] = prosp_dutils.asym_errors(ml_g[:,0], ml_g[:,1], ml_g[:,2], log=True)
 
 	out['ml_kobs'] = np.log10(ml_kobs[:,0])
-	out['ml_kobs_err'] = threed_dutils.asym_errors(ml_kobs[:,0], ml_kobs[:,1], ml_kobs[:,2], log=True)
+	out['ml_kobs_err'] = prosp_dutils.asym_errors(ml_kobs[:,0], ml_kobs[:,1], ml_kobs[:,2], log=True)
 
 	out['gr_color'] = gr_color[:,0]
-	out['gr_color_err'] = threed_dutils.asym_errors(gr_color[:,0], gr_color[:,1], gr_color[:,2], log=False)
+	out['gr_color_err'] = prosp_dutils.asym_errors(gr_color[:,0], gr_color[:,1], gr_color[:,2], log=False)
 
 	out['gi_color'] = gi_color[:,0]
-	out['gi_color_err'] = threed_dutils.asym_errors(gi_color[:,0], gi_color[:,1], gi_color[:,2], log=False)
+	out['gi_color_err'] = prosp_dutils.asym_errors(gi_color[:,0], gi_color[:,1], gi_color[:,2], log=False)
 
 	out['model_parameters'] = model_pars
 	return out

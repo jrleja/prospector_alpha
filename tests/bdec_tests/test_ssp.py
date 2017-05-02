@@ -1,10 +1,10 @@
 import numpy as np
-import fsps, pickle, threed_dutils, os
+import fsps, pickle, prosp_dutils, os
 from bsfh import model_setup
 import matplotlib.pyplot as plt
 
 # setup model, sps
-sps = threed_dutils.setup_sps()
+sps = prosp_dutils.setup_sps()
 
 #### set up dust array
 sps.params['sfh'] = 0.0
@@ -40,7 +40,7 @@ for ii,dd in enumerate(tage):
 
 
     ##### CLOUDY halpha / hbeta
-    modelout = threed_dutils.measure_emline_lum(sps, thetas = None,model=None, obs = None,saveplot=False, 
+    modelout = prosp_dutils.measure_emline_lum(sps, thetas = None,model=None, obs = None,saveplot=False, 
                                                 savestr='tage_'+"{:.2f}".format(dd),spec=spec[ii,:],measure_ir = False)
     mod_bdec.append(modelout['emline_flux'][4]/modelout['emline_flux'][1])
 
@@ -49,7 +49,7 @@ for ii,dd in enumerate(tage):
     ptau1.append(thetas[d1_idx][0])
     ptau2.append(thetas[d2_idx][0])
     pdindex.append(thetas[dind_idx][0])
-    bdec.append(threed_dutils.calc_balmer_dec(ptau1[-1], ptau2[-1], -1.0, pdindex[-1],kriek=True))
+    bdec.append(prosp_dutils.calc_balmer_dec(ptau1[-1], ptau2[-1], -1.0, pdindex[-1],kriek=True))
     '''
 
 mod_bdec = np.array(mod_bdec)

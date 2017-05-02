@@ -1,5 +1,5 @@
 import fsps,os,time,pylab
-import threed_dutils
+import prosp_dutils
 from bsfh import read_results,model_setup
 import matplotlib.pyplot as plt
 import numpy as np
@@ -10,7 +10,7 @@ def simha_sfh_test():
 	
 	# test the SFH=5 prescription
 	# setup stellar populations
-	sps = threed_dutils.setup_sps(zcontinuous=2)
+	sps = prosp_dutils.setup_sps(zcontinuous=2)
 
 	# load custom model
 	param_file=os.getenv('APPS')+'/threedhst_bsfh/parameter_files/testsed_simha/testsed_simha_params.py'

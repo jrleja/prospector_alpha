@@ -4,7 +4,7 @@ import corner, math, copy
 import matplotlib as mpl
 from matplotlib.ticker import MaxNLocator
 import magphys_plot_pref
-import threed_dutils
+import prosp_dutils
 from no_herschel_analysis import create_step
 
 plt.ioff() # don't pop up a window for each plot
@@ -158,7 +158,7 @@ def make_gif(runname='brownseds_np',objname='Arp 256 N', sample_results = None, 
 
 	### LOAD DATA
 	if sample_results is None:
-		#import threed_dutils
+		#import prosp_dutils
 		from brown_io import load_prospector_data
 		sample_results, powell_results, model = load_prospector_data(None, runname=runname, objname=objname)
 

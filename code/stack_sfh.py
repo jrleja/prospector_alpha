@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import threed_dutils
+import prosp_dutils
 import magphys_plot_pref
 from matplotlib.ticker import MaxNLocator
 import copy
@@ -102,14 +102,14 @@ def stack_data(alldata,sigma_sf=None,nbins_horizontal=None,low_mass_cutoff=None,
 	outdict['logm'] = np.array([dat['pquantiles']['q50'][idx_mass][0] for dat in alldata])
 	outdict['logm_eup'] = np.array([dat['pquantiles']['q84'][idx_mass][0] for dat in alldata])
 	outdict['logm_edo'] = np.array([dat['pquantiles']['q16'][idx_mass][0] for dat in alldata])
-	outdict['logm_err'] = threed_dutils.asym_errors(outdict['logm'],
+	outdict['logm_err'] = prosp_dutils.asym_errors(outdict['logm'],
 			                                        outdict['logm_eup'],
 			                                        outdict['logm_edo'])
 	outdict['logsfr'] = np.log10([dat['pextras']['q50'][idx_sfr][0] for dat in alldata])
 	outdict['halftime'] = np.array([dat['pextras']['q50'][idx_time][0] for dat in alldata])
 	outdict['halftime_eup'] = np.array([dat['pextras']['q84'][idx_time][0] for dat in alldata])
 	outdict['halftime_edo'] = np.array([dat['pextras']['q16'][idx_time][0] for dat in alldata])
-	outdict['halftime_err'] = threed_dutils.asym_errors(outdict['halftime'],
+	outdict['halftime_err'] = prosp_dutils.asym_errors(outdict['halftime'],
 			                                            outdict['halftime_eup'],
 			                                            outdict['halftime_edo'])
 
@@ -153,7 +153,7 @@ def stack_data(alldata,sigma_sf=None,nbins_horizontal=None,low_mass_cutoff=None,
 			tdict['errup'].append(errup)
 			tdict['errdown'].append(errdown)
 
-		tdict['err'] = threed_dutils.asym_errors(np.array(tdict['mean']),
+		tdict['err'] = prosp_dutils.asym_errors(np.array(tdict['mean']),
 			                                     np.array(tdict['errup']),
 			                                     np.array(tdict['errdown']))
 
@@ -190,7 +190,7 @@ def stack_data(alldata,sigma_sf=None,nbins_horizontal=None,low_mass_cutoff=None,
 			tdict['errup'].append(errup)
 			tdict['errdown'].append(errdown)
 
-		tdict['err'] = threed_dutils.asym_errors(np.array(tdict['mean']),
+		tdict['err'] = prosp_dutils.asym_errors(np.array(tdict['mean']),
 			                                     np.array(tdict['errup']),
 			                                     np.array(tdict['errdown']))
 

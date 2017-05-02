@@ -2,7 +2,7 @@ import numpy as np
 import brown_io
 import matplotlib.pyplot as plt
 import agn_plot_pref
-from threed_dutils import asym_errors
+from prosp_dutils import asym_errors
 import os
 
 dpi = 150

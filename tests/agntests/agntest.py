@@ -1,5 +1,5 @@
 import numpy as np
-import fsps, threed_dutils, os
+import fsps, prosp_dutils, os
 from bsfh import model_setup
 import matplotlib.pyplot as plt
 import read_sextractor
@@ -88,7 +88,7 @@ def main(control=False):
 	filterlist = [x for x in keys if x[-7:] == 'GOODS-S']
 	obs = {'filters':filterlist,'wavelength':None}
 	lamefflist = [x.lower() for x in filterlist]
-	lameff     = threed_dutils.return_mwave_custom(lamefflist)
+	lameff     = prosp_dutils.return_mwave_custom(lamefflist)
 	modellam   = np.log10(np.array(lameff))
 
 	# set up figure
@@ -136,7 +136,7 @@ def main(control=False):
 		names   = [phot[kk][0].dtype.names[i][2:]+'_GOODS-S' for i in xrange(len(phot[kk][0])) if phot[kk][0].dtype.names[i][:2] == 'e_' ]
 		names   = np.array([x.lower() for x in names])
 		names_irac1 = names == 'irac1_goods-s'
-		iraclam = threed_dutils.return_mwave_custom(names) 
+		iraclam = prosp_dutils.return_mwave_custom(names) 
 
 		# remove non-detections
 		good    = irflux > 0

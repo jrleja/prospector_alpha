@@ -1,6 +1,6 @@
 import numpy as np
 from astropy import constants
-import fsps, threed_dutils
+import fsps, prosp_dutils
 import matplotlib.pyplot as plt
 from scipy.special import gamma, gammainc
 
@@ -82,7 +82,7 @@ for par in params:
         sps.params[par['name']] = samp
 
         # lineflux in cgs
-        x = threed_dutils.measure_emline_lum(sps)
+        x = prosp_dutils.measure_emline_lum(sps)
         cloudy[i] = constants.L_sun.cgs.value * x['emline_flux'][x['emline_name'] == 'Halpha']
 
         sps.params['add_neb_continuum'] = False

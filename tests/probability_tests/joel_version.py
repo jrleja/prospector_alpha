@@ -1,4 +1,4 @@
-import threed_dutils
+import prosp_dutils
 from prospect.models import model_setup
 import os
 import numpy as np
@@ -13,7 +13,7 @@ param_file = model_setup.import_module_from_file(param_name)
 outname = param_file.run_params['outfile']
 outfolder = os.getenv('APPS')+'/threedhst_bsfh/plots/'+outname.split('/')[-2]+'/'
 
-sample_results, powell_results, model = threed_dutils.load_prospector_data(outname)
+sample_results, powell_results, model = prosp_dutils.load_prospector_data(outname)
 
 
 

@@ -1,6 +1,6 @@
 import numpy as np
 from prospect.io import read_results
-import threed_dutils, corner, pickle, math
+import prosp_dutils, corner, pickle, math
 import matplotlib.pyplot as plt
 from prospect.models import model_setup
 from copy import copy
@@ -49,8 +49,8 @@ def calc_sfr(sample_results,nsample=40000):
 	sps = model_setup.load_sps(**sample_results['run_params'])
 
 	#### choose chain to sample from
-	in_priors = np.isfinite(threed_dutils.chop_chain(sample_results['lnprobability'])) == True
-	flatchain = copy(threed_dutils.chop_chain(sample_results['chain'])[in_priors])
+	in_priors = np.isfinite(prosp_dutils.chop_chain(sample_results['lnprobability'])) == True
+	flatchain = copy(prosp_dutils.chop_chain(sample_results['chain'])[in_priors])
 	np.random.shuffle(flatchain)
 
 	### define time array for SFHs
@@ -69,11 +69,11 @@ def calc_sfr(sample_results,nsample=40000):
 
 		##### extract sfh parameters
 		# pass stellar mass to avoid extra model call
-		sfh_params = threed_dutils.find_sfh_params(sample_results['model'],thetas,
+		sfh_params = prosp_dutils.find_sfh_params(sample_results['model'],thetas,
 			                                       sample_results['obs'],sps,sm=sm)
 
 		#### SFR
-		sfr[:,jj] = threed_dutils.return_full_sfh(t, sfh_params)
+		sfr[:,jj] = prosp_dutils.return_full_sfh(t, sfh_params)
 
 	sample_results['sfr'] = sfr
 	sample_results['flatchain'] = flatchain[:nsample,:]
@@ -107,11 +107,11 @@ def calc_sfr_dirichlet(sample_results,nsample=40000):
 
 		##### extract sfh parameters
 		# pass stellar mass to avoid extra model call
-		sfh_params = threed_dutils.find_sfh_params(sample_results['model'],thetas,
+		sfh_params = prosp_dutils.find_sfh_params(sample_results['model'],thetas,
 			                                       sample_results['obs'],sps,sm=sm)
 
 		#### SFR
-		sfr[:,jj] = threed_dutils.return_full_sfh(t, sfh_params)
+		sfr[:,jj] = prosp_dutils.return_full_sfh(t, sfh_params)
 
 	sample_results['sfr_dirichlet'] = sfr
 	sample_results['flatchain_dirichlet'] = flatchain
@@ -224,7 +224,7 @@ def subcorner(sample_results, outfolder):
 
 	# pull out the parameter names and flatten the thinned chains
 	parnames = sample_results['model'].theta_labels()
-	flatchain = threed_dutils.chop_chain(sample_results['chain'])
+	flatchain = prosp_dutils.chop_chain(sample_results['chain'])
 
 	fig = corner.corner(flatchain, labels = parnames,
 	                    quantiles=[0.16, 0.5, 0.84], show_titles=True)

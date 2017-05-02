@@ -5,7 +5,7 @@ import magphys_plot_pref
 import matplotlib.pyplot as plt
 import os
 from scipy import stats
-from threed_dutils import smooth_spectrum
+from prosp_dutils import smooth_spectrum
 
 minorFormatter = magphys_plot_pref.jLogFormatter(base=10, labelOnlyBase=False)
 majorFormatter = magphys_plot_pref.jLogFormatter(base=10, labelOnlyBase=True)

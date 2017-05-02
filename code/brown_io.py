@@ -709,7 +709,7 @@ def write_spectrum(sample_results,outname='best_fit_spectrum.dat'):
 
 def write_villar_data():
 	
-	from threed_dutils import generate_basenames
+	from prosp_dutils import generate_basenames
 
 	# All I need is UV (intrinsic and observed), and mid-IR fluxes, sSFRs, SFRs, Mstars, and tau_V	
 	filebase, parm_basename, ancilname = generate_basenames('villar')
@@ -787,7 +787,7 @@ def write_villar_data():
 
 def write_eufrasio_data():
 
-	from threed_dutils import generate_basenames
+	from prosp_dutils import generate_basenames
 
 	# All I need is UV (intrinsic and observed), and mid-IR fluxes, sSFRs, SFRs, Mstars, and tau_V	
 	filebase, parm_basename, ancilname = generate_basenames('brownseds_np')
@@ -932,7 +932,7 @@ def write_eufrasio_data():
 
 def write_bestfit_photometry():
 
-	import threed_dutils
+	import prosp_dutils
 
 	objnames = ['NGC 0628', 'NGC 2798', 'NGC 4559', 'NGC 4579', 'NGC 7331']
 
@@ -953,7 +953,7 @@ def write_bestfit_photometry():
 
 def write_kinney_txt():
 	
-	filebase, parm_basename, ancilname=threed_dutils.generate_basenames('virgo')
+	filebase, parm_basename, ancilname=prosp_dutils.generate_basenames('virgo')
 	ngals = len(filebase)
 	mass, sfr10, sfr100, cloudyha, dmass = [np.zeros(shape=(3,ngals)) for i in xrange(5)]
 	names = []

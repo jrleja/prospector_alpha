@@ -1,5 +1,5 @@
 import numpy as np
-import threed_dutils
+import prosp_dutils
 import matplotlib.pyplot as plt
 import magphys_plot_pref
 
@@ -32,12 +32,12 @@ def plot_optical_depth():
 
 	#### plot noll version
 	for ii,didx in enumerate(dust2_new):
-		optical_depth = -np.log(threed_dutils.charlot_and_fall_extinction(lam,0.0,dust2,0.0,didx, kriek=True, nobc=True))
+		optical_depth = -np.log(prosp_dutils.charlot_and_fall_extinction(lam,0.0,dust2,0.0,didx, kriek=True, nobc=True))
 		ax.plot(np.log10(lam),np.log(optical_depth),color=cmap(ii),alpha=0.7,lw=2.5,label="{:.2f}".format(didx))
 
 	#### plot old priors
 	for didx in dust2_index_priors:
-		optical_depth = -np.log(threed_dutils.charlot_and_fall_extinction(lam,0.0,dust2,0.0,didx, kriek=False, nobc=True))
+		optical_depth = -np.log(prosp_dutils.charlot_and_fall_extinction(lam,0.0,dust2,0.0,didx, kriek=False, nobc=True))
 		ax.plot(np.log10(lam),np.log(optical_depth),color='k',alpha=0.7,lw=4.0)
 
 	#### legend + labels

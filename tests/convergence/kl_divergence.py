@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from brown_io import load_prospector_data
-from threed_dutils import generate_basenames
+from prosp_dutils import generate_basenames
 import sys, os
 import magphys_plot_pref
 from matplotlib.ticker import MaxNLocator

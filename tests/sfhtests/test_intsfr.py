@@ -1,14 +1,14 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from bsfh import model_setup
-import threed_dutils
+import prosp_dutils
 
 if __name__ == "__main__":
 
     # load model,sps 
     #model = model_setup.load_model('/Users/joel/code/python/threedhst_bsfh/parameter_files/testsed_simha/testsed_simha_params.py')
     model = model_setup.load_model('/Users/joel/code/python/threedhst_bsfh/parameter_files/testsed_simha/testsed_simha_params_2.py')
-    sps   = threed_dutils.setup_sps(zcontinuous=2,compute_vega_magnitudes=False)
+    sps   = prosp_dutils.setup_sps(zcontinuous=2,compute_vega_magnitudes=False)
 
     # custom-set parameters
     initial_theta_true = np.array([10**11.37,-1.35,-0.31,5.93,2.93,1.07,3.74,-0.4])
@@ -16,7 +16,7 @@ if __name__ == "__main__":
     model.set_parameters(model.initial_theta)
 
     # set up arrays
-    #sfh_params = threed_dutils.find_sfh_params(model,model.initial_theta)
+    #sfh_params = prosp_dutils.find_sfh_params(model,model.initial_theta)
     #tcalc = np.linspace(0,5.93,100)
     #mf1 = np.zeros(len(tcalc))
     
@@ -90,7 +90,7 @@ def test_sfh5():
     # load model,sps 
     model = model_setup.load_model('/Users/joel/code/python/threedhst_bsfh/parameter_files/testsed_simha/testsed_simha_params.py')
     #model = model_setup.load_model('/Users/joel/code/python/threedhst_bsfh/parameter_files/testsed_nonoise_fastgen/testsed_nonoise_fastgen_params.py')
-    sps   = threed_dutils.setup_sps(zcontinuous=2,compute_vega_magnitudes=False)
+    sps   = prosp_dutils.setup_sps(zcontinuous=2,compute_vega_magnitudes=False)
 
     # custom-set parameters
     #initial_theta = np.array([10**9.95,0.18,10**1.40,14.0-7.17,13.94,-4.67,1.84,-0.42])
@@ -126,12 +126,12 @@ def test_sfh5():
 
     ###### calculate handwritten quantities ######
     model.params['tage'] = np.array(tcalc_fsps[-1])
-    sfh_params = threed_dutils.find_sfh_params(model,model.initial_theta)
+    sfh_params = prosp_dutils.find_sfh_params(model,model.initial_theta)
     delta_t = 0.01
     for i,tt in enumerate(tcalc):
         
         # use my SFH integral, averaged over 1 Myr
-        mf1[i] = threed_dutils.calculate_sfr(sfh_params, delta_t, minsfr=0.0, maxsfr=None,tcalc=tt)
+        mf1[i] = prosp_dutils.calculate_sfr(sfh_params, delta_t, minsfr=0.0, maxsfr=None,tcalc=tt)
 
     fig, ax = plt.subplots()
     ax.plot(tcalc, mf1, 'o', label='Joel', alpha=0.3)

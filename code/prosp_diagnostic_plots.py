@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import corner, os, copy, threed_dutils
+import corner, os, copy, prosp_dutils
 from prospect.io import read_results
 import matplotlib as mpl
 from matplotlib.ticker import MaxNLocator
@@ -32,7 +32,7 @@ def subcorner(sample_results,  sps, model, extra_output,
 
     # pull out the parameter names and flatten the thinned chains
     parnames = np.array(sample_results['model'].theta_labels())
-    flatchain = threed_dutils.chop_chain(sample_results['chain'],**sample_results['run_params'])
+    flatchain = prosp_dutils.chop_chain(sample_results['chain'],**sample_results['run_params'])
 
     # the line below uses the posterior draws in extra_output
     # which INCLUDE IR PRIORS but are LIMITED IN SAMPLING. tradeoff!
@@ -317,8 +317,8 @@ def add_sfh_plot(exout,fig,ax_loc=None,
 	if truths is not None:
 		
 		# FIND A NEW WAY THAT DOESN'T REQUIRE AN SPS
-		# sfh_params_truth = threed_dutils.find_sfh_params(sample_results['model'],truths['truths'],sample_results['obs'],sps)
-		true_sfh = threed_dutils.return_full_sfh(t, sfh_params_truth)
+		# sfh_params_truth = prosp_dutils.find_sfh_params(sample_results['model'],truths['truths'],sample_results['obs'],sps)
+		true_sfh = prosp_dutils.return_full_sfh(t, sfh_params_truth)
 
 		ax_inset.plot(t, true_sfh,'-',color='blue')
 		ax_inset.text(0.92,0.32, 'truth',transform = ax_inset.transAxes,color='blue',fontsize=axfontsize*1.4,ha='right')
@@ -786,7 +786,7 @@ def make_all_plots(filebase=None,
 	# do we know the truths?
 	objname = sample_results['run_params']['objname']
 	try:
-		truths = threed_dutils.load_truths(os.getenv('APPS')+'/threed'+sample_results['run_params']['param_file'].split('/threed')[1],
+		truths = prosp_dutils.load_truths(os.getenv('APPS')+'/threed'+sample_results['run_params']['param_file'].split('/threed')[1],
 			                               model=sample_results['model'],obs=sample_results['obs'], sps=sps)
 	except KeyError:
 		truths = None
@@ -829,7 +829,7 @@ def plot_all_driver(runname=None,**extras):
 	if runname == None:
 		runname = 'testsed_simha_truth'
 
-	filebase, parm_basename, ancilname=threed_dutils.generate_basenames(runname)
+	filebase, parm_basename, ancilname=prosp_dutils.generate_basenames(runname)
 	for jj in xrange(len(filebase)):
 		print 'iteration '+str(jj) 
 

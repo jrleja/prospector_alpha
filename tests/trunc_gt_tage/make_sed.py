@@ -1,5 +1,5 @@
 import numpy as np
-import fsps, pickle, threed_dutils, os
+import fsps, pickle, prosp_dutils, os
 from bsfh import model_setup
 import matplotlib.pyplot as plt
 import matplotlib.cm as cmx
@@ -19,7 +19,7 @@ def get_cmap(N):
     return map_index_to_rgb_color
 
 # setup model, sps
-sps = threed_dutils.setup_sps()
+sps = prosp_dutils.setup_sps()
 model = model_setup.load_model('brownseds_params_26.py')
 obs = model_setup.load_obs('brownseds_params_26.py')
 initial_theta=np.array([10**8.44,-1.89,0.62,1.57,0.98,-1.54,0.11,0.01,-1.1,0.89,23.02,0.19])
@@ -29,7 +29,7 @@ model.initial_theta = initial_theta
 model.set_parameters(model.initial_theta)
 
 # set up sf_start array
-sfh_params = threed_dutils.find_sfh_params(model,model.initial_theta,obs,sps)
+sfh_params = prosp_dutils.find_sfh_params(model,model.initial_theta,obs,sps)
 nsamp = 300
 cmap = get_cmap(nsamp)
 sftrunc = np.linspace(0.98,1.08, nsamp)

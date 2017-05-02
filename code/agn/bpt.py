@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import agn_plot_pref
 from corner import quantile
 import os
-from threed_dutils import asym_errors
+from prosp_dutils import asym_errors
 
 dpi = 150
 

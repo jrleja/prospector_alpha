@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import magphys_plot_pref
 import matplotlib as mpl
 from magphys_plots import median_by_band
-import threed_dutils
+import prosp_dutils
 
 blue = '#1C86EE' 
 
@@ -94,10 +94,10 @@ def plot_massmet(pdata,plt_idx,**popts):
 	fagn = np.log10(pdata['agn']['fagn']['q50'][plt_idx])
 
 	### pick out errors
-	err_mass_agn = threed_dutils.asym_errors(pdata['agn']['stellar_mass']['q50'][plt_idx],pdata['agn']['stellar_mass']['q84'][plt_idx], pdata['agn']['stellar_mass']['q16'][plt_idx],log=True)
-	err_mass_noagn = threed_dutils.asym_errors(pdata['no_agn']['stellar_mass']['q50'][plt_idx],pdata['no_agn']['stellar_mass']['q84'][plt_idx], pdata['no_agn']['stellar_mass']['q16'][plt_idx],log=True)
-	err_met_agn = threed_dutils.asym_errors(pdata['agn']['logzsol']['q50'][plt_idx],pdata['agn']['logzsol']['q84'][plt_idx], pdata['agn']['logzsol']['q16'][plt_idx])
-	err_met_noagn = threed_dutils.asym_errors(pdata['no_agn']['logzsol']['q50'][plt_idx],pdata['no_agn']['logzsol']['q84'][plt_idx], pdata['no_agn']['logzsol']['q16'][plt_idx])
+	err_mass_agn = prosp_dutils.asym_errors(pdata['agn']['stellar_mass']['q50'][plt_idx],pdata['agn']['stellar_mass']['q84'][plt_idx], pdata['agn']['stellar_mass']['q16'][plt_idx],log=True)
+	err_mass_noagn = prosp_dutils.asym_errors(pdata['no_agn']['stellar_mass']['q50'][plt_idx],pdata['no_agn']['stellar_mass']['q84'][plt_idx], pdata['no_agn']['stellar_mass']['q16'][plt_idx],log=True)
+	err_met_agn = prosp_dutils.asym_errors(pdata['agn']['logzsol']['q50'][plt_idx],pdata['agn']['logzsol']['q84'][plt_idx], pdata['agn']['logzsol']['q16'][plt_idx])
+	err_met_noagn = prosp_dutils.asym_errors(pdata['no_agn']['logzsol']['q50'][plt_idx],pdata['no_agn']['logzsol']['q84'][plt_idx], pdata['no_agn']['logzsol']['q16'][plt_idx])
 	mass_agn = np.log10(pdata['agn']['stellar_mass']['q50'][plt_idx])
 	mass_noagn = np.log10(pdata['no_agn']['stellar_mass']['q50'][plt_idx])
 

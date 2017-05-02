@@ -3,7 +3,7 @@ import matplotlib.gridspec as gridspec
 from matplotlib.ticker import MaxNLocator
 import matplotlib as mpl
 import numpy as np
-import threed_dutils
+import prosp_dutils
 import copy, math
 from scipy.special import erf
 from astropy import constants
@@ -110,8 +110,8 @@ def sfh_xplot(ax,par,par_idx,first=False):
 	for ii,p in enumerate(par):
 
 		theta[par_idx] = p
-		sfh_pars = threed_dutils.find_sfh_params(model,theta,obs,sps)
-		sfh = threed_dutils.return_full_sfh(t, sfh_pars)
+		sfh_pars = prosp_dutils.find_sfh_params(model,theta,obs,sps)
+		sfh = prosp_dutils.return_full_sfh(t, sfh_pars)
 
 		ax.plot(t[::-1]*10,np.log10(sfh[::-1]),color=pcolor[ii],lw=lw,alpha=alpha)
 
@@ -149,7 +149,7 @@ def plot_sed(ax,par_idx,par=None,txtlabel=None,fmt="{:.2e}",longwave=False,first
 		spec *= sps.csp.wavelengths
 		spec *= dfactor_10pc / constants.L_sun.cgs.value
 
-		spec = threed_dutils.smooth_spectrum(sps.csp.wavelengths,spec,200,minlam=3e3,maxlam=1e4)
+		spec = prosp_dutils.smooth_spectrum(sps.csp.wavelengths,spec,200,minlam=3e3,maxlam=1e4)
 
 		ax.plot(sps.csp.wavelengths/1e4,np.log10(spec),color=pcolor[ii],lw=lw,alpha=alpha)
 		spec_sav.append(spec)
@@ -197,7 +197,7 @@ def plot_sed_dustshape(ax,longwave=False):
 		spec *= sps.csp.wavelengths
 		spec *= dfactor_10pc / constants.L_sun.cgs.value
 
-		spec = threed_dutils.smooth_spectrum(sps.csp.wavelengths,spec,200,minlam=3e3,maxlam=1e4)
+		spec = prosp_dutils.smooth_spectrum(sps.csp.wavelengths,spec,200,minlam=3e3,maxlam=1e4)
 
 		ax.plot(sps.csp.wavelengths/1e4,np.log10(spec),color=colors[ii],lw=lw,alpha=alpha)
 		spec_sav.append(spec)

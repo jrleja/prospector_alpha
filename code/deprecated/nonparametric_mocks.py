@@ -3,7 +3,7 @@ import numpy as np
 from astropy.table import Table, vstack
 from astropy.io import ascii
 from astropy import units as u
-import threed_dutils
+import prosp_dutils
 import np_mocks_dp_params as nonparam
 
 #### NONPARAMETRIC GLOBALS
@@ -141,13 +141,13 @@ def construct_mocks(basename,outname=None,add_zp_err=False, plot_mock=False):
 			ax[ii].text(0.95,0.95-(nbins)*0.05,"{:.2f}".format(1-frac),fontsize=8,transform = ax[ii].transAxes,ha='right')
 
 			## write sSFR(10 Myr, 100 Myr, 1 Gyr)
-			sfh_params = threed_dutils.find_sfh_params(model,testparms[ii,:],obs,sps,sm=sm)
+			sfh_params = prosp_dutils.find_sfh_params(model,testparms[ii,:],obs,sps,sm=sm)
 
 			if ii == 0:
 				print sfh_params.keys()
-			ssfr = np.array([threed_dutils.calculate_sfr(sfh_params, 0.01, minsfr=-np.inf, maxsfr=np.inf),\
-			                 threed_dutils.calculate_sfr(sfh_params, 0.1,  minsfr=-np.inf, maxsfr=np.inf),\
-			                 threed_dutils.calculate_sfr(sfh_params, 1.0,  minsfr=-np.inf, maxsfr=np.inf)])/sfh_params['mass']
+			ssfr = np.array([prosp_dutils.calculate_sfr(sfh_params, 0.01, minsfr=-np.inf, maxsfr=np.inf),\
+			                 prosp_dutils.calculate_sfr(sfh_params, 0.1,  minsfr=-np.inf, maxsfr=np.inf),\
+			                 prosp_dutils.calculate_sfr(sfh_params, 1.0,  minsfr=-np.inf, maxsfr=np.inf)])/sfh_params['mass']
 			ssfr_label = ['10 Myr','100 Myr','1 Gyr']
 			for nn in xrange(ssfr.shape[0]): ax[ii].text(0.05,0.2-nn*0.05,"{:.2e}".format(ssfr[nn])+' '+ssfr_label[nn],fontsize=8,transform = ax[ii].transAxes)
 

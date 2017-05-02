@@ -1,4 +1,4 @@
-import fsps,os,time,pylab,threed_dutils
+import fsps,os,time,pylab,prosp_dutils
 from bsfh import read_results,model_setup
 import matplotlib.pyplot as plt
 import numpy as np
@@ -45,7 +45,7 @@ def full_min(x):
 
 	# calculate L_IR
 	spec,mags,w = model.mean_model(model.initial_theta, obs, sps=sps,norm_spec=False)
-	_,lir     = threed_dutils.integrate_mag(w,spec,lir_filter, z=None, alt_file=None) # comes out in ergs/s
+	_,lir     = prosp_dutils.integrate_mag(w,spec,lir_filter, z=None, alt_file=None) # comes out in ergs/s
 	lir = lir / 3.826e33 # convert to Lsun
 
 	# set model redshift to match

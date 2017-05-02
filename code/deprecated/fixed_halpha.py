@@ -1,5 +1,5 @@
 import numpy as np
-import threed_dutils
+import prosp_dutils
 import os
 from prospect.models import model_setup
 import matplotlib as mpl
@@ -146,7 +146,7 @@ def halpha_draw(theta0, delta, ndraw, thetas_start=None, fixed_lbol=None, ha_lum
 			match = False
 			ncount = 0
 			while (match==False) and (ncount < 50):# play with SFH until we have the right halpha
-				out = threed_dutils.measure_emline_lum(sps, thetas=theta, model=model, obs=obs,measure_ir=True, measure_luv=True)
+				out = prosp_dutils.measure_emline_lum(sps, thetas=theta, model=model, obs=obs,measure_ir=True, measure_luv=True)
 				ratio = np.abs(out['emlines']['Halpha']['flux']/ha_lum_fixed)
 
 				### don't know why this happens sometimes
@@ -177,7 +177,7 @@ def halpha_draw(theta0, delta, ndraw, thetas_start=None, fixed_lbol=None, ha_lum
 			match = False
 			ncount = 0
 			while (match==False) and (ncount < 12):# play with SFH until we have the right SFR
-				out = threed_dutils.measure_emline_lum(sps, thetas=theta, model=model,obs=obs, savestr='test',measure_ir=True, measure_luv=True)
+				out = prosp_dutils.measure_emline_lum(sps, thetas=theta, model=model,obs=obs, savestr='test',measure_ir=True, measure_luv=True)
 				lbol = out['luv'] + out['lir']
 				lbol_ratio = np.abs(lbol/fixed_lbol)
 
@@ -341,7 +341,7 @@ def main(redraw_thetas=True,pass_guesses=False,redraw_lbol_thetas=True):
 			spec_perc[kk,:] = corner.quantile(thetas[name]['spec'][kk,:], [0.5, 0.84, 0.16])*to_fnu[kk]
 
 		#### smooth and log spectra
-		for nn in xrange(3): spec_perc[:,nn] = np.log10(threed_dutils.smooth_spectrum(sps.wavelengths,spec_perc[:,nn],smoothing))
+		for nn in xrange(3): spec_perc[:,nn] = np.log10(prosp_dutils.smooth_spectrum(sps.wavelengths,spec_perc[:,nn],smoothing))
 
 		#### plot spectra
 		sedax[0].plot(sps.wavelengths/1e4,spec_perc[:,0],color=colors[ii],lw=lw,zorder=1)
@@ -353,10 +353,10 @@ def main(redraw_thetas=True,pass_guesses=False,redraw_lbol_thetas=True):
 			for kk in xrange(ndraw):
 				theta = thetas[name]['pars'][:,kk]
 				spec,mags,sm = model.mean_model(theta, obs, sps=sps)
-				sfh_params = threed_dutils.find_sfh_params(model,theta,obs,sps,sm=sm)
-				sfr_10[kk] = threed_dutils.calculate_sfr(sfh_params, 0.01, minsfr=-np.inf, maxsfr=np.inf)
+				sfh_params = prosp_dutils.find_sfh_params(model,theta,obs,sps,sm=sm)
+				sfr_10[kk] = prosp_dutils.calculate_sfr(sfh_params, 0.01, minsfr=-np.inf, maxsfr=np.inf)
 
-				ha_ext[kk] = threed_dutils.charlot_and_fall_extinction(6563.0,
+				ha_ext[kk] = prosp_dutils.charlot_and_fall_extinction(6563.0,
 					                                                   theta[parnames=='dust1'],
 					                                                   theta[parnames=='dust2'],
 					                                                   -1.0,
@@ -364,8 +364,8 @@ def main(redraw_thetas=True,pass_guesses=False,redraw_lbol_thetas=True):
 					                                                   kriek=True)
 				ha_ext[kk] = 1./ha_ext[kk]
 
-				luv[kk] = threed_dutils.return_luv(sps.wavelengths,spec) / 3.846e33
-				lir[kk] = threed_dutils.return_lir(sps.wavelengths,spec) / 3.846e33
+				luv[kk] = prosp_dutils.return_luv(sps.wavelengths,spec) / 3.846e33
+				lir[kk] = prosp_dutils.return_lir(sps.wavelengths,spec) / 3.846e33
 
 			thetas[name]['sfr_10'] = sfr_10
 			thetas[name]['ha_ext'] = ha_ext
@@ -402,7 +402,7 @@ def main(redraw_thetas=True,pass_guesses=False,redraw_lbol_thetas=True):
 		spec_to_plot = thetas_lbol['spec'][:,idx]*to_fnu
 
 		#### smooth and log spectra
-		spec_to_plot = np.log10(threed_dutils.smooth_spectrum(sps.wavelengths,spec_to_plot,smoothing))
+		spec_to_plot = np.log10(prosp_dutils.smooth_spectrum(sps.wavelengths,spec_to_plot,smoothing))
 
 		#### get color
 		color = scalarMap.to_rgba(cquant[idx])

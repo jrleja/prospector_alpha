@@ -1,5 +1,5 @@
 import numpy as np
-import fsps, pickle, threed_dutils, os
+import fsps, pickle, prosp_dutils, os
 from bsfh import model_setup
 import matplotlib.pyplot as plt
 import matplotlib.cm as cmx
@@ -18,7 +18,7 @@ def get_cmap(N):
 outname = ''
 
 # setup model, sps
-sps = threed_dutils.setup_sps()
+sps = prosp_dutils.setup_sps()
 model = model_setup.load_model('brownseds_params_26.py')
 obs = model_setup.load_obs('brownseds_params_26.py')
 
@@ -26,7 +26,7 @@ obs = model_setup.load_obs('brownseds_params_26.py')
 model.set_parameters(model.initial_theta)
 
 # set up sf_start array
-sfh_params = threed_dutils.find_sfh_params(model,model.initial_theta,obs,sps)
+sfh_params = prosp_dutils.find_sfh_params(model,model.initial_theta,obs,sps)
 nsamp = 20
 cmap = get_cmap(nsamp)
 dust2 = np.linspace(0.0,4.0, nsamp)

@@ -1,5 +1,5 @@
 import numpy as np
-import threed_dutils
+import prosp_dutils
 from bsfh import model_setup
 import os
 import matplotlib.pyplot as plt
@@ -17,7 +17,7 @@ model = model_setup.load_model(param_file)
 model.params['zred'] = np.atleast_1d(0.0)
 obs   = model_setup.load_obs(param_file)
 obs['filters'] = None # don't generate photometry, for speed
-sps = threed_dutils.setup_sps()
+sps = prosp_dutils.setup_sps()
 parnames = np.array(model.theta_labels())
 
 def generate_thetas():
@@ -69,13 +69,13 @@ def main():
 
 	##### calculate SFR(t)
 	t = np.linspace(0,10.0,num=400)
-	sfhpars1 = threed_dutils.find_sfh_params(model,theta1,obs,sps)
-	sfhpars2 = threed_dutils.find_sfh_params(model,theta2,obs,sps)
-	sfhpars3 = threed_dutils.find_sfh_params(model,theta3,obs,sps)
+	sfhpars1 = prosp_dutils.find_sfh_params(model,theta1,obs,sps)
+	sfhpars2 = prosp_dutils.find_sfh_params(model,theta2,obs,sps)
+	sfhpars3 = prosp_dutils.find_sfh_params(model,theta3,obs,sps)
 
-	sfh1 = threed_dutils.return_full_sfh(t, sfhpars1)
-	sfh2 = threed_dutils.return_full_sfh(t, sfhpars2)
-	sfh3 = threed_dutils.return_full_sfh(t, sfhpars3)
+	sfh1 = prosp_dutils.return_full_sfh(t, sfhpars1)
+	sfh2 = prosp_dutils.return_full_sfh(t, sfhpars2)
+	sfh3 = prosp_dutils.return_full_sfh(t, sfhpars3)
 
 	##### plot SFR(t)
 	fig, ax = plt.subplots(1, 1, figsize = (8,8))

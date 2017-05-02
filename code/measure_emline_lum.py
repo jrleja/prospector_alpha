@@ -1,7 +1,7 @@
 import numpy as np
 from astropy.cosmology import WMAP9 as cosmo
 from astropy.modeling import core, fitting, Parameter, functional_models
-import threed_dutils
+import prosp_dutils
 import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d
 from scipy.optimize import leastsq
@@ -473,14 +473,14 @@ def measure(sample_results, extra_output, obs_spec, magphys, sps, sigsmooth=None
 	mod_abs_lamcont = np.zeros(shape=(nabs,2))
 
 	#### smooth and measure absorption lines
-	flux_smooth = threed_dutils.smooth_spectrum(model_lam,model_flux,smooth,minlam=3e3,maxlam=3e8)
-	out = threed_dutils.measure_abslines(model_lam,flux_smooth,plot=True)
+	flux_smooth = prosp_dutils.smooth_spectrum(model_lam,model_flux,smooth,minlam=3e3,maxlam=3e8)
+	out = prosp_dutils.measure_abslines(model_lam,flux_smooth,plot=True)
 	for kk in xrange(nabs): mod_abs_flux[kk,0] = out[abslines[kk]]['flux']
 	for kk in xrange(nabs): mod_abs_eqw[kk,0] = out[abslines[kk]]['eqw']
 	for kk in xrange(nabs): mod_abs_lamcont[kk,0] = out[abslines[kk]]['lam']
 
-	flux_smooth = threed_dutils.smooth_spectrum(model_lam,prospflux_em,smooth,minlam=3e3,maxlam=3e8)
-	out = threed_dutils.measure_abslines(model_lam,flux_smooth,plot=[out['fig'],out['ax']],alt_plot=True)
+	flux_smooth = prosp_dutils.smooth_spectrum(model_lam,prospflux_em,smooth,minlam=3e3,maxlam=3e8)
+	out = prosp_dutils.measure_abslines(model_lam,flux_smooth,plot=[out['fig'],out['ax']],alt_plot=True)
 	for kk in xrange(nabs): mod_abs_flux[kk,1] = out.get(abslines[kk],{}).get('flux',0.0)
 	for kk in xrange(nabs): mod_abs_eqw[kk,1] = out.get(abslines[kk],{}).get('eqw',0.0)
 	for kk in xrange(nabs): mod_abs_lamcont[kk,1] = out.get(abslines[kk],{}).get('lam',0.0)
@@ -488,7 +488,7 @@ def measure(sample_results, extra_output, obs_spec, magphys, sps, sigsmooth=None
 	#######################
 	##### Dn4000 ########
 	#######################
-	dn4000_mod = threed_dutils.measure_Dn4000(model_lam,flux_smooth,ax=out['ax'][5])
+	dn4000_mod = prosp_dutils.measure_Dn4000(model_lam,flux_smooth,ax=out['ax'][5])
 
 	out['fig'].tight_layout()
 	out['fig'].savefig(out_abs, dpi=dpi)
@@ -579,7 +579,7 @@ def measure(sample_results, extra_output, obs_spec, magphys, sps, sigsmooth=None
 	modflux = flux_interp(obslam[p_idx])
 
 	#### smooth model to match observations
-	smoothed_absflux = threed_dutils.smooth_spectrum(obslam[p_idx], modflux, sigma_spec)
+	smoothed_absflux = prosp_dutils.smooth_spectrum(obslam[p_idx], modflux, sigma_spec)
 
 	#### subtract model from observations
 	residuals = obsflux[p_idx] - modflux
@@ -689,7 +689,7 @@ def measure(sample_results, extra_output, obs_spec, magphys, sps, sigsmooth=None
 
 	if sigma_spec < 200:
 		to_convolve = (200.**2 - sigma_spec**2)**0.5
-		obsflux = threed_dutils.smooth_spectrum(obslam/(1+zadj),obsflux,to_convolve,minlam=3e3,maxlam=3e8)
+		obsflux = prosp_dutils.smooth_spectrum(obslam/(1+zadj),obsflux,to_convolve,minlam=3e3,maxlam=3e8)
 
 	#### bootstrap
 	nboot = 100
@@ -698,7 +698,7 @@ def measure(sample_results, extra_output, obs_spec, magphys, sps, sigsmooth=None
 	for i in xrange(nboot):
 		randomDelta = np.random.normal(0.,1.,len(obsflux))
 		randomFlux = obsflux + randomDelta*emline_noise
-		out = threed_dutils.measure_abslines(obslam/(1+zadj),randomFlux,plot=False)
+		out = prosp_dutils.measure_abslines(obslam/(1+zadj),randomFlux,plot=False)
 
 		for kk in xrange(nabs): tobs_abs_flux[kk,i] = out[abslines[kk]]['flux']
 		for kk in xrange(nabs): tobs_abs_eqw[kk,i] = out[abslines[kk]]['eqw']
@@ -715,11 +715,11 @@ def measure(sample_results, extra_output, obs_spec, magphys, sps, sigsmooth=None
 		                                                   np.percentile(tobs_abs_eqw[kk,:],16)])
 
 	# bestfit, for plotting purposes
-	out = threed_dutils.measure_abslines(obslam/(1+zadj),obsflux,plot=True)
+	out = prosp_dutils.measure_abslines(obslam/(1+zadj),obsflux,plot=True)
 	obs_lam_cont = np.zeros(nabs)
 	for kk in xrange(nabs): obs_lam_cont[kk] = out[abslines[kk]]['lam']
 
-	dn4000_obs = threed_dutils.measure_Dn4000(obslam,obsflux,ax=out['ax'][5])
+	dn4000_obs = prosp_dutils.measure_Dn4000(obslam,obsflux,ax=out['ax'][5])
 
 	plt.tight_layout()
 	plt.savefig(out_absobs, dpi=dpi)

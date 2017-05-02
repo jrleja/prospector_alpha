@@ -17,7 +17,7 @@ from corner import quantile
 from photutils import CircularAperture, CircularAnnulus, find_peaks, aperture_photometry
 from astropy.cosmology import WMAP9
 import pickle
-from threed_dutils import asym_errors
+from prosp_dutils import asym_errors
 from scipy.optimize import brentq
 
 plt.ioff()

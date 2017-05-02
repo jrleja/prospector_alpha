@@ -1,5 +1,5 @@
 import numpy as np
-import fsps, pickle, threed_dutils, os
+import fsps, pickle, prosp_dutils, os
 from bsfh import model_setup
 import matplotlib.pyplot as plt
 import matplotlib.cm as cmx
@@ -21,7 +21,7 @@ def get_cmap(N):
     return map_index_to_rgb_color
 
 # setup model, sps
-sps = threed_dutils.setup_sps()
+sps = prosp_dutils.setup_sps()
 param_file=os.getenv('APPS')+'/threedhst_bsfh/parameter_files/brownseds_tightbc/brownseds_tightbc_params.py'
 
 model = model_setup.load_model(param_file)

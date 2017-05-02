@@ -1,10 +1,10 @@
 import numpy as np
-import fsps, pickle, threed_dutils, os
+import fsps, pickle, prosp_dutils, os
 from bsfh import model_setup
 import matplotlib.pyplot as plt
 
 # setup model, sps
-sps = threed_dutils.setup_sps()
+sps = prosp_dutils.setup_sps()
 model = model_setup.load_model('brownseds_params_26.py')
 obs = model_setup.load_obs('brownseds_params_26.py')
 model.params['add_neb_emission'] = np.array(True)
@@ -19,7 +19,7 @@ trunc_idx = parnames == 'sf_trunc'
 slope_idx = parnames == 'sf_slope'
 
 #### set up dust array
-sfh_params = threed_dutils.find_sfh_params(model,model.initial_theta,obs,sps)
+sfh_params = prosp_dutils.find_sfh_params(model,model.initial_theta,obs,sps)
 nsamp = 45
 dust2 = np.linspace(0.0,1.0, nsamp)
 tage = 10**np.linspace(-0.9,1.0,nsamp)
@@ -39,14 +39,14 @@ for ii,dd in enumerate(tage):
     thetas[trunc_idx] = 0.001*dd
 
     ##### CLOUDY halpha / hbeta
-    modelout = threed_dutils.measure_emline_lum(sps, thetas = thetas,model=model, obs = obs,saveplot=False, savestr='d1_'+"{:.2f}".format(dd))
+    modelout = prosp_dutils.measure_emline_lum(sps, thetas = thetas,model=model, obs = obs,saveplot=False, savestr='d1_'+"{:.2f}".format(dd))
     mod_bdec.append(modelout['emline_flux'][4]/modelout['emline_flux'][1])
 
     ##### calculated halpha / hbeta
     ptau1.append(thetas[d1_idx][0])
     ptau2.append(thetas[d2_idx][0])
     pdindex.append(thetas[dind_idx][0])
-    bdec.append(threed_dutils.calc_balmer_dec(ptau1[-1], ptau2[-1], -1.0, pdindex[-1],kriek=True))
+    bdec.append(prosp_dutils.calc_balmer_dec(ptau1[-1], ptau2[-1], -1.0, pdindex[-1],kriek=True))
 
 mod_bdec = np.array(mod_bdec)
 bdec = np.array(bdec)

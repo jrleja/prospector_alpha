@@ -1,5 +1,5 @@
 import numpy as np
-import threed_dutils
+import prosp_dutils
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 import os
@@ -100,8 +100,8 @@ def add_mass_sfr_plot(alldata,fig):
 		sfr[ii,1] = np.clip(dat['pextras']['q84'][idx_sfr],minsfr,np.inf)
 		sfr[ii,2] = np.clip(dat['pextras']['q16'][idx_sfr],minsfr,np.inf)
 
-	errs_mass = threed_dutils.asym_errors(mass[:,0],mass[:,1],mass[:,2],log=False)
-	errs_sfr  = threed_dutils.asym_errors(sfr[:,0],sfr[:,1],sfr[:,2],log=True)
+	errs_mass = prosp_dutils.asym_errors(mass[:,0],mass[:,1],mass[:,2],log=False)
+	errs_sfr  = prosp_dutils.asym_errors(sfr[:,0],sfr[:,1],sfr[:,2],log=True)
 
 	ax.errorbar(mass[:,0],np.log10(sfr[:,0]),
 		        fmt='o', alpha=0.6,

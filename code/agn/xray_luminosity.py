@@ -1,7 +1,7 @@
 import numpy as np
 import brown_io
 import matplotlib.pyplot as plt
-import threed_dutils
+import prosp_dutils
 import os
 from astropy.cosmology import WMAP9
 import magphys_plot_pref
@@ -254,7 +254,7 @@ def plot_model_corrs(pdata,color_by=None,idx=None,**popts):
 	#### fagn labeling
 	xlabel = r'log(f$_{\mathrm{MIR}}$)'
 	x = np.log10(pdata['fagn'])
-	xerr =  threed_dutils.asym_errors(pdata['fagn'], 
+	xerr =  prosp_dutils.asym_errors(pdata['fagn'], 
 		                              pdata['fagn_up'],
 		                              pdata['fagn_down'],log=True)
 
@@ -272,7 +272,7 @@ def plot_model_corrs(pdata,color_by=None,idx=None,**popts):
 		cidx = np.ones_like(y,dtype=bool)
 		cidx[idx] = False
 
-		yerr =  threed_dutils.asym_errors(pdata[yp], 
+		yerr =  prosp_dutils.asym_errors(pdata[yp], 
 			                              pdata[yp+'_up'],
 			                              pdata[yp+'_down'],log=log)
 		ax[ii].errorbar(x,y,yerr=yerr, xerr=xerr, ms=0.0,zorder=-2,**plotopts)
@@ -332,13 +332,13 @@ def plot(pdata,color_by_observatory=False,color_by_database=False,color_by_wise=
 		for i,obs in enumerate(observatories):
 			idx = pdata['observatory'] == obs
 
-			yerr =  threed_dutils.asym_errors(pdata[ypar], 
+			yerr =  prosp_dutils.asym_errors(pdata[ypar], 
 				                              pdata[ypar+'_up'],
 				                              pdata[ypar+'_down'])
 			if xpar == 'xray_luminosity':
 				xerr = xerr_1d
 			else:
-				xerr =  threed_dutils.asym_errors(np.clip(pdata[xpar],xmin,xmax), 
+				xerr =  prosp_dutils.asym_errors(np.clip(pdata[xpar],xmin,xmax), 
 					                              np.clip(pdata[xpar+'_up'],xmin,xmax),
 					                              np.clip(pdata[xpar+'_down'],xmin,xmax))
 			ax.errorbar(xplot, yplot, yerr=yerr, xerr=xerr, label=obs, color=cmap(i),
@@ -349,14 +349,14 @@ def plot(pdata,color_by_observatory=False,color_by_database=False,color_by_wise=
 		for i,data in enumerate(database):
 			idx = pdata['database'] == data
 
-			yerr =  threed_dutils.asym_errors(pdata[ypar], 
+			yerr =  prosp_dutils.asym_errors(pdata[ypar], 
 				                              pdata[ypar+'_up'],
 				                              pdata[ypar+'_down'])
 
 			if xpar == 'xray_luminosity':
 				xerr = xerr_1d
 			else:
-				xerr =  threed_dutils.asym_errors(np.clip(pdata[xpar],xmin,xmax), 
+				xerr =  prosp_dutils.asym_errors(np.clip(pdata[xpar],xmin,xmax), 
 					                              np.clip(pdata[xpar+'_up'],xmin,xmax),
 					                              np.clip(pdata[xpar+'_down'],xmin,xmax))
 
@@ -365,14 +365,14 @@ def plot(pdata,color_by_observatory=False,color_by_database=False,color_by_wise=
 
 	elif color_by_wise:
 
-		yerr =  threed_dutils.asym_errors(pdata[ypar], 
+		yerr =  prosp_dutils.asym_errors(pdata[ypar], 
 			                              pdata[ypar+'_up'],
 			                              pdata[ypar+'_down'])
 
 		if xpar == 'xray_luminosity':
 			xerr = xerr_1d
 		else:
-			xerr =  threed_dutils.asym_errors(np.clip(pdata[xpar],xmin,xmax), 
+			xerr =  prosp_dutils.asym_errors(np.clip(pdata[xpar],xmin,xmax), 
 				                              np.clip(pdata[xpar+'_up'],xmin,xmax),
 				                              np.clip(pdata[xpar+'_down'],xmin,xmax))
 
@@ -388,14 +388,14 @@ def plot(pdata,color_by_observatory=False,color_by_database=False,color_by_wise=
 
 	else: 
 	'''
-	yerr =  threed_dutils.asym_errors(pdata[ypar], 
+	yerr =  prosp_dutils.asym_errors(pdata[ypar], 
 		                              pdata[ypar+'_up'],
 		                              pdata[ypar+'_down'])
 
 	if xpar == 'xray_luminosity':
 		xerr = xerr_1d
 	else:
-		xerr =  threed_dutils.asym_errors(pdata[xpar],
+		xerr =  prosp_dutils.asym_errors(pdata[xpar],
 			                              pdata[xpar+'_up'],
 			                              pdata[xpar+'_down'])
 

@@ -1,6 +1,6 @@
 import numpy as np
 from astropy import constants
-import fsps, threed_dutils
+import fsps, prosp_dutils
 import matplotlib.pyplot as plt
 from scipy.special import gamma, gammainc
 

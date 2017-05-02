@@ -1,5 +1,5 @@
 import numpy as np
-import threed_dutils
+import prosp_dutils
 import matplotlib.pyplot as plt
 import magphys_plot_pref
 import time
@@ -96,12 +96,12 @@ def make_plot():
             spec,mags,sm = model.mean_model(itheta, obs, sps=sps)
 
             if k == 0:
-                modelout = threed_dutils.measure_restframe_properties(sps, thetas = itheta,
+                modelout = prosp_dutils.measure_restframe_properties(sps, thetas = itheta,
                                                 model=model, obs=obs,
                                                 measure_mir=True)
                 lmir_agn = modelout['lmir']
                 itheta[idx[k]] = 0.0
-                modelout = threed_dutils.measure_restframe_properties(sps, thetas = itheta,
+                modelout = prosp_dutils.measure_restframe_properties(sps, thetas = itheta,
                                         model=model, obs=obs,
                                         measure_mir=True)
                 text = (lmir_agn-modelout['lmir'])/lmir_agn

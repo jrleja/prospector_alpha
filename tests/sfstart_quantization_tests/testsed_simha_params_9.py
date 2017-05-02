@@ -1,5 +1,5 @@
 import numpy as np
-import fsps,os,threed_dutils
+import fsps,os,prosp_dutils
 from sedpy import attenuation
 from bsfh import priors, sedmodel, elines
 from astropy.cosmology import WMAP9
@@ -55,11 +55,11 @@ def load_obs_3dhst(filename, objnum, zperr=False):
     unc  = dat[unc_fields].view(float).reshape(len(dat),-1)[obj_ind]
 
     # define all outputs
-    wave_effective = np.array(threed_dutils.return_mwave_custom(filters))
+    wave_effective = np.array(prosp_dutils.return_mwave_custom(filters))
     phot_mask = np.logical_or(np.logical_or((flux != unc),(flux > 0)),flux != -99.0)
 
     if zperr is True:
-        zp_offsets = threed_dutils.load_zp_offsets(None)
+        zp_offsets = prosp_dutils.load_zp_offsets(None)
         band_names = np.array([x['Band'].lower()+'_'+x['Field'].lower() for x in zp_offsets])
         
         for kk in xrange(len(filters)):

@@ -1,4 +1,4 @@
-import threed_dutils
+import prosp_dutils
 import numpy as np
 import matplotlib.pyplot as plt
 import os
@@ -151,7 +151,7 @@ def pdf_distance(chain, truths, chainnames=None, truthnames=None):
 
 def collate_data(runname='ha_80myr',outpickle=None):
 
-	filebase, parm_basename, ancilname=threed_dutils.generate_basenames(runname)
+	filebase, parm_basename, ancilname=prosp_dutils.generate_basenames(runname)
 
 	out = []
 	sps = None
@@ -210,7 +210,7 @@ def collate_data(runname='ha_80myr',outpickle=None):
 
 		### load truths
 		truename = os.getenv('APPS')+'/threed'+sample_results['run_params']['truename'].split('/threed')[1]
-		outdat['truths'] = threed_dutils.load_truths(os.getenv('APPS')+'/threed'+sample_results['run_params']['param_file'].split('/threed')[1],
+		outdat['truths'] = prosp_dutils.load_truths(os.getenv('APPS')+'/threed'+sample_results['run_params']['param_file'].split('/threed')[1],
 			                                         sps=sps, calc_prob = True)
 
 		### save all fit + derived parameters
@@ -251,7 +251,7 @@ def collate_data(runname='ha_80myr',outpickle=None):
 		d1 = ransamp[:,outdat['parnames']=='dust1']
 		d2 = ransamp[:,outdat['parnames']=='dust2']
 		didx = ransamp[:,outdat['parnames']=='dust_index']
-		ha_ext = threed_dutils.charlot_and_fall_extinction(6563.0, d1, d2, -1.0, didx, kriek=True)
+		ha_ext = prosp_dutils.charlot_and_fall_extinction(6563.0, d1, d2, -1.0, didx, kriek=True)
 		outdat['ha_ext_q16'], outdat['ha_ext_q50'], outdat['ha_ext_q84'] = quantile(ha_ext, [0.16, 0.5, 0.84])
 		outdat['d1_d2_q16'], outdat['d1_d2_q50'], outdat['d1_d2_q84'] = quantile(d1/d2, [0.16, 0.5, 0.84])
 
@@ -262,7 +262,7 @@ def collate_data(runname='ha_80myr',outpickle=None):
 		d1_t = outdat['truths']['truths'][outdat['parnames']=='dust1']
 		d2_t = outdat['truths']['truths'][outdat['parnames']=='dust2']
 		didx_t = outdat['truths']['truths'][outdat['parnames']=='dust_index']
-		outdat['truths']['ha_ext'] = threed_dutils.charlot_and_fall_extinction(6563.0, d1_t, d2_t, -1.0, didx_t, kriek=True)[0]
+		outdat['truths']['ha_ext'] = prosp_dutils.charlot_and_fall_extinction(6563.0, d1_t, d2_t, -1.0, didx_t, kriek=True)[0]
 		outdat['truths']['d1_d2'] = d1_t/d2_t
 
 		out.append(outdat)
@@ -302,7 +302,7 @@ def plot_fit_parameters(alldata,outfolder=None, cdf=False):
 		y = np.array([dat['q50'][ii] for dat in alldata])
 		yup = np.array([dat['q84'][ii] for dat in alldata])
 		ydown = np.array([dat['q16'][ii] for dat in alldata])
-		yerr = threed_dutils.asym_errors(y,yup,ydown,log=False)
+		yerr = prosp_dutils.asym_errors(y,yup,ydown,log=False)
 
 		#### truth
 		x = np.array([dat['truths']['truths'][ii] for dat in alldata])
@@ -312,8 +312,8 @@ def plot_fit_parameters(alldata,outfolder=None, cdf=False):
 		ax[ii].set_xlabel('true '+parlabels[ii])
 		ax[ii].set_ylabel('fit '+parlabels[ii])
 
-		ax[ii] = threed_dutils.equalize_axes(ax[ii], x,y)
-		mean_offset,scat = threed_dutils.offset_and_scatter(x,y)
+		ax[ii] = prosp_dutils.equalize_axes(ax[ii], x,y)
+		mean_offset,scat = prosp_dutils.offset_and_scatter(x,y)
 		ax[ii].text(0.96,0.12, 'scatter='+"{:.2f}".format(scat),transform = ax[ii].transAxes,ha='right')
 		ax[ii].text(0.96,0.05, 'mean offset='+"{:.2f}".format(mean_offset), transform = ax[ii].transAxes,ha='right')
 
@@ -451,7 +451,7 @@ def plot_derived_parameters(alldata,outfolder=None, cdf=False):
 		x = np.squeeze([dat['truths']['extra_truths'][idx_true] for dat in alldata])
 
 		### log all parameters
-		yerr = threed_dutils.asym_errors(y,yup,ydown,log=True)
+		yerr = prosp_dutils.asym_errors(y,yup,ydown,log=True)
 		yup = np.log10(yup)
 		ydown = np.log10(ydown)
 		y = np.log10(y)
@@ -460,7 +460,7 @@ def plot_derived_parameters(alldata,outfolder=None, cdf=False):
 			#yup = 10**yup
 			#ydown = 10**ydown
 			#y = 10**y
-			#yerr = threed_dutils.asym_errors(y,yup,ydown,log=False)
+			#yerr = prosp_dutils.asym_errors(y,yup,ydown,log=False)
 			x = np.log10(x)
 
 		### plot that shit
@@ -468,8 +468,8 @@ def plot_derived_parameters(alldata,outfolder=None, cdf=False):
 		ax[ii].set_xlabel('true '+parlabels[ii])
 		ax[ii].set_ylabel('fit '+parlabels[ii])
 
-		ax[ii] = threed_dutils.equalize_axes(ax[ii], x, y)
-		mean_offset,scat = threed_dutils.offset_and_scatter(x,y)
+		ax[ii] = prosp_dutils.equalize_axes(ax[ii], x, y)
+		mean_offset,scat = prosp_dutils.offset_and_scatter(x,y)
 		ax[ii].text(0.96,0.12, 'scatter='+"{:.2f}".format(scat)+' dex',transform = ax[ii].transAxes,ha='right')
 		ax[ii].text(0.96,0.05, 'mean offset='+"{:.2f}".format(mean_offset)+' dex', transform = ax[ii].transAxes,ha='right')
 
@@ -630,7 +630,7 @@ def plot_spectral_parameters(alldata,outfolder=None):
 		x = np.clip(x,minflux,np.inf)
 
 		#### errors + logify
-		yerr = threed_dutils.asym_errors(y,yup,ydown,log=True)
+		yerr = prosp_dutils.asym_errors(y,yup,ydown,log=True)
 		y = np.log10(y)
 		x = np.log10(x)
 
@@ -639,8 +639,8 @@ def plot_spectral_parameters(alldata,outfolder=None):
 		ax[ii].set_xlabel('true '+plot_names[ii])
 		ax[ii].set_ylabel('fit '+plot_names[ii])
 
-		ax[ii] = threed_dutils.equalize_axes(ax[ii], x, y)
-		mean_offset,scat = threed_dutils.offset_and_scatter(x,y)
+		ax[ii] = prosp_dutils.equalize_axes(ax[ii], x, y)
+		mean_offset,scat = prosp_dutils.offset_and_scatter(x,y)
 		ax[ii].text(0.96,0.12, 'scatter='+"{:.2f}".format(scat),transform = ax[ii].transAxes,ha='right')
 		ax[ii].text(0.96,0.05, 'mean offset='+"{:.2f}".format(mean_offset), transform = ax[ii].transAxes,ha='right')
 
@@ -651,15 +651,15 @@ def plot_spectral_parameters(alldata,outfolder=None):
 	y = np.array([dat['dn4000_q50'] for dat in alldata])
 	yup = np.array([dat['dn4000_q84'] for dat in alldata])
 	ydown = np.array([dat['dn4000_q16'] for dat in alldata])
-	yerr = threed_dutils.asym_errors(y,yup,ydown,log=False)
+	yerr = prosp_dutils.asym_errors(y,yup,ydown,log=False)
 	x = np.array([dat['truths']['dn4000'] for dat in alldata])
 
 	ax[ii+1].errorbar(x,y,yerr,fmt='o',alpha=0.8,color='#1C86EE')
 	ax[ii+1].set_xlabel(r'true D$_n$4000')
 	ax[ii+1].set_ylabel(r'fit D$_n$4000')
 
-	ax[ii+1] = threed_dutils.equalize_axes(ax[ii+1], x, y)
-	mean_offset,scat = threed_dutils.offset_and_scatter(x,y)
+	ax[ii+1] = prosp_dutils.equalize_axes(ax[ii+1], x, y)
+	mean_offset,scat = prosp_dutils.offset_and_scatter(x,y)
 	ax[ii+1].text(0.96,0.12, 'scatter='+"{:.2f}".format(scat),transform = ax[ii+1].transAxes,ha='right')
 	ax[ii+1].text(0.96,0.05, 'mean offset='+"{:.2f}".format(mean_offset), transform = ax[ii+1].transAxes,ha='right')
 
@@ -683,14 +683,14 @@ def plot_spectral_parameters(alldata,outfolder=None):
 	y = bdec_to_ext(y[good])
 	yup = bdec_to_ext(np.array([dat['eq84'][idx] for dat in alldata])[good])
 	ydown = bdec_to_ext(np.array([dat['eq16'][idx] for dat in alldata])[good])
-	yerr = threed_dutils.asym_errors(y,yup,ydown,log=False)
+	yerr = prosp_dutils.asym_errors(y,yup,ydown,log=False)
 
 	ax[ii+2].errorbar(x,y,yerr,fmt='o',alpha=0.8,color='#1C86EE')
 	ax[ii+2].set_xlabel(r'true log(F/F$_0$)$_{\mathrm{H}\alpha}$ - log(F/F$_0$)$_{\mathrm{H}\beta}$')
 	ax[ii+2].set_ylabel(r'fit log(F/F$_0$)$_{\mathrm{H}\alpha}$ - log(F/F$_0$)$_{\mathrm{H}\beta}$')
 
-	ax[ii+2] = threed_dutils.equalize_axes(ax[ii+2], x, y)
-	mean_offset,scat = threed_dutils.offset_and_scatter(x,y)
+	ax[ii+2] = prosp_dutils.equalize_axes(ax[ii+2], x, y)
+	mean_offset,scat = prosp_dutils.offset_and_scatter(x,y)
 	ax[ii+2].text(0.96,0.12, 'scatter='+"{:.2f}".format(scat)+' dex',transform = ax[ii+2].transAxes,ha='right')
 	ax[ii+2].text(0.96,0.05, 'mean offset='+"{:.2f}".format(mean_offset)+' dex', transform = ax[ii+2].transAxes,ha='right')
 
@@ -712,7 +712,7 @@ def plot_mass_resid(alldata,outfolder=None):
 	ratio = true_mass-[dat['q50'][idx_mass] for dat in alldata]
 	yup = true_mass - [dat['q84'][idx_mass] for dat in alldata]
 	ydown = true_mass - [dat['q16'][idx_mass] for dat in alldata]
-	yerr = threed_dutils.asym_errors(ratio,yup,ydown,log=False)
+	yerr = prosp_dutils.asym_errors(ratio,yup,ydown,log=False)
 
 	#### true half-mass
 	epars_truth = alldata[0]['truths']['extra_parnames']
@@ -726,7 +726,7 @@ def plot_mass_resid(alldata,outfolder=None):
 	halfmass_ratio = true_halfmass-np.log10(np.squeeze([dat['eq50'][idx] for dat in alldata]))
 	yup = true_halfmass-np.log10(np.squeeze([dat['eq84'][idx] for dat in alldata]))
 	ydown = true_halfmass-np.log10(np.squeeze([dat['eq16'][idx] for dat in alldata]))
-	halfmass_ratio_err = threed_dutils.asym_errors(halfmass_ratio,yup,ydown,log=False)
+	halfmass_ratio_err = prosp_dutils.asym_errors(halfmass_ratio,yup,ydown,log=False)
 
 	#### make plot
 	fig, ax = plt.subplots(1, 1, figsize = (7,7))

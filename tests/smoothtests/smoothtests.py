@@ -1,5 +1,5 @@
 import numpy as np
-import fsps, threed_dutils
+import fsps, prosp_dutils
 import matplotlib.pyplot as plt
 
 # change to a folder name, to save figures
@@ -24,7 +24,7 @@ plt.xlim(2000,4000)
 
 
 
-spec_joelsmooth = threed_dutils.smooth_spectrum(w,spec,sigsmooth)
+spec_joelsmooth = prosp_dutils.smooth_spectrum(w,spec,sigsmooth)
 
 plt.plot(w,spec_joelsmooth,color='green')
 #plt.plot(w,(spec_smooth-spec)/spec_smooth,color='red')

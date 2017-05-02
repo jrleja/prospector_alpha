@@ -1,4 +1,4 @@
-import read_sextractor, read_data, random, os, threed_dutils
+import read_sextractor, read_data, random, os, prosp_dutils
 import numpy as np
 from astropy.table import Table, vstack
 from astropy.io import ascii
@@ -83,7 +83,7 @@ def ha_mocks(basename,outname=None,add_zp_err=False):
 	#### load test model, build sps  ####
 	model = model_setup.load_model(parmfile)
 	obs   = model_setup.load_obs(parmfile)
-	sps = threed_dutils.setup_sps(custom_filter_key=None)
+	sps = prosp_dutils.setup_sps(custom_filter_key=None)
 
 	#### basic parameters ####
 	# hack to make it run 100x times in for-loop
@@ -152,8 +152,8 @@ def ha_mocks(basename,outname=None,add_zp_err=False):
 			#print parnames[ii]
 			#print min,max
 
-		sfh_params = threed_dutils.find_sfh_params(model,testparms[jj,:],obs,sps)
-		ssfr_10 = threed_dutils.calculate_sfr(sfh_params, 0.01, minsfr=-np.inf, maxsfr=np.inf)/sfh_params['mformed']
+		sfh_params = prosp_dutils.find_sfh_params(model,testparms[jj,:],obs,sps)
+		ssfr_10 = prosp_dutils.calculate_sfr(sfh_params, 0.01, minsfr=-np.inf, maxsfr=np.inf)/sfh_params['mformed']
 		if ssfr_10 > 1e-12:
 			print ssfr_10
 			jj += 1

@@ -1,5 +1,5 @@
 import numpy as np
-from threed_dutils import asym_errors
+from prosp_dutils import asym_errors
 
 def halpha_cuts(e_pinfo,sn=False):
 

@@ -16,7 +16,7 @@ from wise_colors import vega_conversions
 from magphys_plot_pref import jLogFormatter
 import brown_io
 from corner import quantile
-from threed_dutils import smooth_spectrum
+from prosp_dutils import smooth_spectrum
 
 plt.ioff()
 

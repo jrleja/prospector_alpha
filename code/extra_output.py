@@ -1,6 +1,6 @@
 from prospect.models import model_setup
 from prospect.io import read_results
-import os, threed_dutils, hickle, sys, time
+import os, prosp_dutils, hickle, sys, time
 import numpy as np
 from copy import copy
 from astropy import constants
@@ -17,7 +17,7 @@ def maxprob_model(sample_results,sps):
     maxtheta = sample_results['flatchain'][sample_results['flatprob'].argmax()]
 
     ### ensure that maxprob stored is the same as calculated now 
-    current_maxprob = threed_dutils.test_likelihood(sps,
+    current_maxprob = prosp_dutils.test_likelihood(sps,
                                                     sample_results['model'],
                                                     sample_results['obs'],
                                                     maxtheta,
@@ -182,20 +182,20 @@ def calc_extra_quantities(sample_results, ncalc=3000, **kwargs):
 
         ##### extract sfh parameters
         # pass stellar mass to avoid extra model call
-        sfh_params = threed_dutils.find_sfh_params(sample_results['model'],thetas,
+        sfh_params = prosp_dutils.find_sfh_params(sample_results['model'],thetas,
                                                    sample_results['obs'],sps,sm=sm)
 
         ##### calculate SFH
-        intsfr[:,jj] = threed_dutils.return_full_sfh(t, sfh_params)
+        intsfr[:,jj] = prosp_dutils.return_full_sfh(t, sfh_params)
 
         ##### solve for half-mass assembly time
         # this is half-time in the sense of integral of SFR, i.e.
         # mass loss is NOT taken into account.
-        half_time[jj] = threed_dutils.halfmass_assembly_time(sfh_params)
+        half_time[jj] = prosp_dutils.halfmass_assembly_time(sfh_params)
 
         ##### calculate time-averaged SFR
-        sfr_10[jj]   = threed_dutils.calculate_sfr(sfh_params, 0.01, minsfr=-np.inf, maxsfr=np.inf)
-        sfr_100[jj]  = threed_dutils.calculate_sfr(sfh_params, 0.1,  minsfr=-np.inf, maxsfr=np.inf)
+        sfr_10[jj]   = prosp_dutils.calculate_sfr(sfh_params, 0.01, minsfr=-np.inf, maxsfr=np.inf)
+        sfr_100[jj]  = prosp_dutils.calculate_sfr(sfh_params, 0.1,  minsfr=-np.inf, maxsfr=np.inf)
 
         ##### calculate mass, sSFR
         stellar_mass[jj] = sfh_params['mass']
@@ -204,11 +204,11 @@ def calc_extra_quantities(sample_results, ncalc=3000, **kwargs):
 
         ##### calculate L_AGN if necessary
         if 'fagn' in parnames:
-            l_agn[jj] = threed_dutils.measure_agn_luminosity(thetas[parnames=='fagn'],sps,sfh_params['mformed'])
-        xray_lum[jj] = threed_dutils.estimate_xray_lum(sfr_100[jj])
+            l_agn[jj] = prosp_dutils.measure_agn_luminosity(thetas[parnames=='fagn'],sps,sfh_params['mformed'])
+        xray_lum[jj] = prosp_dutils.estimate_xray_lum(sfr_100[jj])
 
         ##### empirical halpha HERE
-        emp_ha[jj] = threed_dutils.synthetic_halpha(sfr_10[jj],dust1,
+        emp_ha[jj] = prosp_dutils.synthetic_halpha(sfr_10[jj],dust1,
                                                     thetas[d2_idx],-1.0,
                                                     dust_idx,
                                                     kriek = (sample_results['model'].params['dust_type'] == 4)[0])
@@ -217,17 +217,17 @@ def calc_extra_quantities(sample_results, ncalc=3000, **kwargs):
         ext_5500[jj] = dust1 + thetas[d2_idx]
 
         ##### empirical Balmer decrement
-        bdec_calc[jj] = threed_dutils.calc_balmer_dec(dust1, thetas[d2_idx], -1.0, 
+        bdec_calc[jj] = prosp_dutils.calc_balmer_dec(dust1, thetas[d2_idx], -1.0, 
                                                       dust_idx,
                                                       kriek = (sample_results['model'].params['dust_type'] == 4)[0])
 
         ##### lbol
-        lbol[jj] = threed_dutils.measure_lbol(sps,sfh_params['mformed'])
+        lbol[jj] = prosp_dutils.measure_lbol(sps,sfh_params['mformed'])
 
         ##### spectral quantities (emission line flux, Balmer decrement, Hdelta absorption, Dn4000)
         ##### and magnitudes (LIR, LUV)
         if opts['measure_spectral_features']:
-            modelout = threed_dutils.measure_restframe_properties(sps, thetas = thetas,
+            modelout = prosp_dutils.measure_restframe_properties(sps, thetas = thetas,
                                                         model=sample_results['model'], obs = sample_results['obs'],
                                                         measure_ir=True, measure_luv=True, measure_mir=True, 
                                                         emlines=True, abslines=True, restframe_optical_photometry = False)
@@ -254,7 +254,7 @@ def calc_extra_quantities(sample_results, ncalc=3000, **kwargs):
             if 'fagn' in parnames:
                 nagn_thetas = copy(thetas)
                 nagn_thetas[parnames == 'fagn'] = 0.0
-                modelout = threed_dutils.measure_restframe_properties(sps, thetas=nagn_thetas,
+                modelout = prosp_dutils.measure_restframe_properties(sps, thetas=nagn_thetas,
                                             model=sample_results['model'], obs=sample_results['obs'],
                                             measure_mir=True)
                 fmir[jj] = (lmir[jj]-modelout['lmir'])/lmir[jj]
@@ -397,7 +397,7 @@ def update_all(runname, **kwargs):
     change some parameters, need to update the post-processing?
     run this!
     '''
-    filebase, parm_basename, ancilname=threed_dutils.generate_basenames(runname)
+    filebase, parm_basename, ancilname=prosp_dutils.generate_basenames(runname)
     for param in parm_basename:
         post_processing(param, **kwargs)
 
@@ -427,8 +427,8 @@ def post_processing(param_name, **kwargs):
     print 'Performing post-processing on ' + sample_results['run_params']['objname']
 
     ### create flatchain, run post-processing
-    sample_results['flatchain'] = threed_dutils.chop_chain(sample_results['chain'],**sample_results['run_params'])
-    sample_results['flatprob'] = threed_dutils.chop_chain(sample_results['lnprobability'],**sample_results['run_params'])
+    sample_results['flatchain'] = prosp_dutils.chop_chain(sample_results['chain'],**sample_results['run_params'])
+    sample_results['flatprob'] = prosp_dutils.chop_chain(sample_results['lnprobability'],**sample_results['run_params'])
     extra_output = calc_extra_quantities(sample_results,**kwargs)
     
     ### create post-processing name, dump info

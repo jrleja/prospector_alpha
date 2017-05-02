@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import threed_dutils
+import prosp_dutils
 import magphys_plot_pref
 from matplotlib.ticker import MaxNLocator
 import copy
@@ -54,7 +54,7 @@ def arrange_data(alldata):
 
 	### do the errors
 	for par in outlabels.keys():
-		outerrs[par] = threed_dutils.asym_errors(np.array(outq[par]['q50']), 
+		outerrs[par] = prosp_dutils.asym_errors(np.array(outq[par]['q50']), 
 				                                 np.array(outq[par]['q84']),
 				                                 np.array(outq[par]['q16']),log=False)
 		outvals[par] = np.array(outvals[par])

@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import magphys_plot_pref
 import matplotlib as mpl
 from magphys_plots import median_by_band
-import threed_dutils
+import prosp_dutils
 from astropy import constants
 from matplotlib.ticker import MaxNLocator
 
@@ -83,12 +83,12 @@ def collate_data(alldata, alldata_noagn):
 			#### pull the chain for spectral quantities
 			rms['obs']['halpha'].append(np.log10(dat['residuals']['emlines']['obs']['lum_chain'][:,obs_eline_names=='H$\\alpha$'].squeeze() / constants.L_sun.cgs.value))
 			rms['obs']['hbeta'].append(np.log10(dat['residuals']['emlines']['obs']['lum_chain'][:,obs_eline_names=='H$\\beta$'].squeeze() / constants.L_sun.cgs.value))
-			rms['obs']['bdec'].append(threed_dutils.bdec_to_ext(10**rms['obs']['halpha'][-1]/10**rms['obs']['hbeta'][-1]))
+			rms['obs']['bdec'].append(prosp_dutils.bdec_to_ext(10**rms['obs']['halpha'][-1]/10**rms['obs']['hbeta'][-1]))
 			rms['obs']['dn4000'].append(np.array(dat['residuals']['emlines']['obs']['dn4000']))
 
 			rms['mod']['halpha'].append(np.log10(dat['model_emline']['flux']['chain'][:,mod_eline_names=='Halpha'].squeeze()))
 			rms['mod']['hbeta'].append(np.log10(dat['model_emline']['flux']['chain'][:,mod_eline_names=='Hbeta'].squeeze()))
-			rms['mod']['bdec'].append(threed_dutils.bdec_to_ext(dat['pextras']['flatchain'][:,mod_extra_names=='bdec_calc'].squeeze()))
+			rms['mod']['bdec'].append(prosp_dutils.bdec_to_ext(dat['pextras']['flatchain'][:,mod_extra_names=='bdec_calc'].squeeze()))
 			rms['mod']['dn4000'].append(dat['spec_info']['dn4000']['chain'].squeeze())
 
 		#### numpy arrays
@@ -185,7 +185,7 @@ def plot_rms(pdata,outfolder,agn_idx=None,**popts):
 		idx = np.isfinite(q50)
 
 		### plot
-		errs = threed_dutils.asym_errors(q50[idx], q84[idx], q16[idx])
+		errs = prosp_dutils.asym_errors(q50[idx], q84[idx], q16[idx])
 		ax[ii].errorbar(fagn[idx],q50[idx],yerr=errs,fmt='o', ecolor=blue, capthick=1,elinewidth=1,ms=8,alpha=0.5,zorder=-5)
 		ax[ii].set_title(trans[key])
 		ax[ii].set_xlabel(r'log(f$_{\mathrm{MIR}}$)')
@@ -199,7 +199,7 @@ def plot_rms(pdata,outfolder,agn_idx=None,**popts):
 		ax[ii].set_ylim(lims[ii][0],lims[ii][1])
 
 		### running median
-		x, y = threed_dutils.running_median(fagn[idx],q50[idx],nbins=9,weights=2./(q84[idx]-q16[idx])**2,avg=True)
+		x, y = prosp_dutils.running_median(fagn[idx],q50[idx],nbins=9,weights=2./(q84[idx]-q16[idx])**2,avg=True)
 		ax[ii].plot(x,y,color=red,lw=4,alpha=0.6)
 		ax[ii].plot(x,y,color=red,lw=4,alpha=0.6)
 
@@ -210,8 +210,8 @@ def plot_rms(pdata,outfolder,agn_idx=None,**popts):
 			q50o[jj],q84o[jj],q16o[jj] = np.nanpercentile(obs_agn[jj],[50.0,84.0,16.0])
 			q50m[jj],q84m[jj],q16m[jj] = np.nanpercentile(mod_agn[jj],[50.0,84.0,16.0])
 		
-		errs_obs = threed_dutils.asym_errors(q50o[idx], q84o[idx], q16o[idx])
-		errs_mod = threed_dutils.asym_errors(q50m[idx], q84m[idx], q16m[idx])
+		errs_obs = prosp_dutils.asym_errors(q50o[idx], q84o[idx], q16o[idx])
+		errs_mod = prosp_dutils.asym_errors(q50m[idx], q84m[idx], q16m[idx])
 
 		p2 = 2*ii
 		ax2[p2].errorbar(q50o[idx],q50m[idx],xerr=errs_obs,yerr=errs_mod,fmt='o', 
@@ -226,7 +226,7 @@ def plot_rms(pdata,outfolder,agn_idx=None,**popts):
 		ax2[p2].set_xlim(lims2[ii][0],lims2[ii][1])
 		ax2[p2].set_ylim(lims2[ii][0],lims2[ii][1])
 		ax2[p2].plot(lims2[ii],lims2[ii],'--',color='0.5',alpha=0.5)
-		off,scat = threed_dutils.offset_and_scatter(q50o[idx],q50m[idx],biweight=True)
+		off,scat = prosp_dutils.offset_and_scatter(q50o[idx],q50m[idx],biweight=True)
 		ax2[p2].text(0.05,0.94, 'biweight scatter='+"{:.2f}".format(scat),
                      transform = ax2[p2].transAxes,horizontalalignment='left')
 		ax2[p2].text(0.05,0.89, 'mean offset='+"{:.2f}".format(off),
@@ -238,8 +238,8 @@ def plot_rms(pdata,outfolder,agn_idx=None,**popts):
 			q50o_no[jj],q84o_no[jj],q16o_no[jj] = np.nanpercentile(obs_noagn[jj],[50.0,84.0,16.0])
 			q50m_no[jj],q84m_no[jj],q16m_no[jj] = np.nanpercentile(mod_noagn[jj],[50.0,84.0,16.0])
 		
-		errs_obs = threed_dutils.asym_errors(q50o_no[idx], q84o_no[idx], q16o_no[idx])
-		errs_mod = threed_dutils.asym_errors(q50m_no[idx], q84m_no[idx], q16m_no[idx])
+		errs_obs = prosp_dutils.asym_errors(q50o_no[idx], q84o_no[idx], q16o_no[idx])
+		errs_mod = prosp_dutils.asym_errors(q50m_no[idx], q84m_no[idx], q16m_no[idx])
 
 		p2+=1
 		ax2[p2].errorbar(q50o_no[idx],q50m_no[idx],xerr=errs_obs,yerr=errs_mod,fmt='o', 
@@ -253,7 +253,7 @@ def plot_rms(pdata,outfolder,agn_idx=None,**popts):
 		ax2[p2].set_xlim(lims2[ii][0],lims2[ii][1])
 		ax2[p2].set_ylim(lims2[ii][0],lims2[ii][1])
 		ax2[p2].plot(lims2[ii],lims2[ii],'--',color='0.5',alpha=0.5)
-		off,scat = threed_dutils.offset_and_scatter(q50o_no[idx],q50m_no[idx],biweight=True)
+		off,scat = prosp_dutils.offset_and_scatter(q50o_no[idx],q50m_no[idx],biweight=True)
 		ax2[p2].text(0.05,0.94, 'biweight scatter='+"{:.2f}".format(scat),
                      transform = ax2[p2].transAxes,horizontalalignment='left')
 		ax2[p2].text(0.05,0.89, 'mean offset='+"{:.2f}".format(off),
@@ -271,12 +271,12 @@ def plot_rms(pdata,outfolder,agn_idx=None,**popts):
 		ax3[ii].scatter(q50o[agn_idx], q50m[agn_idx], marker='o', color=popts['agn_color'],s=70,zorder=10,alpha=alpha,edgecolors='k')
 
 		'''
-		errs_obs = threed_dutils.asym_errors(q50o[agn_idx], q84o[agn_idx], q16o[agn_idx])
-		errs_mod = threed_dutils.asym_errors(q50m[agn_idx], q84m[agn_idx], q16m[agn_idx])
+		errs_obs = prosp_dutils.asym_errors(q50o[agn_idx], q84o[agn_idx], q16o[agn_idx])
+		errs_mod = prosp_dutils.asym_errors(q50m[agn_idx], q84m[agn_idx], q16m[agn_idx])
 		ax3[ii].errorbar(q50o[agn_idx], q50m[agn_idx], xerr=errs_obs,yerr=errs_mod, ms=0.0, zorder=-2,**ebaropts)
 
-		errs_obs = threed_dutils.asym_errors(q50o_no[agn_idx], q84o_no[agn_idx], q16o_no[agn_idx])
-		errs_mod = threed_dutils.asym_errors(q50m_no[agn_idx], q84m_no[agn_idx], q16m_no[agn_idx])
+		errs_obs = prosp_dutils.asym_errors(q50o_no[agn_idx], q84o_no[agn_idx], q16o_no[agn_idx])
+		errs_mod = prosp_dutils.asym_errors(q50m_no[agn_idx], q84m_no[agn_idx], q16m_no[agn_idx])
 		ax3[ii].errorbar(q50o_no[agn_idx], q50m_no[agn_idx], xerr=errs_obs,yerr=errs_mod, ms=0.0, zorder=-2,**ebaropts)
 		'''
 
@@ -296,8 +296,8 @@ def plot_rms(pdata,outfolder,agn_idx=None,**popts):
 		ax3[ii].plot(lims3[ii],lims3[ii],'--',color='0.5',alpha=0.5,zorder=-15)
 
 		good = ((np.isfinite(q50o)) & (np.isfinite(q50m)) & (np.isfinite(q50o_no)) & (np.isfinite(q50m_no)))[agn_idx]
-		off_agn,scat_agn = threed_dutils.offset_and_scatter(q50o[agn_idx][good],q50m[agn_idx][good],mad=True)
-		off_noagn,scat_noagn = threed_dutils.offset_and_scatter(q50o_no[agn_idx][good],q50m_no[agn_idx][good],mad=True)
+		off_agn,scat_agn = prosp_dutils.offset_and_scatter(q50o[agn_idx][good],q50m[agn_idx][good],mad=True)
+		off_noagn,scat_noagn = prosp_dutils.offset_and_scatter(q50o_no[agn_idx][good],q50m_no[agn_idx][good],mad=True)
 		topts = {'transform':ax3[ii].transAxes,'fontsize':13,'verticalalignment':'top'}
 		ax3[ii].text(0.04,0.95,'AGN-off', color=popts['noagn_color'],weight='bold', **topts)
 		ax3[ii].text(0.04,0.9,'scatter, offset=', color=popts['noagn_color'], **topts)

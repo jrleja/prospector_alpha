@@ -1,5 +1,5 @@
 from prospect.models import model_setup
-import os, threed_dutils
+import os, prosp_dutils
 import numpy as np
 import matplotlib.pyplot as plt
 from magphys_plot_pref import jLogFormatter

@@ -1,6 +1,6 @@
 import numpy as np
 from prospect.io import read_results
-import threed_dutils, corner, pickle, math
+import prosp_dutils, corner, pickle, math
 import matplotlib.pyplot as plt
 from prospect.models import model_setup
 from copy import copy
@@ -69,11 +69,11 @@ def calc_sfr(nsample=40000):
 
 		##### extract sfh parameters
 		# pass stellar mass to avoid extra model call
-		sfh_params = threed_dutils.find_sfh_params(model,thetas,
+		sfh_params = prosp_dutils.find_sfh_params(model,thetas,
 			                                       obs,sps,sm=sm)
 
 		#### SFR
-		sfr[:,jj] = threed_dutils.return_full_sfh(t, sfh_params,minsfr=-np.inf)
+		sfr[:,jj] = prosp_dutils.return_full_sfh(t, sfh_params,minsfr=-np.inf)
 
 	out = {}
 	out['sfr'] = sfr

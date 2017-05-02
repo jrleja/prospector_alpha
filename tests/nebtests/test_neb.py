@@ -2,7 +2,7 @@ import numpy as np
 from astropy import constants
 from bsfh import read_results
 import fsps, os
-import threed_dutils
+import prosp_dutils
 
 def integrate_sfh(t1,t2,tage,tau,sf_start,tburst,fburst):
     
@@ -81,7 +81,7 @@ deltat=0.1 # in Gyr
 # remove filters
 sample_results['obs']['filters'] = ['U']
 
-flatchain = threed_dutils.chop_chain(sample_results['chain'])
+flatchain = prosp_dutils.chop_chain(sample_results['chain'])
 np.random.shuffle(flatchain)
 for jj in xrange(ns):
     

@@ -3,11 +3,11 @@ import pickle
 
 '''
 from bsfh import model_setup
-import threed_dutils
+import prosp_dutils
 
 outname = 'old_brownseds.pickle'
 # setup model, sps
-sps = threed_dutils.setup_sps()
+sps = prosp_dutils.setup_sps()
 sps.params['tpagb_norm_type'] = 2
 model = model_setup.load_model('old_brownseds.py')
 obs = model_setup.load_obs('old_brownseds.py')

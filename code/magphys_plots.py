@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from magphys import read_magphys_output
-import os, copy, threed_dutils
+import os, copy, prosp_dutils
 from scipy.interpolate import interp1d
 from matplotlib.ticker import MaxNLocator
 import math, measure_emline_lum, brown_io
@@ -278,7 +278,7 @@ def plot_all_residuals(alldata,runname):
 		# wrap quiescent galaxies in try-except clause
 		# as there are no Akari spectra for these
 		try:
-			probins_qu, promedian_qu = threed_dutils.running_median(obs_restlam_qu,res_prosp_qu,nbins=nbins[i])
+			probins_qu, promedian_qu = prosp_dutils.running_median(obs_restlam_qu,res_prosp_qu,nbins=nbins[i])
 			plot.plot(probins_qu, 
 				      promedian_qu,
 				      color='black',
@@ -293,7 +293,7 @@ def plot_all_residuals(alldata,runname):
 			pass
 
 		try:
-			probins_sf, promedian_sf = threed_dutils.running_median(obs_restlam_sf,res_prosp_sf,nbins=nbins[i])
+			probins_sf, promedian_sf = prosp_dutils.running_median(obs_restlam_sf,res_prosp_sf,nbins=nbins[i])
 			plot.plot(probins_sf, 
 				      promedian_sf,
 				      color='black',
@@ -415,15 +415,15 @@ def plot_obs_spec(obs_spec, phot, spec_res, alpha,
 
 	##### smooth the model, or the observations
 	if label != 'Spitzer IRS':
-		modspec_smooth = threed_dutils.smooth_spectrum(modlam,
+		modspec_smooth = prosp_dutils.smooth_spectrum(modlam,
 		                                        modspec,sigsmooth)
-		magspec_smooth = threed_dutils.smooth_spectrum(maglam/(1+z),
+		magspec_smooth = prosp_dutils.smooth_spectrum(maglam/(1+z),
 		                                        magspec,sigsmooth)
 		obs_flux = obs_spec['flux'][mask]
 	else: # observations!
 		modspec_smooth = modspec
 		magspec_smooth = magspec
-		obs_flux = threed_dutils.smooth_spectrum(obslam, obs_spec['flux'][mask], 2500)
+		obs_flux = prosp_dutils.smooth_spectrum(obslam, obs_spec['flux'][mask], 2500)
 
 	# interpolate fsps spectra onto observational wavelength grid
 	pro_flux_interp = interp1d(modlam*(1+z),
@@ -871,7 +871,7 @@ def plt_all(runname=None,startup=True,**extras):
 	outfolder = os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/magphys/sed_residuals/'
 
 	if startup == True:
-		filebase, parm_basename, ancilname=threed_dutils.generate_basenames(runname)
+		filebase, parm_basename, ancilname=prosp_dutils.generate_basenames(runname)
 		alldata = []
 		for jj in xrange(len(filebase)):
 			dictionary = collate_data(filebase=filebase[jj],\
@@ -904,7 +904,7 @@ def perform_wavelength_cal(spec_dict, objname):
 	spec_cal = brown_io.load_spec_cal(runname=None)
 
 	#### find matching galaxy by loading basenames for BROWNSEDS
-	filebase, parm_basename, ancilname=threed_dutils.generate_basenames('brownseds')
+	filebase, parm_basename, ancilname=prosp_dutils.generate_basenames('brownseds')
 	match = np.array([f.split('_')[-1] for f in filebase]) == objname
 
 	#### find ratio, calculate polynomial
@@ -942,10 +942,10 @@ def compute_specmags(runname=None, outfolder=None):
 		runname = 'brownseds'
 
 	#### load up prospector results
-	filebase, parm_basename, ancilname=threed_dutils.generate_basenames(runname)
+	filebase, parm_basename, ancilname=prosp_dutils.generate_basenames(runname)
 	outname = os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/pcomp/sfrcomp.png'
 	alldata = brown_io.load_alldata(runname=runname)
-	sps = threed_dutils.setup_sps(custom_filter_key=None)
+	sps = prosp_dutils.setup_sps(custom_filter_key=None)
 
 	optphot = np.zeros(shape=(3,len(alldata)))
 	obsphot = np.zeros(shape=(3,len(alldata)))
@@ -1021,9 +1021,9 @@ def compute_specmags(runname=None, outfolder=None):
 		combspec *= 3631*1e-23 / constants.L_sun.cgs.value / dfactor # to Jy, to erg/s/cm^2/Hz, to Lsun/cm^2/Hz, to Lsun/Hz
 
 		#### integrate spectra, save mags
-		optphot[0,ii],_ = threed_dutils.integrate_mag(comblam,combspec,'SDSS Camera u',alt_file='/Users/joel/code/fsps/data/allfilters.dat',z=z)
-		optphot[1,ii],_ = threed_dutils.integrate_mag(comblam,combspec,'SDSS Camera g',alt_file='/Users/joel/code/fsps/data/allfilters.dat',z=z)
-		optphot[2,ii],_ = threed_dutils.integrate_mag(comblam,combspec,'SDSS Camera r',alt_file='/Users/joel/code/fsps/data/allfilters.dat',z=z)
+		optphot[0,ii],_ = prosp_dutils.integrate_mag(comblam,combspec,'SDSS Camera u',alt_file='/Users/joel/code/fsps/data/allfilters.dat',z=z)
+		optphot[1,ii],_ = prosp_dutils.integrate_mag(comblam,combspec,'SDSS Camera g',alt_file='/Users/joel/code/fsps/data/allfilters.dat',z=z)
+		optphot[2,ii],_ = prosp_dutils.integrate_mag(comblam,combspec,'SDSS Camera r',alt_file='/Users/joel/code/fsps/data/allfilters.dat',z=z)
 		optphot[:,ii] =  10**(-0.4*optphot[:,ii])
 
 		#### save observed mags
@@ -1070,9 +1070,9 @@ def add_sfr_info(runname=None, outfolder=None):
 		runname = 'brownseds'
 
 	#### load up prospector results
-	filebase, parm_basename, ancilname=threed_dutils.generate_basenames(runname)
+	filebase, parm_basename, ancilname=prosp_dutils.generate_basenames(runname)
 	alldata = brown_io.load_alldata(runname=runname)
-	sps = threed_dutils.setup_sps(custom_filter_key=None)
+	sps = prosp_dutils.setup_sps(custom_filter_key=None)
 	outname = os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/pcomp/sfrcomp.png'
 
 	sfr_mips_z2, sfr_mips, sfr_uvir, sfr_prosp = [], [], [], []
@@ -1094,25 +1094,25 @@ def add_sfr_info(runname=None, outfolder=None):
 
 		# input angstroms, Lsun/Hz
 		# output in erg/s, convert to erg / s
-		luv = threed_dutils.return_luv(sps.wavelengths,spec)/constants.L_sun.cgs.value
-		lir = threed_dutils.return_lir(sps.wavelengths,spec)/constants.L_sun.cgs.value
+		luv = prosp_dutils.return_luv(sps.wavelengths,spec)/constants.L_sun.cgs.value
+		lir = prosp_dutils.return_lir(sps.wavelengths,spec)/constants.L_sun.cgs.value
 
 		# input angstroms, Lsun/Hz
 		# output in apparent magnitude
 		# convert to erg/s/cm^2/Hz
-		mips,_ = threed_dutils.integrate_mag(sps.wavelengths*(1.+z),spec,'MIPS_24um_AEGIS',z=z)
+		mips,_ = prosp_dutils.integrate_mag(sps.wavelengths*(1.+z),spec,'MIPS_24um_AEGIS',z=z)
 		mips_fluxdens = 10**((mips+48.60)/(-2.5)) # erg/s/cm^2/Hz
-		mips_z2_mag,_ = threed_dutils.integrate_mag(sps.wavelengths*(1+2.0),spec,'MIPS_24um_AEGIS',z=2.0)
+		mips_z2_mag,_ = prosp_dutils.integrate_mag(sps.wavelengths*(1+2.0),spec,'MIPS_24um_AEGIS',z=2.0)
 		mips_z2_fluxdens = 10**((mips_z2_mag+48.60)/(-2.5)) # erg/s/cm^2/Hz
 
 		# goes in in milliJy, comes out in Lsun
-		lir_mips = threed_dutils.mips_to_lir(mips_fluxdens/1e-23/1e-3,z)
-		lir_mips_z2 = threed_dutils.mips_to_lir(mips_z2_fluxdens/1e-23/1e-3,2.0)
+		lir_mips = prosp_dutils.mips_to_lir(mips_fluxdens/1e-23/1e-3,z)
+		lir_mips_z2 = prosp_dutils.mips_to_lir(mips_z2_fluxdens/1e-23/1e-3,2.0)
 
 		# input in Lsun, output in SFR/yr
-		sfr_uvir.append(threed_dutils.sfr_uvir(lir,luv))
-		sfr_mips.append(threed_dutils.sfr_uvir(lir_mips,luv))
-		sfr_mips_z2.append(threed_dutils.sfr_uvir(lir_mips_z2,luv))
+		sfr_uvir.append(prosp_dutils.sfr_uvir(lir,luv))
+		sfr_mips.append(prosp_dutils.sfr_uvir(lir_mips,luv))
+		sfr_mips_z2.append(prosp_dutils.sfr_uvir(lir_mips_z2,luv))
 		sfr_prosp.append(dat['bfit']['sfr_100'])
 
 		print sfr_uvir[-1]
@@ -1131,8 +1131,8 @@ def add_sfr_info(runname=None, outfolder=None):
 		ax[ii].errorbar(xplot, yplot[ii], fmt='o',alpha=0.6,linestyle=' ',color='0.4')
 		ax[ii].set_xlabel(xlabel)
 		ax[ii].set_ylabel(ylabel[ii])
-		ax[ii] = threed_dutils.equalize_axes(ax[ii], xplot, yplot[ii])
-		off,scat = threed_dutils.offset_and_scatter(xplot, yplot[ii], biweight=True)
+		ax[ii] = prosp_dutils.equalize_axes(ax[ii], xplot, yplot[ii])
+		off,scat = prosp_dutils.offset_and_scatter(xplot, yplot[ii], biweight=True)
 		ax[ii].text(0.99,0.05, 'biweight scatter='+"{:.3f}".format(scat) +' dex',
 				  transform = ax[ii].transAxes,horizontalalignment='right')
 		ax[ii].text(0.99,0.1, 'mean offset='+"{:.3f}".format(off)+ ' dex',
@@ -1174,7 +1174,7 @@ def add_prosp_mag_info(runname='brownseds_np'):
 
 	alldata = brown_io.load_alldata(runname=runname)
 
-	filebase, parm_basename, ancilname=threed_dutils.generate_basenames(runname)
+	filebase, parm_basename, ancilname=prosp_dutils.generate_basenames(runname)
 	for ii,dat in enumerate(alldata):
 		sample_results, powell_results, model, extra_output = brown_io.load_prospector_data(filebase[ii], hdf5=True)
 		magphys = read_magphys_output(objname=dat['objname'])

@@ -1,4 +1,4 @@
-import read_sextractor, read_data, random, os, threed_dutils
+import read_sextractor, read_data, random, os, prosp_dutils
 import numpy as np
 u.random.seed(25001)
 	
@@ -89,7 +89,7 @@ def build_sample_constrained(basename,outname=None,add_zp_err=False):
 	#### load test model, build sps  ####
 	model = model_setup.load_model(parmfile)
 	obs   = model_setup.load_obs(parmfile)
-	sps = threed_dutils.setup_sps()
+	sps = prosp_dutils.setup_sps()
 
 	#### basic parameters ####
 	ngals_per_model     = 70
@@ -257,7 +257,7 @@ def build_sample_test(basename,outname=None,add_zp_err=False):
 	#### load test model, build sps  ####
 	model = model_setup.load_model(parmfile)
 	obs   = model_setup.load_obs(parmfile)
-	sps = threed_dutils.setup_sps(custom_filter_key=model['run_params'].get('custom_filter_key',None))
+	sps = prosp_dutils.setup_sps(custom_filter_key=model['run_params'].get('custom_filter_key',None))
 
 	#### basic parameters ####
 	ngals_per_model     = 500

@@ -4,7 +4,7 @@ import numpy as np
 from prospect.io import read_results
 from prospect.models import model_setup
 from brown_io import load_prospector_data
-from threed_dutils import generate_basenames, chop_chain, asym_errors
+from prosp_dutils import generate_basenames, chop_chain, asym_errors
 from matplotlib.ticker import MaxNLocator
 import os
 

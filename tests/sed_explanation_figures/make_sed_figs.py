@@ -3,7 +3,7 @@ import matplotlib.gridspec as gridspec
 from matplotlib.ticker import MaxNLocator
 import matplotlib as mpl
 import numpy as np
-import threed_dutils
+import prosp_dutils
 from prospect.models import model_setup
 import copy, math
 from scipy.special import erf
@@ -247,8 +247,8 @@ def sfh_xplot(ax,par,par_idx,init=None):
 		if par_idx is not None:
 			theta[par_idx] = p
 
-		sfh_pars = threed_dutils.find_sfh_params(model,theta,obs,sps)
-		sfh = threed_dutils.return_full_sfh(t, sfh_pars)
+		sfh_pars = prosp_dutils.find_sfh_params(model,theta,obs,sps)
+		sfh = prosp_dutils.return_full_sfh(t, sfh_pars)
 
 		ax.plot(t[::-1],np.log10(sfh[::-1]),color=colors[ii],lw=lw,alpha=alpha)
 
@@ -285,13 +285,13 @@ def attn_xplot(ax,par,par_idx,label,short_ylim=False):
 	theta = copy.copy(model.initial_theta)
 	for ii,p in enumerate(par):
 		if par_idx == 6: # if dust2
-			diff_attn = threed_dutils.charlot_and_fall_extinction(lam,bc,p,didx_bc,didx_diff, kriek=True, nobc=True, nodiff=False)
+			diff_attn = prosp_dutils.charlot_and_fall_extinction(lam,bc,p,didx_bc,didx_diff, kriek=True, nobc=True, nodiff=False)
 			ax.plot(lam/1e4,-np.log(diff_attn),color=colors[ii],lw=lw,alpha=alpha,linestyle=linestyle)
 		elif par_idx == 9: # if dust1
-			bc_attn   = threed_dutils.charlot_and_fall_extinction(lam,p,diff,didx_bc,didx_diff, kriek=True, nobc=False, nodiff=True)
+			bc_attn   = prosp_dutils.charlot_and_fall_extinction(lam,p,diff,didx_bc,didx_diff, kriek=True, nobc=False, nodiff=True)
 			ax.plot(lam/1e4,-np.log(bc_attn),color=colors[ii],lw=lw,alpha=alpha,linestyle=linestyle)
 		elif par_idx == 8: # if dust_index
-			diff_attn = threed_dutils.charlot_and_fall_extinction(lam,bc,diff,didx_bc,p, kriek=True, nobc=True, nodiff=False)
+			diff_attn = prosp_dutils.charlot_and_fall_extinction(lam,bc,diff,didx_bc,p, kriek=True, nobc=True, nodiff=False)
 			ax.plot(lam/1e4,-np.log(diff_attn),color=colors[ii],lw=lw,alpha=alpha,linestyle=linestyle)
 
 	#### limits and labels
@@ -581,7 +581,7 @@ def plot_sed(ax,ax_res,par_idx,par=None,txtlabel=None,fmt="{:.2e}",init=None, li
 		spec,mags,_ = model.mean_model(theta, obs, sps=sps)
 		spec *= c/sps.wavelengths
 
-		spec = threed_dutils.smooth_spectrum(sps.wavelengths,spec,smooth)
+		spec = prosp_dutils.smooth_spectrum(sps.wavelengths,spec,smooth)
 
 		if ax is not None:
 			ax.plot(sps.wavelengths/1e4,np.log10(spec),color=colors[ii],lw=lw,alpha=alpha)

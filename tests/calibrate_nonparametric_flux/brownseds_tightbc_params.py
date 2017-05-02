@@ -49,7 +49,7 @@ def translate_filters(bfilters, full_list = False):
 
     # this is necessary for my code
     # to calculate effective wavelength
-    # in threed_dutils
+    # in prosp_dutils
     translate = {
     'FUV': 'GALEX FUV',
     'UVW2': 'UVOT w2',
