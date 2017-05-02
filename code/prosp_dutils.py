@@ -211,6 +211,23 @@ def find_sfh_params(model,theta,obs,sps,sm=None):
 
     return out
 
+def transform_chain(flatchain, parnames, model):
+
+    ### turn fractional_dust1 into dust1
+    if 'fractional_dust1' in parnames:
+        d1idx, d2idx = model.theta_index['fractional_dust1'], model.theta_index['dust2']
+        flatchain[:,d1idx] = model.to_dust1(dust1_fraction=flatchain[:,d1dx], dust2=flatchain[:,d2idx]) 
+        parnames[didx] = 'dust1'
+
+    ### turn z_fraction into sfr_fraction
+    if 'z_fraction' in parnames:
+        zidx = model.theta_index['z_fraction']
+        for i in flatchain.shape[0]:
+            flatchain[i,zidx] = model.transform_zfraction_to_sfrfraction(
+                                z_fraction=flatchain[i,zidx],sfr_fraction=np.empty(zidx.shape[0])) 
+
+    return flatchain, parnames
+
 def test_likelihood(sps,model,obs,thetas,param_file):
 
     '''

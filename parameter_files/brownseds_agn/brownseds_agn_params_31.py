@@ -538,33 +538,6 @@ for param in model_params:
     if param['name'] not in fit_order:
         tparams.append(param)
 model_params = tparams
-
-###### REDEFINE MODEL FOR MY OWN NEFARIOUS PURPOSES ######
-class BurstyModel(sedmodel.SedModel):
-
-    def prior_product(self, theta):
-        """
-        Return a scalar which is the ln of the product of the prior
-        probabilities for each element of theta.  Requires that the
-        prior functions are defined in the theta descriptor.
-
-        :param theta:
-            Iterable containing the free model parameter values.
-
-        :returns lnp_prior:
-            The log of the product of the prior probabilities for
-            these parameter values.
-        """  
-        lnp_prior = 0
-
-        for k, v in self.theta_index.iteritems():
-            this_prior = np.sum(self._config_dict[k]['prior_function']
-                                (theta[v], **self._config_dict[k]['prior_args']))
-
-            if (not np.isfinite(this_prior)):
-                print('WARNING: ' + k + ' is out of bounds')
-            lnp_prior += this_prior
-        return lnp_prior
         
 class FracSFH(FastStepBasis):
     
@@ -742,9 +715,9 @@ def load_model(objname='',datname='', agelims=[], **extras):
     model_params[n.index('lumdist')]['init'] = lumdist
     
     #### CREATE MODEL
-    model = BurstyModel(model_params)
+    model = sedmodel.SedModel(model_params)
 
     return model
 
-model_type = BurstyModel
+model_type = sedmodel.SedModel
 

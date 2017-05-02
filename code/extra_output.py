@@ -276,8 +276,6 @@ def calc_extra_quantities(sample_results, ncalc=3000, **kwargs):
     q_16, q_50, q_84 = (np.zeros(ntheta)+np.nan for i in range(3))
     for kk in xrange(ntheta): q_16[kk], q_50[kk], q_84[kk] = np.percentile(sample_results['flatchain'][sample_idx][:,kk], [16.0, 50.0, 84.0])
     
-    
-
     #### QUANTILE OUTPUTS #
     quantiles = {'sample_chain': sample_results['flatchain'][sample_idx],
                  'parnames': parnames,
