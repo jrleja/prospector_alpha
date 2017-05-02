@@ -5,8 +5,7 @@ from prospect.sources import FastStepBasis
 from sedpy import observate
 from astropy.cosmology import WMAP9
 from astropy.io import fits
-tophat = priors.tophat
-logarithmic = priors.logarithmic
+import operator
 
 lsun = 3.846e33
 pc = 3.085677581467192e18  # in cm
@@ -29,7 +28,7 @@ run_params = {'verbose':True,
               # MCMC params
               'nwalkers':620,
               'nburn':[150,200,200], 
-              'niter': 6500,
+              'niter': 7500,
               'interval': 0.2,
               # Convergence parameters
               'convergence_check_interval': 50,
@@ -250,23 +249,31 @@ def load_obs(photname='', extinctname='', herschname='', objname='', **extras):
     extinct.close()
     herschel.close()
     return obs
+
 ######################
 # GENERATING FUNCTIONS
 ######################
 def transform_logmass_to_mass(mass=None, logmass=None, **extras):
-
     return 10**logmass
 
 def load_gp(**extras):
     return None, None
 
-def add_dust1(dust2=None, **extras):
-
-    return 0.86*dust2
-
 def tie_gas_logz(logzsol=None, **extras):
-
     return logzsol
+
+def to_dust1(dust1_fraction=None, dust1=None, dust2=None, **extras):
+    return dust1_fraction*dust2
+
+def transform_zfraction_to_sfrfraction(sfr_fraction=None, z_fraction=None, **extras):
+
+    def prod(factors):
+        return reduce(operator.mul, factors, 1)
+
+    sfr_fraction[0] = 1-z_fraction[0]
+    for i in xrange(1,sfr_fraction.shape[0]): sfr_fraction[i] =  prod(z_fraction[:i])*(1-z_fraction[i])
+    #sfr_fraction[-1] = prod(z)  #### THIS IS SET IMPLICITLY
+    return sfr_fraction
 
 #############
 # MODEL_PARAMS
@@ -279,8 +286,7 @@ model_params.append({'name': 'zred', 'N': 1,
                         'isfree': False,
                         'init': 0.0,
                         'units': '',
-                        'prior_function': tophat,
-                        'prior_args': {'mini':0.0, 'maxi':4.0}})
+                        'prior': priors.TopHat(mini=0.0, maxi=4.0)})
 
 model_params.append({'name': 'lumdist', 'N': 1,
                         'isfree': False,
@@ -316,8 +322,7 @@ model_params.append({'name': 'logzsol', 'N': 1,
                         'init_disp': 0.25,
                         'disp_floor': 0.2,
                         'units': r'$\log (Z/Z_\odot)$',
-                        'prior_function': tophat,
-                        'prior_args': {'mini':-1.98, 'maxi':0.19}})
+                        'prior': priors.TopHat(mini=-1.98, maxi=0.19)})
                         
 ###### SFH   ########
 model_params.append({'name': 'sfh', 'N':1,
@@ -329,30 +334,33 @@ model_params.append({'name': 'logmass', 'N': 1,
                         'isfree': True,
                         'init': 10.0,
                         'units': 'Msun',
-                        'prior_function': priors.tophat,
-                        'prior_args':{'mini':1.0, 'maxi':14.0}})
+                        'prior': priors.TopHat(mini=5.0, maxi=13.0)})
 
 model_params.append({'name': 'mass', 'N': 1,
                         'isfree': False,
                         'init': 1e10,
                         'depends_on': transform_logmass_to_mass,
                         'units': 'Msun',
-                        'prior_function': priors.tophat,
-                        'prior_args':{'mini':1e1, 'maxi':1e14}})
+                        'prior': priors.TopHat(mini=1e5, maxi=1e13)})
 
 model_params.append({'name': 'agebins', 'N': 1,
                         'isfree': False,
                         'init': [],
                         'units': 'log(yr)',
-                        'prior_function': priors.tophat,
-                        'prior_args':{'mini':0.1, 'maxi':15.0}})
+                        'prior': None})
 
 model_params.append({'name': 'sfr_fraction', 'N': 1,
+                        'isfree': False,
+                        'init': [],
+                        'depends_on': transform_zfraction_to_sfrfraction,
+                        'units': '',
+                        'prior': priors.TopHat(mini=0.0, maxi=1.0)})
+
+model_params.append({'name': 'z_fraction', 'N': 1,
                         'isfree': True,
                         'init': [],
-                        'units': 'Msun',
-                        'prior_function': priors.tophat,
-                        'prior_args':{'mini':0.0, 'maxi':1.0}})
+                        'units': '',
+                        'prior': priors.Beta(alpha=1.0, beta=1.0)})
 
 ########    IMF  ##############
 model_params.append({'name': 'imf_type', 'N': 1,
@@ -371,13 +379,19 @@ model_params.append({'name': 'dust_type', 'N': 1,
                         'prior_args': None})
                         
 model_params.append({'name': 'dust1', 'N': 1,
+                        'isfree': False,
+                        'depends_on': to_dust1,
+                        'init': 1.0,
+                        'units': '',
+                        'prior': priors.TopHat(mini=0.0, maxi=6.0)})
+
+model_params.append({'name': 'dust1_fraction', 'N': 1,
                         'isfree': True,
                         'init': 1.0,
                         'init_disp': 0.8,
                         'disp_floor': 0.5,
                         'units': '',
-                        'prior_function': tophat,
-                        'prior_args': {'mini':0.0, 'maxi':4.0}})
+                        'prior': priors.TopHat(mini=0.0, maxi=2.0)})
 
 model_params.append({'name': 'dust2', 'N': 1,
                         'isfree': True,
@@ -385,8 +399,7 @@ model_params.append({'name': 'dust2', 'N': 1,
                         'init_disp': 0.25,
                         'disp_floor': 0.15,
                         'units': '',
-                        'prior_function': tophat,
-                        'prior_args': {'mini':0.0,'maxi':4.0}})
+                        'prior': priors.TopHat(mini=0.0, maxi=3.0)})
 
 model_params.append({'name': 'dust_index', 'N': 1,
                         'isfree': True,
@@ -394,15 +407,13 @@ model_params.append({'name': 'dust_index', 'N': 1,
                         'init_disp': 0.25,
                         'disp_floor': 0.15,
                         'units': '',
-                        'prior_function': tophat,
-                        'prior_args': {'mini':-2.2, 'maxi': 0.4}})
+                        'prior': priors.TopHat(mini=-2.2, maxi=0.4)})
 
 model_params.append({'name': 'dust1_index', 'N': 1,
                         'isfree': False,
                         'init': -1.0,
                         'units': '',
-                        'prior_function': tophat,
-                        'prior_args': {'mini':-1.5, 'maxi':-0.5}})
+                        'prior': priors.TopHat(mini=-1.5, maxi=-0.5)})
 
 model_params.append({'name': 'dust_tesc', 'N': 1,
                         'isfree': False,
@@ -425,8 +436,7 @@ model_params.append({'name': 'duste_gamma', 'N': 1,
                         'init_disp': 0.2,
                         'disp_floor': 0.15,
                         'units': None,
-                        'prior_function': tophat,
-                        'prior_args': {'mini':0.0, 'maxi':1.0}})
+                        'prior': priors.TopHat(mini=0.0, maxi=1.0)})
 
 model_params.append({'name': 'duste_umin', 'N': 1,
                         'isfree': True,
@@ -434,8 +444,7 @@ model_params.append({'name': 'duste_umin', 'N': 1,
                         'init_disp': 5.0,
                         'disp_floor': 4.5,
                         'units': None,
-                        'prior_function': tophat,
-                        'prior_args': {'mini':0.1, 'maxi':25.0}})
+                        'prior': priors.TopHat(mini=0.1, maxi=25.0)})
 
 model_params.append({'name': 'duste_qpah', 'N': 1,
                         'isfree': True,
@@ -443,8 +452,7 @@ model_params.append({'name': 'duste_qpah', 'N': 1,
                         'init_disp': 3.0,
                         'disp_floor': 3.0,
                         'units': 'percent',
-                        'prior_function': tophat,
-                        'prior_args': {'mini':0.0, 'maxi':10.0}})
+                        'prior': priors.TopHat(mini=0.0, maxi=10.0)})
 
 ###### Nebular Emission ###########
 model_params.append({'name': 'add_neb_emission', 'N': 1,
@@ -472,15 +480,13 @@ model_params.append({'name': 'gas_logz', 'N': 1,
                         'init': 0.0,
                         'depends_on': tie_gas_logz,
                         'units': r'log Z/Z_\odot',
-                        'prior_function': tophat,
-                        'prior_args': {'mini':-2.0, 'maxi':0.5}})
+                        'prior': priors.TopHat(mini=-2.0, maxi=0.5)})
 
 model_params.append({'name': 'gas_logu', 'N': 1,
                         'isfree': False,
                         'init': -2.0,
                         'units': '',
-                        'prior_function': tophat,
-                        'prior_args': {'mini':-4, 'maxi':-1}})
+                        'prior': priors.TopHat(mini=-4.0, maxi=-1.0)})
 
 ##### AGN dust ##############
 model_params.append({'name': 'add_agn_dust', 'N': 1,
@@ -492,21 +498,19 @@ model_params.append({'name': 'add_agn_dust', 'N': 1,
 
 model_params.append({'name': 'fagn', 'N': 1,
                         'isfree': True,
-                        'init': 0.1,
-                        'init_disp': 0.2,
-                        'disp_floor': 0.1,
+                        'init': 0.05,
+                        'init_disp': 0.05,
+                        'disp_floor': 0.01,
                         'units': '',
-                        'prior_function': tophat,
-                        'prior_args': {'mini':0.0, 'maxi':5.0}})
+                        'prior': priors.LogUniform(mini=1e-5, maxi=3.0)})
 
 model_params.append({'name': 'agn_tau', 'N': 1,
                         'isfree': True,
                         'init': 4.0,
-                        'init_disp': 5,
+                        'init_disp': 10,
                         'disp_floor': 2,
                         'units': '',
-                        'prior_function': tophat,
-                        'prior_args': {'mini':0.0, 'maxi':40.0}})
+                        'prior': priors.LogUniform(mini=5.0, maxi=150.0)})
 
 ####### Calibration ##########
 model_params.append({'name': 'phot_jitter', 'N': 1,
@@ -514,8 +518,7 @@ model_params.append({'name': 'phot_jitter', 'N': 1,
                         'init': 0.0,
                         'init_disp': 0.5,
                         'units': 'fractional maggies (mags/1.086)',
-                        'prior_function':tophat,
-                        'prior_args': {'mini':0.0, 'maxi':0.5}})
+                        'prior': priors.TopHat(mini=0.0, maxi=0.5)})
 
 ####### Units ##########
 model_params.append({'name': 'peraa', 'N': 1,
@@ -529,7 +532,7 @@ model_params.append({'name': 'mass_units', 'N': 1,
 #### resort list of parameters 
 #### so that major ones are fit first
 parnames = [m['name'] for m in model_params]
-fit_order = ['logmass','sfr_fraction', 'dust2', 'logzsol', 'dust_index', 'dust1', 'duste_qpah', 'duste_gamma', 'duste_umin']
+fit_order = ['logmass','z_fraction', 'dust2', 'logzsol', 'dust_index', 'dust1_fraction', 'duste_qpah', 'duste_gamma', 'duste_umin']
 tparams = [model_params[parnames.index(i)] for i in fit_order]
 for param in model_params: 
     if param['name'] not in fit_order:
@@ -553,20 +556,6 @@ class BurstyModel(sedmodel.SedModel):
             these parameter values.
         """  
         lnp_prior = 0
-
-        # dust1/dust2 ratio
-        if 'dust1' in self.theta_index:
-            if 'dust2' in self.theta_index:
-                dust1 = theta[self.theta_index['dust1']]
-                dust2 = theta[self.theta_index['dust2']]
-                if dust1/2. > dust2:
-                    return -np.inf
-
-        # sum of SFH fractional bins <= 1.0
-        if 'sfr_fraction' in self.theta_index:
-            sfr_fraction = theta[self.theta_index['sfr_fraction']]
-            if np.sum(sfr_fraction) > 1.0:
-                return -np.inf
 
         for k, v in self.theta_index.iteritems():
             this_prior = np.sum(self._config_dict[k]['prior_function']
@@ -737,12 +726,14 @@ def load_model(objname='',datname='', agelims=[], **extras):
 
     #### FRACTIONAL MASS INITIALIZATION
     # N-1 bins, last is set by x = 1 - np.sum(sfr_fraction)
+    model_params[n.index('z_fraction')]['N'] = ncomp-1
+    tilde_alpha = np.array([ncomp-i for i in xrange(1,ncomp)])
+    model_params[n.index('z_fraction')]['prior'] = priors.Beta(alpha=tilde_alpha, beta=np.ones_like(tilde_alpha))
+    model_params[n.index('z_fraction')]['init'] =  model_params[n.index('z_fraction')]['prior'].sample()
+    model_params[n.index('z_fraction')]['init_disp'] = 0.02
+
     model_params[n.index('sfr_fraction')]['N'] = ncomp-1
-    model_params[n.index('sfr_fraction')]['prior_args'] = {
-                                                           'maxi':np.full(ncomp-1,1.0), 
-                                                           'mini':np.full(ncomp-1,0.0),
-                                                           # NOTE: ncomp instead of ncomp-1 makes the prior take into account the implicit Nth variable too
-                                                          }
+    model_params[n.index('sfr_fraction')]['prior'] = priors.TopHat(maxi=np.full(ncomp-1,1.0), mini=np.full(ncomp-1,0.0))
     model_params[n.index('sfr_fraction')]['init'] =  np.zeros(ncomp-1)+1./ncomp
     model_params[n.index('sfr_fraction')]['init_disp'] = 0.02
 

@@ -5,6 +5,7 @@ from prospect.sources import FastStepBasis
 from sedpy import observate
 from astropy.cosmology import WMAP9
 from astropy.io import fits
+import operator
 
 lsun = 3.846e33
 pc = 3.085677581467192e18  # in cm
@@ -242,6 +243,7 @@ def load_obs(photname='', extinctname='', herschname='', objname='', **extras):
     extinct.close()
     herschel.close()
     return obs
+
 ######################
 # GENERATING FUNCTIONS
 ######################
@@ -254,12 +256,11 @@ def load_gp(**extras):
 def tie_gas_logz(logzsol=None, **extras):
     return logzsol
 
-def to_dust1(dust1_fraction=None, dust2=None, **extras):
+def to_dust1(dust1_fraction=None, dust1=None, dust2=None, **extras):
     return dust1_fraction*dust2
 
 def transform_zfraction_to_sfrfraction(sfr_fraction=None, z_fraction=None, **extras):
 
-    import operator
     def prod(factors):
         return reduce(operator.mul, factors, 1)
 
@@ -337,7 +338,7 @@ model_params.append({'name': 'agebins', 'N': 1,
                         'isfree': False,
                         'init': [],
                         'units': 'log(yr)',
-                        'prior': priors.TopHat(mini=0.1, maxi=15.0)})
+                        'prior': None})
 
 model_params.append({'name': 'sfr_fraction', 'N': 1,
                         'isfree': False,
@@ -371,8 +372,6 @@ model_params.append({'name': 'dust1', 'N': 1,
                         'isfree': False,
                         'init': 1.0,
                         'depends_on': to_dust1,
-                        'init_disp': 0.8,
-                        'disp_floor': 0.5,
                         'units': '',
                         'prior': priors.TopHat(mini=0.0, maxi=6.0)})
 
@@ -495,7 +494,7 @@ model_params.append({'name': 'agn_tau', 'N': 1,
                         'init_disp': 5,
                         'disp_floor': 2,
                         'units': '',
-                        'prior': priors.TopHat(mini=0.0, maxi=40.0)})
+                        'prior': priors.LogUniform(mini=5.0, maxi=150.0)})
 
 ####### Calibration ##########
 model_params.append({'name': 'phot_jitter', 'N': 1,
