@@ -1,5 +1,5 @@
 import numpy as np
-from threedhst_diag import add_sfh_plot
+from prosp_diagnostic_plots import add_sfh_plot
 import os
 import matplotlib.pyplot as plt
 import magphys_plot_pref
@@ -296,8 +296,8 @@ def plot_rms(pdata,outfolder,agn_idx=None,**popts):
 		ax3[ii].plot(lims3[ii],lims3[ii],'--',color='0.5',alpha=0.5,zorder=-15)
 
 		good = ((np.isfinite(q50o)) & (np.isfinite(q50m)) & (np.isfinite(q50o_no)) & (np.isfinite(q50m_no)))[agn_idx]
-		off_agn,scat_agn = threed_dutils.offset_and_scatter(q50o[agn_idx][good],q50m[agn_idx][good],biweight=False)
-		off_noagn,scat_noagn = threed_dutils.offset_and_scatter(q50o_no[agn_idx][good],q50m_no[agn_idx][good],biweight=False)
+		off_agn,scat_agn = threed_dutils.offset_and_scatter(q50o[agn_idx][good],q50m[agn_idx][good],mad=True)
+		off_noagn,scat_noagn = threed_dutils.offset_and_scatter(q50o_no[agn_idx][good],q50m_no[agn_idx][good],mad=True)
 		topts = {'transform':ax3[ii].transAxes,'fontsize':13,'verticalalignment':'top'}
 		ax3[ii].text(0.04,0.95,'AGN-off', color=popts['noagn_color'],weight='bold', **topts)
 		ax3[ii].text(0.04,0.9,'scatter, offset=', color=popts['noagn_color'], **topts)

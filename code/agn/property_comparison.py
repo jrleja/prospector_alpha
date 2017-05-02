@@ -1,5 +1,5 @@
 import numpy as np
-from threedhst_diag import add_sfh_plot
+from prosp_diagnostic_plots import add_sfh_plot
 import os
 import matplotlib.pyplot as plt
 import magphys_plot_pref

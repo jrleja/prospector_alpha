@@ -10,7 +10,6 @@ import pickle
 import corner
 from matplotlib.ticker import MaxNLocator
 import brown_quality_cuts, brown_io
-from np_mocks_analysis import gaussian
 
 #### set up colors and plot style
 prosp_color = '#e60000'

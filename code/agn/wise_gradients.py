@@ -80,7 +80,6 @@ def collate_data(alldata,alldata_noagn):
 		xflux = xray['flux'][idx][0]
 		xflux_err = xray['flux_err'][idx][0]
 
-
 		#### convert lumdist to redshift for distance calculations
 		# only in alldata_noagn for now...
 		lumdist = alldata_noagn[i]['residuals']['phot']['lumdist']

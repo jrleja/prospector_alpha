@@ -6,7 +6,7 @@ from copy import copy
 from astropy import constants
 
 try:
-    import threedhst_diag
+    import prosp_diagnostic_plots
 except IOError:
     pass
 
@@ -257,7 +257,7 @@ def calc_extra_quantities(sample_results, ncalc=3000, **kwargs):
                 modelout = threed_dutils.measure_restframe_properties(sps, thetas=nagn_thetas,
                                             model=sample_results['model'], obs=sample_results['obs'],
                                             measure_mir=True)
-                fmir[jj] = 1. - (lmir[jj]-modelout['lmir'])/lmir[jj]
+                fmir[jj] = (lmir[jj]-modelout['lmir'])/lmir[jj]
 
         #### no dust
         if opts['mags_nodust']:
@@ -276,6 +276,16 @@ def calc_extra_quantities(sample_results, ncalc=3000, **kwargs):
     q_16, q_50, q_84 = (np.zeros(ntheta)+np.nan for i in range(3))
     for kk in xrange(ntheta): q_16[kk], q_50[kk], q_84[kk] = np.percentile(sample_results['flatchain'][sample_idx][:,kk], [16.0, 50.0, 84.0])
     
+    
+
+    #### QUANTILE OUTPUTS #
+    quantiles = {'sample_chain': sample_results['flatchain'][sample_idx],
+                 'parnames': parnames,
+                 'q16':q_16,
+                 'q50':q_50,
+                 'q84':q_84}
+    extra_output['quantiles'] = quantiles
+
     ##### CALCULATE Q16,Q50,Q84 FOR EXTRA PARAMETERS
     extra_output = {}
     extra_flatchain = np.dstack((half_time, sfr_10, sfr_100, ssfr_10, ssfr_100, stellar_mass, emp_ha, bdec_calc, ext_5500, xray_lum,lbol))[0]
@@ -302,14 +312,6 @@ def calc_extra_quantities(sample_results, ncalc=3000, **kwargs):
                    'mags': mags,
                    'lam_obs': wavelengths}
     extra_output['observables'] = observables
-
-    #### QUANTILE OUTPUTS #
-    quantiles = {'sample_chain': sample_results['flatchain'][sample_idx],
-                 'parnames': parnames,
-                 'q16':q_16,
-                 'q50':q_50,
-                 'q84':q_84}
-    extra_output['quantiles'] = quantiles
 
     #### BEST-FITS
     bfit      = {'maxprob_params':maxthetas,
@@ -435,7 +437,7 @@ def post_processing(param_name, **kwargs):
 
     ### MAKE PLOTS HERE
     try:
-        threedhst_diag.make_all_plots(sample_results=sample_results,extra_output=extra_output,
+        prosp_diagnostic_plots.make_all_plots(sample_results=sample_results,extra_output=extra_output,
                                       filebase=outname,outfolder=outfolder,param_name=param_name+'.py')
     except NameError:
         print "Unable to make plots for "+sample_results['run_params']['objname']+" due to import error. Passing."

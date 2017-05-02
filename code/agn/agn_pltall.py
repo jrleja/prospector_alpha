@@ -28,10 +28,10 @@ def plot(runname='brownseds_agn',runname_noagn='brownseds_np',
 			lidx = dat['pextras']['parnames'] == 'l_agn'
 
 			### FAGN ---> FMIR
-			dat['pquantiles']['q50'][fidx] = dat['pextras']['q50'][midx].squeeze()
-			dat['pquantiles']['q84'][fidx] = dat['pextras']['q84'][midx].squeeze()
-			dat['pquantiles']['q16'][fidx] = dat['pextras']['q16'][midx].squeeze()
-			dat['pquantiles']['sample_chain'][:,fidx] = dat['pextras']['flatchain'][:,midx]
+			dat['pquantiles']['q50'][fidx] = 1-dat['pextras']['q50'][midx].squeeze()
+			dat['pquantiles']['q84'][fidx] = 1-dat['pextras']['q84'][midx].squeeze()
+			dat['pquantiles']['q16'][fidx] = 1-dat['pextras']['q16'][midx].squeeze()
+			dat['pquantiles']['sample_chain'][:,fidx] = 1-dat['pextras']['flatchain'][:,midx]
 
 			'''
 			### FMIR ---> L_MIR
@@ -80,6 +80,8 @@ def plot(runname='brownseds_agn',runname_noagn='brownseds_np',
 	print 'PLOTTING WISE GRADIENTS'
 	wise_gradients.plot_all(runname=runname,runname_noagn=runname_noagn,alldata=alldata_sub,
 	         			    alldata_noagn=alldata_noagn,agn_idx=agn_idx,regenerate=False,outfolder=outfolder, **popts)
+	print 'PLOTTING DELTA OBSERVABLES'
+	plot_spec_rms.plot_comparison(runname=runname,alldata=alldata_sub,alldata_noagn=alldata_noagn,outfolder=outfolder,idx=agn_idx,**popts)
 	print 1/0
 
 	print 'PLOTTING PROPERTY COMPARISON'
@@ -96,8 +98,6 @@ def plot(runname='brownseds_agn',runname_noagn='brownseds_np',
 	#optical_color_color.plot(runname=runname,alldata=alldata_sub,outfolder=outfolder)
 	print 'PLOTTING XRAY LUMINOSITY'
 	xray_luminosity.make_plot(runname=runname,alldata=alldata_sub,outfolder=outfolder,idx=agn_idx,**popts)
-	print 'PLOTTING DELTA OBSERVABLES'
-	plot_spec_rms.plot_comparison(runname=runname,alldata=alldata_sub,alldata_noagn=alldata_noagn,outfolder=outfolder,idx=agn_idx,**popts)
 	### check out what you've made
 	if open_all:
 		os.system('open '+outfolder+'*.png')

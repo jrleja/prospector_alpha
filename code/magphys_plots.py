@@ -720,7 +720,7 @@ def sed_comp_figure(sample_results, extra_output, sps, model, magphys,
 	phot.axhline(0, linestyle=':', color='grey')
 	
 	##### add SFH plot
-	from threedhst_diag import add_sfh_plot
+	from prosp_diagnostic_plots import add_sfh_plot
 	ax_loc = [0.38,0.68,0.13,0.13]
 	ax_inset = fig.add_axes(ax_loc,zorder=32)
 	text_size = 1.5

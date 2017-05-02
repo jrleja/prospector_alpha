@@ -12,7 +12,7 @@ majorFormatter = magphys_plot_pref.jLogFormatter(base=10, labelOnlyBase=True)
 
 '''
 final to-dos:
-	-- update chain plot in threedhst_diag. also plot KL divergence there.
+	-- update chain plot in prosp_diagnostic_plots. also plot KL divergence there.
 	-- create implementation for prospector
 	-- run test for brown sample, make sure it works (inspect chain plots), then push to master
 	-- these parameters imply how long of the chain before the end is useful for calculations (n_stable_checks_before_stop, etc)
