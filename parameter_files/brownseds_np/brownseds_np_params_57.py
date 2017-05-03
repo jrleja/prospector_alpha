@@ -677,7 +677,7 @@ def load_model(objname='',datname='', agelims=[], **extras):
     # N-1 bins, last is set by x = 1 - np.sum(sfr_fraction)
     model_params[n.index('z_fraction')]['N'] = ncomp-1
     tilde_alpha = np.array([ncomp-i for i in xrange(1,ncomp)])
-    model_params[n.index('z_fraction')]['prior'] = priors.Beta(alpha=tilde_alpha, beta=np.ones_like(tilde_alpha))
+    model_params[n.index('z_fraction')]['prior'] = priors.Beta(alpha=tilde_alpha, beta=np.ones_like(tilde_alpha),,mini=0.0,maxi=1.0)
     model_params[n.index('z_fraction')]['init'] =  model_params[n.index('z_fraction')]['prior'].sample()
     model_params[n.index('z_fraction')]['init_disp'] = 0.02
 
