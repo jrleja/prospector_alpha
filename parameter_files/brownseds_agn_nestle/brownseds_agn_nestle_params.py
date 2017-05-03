@@ -351,7 +351,7 @@ model_params.append({'name': 'z_fraction', 'N': 1,
                         'isfree': True,
                         'init': [],
                         'units': '',
-                        'prior': priors.Beta(alpha=1.0, beta=1.0)})
+                        'prior': priors.Beta(alpha=1.0, beta=1.0,mini=0.0,maxi=1.0)})
 
 ########    IMF  ##############
 model_params.append({'name': 'imf_type', 'N': 1,
