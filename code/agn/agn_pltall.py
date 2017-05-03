@@ -33,19 +33,6 @@ def plot(runname='brownseds_agn',runname_noagn='brownseds_np',
 			dat['pquantiles']['q16'][fidx] = 1-dat['pextras']['q16'][midx].squeeze()
 			dat['pquantiles']['sample_chain'][:,fidx] = 1-dat['pextras']['flatchain'][:,midx]
 
-			'''
-			### FMIR ---> L_MIR
-			fmir50 = alldata[i]['pquantiles']['q50'][fidx].squeeze() / dat['pquantiles']['q50'][fidx].squeeze()
-			fmir84 = alldata[i]['pquantiles']['q84'][fidx].squeeze() / dat['pquantiles']['q84'][fidx].squeeze()
-			fmir16 = alldata[i]['pquantiles']['q16'][fidx].squeeze() / dat['pquantiles']['q16'][fidx].squeeze()
-			fmir_chain = alldata[i]['pquantiles']['sample_chain'][:,fidx] / dat['pquantiles']['sample_chain'][:,fidx]
-
-			dat['pextras']['q50'][midx] = dat['pextras']['q50'][lidx].squeeze() / (fmir50*constants.L_sun.cgs.value)
-			dat['pextras']['q84'][midx] = dat['pextras']['q84'][lidx].squeeze() / (fmir84*constants.L_sun.cgs.value)
-			dat['pextras']['q16'][midx] = dat['pextras']['q16'][lidx].squeeze() / (fmir16*constants.L_sun.cgs.value)
-			dat['pextras']['flatchain'][:,midx] = dat['pextras']['flatchain'][:,lidx] / (fmir_chain*constants.L_sun.cgs.value)
-			'''
-
 	else:
 		alldata_sub = deepcopy(alldata)
 
@@ -80,13 +67,13 @@ def plot(runname='brownseds_agn',runname_noagn='brownseds_np',
 	print 'PLOTTING WISE GRADIENTS'
 	wise_gradients.plot_all(runname=runname,runname_noagn=runname_noagn,alldata=alldata_sub,
 	         			    alldata_noagn=alldata_noagn,agn_idx=agn_idx,regenerate=False,outfolder=outfolder, **popts)
-	print 'PLOTTING DELTA OBSERVABLES'
-	plot_spec_rms.plot_comparison(runname=runname,alldata=alldata_sub,alldata_noagn=alldata_noagn,outfolder=outfolder,idx=agn_idx,**popts)
-	print 1/0
 
 	print 'PLOTTING PROPERTY COMPARISON'
 	property_comparison.plot_comparison(idx_plot=agn_idx,runname=runname,runname_noagn=runname_noagn,
 		 								alldata=alldata_sub,alldata_noagn=alldata_noagn,outfolder=outfolder,**popts)
+	print 1/0
+	print 'PLOTTING DELTA OBSERVABLES'
+	plot_spec_rms.plot_comparison(runname=runname,alldata=alldata_sub,alldata_noagn=alldata_noagn,outfolder=outfolder,idx=agn_idx,**popts)
 	print 'PLOTTING DELTA PARS'
 	plot_delta_pars.plot(runname=runname,runname_noagn=runname_noagn,alldata=alldata_sub,alldata_noagn=alldata_noagn,outfolder=outfolder,idx=agn_idx,**popts)
 	print 'PLOTTING BPT DIAGRAM'

@@ -225,9 +225,9 @@ def plot_residuals(pdata,idx_plot,outfolder,avg=True,**popts):
 
 	xlim_phot = [0.2,30]
 	ylim_phot = [-0.4,0.4]
-	ylim_spec = [[-.4,.4],
-	             [-.4,.4],
-	             [-.4,.4]]
+	ylim_spec = [[-.5,.5],
+	             [-.5,.5],
+	             [-.5,.5]]
 	xlim_spec = [[0.35,0.7],
 	             [5,34],
 	             [2.4,4.84]]             
@@ -247,11 +247,13 @@ def plot_residuals(pdata,idx_plot,outfolder,avg=True,**popts):
 				specy_noagn[i] += pdata['no_agn']['residuals'][key]['resid'][idx].tolist()
 				specy_agn[i] += pdata['agn']['residuals'][key]['resid'][idx].tolist()
 
-	#### plot medians (AVERAGE?)
+	#### plot medians
 	photx_median, photy_median_noagn = median_by_band(np.array(photx),np.array(photy_noagn),avg=avg)
 	photx_median, photy_median_agn = median_by_band(np.array(photx),np.array(photy_agn),avg=avg)
-	ax[0].plot(photx_median, photy_median_agn,color=popts['agn_color'],**median_opts)
-	ax[0].plot(photx_median, photy_median_noagn,color=popts['noagn_color'],**median_opts)
+	ax[0].plot(photx_median, photy_median_agn,'o', ms=10, color=popts['agn_color'],linestyle='-' , lw=2,alpha=0.8)
+	ax[0].plot(photx_median, photy_median_noagn,'o', ms=10, color=popts['noagn_color'],linestyle='-' , lw=2, alpha=0.8)
+	ax[0].plot(np.array(photx),np.array(photy_noagn), 'o', color=popts['noagn_color'], alpha=0.25, ms=5, mew=0.0,zorder=-1)
+	ax[0].plot(np.array(photx),np.array(photy_agn), 'o', color=popts['agn_color'], alpha=0.25, ms=5, mew=0.0,zorder=-1)
 
 	for i, key in enumerate(pdata['agn']['residuals'].keys()):
 		# horrible hack to pick out wavelengths. this preserves ~native spacing, downsampled by 3
@@ -262,8 +264,17 @@ def plot_residuals(pdata,idx_plot,outfolder,avg=True,**popts):
 		x, y_agn = running_median(np.array(specx[i]),np.array(specy_agn[i]),bins=bins,avg=avg)
 		x, y_noagn = running_median(np.array(specx[i]),np.array(specy_noagn[i]),bins=bins,avg=avg)
 
+		nbins = len(bins)-1
+		yagn_up, yagn_down, ynoagn_up, ynoagn_down = [np.empty(nbins) for k in xrange(4)]
+		for k in xrange(nbins):
+			bidx = (np.array(specx[i]) > bins[k]) & (np.array(specx[i]) <= bins[k+1])
+			yagn_up[k], yagn_down[k] = np.nanpercentile(np.array(specy_agn[i])[bidx],[84,16])
+			ynoagn_up[k], ynoagn_down[k] = np.nanpercentile(np.array(specy_noagn[i])[bidx],[84,16])
+
 		ax[i+1].plot(x, y_agn, color=popts['agn_color'],**median_opts)
+		ax[i+1].fill_between(x, yagn_down, yagn_up, color=popts['agn_color'], alpha=0.2)
 		ax[i+1].plot(x, y_noagn, color=popts['noagn_color'],**median_opts)
+		ax[i+1].fill_between(x, ynoagn_down, ynoagn_up, color=popts['noagn_color'], alpha=0.2)
 
 	#### labels and scales
 	ymin, ymax = np.repeat(-0.3,4), np.repeat(0.3,4)
@@ -301,7 +312,6 @@ def plot_residuals(pdata,idx_plot,outfolder,avg=True,**popts):
 def sedfig(sedax,pdata,**popts):
 
 	#### choose galaxies
-	# third one is just a misidentification due to bad 3.3um oscillator strength?
 	to_plot = ['IRAS 08572+3915','NGC 0695','NGC 3690','NGC 7674']
 	# to_plot = ['IRAS 08572+3915','NGC 1068','NGC 3690','NGC 7674']
 	# to_plot = ['IRAS 08572+3915','IC 0691','UGC 05101','NGC 7674']

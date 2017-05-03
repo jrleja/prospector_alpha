@@ -58,7 +58,7 @@ majorFormatter = jLogFormatter(base=10, labelOnlyBase=True)
 def median_by_band(x,y,avg=False):
 
 	##### get filter effective wavelengths for sorting
-	delz = 0.06
+	delz = 0.15
 	from brownseds_np_params import translate_filters
 	from sedpy import observate
 	filtnames = np.array(translate_filters(0,full_list=True))
