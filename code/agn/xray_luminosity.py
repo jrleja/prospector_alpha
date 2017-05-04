@@ -45,7 +45,7 @@ def collate_data(alldata, **extras):
 
 	#### for each object
 	fagn, fagn_up, fagn_down, mass, lir_luv, lir_luv_up, lir_luv_down, xray_lum, xray_lum_err, database, observatory = [[] for i in range(11)]
-	fagn_obs, fagn_obs_up, fagn_obs_down, lmir_lbol, lmir_lbol_up, lmir_lbol_down = [[] for i in range(6)]
+	fagn_obs, fagn_obs_up, fagn_obs_down, lmir_lbol, lmir_lbol_up, lmir_lbol_down, xray_hardness, xray_hardness_err = [[] for i in range(8)]
 	lagn, lagn_up, lagn_down, lsfr, lsfr_up, lsfr_down = [], [], [], [], [], []
 	sfr, sfr_up, sfr_down, ssfr, ssfr_up, ssfr_down, d2, d2_up, d2_down = [[] for i in range(9)]
 	fmir, fmir_up, fmir_down = [], [], []
@@ -100,6 +100,8 @@ def collate_data(alldata, **extras):
 		dfactor = 4*np.pi*(dat['residuals']['phot']['lumdist']*1e6*pc2cm)**2
 		xray_lum.append(xflux * dfactor)
 		xray_lum_err.append(xflux_err * dfactor)
+		xray_hardness.append(xray['hardness'][idx][0])
+		xray_hardness_err.append(xray['hardness_err'][idx][0])
 
 		#### CALCULATE F_AGN_OBS
 		# take advantage of the already-computed conversion between FAGN (model) and LAGN (model)
@@ -180,6 +182,8 @@ def collate_data(alldata, **extras):
 	out['lsfr_down'] = lsfr_down
 	out['xray_luminosity'] = xray_lum
 	out['xray_luminosity_err'] = xray_lum_err
+	out['xray_hardness'] = xray_hardness
+	out['xray_hardness_err'] = xray_hardness_err
 
 	for key in out.keys(): out[key] = np.array(out[key])
 
@@ -229,6 +233,16 @@ def make_plot(runname='brownseds_agn',alldata=None,outfolder=None,maxradius=30,i
 	plt.savefig(outfolder+outname,dpi=dpi)
 	plt.close()
 
+	### PLOT VERSUS HARDNESS
+	outname = 'xray_hardness.png'
+	fig,ax = plot(pdata,color_by_observatory=cbo,color_by_database=cbd,color_by_wise=cbw,
+		          ypar='fagn',ylabel = r'f$_{\mathrm{MIR}}$',
+		          xpar='xray_hardness',xlabel = r'X-ray hardness',
+		          idx = idx, **popts)
+	plt.savefig(outfolder+outname,dpi=dpi)
+	plt.close()
+
+	print 1/0
 	'''
 	outname = 'xray_lum_sfrcorr_lagn.png'
 	fig,ax = plot(pdata,color_by_observatory=cbo,color_by_database=cbd,color_by_wise=cbw,
@@ -309,15 +323,15 @@ def plot(pdata,color_by_observatory=False,color_by_database=False,color_by_wise=
 	yplot = pdata[ypar]
 
 	if xpar == 'xray_luminosity':
-		xmin, xmax = 1e36,1e44
+		xmin, xmax = 5e35,2e44
 		#xplot = np.clip(pdata['xray_luminosity'],xmin,np.inf)
 		xerr_1d = pdata['xray_luminosity_err']
 	elif xpar == 'lsfr':
-		xmin, xmax = 1e36,1e45
-		xmin, xmax = 5e-3,1e3
+		xmin, xmax = 5e35,2e45
+		xmin, xmax = 2.5e-3,2e3
 		#xplot = np.clip(pdata[xpar],xmin,xmax)
 	else:
-		xmin, xmax = 5e-6,1e-1
+		xmin, xmax = -1.0,1.0
 		#xplot = np.clip(pdata[xpar],xmin,xmax)
 
 	#### plot photometry
@@ -325,69 +339,7 @@ def plot(pdata,color_by_observatory=False,color_by_database=False,color_by_wise=
 		fig, ax = plt.subplots(1,1, figsize=(9.5, 8))
 	else:
 		fig, ax = plt.subplots(1,1, figsize=(8, 8))
-	'''
-	if color_by_observatory:
-		observatories = np.unique(pdata['observatory'])
-		cmap = get_cmap(observatories.shape[0])
-		for i,obs in enumerate(observatories):
-			idx = pdata['observatory'] == obs
 
-			yerr =  prosp_dutils.asym_errors(pdata[ypar], 
-				                              pdata[ypar+'_up'],
-				                              pdata[ypar+'_down'])
-			if xpar == 'xray_luminosity':
-				xerr = xerr_1d
-			else:
-				xerr =  prosp_dutils.asym_errors(np.clip(pdata[xpar],xmin,xmax), 
-					                              np.clip(pdata[xpar+'_up'],xmin,xmax),
-					                              np.clip(pdata[xpar+'_down'],xmin,xmax))
-			ax.errorbar(xplot, yplot, yerr=yerr, xerr=xerr, label=obs, color=cmap(i),
-			            **plotopts)
-	elif color_by_database:
-		database = np.unique(pdata['database'])
-		cmap = get_cmap(database.shape[0])
-		for i,data in enumerate(database):
-			idx = pdata['database'] == data
-
-			yerr =  prosp_dutils.asym_errors(pdata[ypar], 
-				                              pdata[ypar+'_up'],
-				                              pdata[ypar+'_down'])
-
-			if xpar == 'xray_luminosity':
-				xerr = xerr_1d
-			else:
-				xerr =  prosp_dutils.asym_errors(np.clip(pdata[xpar],xmin,xmax), 
-					                              np.clip(pdata[xpar+'_up'],xmin,xmax),
-					                              np.clip(pdata[xpar+'_down'],xmin,xmax))
-
-			ax.errorbar(xplot, yplot, yerr=yerr, xerr=xerr, label=data,color=cmap(i),
-			            **plotopts)
-
-	elif color_by_wise:
-
-		yerr =  prosp_dutils.asym_errors(pdata[ypar], 
-			                              pdata[ypar+'_up'],
-			                              pdata[ypar+'_down'])
-
-		if xpar == 'xray_luminosity':
-			xerr = xerr_1d
-		else:
-			xerr =  prosp_dutils.asym_errors(np.clip(pdata[xpar],xmin,xmax), 
-				                              np.clip(pdata[xpar+'_up'],xmin,xmax),
-				                              np.clip(pdata[xpar+'_down'],xmin,xmax))
-
-		ax.errorbar(xplot, yplot, yerr=yerr, xerr=xerr,ms=0.0,zorder=-5,
-		            **plotopts)
-		pts = ax.scatter(xplot, yplot, marker='o', c=pdata['w1w2'], cmap=plt.cm.jet,s=70,zorder=10)
-
-		#### label and add colorbar
-		cb = fig.colorbar(pts, ax=ax, aspect=10)
-		cb.set_label('W1 - W2 [Vega]')
-		cb.solids.set_rasterized(True)
-		cb.solids.set_edgecolor("face")
-
-	else: 
-	'''
 	yerr =  prosp_dutils.asym_errors(pdata[ypar], 
 		                              pdata[ypar+'_up'],
 		                              pdata[ypar+'_down'])
@@ -395,9 +347,12 @@ def plot(pdata,color_by_observatory=False,color_by_database=False,color_by_wise=
 	if xpar == 'xray_luminosity':
 		xerr = xerr_1d
 	else:
-		xerr =  prosp_dutils.asym_errors(pdata[xpar],
-			                              pdata[xpar+'_up'],
-			                              pdata[xpar+'_down'])
+		try:
+			xerr =  prosp_dutils.asym_errors(pdata[xpar],
+				                              pdata[xpar+'_up'],
+				                              pdata[xpar+'_down'])
+		except KeyError:
+			xerr = None
 
 	cidx = np.ones_like(pdata[xpar],dtype=bool)
 	cidx[idx] = False
@@ -425,34 +380,30 @@ def plot(pdata,color_by_observatory=False,color_by_database=False,color_by_wise=
 			ax.text(0.98,0.10,r'L$_{\mathrm{X}}$ inconsistent',transform=ax.transAxes,color=red,ha='right')
 			ax.text(0.98,0.06,'with XRBs',transform=ax.transAxes,color=red,ha='right')
 	else:
-		ax.errorbar(xplot, yplot, yerr=yerr, xerr=xerr,ms=0.0,zorder=-2,
-		            **plotopts)
+		try:
+			ax.errorbar(xplot, yplot, yerr=yerr, xerr=xerr,ms=0.0,zorder=-2,
+			            **plotopts)
+		except:
+			pass
 		ax.scatter(xplot[cidx], yplot[cidx], marker=popts['nofmir_shape'], alpha=popts['nofmir_alpha'], color=blue,s=s,zorder=10,edgecolors='k')
 		ax.scatter(xplot[~cidx], yplot[~cidx], marker=popts['fmir_shape'], alpha=popts['fmir_alpha'], color=blue,s=s,zorder=10,edgecolors='k')
 
-
 	ax.set_ylabel(ylabel)
 	ax.set_xlabel(xlabel)
-	ax.set_xlim(xmin*0.5,xmax*2)
+	ax.set_xlim(xmin,xmax)
 	ax.set_ylim(1e-3,2e0)
 
-	if xpar == 'xray_luminosity':
+	if xpar != 'xray_hardness':
 		ax.set_xscale('log',nonposx='clip',subsx=([1]))
-		loc = 2
-	else:
-		ax.set_xscale('log',nonposx='clip',subsx=([1]))
-		loc = 4
-	try:
-		ax.set_yscale('log',nonposy='clip',subsy=([1]))
-	except ValueError:
-		print 1/0
+
+	ax.set_yscale('log',nonposy='clip',subsy=([1]))
 
 	if color_by_observatory or color_by_database:
 		if color_by_observatory:
 			title = 'Observatory'
 		else:
 			title = 'Database'
-		ax.legend(title=title,loc=loc,prop={'size':8},)
+		ax.legend(title=title,loc=loc,prop={'size':8})
 	ax.text(0.05,0.05, r'N$_{\mathrm{match}}$='+str((pdata['xray_luminosity'] > xmin).sum()), transform=ax.transAxes)
 
 	return fig, ax

@@ -222,7 +222,6 @@ def load_obs(photname='', extinctname='', herschname='', objname='', **extras):
     filters,fsps_filters = translate_filters(mag_fields)
     have_definition = np.array(filters) != 'nan'
 
-    filters = filters[have_definition]
     fsps_filters = fsps_filters[have_definition]
     flux = flux[have_definition]
     unc = unc[have_definition]
@@ -230,6 +229,8 @@ def load_obs(photname='', extinctname='', herschname='', objname='', **extras):
 
     # implement error floor
     unc = np.clip(unc, flux*0.05, np.inf)
+    w3_idx = fsps_filters == 'wise_w3'
+    unc[w3_idx] = np.clip(unc[w3_idx], flux[w3_idx]*0.3, np.inf) # for the silicate feature
 
     # build output dictionary
     obs['filters'] = observate.load_filters(fsps_filters)
