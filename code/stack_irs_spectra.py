@@ -101,7 +101,6 @@ def cloudy_spectrum(ax):
 	run_params = model_setup.get_run_params(param_file=param_file)
 	sps = model_setup.load_sps(**run_params)
 	model = model_setup.load_model(**run_params)
-	model.params['dust1'] = np.array(0.0)
 	model.params['dust2'] = np.array(0.0)
 	obs = model_setup.load_obs(**run_params)
 	spec,_,_ = model.mean_model(model.initial_theta, obs, sps=sps)

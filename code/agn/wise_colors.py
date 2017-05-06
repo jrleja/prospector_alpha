@@ -297,6 +297,9 @@ def load_dl07_models(outfolder=None,string=''):
 
 def generate_dl07_models(outfolder='/Users/joel/code/python/threedhst_bsfh/plots/brownseds_agn/agn_plots/'):
 
+	### this will break now because sfr_fraction isn't a parameter!
+	### either create a new parameter file or build the reverse map sfrfraction --> zfraction
+
 	import brownseds_agn_params as nonparam
 
 	#### load test model, build sps, build important variables ####
@@ -344,7 +347,6 @@ def generate_dl07_models(outfolder='/Users/joel/code/python/threedhst_bsfh/plots
 					for c in colors: outdict[" ".join(c)].append(-2.5*np.log10(mags[fnames.index(c[0])])+2.5*np.log10(mags[fnames.index(c[1])]))
 		
 	# now do it again with no dust
-	theta[pnames.index('dust1')] = 0.0
 	theta[pnames.index('dust2')] = 0.0
 	for logzsol in grid[3]:
 		theta[pnames.index('logzsol')] = logzsol

@@ -211,23 +211,6 @@ def find_sfh_params(model,theta,obs,sps,sm=None):
 
     return out
 
-def transform_chain(flatchain, parnames, model):
-
-    ### turn fractional_dust1 into dust1
-    if 'fractional_dust1' in parnames:
-        d1idx, d2idx = model.theta_index['fractional_dust1'], model.theta_index['dust2']
-        flatchain[:,d1idx] = model.to_dust1(dust1_fraction=flatchain[:,d1dx], dust2=flatchain[:,d2idx]) 
-        parnames[didx] = 'dust1'
-
-    ### turn z_fraction into sfr_fraction
-    if 'z_fraction' in parnames:
-        zidx = model.theta_index['z_fraction']
-        for i in flatchain.shape[0]:
-            flatchain[i,zidx] = model.transform_zfraction_to_sfrfraction(
-                                z_fraction=flatchain[i,zidx],sfr_fraction=np.empty(zidx.shape[0])) 
-
-    return flatchain, parnames
-
 def test_likelihood(sps,model,obs,thetas,param_file):
 
     '''
@@ -918,6 +901,17 @@ def calculate_sfr(sfh_params, timescale, tcalc = None,
 
     return sfr
 
+def transform_zfraction_to_sfrfraction(zfraction):
+    '''vectorized and without I/O keywords
+    '''
+    if zfraction.ndim == 1:
+        zfraction = np.atleast_2d(zfraction).transpose()
+    sfr_fraction = np.zeros_like(zfraction)
+    sfr_fraction[:,0] = 1-zfraction[:,0]
+    for i in xrange(1,sfr_fraction.shape[1]): sfr_fraction[:,i] = np.prod(zfraction[:,:i],axis=1)*(1-zfraction[:,i])
+    #sfr_fraction[:,-1] = np.prod(zfraction,axis=1)  #### THIS IS SET IMPLICITLY
+    return sfr_fraction
+
 def integrate_exp_tau(t1,t2,sfh):
 
     return sfh['tau']*(np.exp(-t1/sfh['tau'])-np.exp(-t2/sfh['tau']))
@@ -1154,7 +1148,8 @@ def measure_restframe_properties(sps, model = None, obs = None, thetas = None, e
     z      = model.params.get('zred', np.array(0.0))
     lumdist = model.params.get('lumdist', np.array(0.0))
     model.params['zred'] = np.array(0.0)
-    model.params['lumdist'] = np.array(1e-5)
+    if lumdist:
+        model.params['lumdist'] = np.array(1e-5)
 
     ### if we want restframe optical photometry, generate fake obs file
     ### else generate NO obs file (don't do extra filter convolutions if not necessary)
@@ -1171,7 +1166,8 @@ def measure_restframe_properties(sps, model = None, obs = None, thetas = None, e
 
     ### reset model
     model.params['zred'] = z
-    model.params['lumdist'] = lumdist
+    if lumdist:
+        model.params['lumdist'] = lumdist
 
     ### convert to Lsun / hz
     spec *= dfactor_10pc / constants.L_sun.cgs.value * to_ergs

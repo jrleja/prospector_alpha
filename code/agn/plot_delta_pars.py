@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import agn_plot_pref
 from corner import quantile
 import os
-from prosp_dutils import asym_errors, running_median
+from prosp_dutils import asym_errors, running_median, transform_zfraction_to_sfrfraction
 from matplotlib.ticker import MaxNLocator
 from astropy.cosmology import WMAP9
 
@@ -76,7 +76,7 @@ def collate_data(alldata,alldata_noagn):
 		### this is super ugly but it works
 		# calculate tuniv, create agelim array
 		par = 'm23_frac'
-		sfrfrac_idx = np.array(['sfr_fraction' in p for p in parnames],dtype=bool)
+		zfrac_idx = np.array(['z_fraction' in p for p in parnames],dtype=bool)
 		tuniv = WMAP9.age(dat['residuals']['phot']['z']).value
 		agelims = [0.0,8.0,8.5,9.0,9.5,9.8,10.0]
 		agelims[-1] = np.log10(tuniv*1e9)
@@ -84,13 +84,13 @@ def collate_data(alldata,alldata_noagn):
 		for i in xrange(len(agelims)-1): time_per_bin.append(10**agelims[i+1]-10**agelims[i])
 
 		# now calculate fractions for each of them
-		sfrfrac = dat['pquantiles']['sample_chain'][:,sfrfrac_idx]
+		sfrfrac = transform_zfraction_to_sfrfraction(dat['pquantiles']['sample_chain'][:,zfrac_idx])
 		full = np.concatenate((sfrfrac,(1-sfrfrac.sum(axis=1))[:,None]),axis=1)
 		mass_fraction = full*np.array(time_per_bin)
 		mass_fraction /= mass_fraction.sum(axis=1)[:,None]
 		m23_agn = mass_fraction[:,1:3].sum(axis=1)
 
-		sfrfrac = datnoagn['pquantiles']['sample_chain'][:,sfrfrac_idx]
+		sfrfrac = transform_zfraction_to_sfrfraction(datnoagn['pquantiles']['sample_chain'][:,zfrac_idx])
 		full = np.concatenate((sfrfrac,(1-sfrfrac.sum(axis=1))[:,None]),axis=1)
 		mass_fraction = full*np.array(time_per_bin)
 		mass_fraction /= mass_fraction.sum(axis=1)[:,None]

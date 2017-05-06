@@ -5,7 +5,6 @@ from prospect.sources import FastStepBasis
 from sedpy import observate
 from astropy.cosmology import WMAP9
 from astropy.io import fits
-import operator
 
 lsun = 3.846e33
 pc = 3.085677581467192e18  # in cm
@@ -260,13 +259,9 @@ def to_dust1(dust1_fraction=None, dust1=None, dust2=None, **extras):
     return dust1_fraction*dust2
 
 def transform_zfraction_to_sfrfraction(sfr_fraction=None, z_fraction=None, **extras):
-
-    def prod(factors):
-        return reduce(operator.mul, factors, 1)
-
     sfr_fraction[0] = 1-z_fraction[0]
-    for i in xrange(1,sfr_fraction.shape[0]): sfr_fraction[i] =  prod(z_fraction[:i])*(1-z_fraction[i])
-    #sfr_fraction[-1] = prod(z)  #### THIS IS SET IMPLICITLY
+    for i in xrange(1,sfr_fraction.shape[0]): sfr_fraction[i] =  np.prod(z_fraction[:i])*(1-z_fraction[i])
+    #sfr_fraction[-1] = np.prod(z)  #### THIS IS SET IMPLICITLY
     return sfr_fraction
 
 #############

@@ -28,28 +28,6 @@ def maxprob_model(sample_results,sps):
 
     return maxtheta, maxprob
 
-def measure_spire_phot(sample_results, flatchain, sps):
-
-    '''
-    for plots for kim-vy tran on 10/26/16
-    '''
-
-    from sedpy.observate import load_filters
-    filters = ['herschel_spire_250','herschel_spire_350','herschel_spire_500']
-    obs = {'filters': load_filters(filters), 'wavelength': None}
-
-    ncalc = flatchain.shape[0]
-    mags = np.zeros(shape=(len(filters),ncalc))
-    for i in xrange(ncalc):
-        _,mags[:,i],sm = sample_results['model'].mean_model(flatchain[i,:], obs, sps=sps)
-        print i
-
-    sample_results['hphot'] = {}
-    sample_results['hphot']['mags'] = mags
-    sample_results['hphot']['name'] = np.array(filters)
-
-    return sample_results
-
 def sample_flatchain(chain, lnprob, parnames, ir_priors=True, include_maxlnprob=True, nsamp=2000):
 
     '''
@@ -175,15 +153,23 @@ def calc_extra_quantities(sample_results, ncalc=3000, **kwargs):
         ##### if we don't use these parameters, set them to defaults
         dust1 = thetas[d1_idx]
         if dust1.shape[0] == 0:
-            dust1 = sps.csp.params['dust1']
+            try:
+                dust1 = sps.csp.params['dust1']
+            except AttributeError:
+                dust1 = sps.params['dust1']
         dust_idx = thetas[didx]
         if dust_idx.shape[0] == 0:
-            dust_idx = sps.csp.params['dust_index']
+            try:
+                dust_idx = sps.csp.params['dust_index']
+            except AttributeError:
+                dust1 = sps.params['dust1']
+
+        print 1/0
 
         ##### extract sfh parameters
         # pass stellar mass to avoid extra model call
         sfh_params = prosp_dutils.find_sfh_params(sample_results['model'],thetas,
-                                                   sample_results['obs'],sps,sm=sm)
+                                                  sample_results['obs'],sps,sm=sm)
 
         ##### calculate SFH
         intsfr[:,jj] = prosp_dutils.return_full_sfh(t, sfh_params)
@@ -224,6 +210,7 @@ def calc_extra_quantities(sample_results, ncalc=3000, **kwargs):
         ##### lbol
         lbol[jj] = prosp_dutils.measure_lbol(sps,sfh_params['mformed'])
 
+        t2 = time.time()
         ##### spectral quantities (emission line flux, Balmer decrement, Hdelta absorption, Dn4000)
         ##### and magnitudes (LIR, LUV)
         if opts['measure_spectral_features']:
@@ -269,7 +256,8 @@ def calc_extra_quantities(sample_results, ncalc=3000, **kwargs):
             nd_thetas[d2_idx] = np.array([0.0])
             _,mags_nodust[:,jj],sm = sample_results['model'].mean_model(nd_thetas, sample_results['obs'], sps=sps)
 
-        print('loop {0} took {1}s'.format(jj,time.time() - t1))
+        t3 = time.time()
+        print('loop {0} took {1}s ({2}s for absorption+emission)'.format(jj,t3 - t1,t3 - t2))
 
     ##### CALCULATE Q16,Q50,Q84 FOR MODEL PARAMETERS
     ntheta = len(sample_results['initial_theta'])
@@ -277,6 +265,7 @@ def calc_extra_quantities(sample_results, ncalc=3000, **kwargs):
     for kk in xrange(ntheta): q_16[kk], q_50[kk], q_84[kk] = np.percentile(sample_results['flatchain'][sample_idx][:,kk], [16.0, 50.0, 84.0])
     
     #### QUANTILE OUTPUTS #
+    extra_output = {}
     quantiles = {'sample_chain': sample_results['flatchain'][sample_idx],
                  'parnames': parnames,
                  'q16':q_16,
@@ -285,7 +274,6 @@ def calc_extra_quantities(sample_results, ncalc=3000, **kwargs):
     extra_output['quantiles'] = quantiles
 
     ##### CALCULATE Q16,Q50,Q84 FOR EXTRA PARAMETERS
-    extra_output = {}
     extra_flatchain = np.dstack((half_time, sfr_10, sfr_100, ssfr_10, ssfr_100, stellar_mass, emp_ha, bdec_calc, ext_5500, xray_lum,lbol))[0]
     if 'fagn' in parnames:
         extra_flatchain = np.append(extra_flatchain, np.hstack((l_agn[:,None], fmir[:,None])), axis=1)

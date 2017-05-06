@@ -9,6 +9,7 @@ from corner import quantile
 import math
 import os
 
+
 ### time per bin
 # must recalculate if the bins change!
 time_per_bin = np.array([1e+08,2.16227766e+08,6.83772234e+08,2.16227766e+09,3.14729578e+09,7.45932607e+09])
@@ -86,7 +87,7 @@ def stack_data(alldata,sigma_sf=None,nbins_horizontal=None,low_mass_cutoff=None,
 	idx_mass = parnames == 'logmass'
 
 	### fractional parameters, for stacking
-	fracpars = np.array([True if 'sfr_fraction' in par else False for par in parnames],dtype=bool)
+	fracpars = np.array([True if 'z_fraction' in par else False for par in parnames],dtype=bool)
 	frac_parnames = parnames[fracpars]
 	nbins_sfh = frac_parnames.shape[0]
 
@@ -140,7 +141,7 @@ def stack_data(alldata,sigma_sf=None,nbins_horizontal=None,low_mass_cutoff=None,
 		### calculate sSFR chains (fn / sum(tn*fn))
 		outfrac = []
 		for dat in np.array(alldata)[on_ms][in_bin]:
-			frac = dat['pquantiles']['sample_chain'][:,fracpars]
+			frac = prosp_dutils.transform_zfraction_to_sfrfraction(dat['pquantiles']['sample_chain'][:,fracpars])
 			frac = np.concatenate((frac, (1-frac.sum(axis=1))[:,None]),axis=1)
 			norm = (frac * time_per_bin).sum(axis=1) ### sum(fn*tn)
 			outfrac.append(frac/norm[:,None])
@@ -177,7 +178,7 @@ def stack_data(alldata,sigma_sf=None,nbins_horizontal=None,low_mass_cutoff=None,
 		### calculate sSFR chains (fn / sum(tn*fn))
 		outfrac = []
 		for dat in np.array(alldata)[in_bin]:
-			frac = dat['pquantiles']['sample_chain'][:,fracpars]
+			frac = prosp_dutils.transform_zfraction_to_sfrfraction(dat['pquantiles']['sample_chain'][:,fracpars])
 			frac = np.concatenate((frac, (1-frac.sum(axis=1))[:,None]),axis=1)
 			norm = (frac * time_per_bin).sum(axis=1) ### sum(fn*tn)
 			outfrac.append(frac/norm[:,None])
