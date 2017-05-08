@@ -164,8 +164,6 @@ def calc_extra_quantities(sample_results, ncalc=3000, **kwargs):
             except AttributeError:
                 dust1 = sps.params['dust1']
 
-        print 1/0
-
         ##### extract sfh parameters
         # pass stellar mass to avoid extra model call
         sfh_params = prosp_dutils.find_sfh_params(sample_results['model'],thetas,
