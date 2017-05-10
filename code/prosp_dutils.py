@@ -1201,7 +1201,7 @@ def measure_restframe_properties(sps, model = None, obs = None, thetas = None, e
 
     return out
 
-def measure_Dn4000(lam,flux):
+def measure_Dn4000(lam,flux,ax=None):
     ''' defined as average flux ratio between
     [4050,4250] and [3750,3950] (Bruzual 1983; Hamilton 1985)
     blue: 3850-3950 . . . 4000-4100 (Balogh 1999)
@@ -1209,6 +1209,19 @@ def measure_Dn4000(lam,flux):
     blue = (lam > 3850) & (lam < 3950)
     red  = (lam > 4000) & (lam < 4100)
     dn4000 = np.mean(flux[red])/np.mean(flux[blue])
+
+    if ax is not None:
+        ax.plot(lam,flux,color='black',drawstyle='steps-mid')
+        ax.plot(lam[blue],flux[blue],color='blue',drawstyle='steps-mid')
+        ax.plot(lam[red],flux[red],color='red',drawstyle='steps-mid')
+
+        ax.text(0.96,0.05, 'D$_{n}$4000='+"{:.2f}".format(dn4000), transform = ax.transAxes,horizontalalignment='right')
+
+        ax.set_xlim(3800,4150)
+        plt_lam_idx = (lam > 3800) & (lam < 4150)
+        minplot = np.min(flux[plt_lam_idx])*0.9
+        maxplot = np.max(flux[plt_lam_idx])*1.1
+        ax.set_ylim(minplot,maxplot)
 
     return dn4000
 

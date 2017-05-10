@@ -242,7 +242,6 @@ def make_plot(runname='brownseds_agn',alldata=None,outfolder=None,maxradius=30,i
 	plt.savefig(outfolder+outname,dpi=dpi)
 	plt.close()
 
-	print 1/0
 	'''
 	outname = 'xray_lum_sfrcorr_lagn.png'
 	fig,ax = plot(pdata,color_by_observatory=cbo,color_by_database=cbd,color_by_wise=cbw,

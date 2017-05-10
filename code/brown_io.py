@@ -34,7 +34,7 @@ def return_agn_str(idx, string=False):
         agn_str=pickle.load(f)
 
     agn_str = agn_str[idx]
-    sfing = (agn_str == 'SF') | (agn_str == '---')
+    sfing = (agn_str == 'SF') | (agn_str == 'None')
     composite = (agn_str == 'SF/AGN')
     agn = agn_str == 'AGN'
 

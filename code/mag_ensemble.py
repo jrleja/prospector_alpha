@@ -711,7 +711,9 @@ def define_balmer_index(dat, hdel=False):
 
     return halph_ind
 
-def fmt_emline_info(alldata,add_abs_err = True):
+def fmt_emline_info(alldata,add_abs_err = False):
+
+    # add_abs_err no longer makes sense since we no longer measure absorption depth!
 
     ngals = len(alldata)
 
@@ -793,9 +795,6 @@ def fmt_emline_info(alldata,add_abs_err = True):
     ha_lum_pro_marg,ha_eqw_pro_marg,\
     hb_lum_pro_marg,hb_eqw_pro_marg = [np.zeros(shape=(ngals,3)) for i in xrange(4)]
 
-    ha_lum_pro, ha_eqw_pro, \
-    hb_lum_pro, hb_eqw_pro = [np.zeros(ngals) for i in xrange(4)]
-
     for kk, dat in enumerate(alldata):
 
         #### hbeta, halpha marginalized
@@ -815,30 +814,11 @@ def fmt_emline_info(alldata,add_abs_err = True):
                                           dat['spec_info']['eqw']['q84'][anames == halph_ind],
                                           dat['spec_info']['eqw']['q16'][anames == halph_ind]])[:,0]
 
-        #### are there useful spectra?
-        if dat['residuals']['emlines'] is None:
-            continue
-
-        #### best-fit
-        hb_ind = dat['residuals']['emlines']['mod']['balmer_names'] == 'hbeta'
-        hb_lum_pro[kk] = dat['residuals']['emlines']['mod']['balmer_lum'][hb_ind]
-        hb_eqw_pro[kk] = dat['residuals']['emlines']['mod']['balmer_eqw_rest'][hb_ind]
-
-        ha_ind = dat['residuals']['emlines']['mod']['balmer_names'] == halph_ind
-        ha_lum_pro[kk] = dat['residuals']['emlines']['mod']['balmer_lum'][ha_ind]
-        ha_eqw_pro[kk] = dat['residuals']['emlines']['mod']['balmer_eqw_rest'][ha_ind]
-
     # save marginalized halpha, hbeta
     prosp['hbeta_abs_marg'] = hb_lum_pro_marg
     prosp['hbeta_eqw_marg'] = hb_eqw_pro_marg
     prosp['halpha_abs_marg'] = ha_lum_pro_marg
     prosp['halpha_eqw_marg'] = ha_eqw_pro_marg
-
-    # save best-fit halpha, hbeta
-    prosp['hbeta_abs'] = hb_lum_pro
-    prosp['hbeta_eqw'] = hb_eqw_pro
-    prosp['halpha_abs'] = ha_lum_pro
-    prosp['halpha_eqw'] = ha_eqw_pro
 
     ##### add Halpha, Hbeta absorption to errors
     if add_abs_err:
@@ -890,8 +870,6 @@ def fmt_emline_info(alldata,add_abs_err = True):
     hd_lum_obs, hd_eqw_obs = [np.zeros(shape=(ngals,3)) for i in xrange(6)]
     hd_eqw_obs_chain = np.zeros(shape=(ngals,100))
 
-    hd_lum_prosp, hd_eqw_prosp, \
-    hd_lum_eline_prosp, hd_eqw_eline_prosp = [np.zeros(ngals) for i in xrange(4)]
     for kk, dat in enumerate(alldata):
         
         hdelta_ind = define_balmer_index(dat,hdel=True)
@@ -903,39 +881,29 @@ def fmt_emline_info(alldata,add_abs_err = True):
         hd_eqw_prosp_marg[kk,:] = [dat['spec_info']['eqw']['q50'][anames == hdelta_ind],
                                    dat['spec_info']['eqw']['q84'][anames == hdelta_ind],
                                    dat['spec_info']['eqw']['q16'][anames == hdelta_ind]]
-        hd_lum_eline_prosp_marg[kk,:] = [dat['spec_info']['flux_elines_on']['q50'][anames == hdelta_ind],
-                                         dat['spec_info']['flux_elines_on']['q84'][anames == hdelta_ind],
-                                         dat['spec_info']['flux_elines_on']['q16'][anames == hdelta_ind]]
-        hd_eqw_eline_prosp_marg[kk,:] = [dat['spec_info']['eqw_elines_on']['q50'][anames == hdelta_ind],
-                                         dat['spec_info']['eqw_elines_on']['q84'][anames == hdelta_ind],
-                                         dat['spec_info']['eqw_elines_on']['q16'][anames == hdelta_ind]]
+        hd_lum_eline_prosp_marg[kk,:] = [dat['spec_info']['flux']['q50'][anames == hdelta_ind],
+                                         dat['spec_info']['flux']['q84'][anames == hdelta_ind],
+                                         dat['spec_info']['flux']['q16'][anames == hdelta_ind]]
+        hd_eqw_eline_prosp_marg[kk,:] = [dat['spec_info']['eqw']['q50'][anames == hdelta_ind],
+                                         dat['spec_info']['eqw']['q84'][anames == hdelta_ind],
+                                         dat['spec_info']['eqw']['q16'][anames == hdelta_ind]]
 
 
         #### are there useful spectra?
         if dat['residuals']['emlines'] is None:
             continue
 
-        #### best-fit, Prospector. also best-fit + emission lines
-        hd_ind = dat['residuals']['emlines']['mod']['balmer_names'] == hdelta_ind
-        hd_lum_prosp[kk] = dat['residuals']['emlines']['mod']['balmer_lum'][hd_ind]
-        hd_eqw_prosp[kk] = dat['residuals']['emlines']['mod']['balmer_eqw_rest'][hd_ind]
-        hd_lum_eline_prosp[kk] = dat['residuals']['emlines']['mod']['balmer_lum_addem'][hd_ind]
-        hd_eqw_eline_prosp[kk] = dat['residuals']['emlines']['mod']['balmer_eqw_rest_addem'][hd_ind]
-
         #### observed
+        hd_ind = dat['residuals']['emlines']['obs']['balmer_names'] == hdelta_ind
         hd_lum_obs[kk,:] = dat['residuals']['emlines']['obs']['balmer_lum'][hd_ind,:]
         hd_eqw_obs[kk,:] = dat['residuals']['emlines']['obs']['balmer_eqw_rest'][hd_ind,:]
         hd_eqw_obs_chain[kk,:] = dat['residuals']['emlines']['obs']['balmer_eqw_rest_chain'][hd_ind,:]
 
     ##### hdelta absorption
-    prosp['hdel_abs'] = hd_lum_prosp
-    prosp['hdel_eqw'] = hd_eqw_prosp
     prosp['hdel_abs_marg'] = hd_lum_prosp_marg
     prosp['hdel_eqw_marg'] = hd_eqw_prosp_marg
     prosp['hdel_abs_elineon_marg'] = hd_lum_eline_prosp_marg
     prosp['hdel_eqw_elineon_marg'] = hd_eqw_eline_prosp_marg
-    prosp['hdel_abs_addem'] = hd_lum_eline_prosp
-    prosp['hdel_eqw_addem'] = hd_eqw_eline_prosp
 
     obslines['hdel'] = hd_lum_obs
     obslines['hdel_err'] = (obslines['hdel'][:,1] - obslines['hdel'][:,2]) / 2.
@@ -1490,7 +1458,6 @@ def bpt_diagram(e_pinfo,hflag,outname=None):
     bpt_flag[:] = 'None'
     bpt_flag[keep_idx] = bpt_flag_idx
     pickle.dump(bpt_flag,open(os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/joel_bpt.pickle', "wb"))
-    print 1/0
 
     ax1[0].text(0.04,0.1, r'S/N (H$\alpha$,H$\beta$,[OIII],[NII]) > '+str(int(e_pinfo['obs']['sn_cut'])), transform = ax1[0].transAxes,horizontalalignment='left')
     ax1[0].set_xlabel(r'log([NII 6583]/H$_{\alpha}$) [observed]')
@@ -2055,7 +2022,6 @@ def obs_vs_model_hdelta(e_pinfo,hflag,outname=None,outname2=None,outname_dnplt=N
         hdel_obs = e_pinfo['obs']['hdel_eqw'][good_idx]
         hdel_prosp_marg = e_pinfo['prosp']['hdel_eqw_marg'][good_idx]
         hdel_prosp_em = e_pinfo['prosp']['hdel_eqw_elineon_marg'][good_idx]
-        hdel_prosp = np.log10(e_pinfo['prosp']['hdel_eqw'][good_idx])
 
         xtit = [r'observed H$_{\delta}$ EW', 
                 r'observed H$_{\delta}$ EW',
@@ -2077,7 +2043,6 @@ def obs_vs_model_hdelta(e_pinfo,hflag,outname=None,outname2=None,outname_dnplt=N
         hdel_obs = e_pinfo['obs']['hdel'][good_idx]     
         hdel_prosp_marg = e_pinfo['prosp']['hdel_abs_marg'][good_idx]       
         hdel_prosp_em = e_pinfo['prosp']['hdel_abs_elineon_marg'][good_idx]
-        hdel_prosp = np.log10(e_pinfo['prosp']['hdel_abs'][good_idx])
 
         xtit = [r'observed log(-H$_{\delta}$)', 
                 r'observed log(-H$_{\delta}$)',
@@ -2358,11 +2323,6 @@ def eline_errs(e_pinfo,hflag,outname='test.png'):
     first calculate error width by using 1sigma definition
     try also fitting a gaussian to see what that does
     consider a three-panel, for halpha, hbeta, bdec
-
-    obslines['err_ha_orig']
-    obslines['err_hb_orig']
-    obslines['f_ha_orig']
-    obslines['f_hb_orig']
     '''
 
     error_fraction = np.linspace(0.0,1.0,50)
@@ -2370,11 +2330,11 @@ def eline_errs(e_pinfo,hflag,outname='test.png'):
 
     keep_idx = brown_quality_cuts.halpha_cuts(e_pinfo)
 
-    #### pull out original halpha / hbeta calculations
-    f_ha = e_pinfo['obs']['f_ha_orig']
-    f_hb = e_pinfo['obs']['f_hb_orig']
+    #### pull out original halpha , hbeta measurements
+    f_ha = copy.copy(e_pinfo['obs']['f_ha_orig'])
+    f_hb = copy.copy(e_pinfo['obs']['f_hb_orig'])
 
-    #### open up variables
+    #### define variables
     ha_sig,hb_sig,bdec_sig = [],[],[]
 
     ### loop over errors, calculate sigma
@@ -2939,7 +2899,6 @@ def plot_emline_comp(alldata,outfolder,hflag):
 
 
     for i in xrange(129): print alldata[i]['objname'] +" {:.2f}".format(sfrfrac[i,5])
-    print 1/0
     '''
 
     ##### add in 'location in truth' PDF
@@ -2956,7 +2915,8 @@ def plot_emline_comp(alldata,outfolder,hflag):
     specpar_pdf_plot(pdf,outname=outname)
 
     # errors
-    eline_errs(e_pinfo,hflag,outname=outfolder+'error_sig.png')
+    # this no longer makes sense since we don't measure the absorption depth!
+    # eline_errs(e_pinfo,hflag,outname=outfolder+'error_sig.png')
 
     # dn4000 and halpha paper plots
     paper_summary_plot(e_pinfo, hflag, outname=outfolder+'paper_summary_plot.png')

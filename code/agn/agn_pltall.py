@@ -28,16 +28,16 @@ def plot(runname='brownseds_agn',runname_noagn='brownseds_np',
 			lidx = dat['pextras']['parnames'] == 'l_agn'
 
 			### FAGN ---> FMIR
-			dat['pquantiles']['q50'][fidx] = 1-dat['pextras']['q50'][midx].squeeze()
-			dat['pquantiles']['q84'][fidx] = 1-dat['pextras']['q84'][midx].squeeze()
-			dat['pquantiles']['q16'][fidx] = 1-dat['pextras']['q16'][midx].squeeze()
-			dat['pquantiles']['sample_chain'][:,fidx] = 1-dat['pextras']['flatchain'][:,midx]
+			dat['pquantiles']['q50'][fidx] = dat['pextras']['q50'][midx].squeeze()
+			dat['pquantiles']['q84'][fidx] = dat['pextras']['q84'][midx].squeeze()
+			dat['pquantiles']['q16'][fidx] = dat['pextras']['q16'][midx].squeeze()
+			dat['pquantiles']['sample_chain'][:,fidx] = dat['pextras']['flatchain'][:,midx]
 
 	else:
 		alldata_sub = deepcopy(alldata)
 
 	### what are we calling "AGN" ?
-	twosigma_fmir = np.array([np.percentile(dat['pquantiles']['sample_chain'][:,fidx].squeeze(),2.5) for dat in alldata_sub])
+	twosigma_fmir = np.array([np.percentile(dat['pquantiles']['sample_chain'][:,fidx].squeeze(),16) for dat in alldata_sub])
 	agn_idx = np.where(twosigma_fmir > 0.05)[0]
 
 	### resort from largest to smallest
@@ -64,7 +64,6 @@ def plot(runname='brownseds_agn',runname_noagn='brownseds_np',
 	#### PLOT ALL
 	print 'PLOTTING XRAY LUMINOSITY'
 	xray_luminosity.make_plot(runname=runname,alldata=alldata_sub,outfolder=outfolder,idx=agn_idx,**popts)
-	print 1/0
 	print 'PLOTTING MASS-METALLICITY DIAGRAM'
 	delta_mass_met.plot_comparison(runname=runname,alldata=alldata_sub,alldata_noagn=alldata_noagn,outfolder=outfolder,plt_idx=agn_idx,**popts)
 	print 'PLOTTING WISE GRADIENTS'

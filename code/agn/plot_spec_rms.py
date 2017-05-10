@@ -265,20 +265,10 @@ def plot_rms(pdata,outfolder,agn_idx=None,**popts):
 		cb.solids.set_rasterized(True)
 		cb.solids.set_edgecolor("face")
 
-		####### NEW FINAL PLOT OF AWESOMENESS
+		####### NEW FINAL PLOT
 		alpha = 0.7
 		ax3[ii].scatter(q50o_no[agn_idx], q50m_no[agn_idx], marker='o', color=popts['noagn_color'],s=70,zorder=10,alpha=alpha,edgecolors='k')
 		ax3[ii].scatter(q50o[agn_idx], q50m[agn_idx], marker='o', color=popts['agn_color'],s=70,zorder=10,alpha=alpha,edgecolors='k')
-
-		'''
-		errs_obs = prosp_dutils.asym_errors(q50o[agn_idx], q84o[agn_idx], q16o[agn_idx])
-		errs_mod = prosp_dutils.asym_errors(q50m[agn_idx], q84m[agn_idx], q16m[agn_idx])
-		ax3[ii].errorbar(q50o[agn_idx], q50m[agn_idx], xerr=errs_obs,yerr=errs_mod, ms=0.0, zorder=-2,**ebaropts)
-
-		errs_obs = prosp_dutils.asym_errors(q50o_no[agn_idx], q84o_no[agn_idx], q16o_no[agn_idx])
-		errs_mod = prosp_dutils.asym_errors(q50m_no[agn_idx], q84m_no[agn_idx], q16m_no[agn_idx])
-		ax3[ii].errorbar(q50o_no[agn_idx], q50m_no[agn_idx], xerr=errs_obs,yerr=errs_mod, ms=0.0, zorder=-2,**ebaropts)
-		'''
 
 		### draw in some SICK arrows
 		for kk in xrange(len(agn_idx)):
@@ -296,8 +286,8 @@ def plot_rms(pdata,outfolder,agn_idx=None,**popts):
 		ax3[ii].plot(lims3[ii],lims3[ii],'--',color='0.5',alpha=0.5,zorder=-15)
 
 		good = ((np.isfinite(q50o)) & (np.isfinite(q50m)) & (np.isfinite(q50o_no)) & (np.isfinite(q50m_no)))[agn_idx]
-		off_agn,scat_agn = prosp_dutils.offset_and_scatter(q50o[agn_idx][good],q50m[agn_idx][good],mad=True)
-		off_noagn,scat_noagn = prosp_dutils.offset_and_scatter(q50o_no[agn_idx][good],q50m_no[agn_idx][good],mad=True)
+		off_agn,scat_agn = prosp_dutils.offset_and_scatter(q50o[agn_idx][good],q50m[agn_idx][good],biweight=True)
+		off_noagn,scat_noagn = prosp_dutils.offset_and_scatter(q50o_no[agn_idx][good],q50m_no[agn_idx][good],biweight=True)
 		topts = {'transform':ax3[ii].transAxes,'fontsize':13,'verticalalignment':'top'}
 		ax3[ii].text(0.04,0.95,'AGN-off', color=popts['noagn_color'],weight='bold', **topts)
 		ax3[ii].text(0.04,0.9,'scatter, offset=', color=popts['noagn_color'], **topts)
