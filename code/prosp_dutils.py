@@ -1183,7 +1183,7 @@ def measure_restframe_properties(sps, model = None, obs = None, thetas = None, e
     ##### measure absorption lines and dn4000
     if abslines:
         out['abslines'] = measure_abslines(w,smooth_spec) # comes out in Lsun and rest-frame EQW
-        out['dn4000'] = measure_Dn4000(w,spec_flam)
+        out['dn4000'] = measure_Dn4000(w,smooth_spec)
 
     ##### measure emission lines
     if emlines:

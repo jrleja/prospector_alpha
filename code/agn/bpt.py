@@ -11,8 +11,8 @@ dpi = 150
 def collate_data(alldata):
 
 	### BPT information
-	oiii_hb = np.zeros(shape=(len(alldata),2))
-	nii_ha = np.zeros(shape=(len(alldata),2))
+	oiii_hb = np.zeros(shape=(len(alldata),3))
+	nii_ha = np.zeros(shape=(len(alldata),3))
 	linenames = alldata[0]['residuals']['emlines']['em_name']
 	ha_em = linenames == 'H$\\alpha$'
 	hb_em = linenames == 'H$\\beta$'
@@ -37,7 +37,8 @@ def collate_data(alldata):
 			oiii_hb[ii,1] = np.inf
 			nii_ha[ii,1] = np.inf
 			continue
-
+		
+		'''
 		f_oiii = dat['residuals']['emlines']['obs']['lum'][oiii_em]
 		f_hb = dat['residuals']['emlines']['obs']['lum'][hb_em]
 		err_oiii = (dat['residuals']['emlines']['obs']['lum_errup'][oiii_em] - dat['residuals']['emlines']['obs']['lum_errdown'][oiii_em])/2.
@@ -51,18 +52,15 @@ def collate_data(alldata):
 		err_ha = (dat['residuals']['emlines']['obs']['lum_errup'][ha_em] - dat['residuals']['emlines']['obs']['lum_errdown'][ha_em])/2.
 		nii_ha[ii,0] = f_nii / f_ha
 		nii_ha[ii,1] = nii_ha[ii,0] * np.sqrt((err_nii/f_nii)**2+(err_ha/f_ha)**2)
-
-
 		'''
+
 		#### sample randomly
-		ratio = np.log10(np.random.choice(dat['model_emline']['flux']['chain'][:,oiii_em].squeeze(),size=1e4) / 
-			             np.random.choice(dat['model_emline']['flux']['chain'][:,hb_em].squeeze(),size=1e4))
-		oiii_hb[ii,:] = quantile(ratio, [0.5, 0.84, 0.16])
+		ratio = np.log10(np.random.choice(dat['residuals']['emlines']['obs']['lum_chain'][:,oiii_em].squeeze(),size=1e4) / np.random.choice(dat['residuals']['emlines']['obs']['lum_chain'][:,hb_em].squeeze(),size=1e4))
+		oiii_hb[ii,:] = np.percentile(ratio, [50, 84, 16])
 			
-		ratio = np.log10(np.random.choice(dat['model_emline']['flux']['chain'][:,nii_em].squeeze(),size=1e4) / 
-			             np.random.choice(dat['model_emline']['flux']['chain'][:,ha_em].squeeze(),size=1e4))
-		nii_ha[ii,:] = quantile(ratio, [0.5, 0.84, 0.16])
-		'''
+		ratio = np.log10(np.random.choice(dat['residuals']['emlines']['obs']['lum_chain'][:,nii_em].squeeze(),size=1e4) / np.random.choice(dat['residuals']['emlines']['obs']['lum_chain'][:,ha_em].squeeze(),size=1e4))
+		nii_ha[ii,:] = np.percentile(ratio, [50, 84, 16])
+
 	#### numpy arrays
 	for key in model_pars.keys(): model_pars[key] = np.array(model_pars[key])
 
@@ -113,21 +111,20 @@ def plot_scatterplot(pdata,colorpar=None,colorparlabel=None,log_cpar=False,cpar_
 	'''
 
 	#### only select those with good BPT measurements
-	sncut = 4
-	good = (pdata['oiii_hb'][:,0]/pdata['oiii_hb'][:,1] > sncut) & \
-	       (pdata['nii_ha'][:,0]/pdata['nii_ha'][:,1] > sncut) & \
-	       (pdata['nii_ha'][:,0] > 0) & \
-	       (pdata['oiii_hb'][:,0] > 0)
-
+	sncut = 0.2  # in dex
+	good = ((pdata['oiii_hb'][:,1]-pdata['oiii_hb'][:,2])/2. < sncut) & \
+	       ((pdata['nii_ha'][:,1]-pdata['nii_ha'][:,2])/2. < sncut) & \
+	       np.isfinite(pdata['nii_ha'][:,0]) & np.isfinite(pdata['oiii_hb'][:,0])
+	       
 	cidx = np.ones_like(good,dtype=bool)
 	cidx[idx] = False
 	cidx = cidx[good]
 
 	#### generate x, y values
-	xerr = asym_errors(pdata['nii_ha'][good,0],pdata['nii_ha'][good,0]+pdata['nii_ha'][good,1],pdata['nii_ha'][good,0]-pdata['nii_ha'][good,1],log=True)
-	yerr = asym_errors(pdata['oiii_hb'][good,0],pdata['oiii_hb'][good,0]+pdata['oiii_hb'][good,1],pdata['oiii_hb'][good,0]-pdata['oiii_hb'][good,1],log=True)
-	xplot = np.log10(pdata['nii_ha'][good,0])
-	yplot = np.log10(pdata['oiii_hb'][good,0])
+	xerr = asym_errors(pdata['nii_ha'][good,0],pdata['nii_ha'][good,1],pdata['nii_ha'][good,2])
+	yerr = asym_errors(pdata['oiii_hb'][good,0],pdata['oiii_hb'][good,1],pdata['oiii_hb'][good,2])
+	xplot = pdata['nii_ha'][good,0]
+	yplot = pdata['oiii_hb'][good,0]
 
 	#### generate color mapping
 	cpar_plot = np.array(pdata['model_pars'][colorpar][good])

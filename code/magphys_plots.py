@@ -13,6 +13,7 @@ from astropy import constants
 from allpar_plot import allpar_plot
 from stack_sfh import plot_stacked_sfh
 import stack_irs_spectra
+import time
 
 c = 3e18   # angstroms per second
 dpi = 150
@@ -812,19 +813,22 @@ def collate_data(filebase=None,
         print 'MAKING SED COMPARISON PLOT'
         outname = outfolder+objname.replace(' ','_')+'.sed.png'
     # plot
+    t1 = time.time()
     residuals = sed_comp_figure(sample_results, extra_output, sps, copy.deepcopy(sample_results['model']),
                                 magphys, maxprob=1,runname=runname, outname=outname)
-        
+    print('line measurement took {0}s'.format(time.time()-t1))
+    print 'SAVING OUTPUTS for ' + sample_results['run_params']['objname']
+    print ' '
+
     # SAVE OUTPUTS
     alldata = {}
     if residuals is not None:
-        print 'SAVING OUTPUTS for ' + sample_results['run_params']['objname']
         alldata['residuals'] = residuals
         alldata = update_model_info(alldata, sample_results, extra_output, magphys)
     else:
         alldata = None
 
-    return alldata
+    return alldata, sps
 
 def plt_all(runname=None,startup=True,**extras):
 
@@ -842,11 +846,13 @@ def plt_all(runname=None,startup=True,**extras):
     if startup == True:
         filebase, parm_basename, ancilname=prosp_dutils.generate_basenames(runname)
         alldata = []
+        sps = None
         for jj in xrange(len(filebase)):
-            dictionary = collate_data(filebase=filebase[jj],\
-                                       outfolder=outfolder,
-                                       runname=runname,
-                                       **extras)
+            dictionary, sps = collate_data(filebase=filebase[jj],\
+                                           outfolder=outfolder,
+                                           runname=runname,
+                                           sps=sps,
+                                           **extras)
             alldata.append(dictionary)
         brown_io.save_alldata(alldata,runname=runname)
     else:
