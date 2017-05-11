@@ -92,7 +92,7 @@ def calc_extra_quantities(sample_results, ncalc=3000, **kwargs):
     # speedup is measured in runtime, where runtime = ncalc * model_call
     opts = {
             'restframe_optical_photometry': False, # currently deprecated! but framework exists in restframe_optical_properties
-            'ir_priors': True, # no cost
+            'ir_priors': False, # no cost
             'measure_spectral_features': True, # cost = 2 runtimes
             'mags_nodust': False # cost = 1 runtime
             }
