@@ -471,8 +471,6 @@ def measure(sample_results, extra_output, obs_spec, sps, runname='brownseds_np',
     ##############################################
     # use redshift from emission line fit
     # currently, NO spectral smoothing; inspect to see if it's important for HDELTA ONLY
-    print 'TWO CHANGES: NO SHIFTING OF SPECTRUM FOR ABSORPTION LINES'
-    print 'AND CONVOLVING WITH LARGER NUMBER'
     zadj = bfit_mod.mean_0.value / 4958.92 - 1
     zadj = 0.0 # DON'T SHIFT ABSORPTION LINES
 

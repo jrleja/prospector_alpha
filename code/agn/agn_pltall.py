@@ -66,6 +66,9 @@ def plot(runname='brownseds_agn',runname_noagn='brownseds_np',
 	plot_dn.plot_dn(idx_plot=agn_idx,runname=runname,runname_noagn=runname_noagn,
 		 			alldata=alldata_sub,alldata_noagn=alldata_noagn,outfolder=outfolder,**popts)
 	'''
+	print 'PLOTTING XRAY LUMINOSITY'
+	xray_luminosity.make_plot(runname=runname,alldata=alldata_sub,outfolder=outfolder,idx=agn_idx,**popts)
+	print 1/0
 	print 'PLOTTING DELTA OBSERVABLES'
 	plot_spec_rms.plot_comparison(runname=runname,alldata=alldata_sub,alldata_noagn=alldata_noagn,outfolder=outfolder,idx=agn_idx,**popts)
 	print 'PLOTTING BPT DIAGRAM'
@@ -79,8 +82,6 @@ def plot(runname='brownseds_agn',runname_noagn='brownseds_np',
 	plot_delta_pars.plot(runname=runname,runname_noagn=runname_noagn,alldata=alldata_sub,alldata_noagn=alldata_noagn,outfolder=outfolder,idx=agn_idx,**popts)
 	print 'PLOTTING WISE COLORS'
 	wise_colors.plot_mir_colors(runname=runname,alldata=alldata_sub,outfolder=outfolder,idx=agn_idx,**popts)
-	print 'PLOTTING XRAY LUMINOSITY'
-	xray_luminosity.make_plot(runname=runname,alldata=alldata_sub,outfolder=outfolder,idx=agn_idx,**popts)
 	print 'PLOTTING WISE GRADIENTS'
 	wise_gradients.plot_all(runname=runname,runname_noagn=runname_noagn,alldata=alldata_sub,
 	         			    alldata_noagn=alldata_noagn,agn_idx=agn_idx,regenerate=False,outfolder=outfolder, **popts)

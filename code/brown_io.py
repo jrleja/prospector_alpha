@@ -301,6 +301,25 @@ def write_coordinates():
         for r, d in zip(ra,dec):
             f.write(str(r)+', '+d+'; ')
 
+def agn_str_match(dat, bcoords, objname):
+    '''used to be simple string matching but issue popped up with floating point accuracy (?)
+    now matches based on declination string
+    '''
+
+    ### add match
+    match = []
+    bco_dec = np.array([cord.split(', ')[-1] for cord in bcoords])
+    for query in dat['_Search_Offset']:
+        match_str = (query.split('('))[1].split(')')[0].split(', ')[-1]
+        idx = bco_dec == match_str
+        if idx.sum() != 1:
+            print 1/0
+        match.append(objname[idx][0])
+    match = np.array(match)
+    dat = np.lib.recfunctions.append_fields(dat, 'match', data=match)
+
+    return dat
+
 def load_csc(bcoords,objname):
 
     location = '/Users/joel/code/python/threedhst_bsfh/data/brownseds_data/photometry/xray/csc_table.dat'
@@ -324,14 +343,7 @@ def load_csc(bcoords,objname):
                      'formats':(['S40','S40','S40','S40','f16','f16','f16','f16','f16','f16','f16','f16','f16','S40','f16','f16','f16','f16','S40'])})
     offset = gather_offset(dat['_Search_Offset'])
     dat = np.lib.recfunctions.append_fields(dat, 'offset', data=offset) 
-
-    ### add match
-    match = []
-    for query in dat['_Search_Offset']:
-        match_str = (query.split('('))[1].split(')')[0]
-        match.append(objname[bcoords.index(match_str)])
-    match = np.array(match)
-    dat = np.lib.recfunctions.append_fields(dat, 'match', data=match)
+    dat = agn_str_match(dat,bcoords,objname)
 
     return dat
 
@@ -357,14 +369,7 @@ def load_cxo(bcoords,objname):
     
     offset = gather_offset(dat['_Search_Offset'])
     dat = np.lib.recfunctions.append_fields(dat, 'offset', data=offset)
-
-    ### add match
-    match = []
-    for query in dat['_Search_Offset']:
-        match_str = (query.split('('))[1].split(')')[0]
-        match.append(objname[bcoords.index(match_str)])
-    match = np.array(match)
-    dat = np.lib.recfunctions.append_fields(dat, 'match', data=match)
+    dat = agn_str_match(dat,bcoords,objname)
 
     return dat
 
@@ -391,14 +396,7 @@ def load_chng(bcoords,objname):
     ### add offset
     offset = gather_offset(dat['_Search_Offset'])
     dat = np.lib.recfunctions.append_fields(dat, 'offset', data=offset)
-
-    ### add match
-    match = []
-    for query in dat['_Search_Offset']:
-        match_str = (query.split('('))[1].split(')')[0]
-        match.append(objname[bcoords.index(match_str)])
-    match = np.array(match)
-    dat = np.lib.recfunctions.append_fields(dat, 'match', data=match)
+    dat = agn_str_match(dat,bcoords,objname)
 
     return dat
 

@@ -75,6 +75,7 @@ def make_plot():
     nsamp = 5
     to_samp = [r'f$_{\mathrm{MIR}}$',r'$\tau_{\mathrm{AGN}}$']
     samp_pars = [[0.0, 0.05, 0.1, 0.2, 0.5],[5,10,20,50,150]] 
+
     idx = [didx,tidx]
     model.initial_theta[didx] = 0.5
     model.initial_theta[tidx] = 20
@@ -125,7 +126,7 @@ def make_plot():
         a.xaxis.set_minor_formatter(minorFormatter)
         a.xaxis.set_major_formatter(majorFormatter)
         a.set_xlim(to_plot)
-        a.set_ylim(15,21)
+        a.set_ylim(17,23)
 
         a.set_xlabel(r'wavelength [$\mu$m]')
         a.set_ylabel(r'log($\nu$f$_{\nu}$)')

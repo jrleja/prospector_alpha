@@ -13,6 +13,9 @@ dpi = 150
 minorFormatter = magphys_plot_pref.jLogFormatter(base=10, labelOnlyBase=False)
 majorFormatter = magphys_plot_pref.jLogFormatter(base=10, labelOnlyBase=True)
 
+red = '#FF3D0D'
+blue = '#1C86EE'
+
 plotopts = {
 		 'fmt':'o',
 		 'ecolor':'k',
@@ -44,13 +47,14 @@ def collate_data(alldata, **extras):
 	nsamp = 100000 # for newly defined variables
 
 	#### for each object
-	fagn, fagn_up, fagn_down, mass, lir_luv, lir_luv_up, lir_luv_down, xray_lum, xray_lum_err, database, observatory = [[] for i in range(11)]
+	fagn, fagn_up, fagn_down, agn_tau, agn_tau_up, agn_tau_down, mass, lir_luv, lir_luv_up, lir_luv_down, xray_lum, xray_lum_err, database, observatory = [[] for i in range(14)]
 	fagn_obs, fagn_obs_up, fagn_obs_down, lmir_lbol, lmir_lbol_up, lmir_lbol_down, xray_hardness, xray_hardness_err = [[] for i in range(8)]
 	lagn, lagn_up, lagn_down, lsfr, lsfr_up, lsfr_down = [], [], [], [], [], []
 	sfr, sfr_up, sfr_down, ssfr, ssfr_up, ssfr_down, d2, d2_up, d2_down = [[] for i in range(9)]
-	fmir, fmir_up, fmir_down = [], [], []
+	fmir, fmir_up, fmir_down, objname = [], [], [], []
 	for ii, dat in enumerate(alldata):
-		
+		objname.append(dat['objname'])
+
 		#### mass, SFR, sSFR, dust2
 		mass.append(dat['pextras']['q50'][eparnames=='stellar_mass'][0])
 		sfr.append(dat['pextras']['q50'][eparnames=='sfr_100'][0])
@@ -67,6 +71,9 @@ def collate_data(alldata, **extras):
 		fagn.append(dat['pquantiles']['q50'][parnames=='fagn'][0])
 		fagn_up.append(dat['pquantiles']['q84'][parnames=='fagn'][0])
 		fagn_down.append(dat['pquantiles']['q16'][parnames=='fagn'][0])
+		agn_tau.append(dat['pquantiles']['q50'][parnames=='agn_tau'][0])
+		agn_tau_up.append(dat['pquantiles']['q84'][parnames=='agn_tau'][0])
+		agn_tau_down.append(dat['pquantiles']['q16'][parnames=='agn_tau'][0])
 		lagn.append(dat['pextras']['q50'][eparnames=='l_agn'][0])
 		lagn_up.append(dat['pextras']['q84'][eparnames=='l_agn'][0])
 		lagn_down.append(dat['pextras']['q16'][eparnames=='l_agn'][0])
@@ -147,6 +154,7 @@ def collate_data(alldata, **extras):
 			observatory.append(' ')
 
 	out = {}
+	out['objname'] = objname
 	out['database'] = database
 	out['observatory'] = observatory
 	out['mass'] = mass
@@ -168,6 +176,9 @@ def collate_data(alldata, **extras):
 	out['fagn'] = fagn
 	out['fagn_up'] = fagn_up
 	out['fagn_down'] = fagn_down
+	out['agn_tau'] = agn_tau
+	out['agn_tau_up'] = agn_tau_up
+	out['agn_tau_down'] = agn_tau_down
 	out['fmir'] = fmir
 	out['fmir_up'] = fmir_up
 	out['fmir_down'] = fmir_down
@@ -213,49 +224,116 @@ def make_plot(runname='brownseds_agn',alldata=None,outfolder=None,maxradius=30,i
 
 	#### collate data
 	pdata = collate_data(alldata, maxradius=maxradius)
-	cbd = False
-	cbo = False
-	cbw = False
 
 	### PLOT VERSUS OBSERVED X-RAY FLUX
 	outname = 'xray_lum_fagn_model.png'
-	fig,ax = plot(pdata,color_by_observatory=cbo,color_by_database=cbd,color_by_wise=cbw,
-		          ypar='fagn',ylabel = r'f$_{\mathrm{MIR}}$',sf_flag=True, idx=idx, **popts)
+	fig,ax = plot(pdata,
+		          ypar='fagn',ylabel = r'f$_{\mathrm{MIR}}$',xrb_color_flag=True, idx=idx, **popts)
 	plt.savefig(outfolder+outname,dpi=dpi)
 	plt.close()
 
 	### PLOT VERSUS 'TRUE' X-RAY FLUX
 	outname = 'xray_lum_sfrcorr_fagn_model.png'
-	fig,ax = plot(pdata,color_by_observatory=cbo,color_by_database=cbd,color_by_wise=cbw,
+	fig,ax = plot(pdata,
 		          ypar='fagn',ylabel = r'f$_{\mathrm{MIR}}$',
 		          xpar='lsfr',xlabel = r'L$_{\mathrm{X}}$(observed)/L$_{\mathrm{XRB}}$(model)',
 		          idx = idx, **popts)
 	plt.savefig(outfolder+outname,dpi=dpi)
 	plt.close()
 
-	### PLOT VERSUS HARDNESS
-	outname = 'xray_hardness.png'
-	fig,ax = plot(pdata,color_by_observatory=cbo,color_by_database=cbd,color_by_wise=cbw,
-		          ypar='fagn',ylabel = r'f$_{\mathrm{MIR}}$',
-		          xpar='xray_hardness',xlabel = r'X-ray hardness',
-		          idx = idx, **popts)
-	plt.savefig(outfolder+outname,dpi=dpi)
-	plt.close()
-
-	'''
-	outname = 'xray_lum_sfrcorr_lagn.png'
-	fig,ax = plot(pdata,color_by_observatory=cbo,color_by_database=cbd,color_by_wise=cbw,
-		          ypar='lagn',ylabel = r'model L$_{\mathrm{MIR}}$ [erg/s]',
-		          xpar='lsfr',xlabel = r'L$_{\mathrm{X}}$(observed)/L$_{\mathrm{XRB}}$(model)')
-	plt.savefig(outfolder+outname,dpi=dpi)
-	plt.close()
-	'''
-
 	### SFR, sSFR, dust2, LUV/LIR versus FAGN
 	fig,ax = plot_model_corrs(pdata,idx=idx,**popts)
-	#plt.tight_layout()
 	plt.savefig(outfolder+'fagn_versus_galaxy_properties.png',dpi=dpi)
 	plt.close()
+
+def plot_xray_pdf(pdata, idx=Ellipsis, **popts):
+
+	fig, ax = plt.subplots(1,2,figsize=(12,6))
+
+	### get ydata
+	ypar = 'xray_luminosity'
+	yplot = pdata[ypar][idx]
+	yerr = prosp_dutils.asym_errors(pdata[ypar], pdata[ypar+'_up'], pdata[ypar+'_down'])
+
+	### get xdata and create shape
+	# need PDF
+	# create histogram
+	# smooth it? or more likely load the chains for the full PDF
+	# make a PDF polygon! fixed width (ignore x-errors, miniscule)
+	# fill in with light color, do line down the center, mark q50 with red point
+	print 1/0
+
+
+def plot(pdata,
+	     ypar=None, ylabel=None, 
+	     xpar='xray_luminosity', xlabel=r'L$_{\mathrm{X}}$(observed) [erg/s]',idx=Ellipsis,
+	     xrb_color_flag=False, **popts):
+	'''
+	plots a color-color BPT scatterplot
+	'''
+
+	xplot = pdata[xpar]
+	yplot = pdata[ypar]
+
+	if xpar == 'xray_luminosity':
+		xmin, xmax = 5e35,2e44
+		xerr_1d = pdata['xray_luminosity_err']
+	elif xpar == 'lsfr':
+		xmin, xmax = 5e35,2e45
+		xmin, xmax = 2.5e-3,2e3
+
+	#### plot photometry
+	fig, ax = plt.subplots(1,1, figsize=(8, 8))
+
+	### figure out errors
+	yerr =  prosp_dutils.asym_errors(pdata[ypar], pdata[ypar+'_up'], pdata[ypar+'_down'])
+	if xpar == 'xray_luminosity':
+		xerr = xerr_1d
+	else:
+		xerr =  prosp_dutils.asym_errors(pdata[xpar], pdata[xpar+'_up'], pdata[xpar+'_down'])
+
+	cidx = np.ones_like(pdata[xpar],dtype=bool)
+	cidx[idx] = False
+	s = 120
+
+	if xrb_color_flag:
+
+		for ind, shape, alph in zip([cidx,~cidx],[popts['nofmir_shape'],popts['fmir_shape']],[popts['nofmir_alpha'],popts['fmir_alpha']]):
+			lower_sigma = pdata['lsfr_down'][ind]
+			significant = lower_sigma > 1
+
+			ax.errorbar(xplot[ind][significant], yplot[ind][significant], 
+				        yerr=[yerr[0][ind][significant],yerr[1][ind][significant]], xerr=xerr[ind][significant],
+				        zorder=-5,ms=0.0,
+			            **plotopts)
+			ax.scatter(xplot[ind][significant], yplot[ind][significant], marker=shape, color=red,s=s,zorder=11,alpha=alph,edgecolors='k')
+			ax.errorbar(xplot[ind][~significant], yplot[ind][~significant], 
+				        yerr=[yerr[0][ind][~significant],yerr[1][ind][~significant]], xerr=xerr[ind][~significant],
+				        zorder=-5,ms=0.0,
+			            **plotopts)
+			ax.scatter(xplot[ind][~significant], yplot[ind][~significant], marker=shape, color=blue,s=s,zorder=10,alpha=alph,edgecolors='k')
+
+			ax.text(0.98,0.18,r'L$_{\mathrm{X}}$ consistent',transform=ax.transAxes,color=blue,ha='right')
+			ax.text(0.98,0.14,'with XRBs',transform=ax.transAxes,color=blue,ha='right')
+			ax.text(0.98,0.10,r'L$_{\mathrm{X}}$ inconsistent',transform=ax.transAxes,color=red,ha='right')
+			ax.text(0.98,0.06,'with XRBs',transform=ax.transAxes,color=red,ha='right')
+	else:
+		ax.errorbar(xplot, yplot, yerr=yerr, xerr=xerr,ms=0.0,zorder=-2,
+		            **plotopts)
+		ax.scatter(xplot[cidx], yplot[cidx], marker=popts['nofmir_shape'], alpha=popts['nofmir_alpha'], color=blue,s=s,zorder=10,edgecolors='k')
+		ax.scatter(xplot[~cidx], yplot[~cidx], marker=popts['fmir_shape'], alpha=popts['fmir_alpha'], color=blue,s=s,zorder=10,edgecolors='k')
+
+	ax.set_ylabel(ylabel)
+	ax.set_xlabel(xlabel)
+	ax.set_xlim(xmin,xmax)
+	ax.set_ylim(1e-3,2e0)
+
+	ax.set_xscale('log',nonposx='clip',subsx=([1]))
+	ax.set_yscale('log',nonposy='clip',subsy=([1]))
+
+	ax.text(0.05,0.05, r'N$_{\mathrm{match}}$='+str((pdata['xray_luminosity'] > xmin).sum()), transform=ax.transAxes)
+
+	return fig, ax
 
 def plot_model_corrs(pdata,color_by=None,idx=None,**popts):
 
@@ -268,8 +346,8 @@ def plot_model_corrs(pdata,color_by=None,idx=None,**popts):
 	xlabel = r'log(f$_{\mathrm{MIR}}$)'
 	x = np.log10(pdata['fagn'])
 	xerr =  prosp_dutils.asym_errors(pdata['fagn'], 
-		                              pdata['fagn_up'],
-		                              pdata['fagn_down'],log=True)
+		                             pdata['fagn_up'],
+		                             pdata['fagn_down'],log=True)
 
 	#### y-axis
 	ypar = ['sfr','ssfr','lmir_lbol','lir_luv']
@@ -306,108 +384,6 @@ def plot_model_corrs(pdata,color_by=None,idx=None,**popts):
 	cb.solids.set_edgecolor("face")
 
 	return fig, ax
-
-def plot(pdata,color_by_observatory=False,color_by_database=False,color_by_wise=False,
-	     ypar=None, ylabel=None, 
-	     xpar='xray_luminosity', xlabel=r'L$_{\mathrm{X}}$(observed) [erg/s]',idx=Ellipsis,
-	     sf_flag=False, **popts):
-	'''
-	plots a color-color BPT scatterplot
-	'''
-
-	red = '#FF3D0D'
-	blue = '#1C86EE'
-
-	xplot = pdata[xpar]
-	yplot = pdata[ypar]
-
-	if xpar == 'xray_luminosity':
-		xmin, xmax = 5e35,2e44
-		#xplot = np.clip(pdata['xray_luminosity'],xmin,np.inf)
-		xerr_1d = pdata['xray_luminosity_err']
-	elif xpar == 'lsfr':
-		xmin, xmax = 5e35,2e45
-		xmin, xmax = 2.5e-3,2e3
-		#xplot = np.clip(pdata[xpar],xmin,xmax)
-	else:
-		xmin, xmax = -1.0,1.0
-		#xplot = np.clip(pdata[xpar],xmin,xmax)
-
-	#### plot photometry
-	if color_by_wise:
-		fig, ax = plt.subplots(1,1, figsize=(9.5, 8))
-	else:
-		fig, ax = plt.subplots(1,1, figsize=(8, 8))
-
-	yerr =  prosp_dutils.asym_errors(pdata[ypar], 
-		                              pdata[ypar+'_up'],
-		                              pdata[ypar+'_down'])
-
-	if xpar == 'xray_luminosity':
-		xerr = xerr_1d
-	else:
-		try:
-			xerr =  prosp_dutils.asym_errors(pdata[xpar],
-				                              pdata[xpar+'_up'],
-				                              pdata[xpar+'_down'])
-		except KeyError:
-			xerr = None
-
-	cidx = np.ones_like(pdata[xpar],dtype=bool)
-	cidx[idx] = False
-	s = 120
-
-	if sf_flag:
-
-		for ind, shape, alph in zip([cidx,~cidx],[popts['nofmir_shape'],popts['fmir_shape']],[popts['nofmir_alpha'],popts['fmir_alpha']]):
-			lower_sigma = pdata['lsfr_down'][ind]
-			significant = lower_sigma > 1
-
-			ax.errorbar(xplot[ind][significant], yplot[ind][significant], 
-				        yerr=[yerr[0][ind][significant],yerr[1][ind][significant]], xerr=xerr[ind][significant],
-				        zorder=-5,ms=0.0,
-			            **plotopts)
-			ax.scatter(xplot[ind][significant], yplot[ind][significant], marker=shape, color=red,s=s,zorder=11,alpha=alph,edgecolors='k')
-			ax.errorbar(xplot[ind][~significant], yplot[ind][~significant], 
-				        yerr=[yerr[0][ind][~significant],yerr[1][ind][~significant]], xerr=xerr[ind][~significant],
-				        zorder=-5,ms=0.0,
-			            **plotopts)
-			ax.scatter(xplot[ind][~significant], yplot[ind][~significant], marker=shape, color=blue,s=s,zorder=10,alpha=alph,edgecolors='k')
-
-			ax.text(0.98,0.18,r'L$_{\mathrm{X}}$ consistent',transform=ax.transAxes,color=blue,ha='right')
-			ax.text(0.98,0.14,'with XRBs',transform=ax.transAxes,color=blue,ha='right')
-			ax.text(0.98,0.10,r'L$_{\mathrm{X}}$ inconsistent',transform=ax.transAxes,color=red,ha='right')
-			ax.text(0.98,0.06,'with XRBs',transform=ax.transAxes,color=red,ha='right')
-	else:
-		try:
-			ax.errorbar(xplot, yplot, yerr=yerr, xerr=xerr,ms=0.0,zorder=-2,
-			            **plotopts)
-		except:
-			pass
-		ax.scatter(xplot[cidx], yplot[cidx], marker=popts['nofmir_shape'], alpha=popts['nofmir_alpha'], color=blue,s=s,zorder=10,edgecolors='k')
-		ax.scatter(xplot[~cidx], yplot[~cidx], marker=popts['fmir_shape'], alpha=popts['fmir_alpha'], color=blue,s=s,zorder=10,edgecolors='k')
-
-	ax.set_ylabel(ylabel)
-	ax.set_xlabel(xlabel)
-	ax.set_xlim(xmin,xmax)
-	ax.set_ylim(1e-3,2e0)
-
-	if xpar != 'xray_hardness':
-		ax.set_xscale('log',nonposx='clip',subsx=([1]))
-
-	ax.set_yscale('log',nonposy='clip',subsy=([1]))
-
-	if color_by_observatory or color_by_database:
-		if color_by_observatory:
-			title = 'Observatory'
-		else:
-			title = 'Database'
-		ax.legend(title=title,loc=loc,prop={'size':8})
-	ax.text(0.05,0.05, r'N$_{\mathrm{match}}$='+str((pdata['xray_luminosity'] > xmin).sum()), transform=ax.transAxes)
-
-	return fig, ax
-
-
 
 
 
