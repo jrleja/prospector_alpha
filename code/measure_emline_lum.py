@@ -231,6 +231,7 @@ def measure(sample_results, extra_output, obs_spec, sps, runname='brownseds_np',
     measure emission line luminosities using prospector continuum model
     '''
 
+    '''
     ##### FIRST, CHECK RESOLUTION IN REGION OF HALPHA
     ##### IF IT'S JUNK, THEN RETURN NOTHING!
     idx = (np.abs(obs_spec['rest_lam'] - 6563)).argmin()
@@ -238,7 +239,7 @@ def measure(sample_results, extra_output, obs_spec, sps, runname='brownseds_np',
     if dellam > 14:
         print 'low resolution, not measuring fluxes for '+sample_results['run_params']['objname']
         return None
-
+    '''
     #### smoothing in km/s
     smooth       = 200
 
@@ -470,10 +471,15 @@ def measure(sample_results, extra_output, obs_spec, sps, runname='brownseds_np',
     ##############################################
     # use redshift from emission line fit
     # currently, NO spectral smoothing; inspect to see if it's important for HDELTA ONLY
+    print 'TWO CHANGES: NO SHIFTING OF SPECTRUM FOR ABSORPTION LINES'
+    print 'AND CONVOLVING WITH LARGER NUMBER'
     zadj = bfit_mod.mean_0.value / 4958.92 - 1
+    zadj = 0.0 # DON'T SHIFT ABSORPTION LINES
 
-    if sigma_spec < 200:
+    # if sigma_spec < 200:
+    if True:
         to_convolve = (200.**2 - sigma_spec**2)**0.5
+        to_convolve = 180
         obsflux = prosp_dutils.smooth_spectrum(obslam/(1+zadj),obsflux,to_convolve,minlam=3e3,maxlam=1e4)
 
     #### bootstrap
@@ -504,7 +510,7 @@ def measure(sample_results, extra_output, obs_spec, sps, runname='brownseds_np',
     obs_lam_cont = np.zeros(nabs)
     for kk in xrange(nabs): obs_lam_cont[kk] = out[abslines[kk]]['lam']
 
-    dn4000_obs = prosp_dutils.measure_Dn4000(obslam/(1+zadj),obsflux,ax=out['ax'][5])
+    dn4000_obs = prosp_dutils.measure_Dn4000(obslam,obsflux,ax=out['ax'][5])
 
     plt.tight_layout()
     plt.savefig(out_absobs, dpi=dpi)

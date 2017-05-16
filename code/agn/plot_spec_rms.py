@@ -66,7 +66,6 @@ def collate_data(alldata, alldata_noagn):
 					model_pars[key]['q84'].append(dat['pquantiles']['q84'][parnames==key][0])
 					model_pars[key]['q16'].append(dat['pquantiles']['q16'][parnames==key][0])
 
-
 			# if we don't measure spectral parameters, put a confusing filler value
 			if dat['residuals']['emlines'] is None:
 				rms['obs']['halpha'].append(np.array([np.nan]))
@@ -133,12 +132,10 @@ def plot_rms(pdata,outfolder,agn_idx=None,**popts):
 
 	#### plot geometry
 	fig, ax = plt.subplots(2,2, figsize=(10, 10))
-	fig2, ax2 = plt.subplots(4,2, figsize=(12, 20))
-	fig3, ax3 = plt.subplots(2,2, figsize=(11, 11))
+	fig2, ax2 = plt.subplots(2,2, figsize=(11, 11))
 
 	ax = ax.ravel()
 	ax2 = ax2.ravel()
-	ax3 = ax3.ravel()
 	red = '#FF3D0D'
 	blue = '#1C86EE' 
 
@@ -150,8 +147,8 @@ def plot_rms(pdata,outfolder,agn_idx=None,**popts):
 	         'bdec':r'log(F/F$_0$)$_{\mathrm{H}\alpha}$ - log(F/F$_0$)$_{\mathrm{H}\beta}$'
 	        }
 	lims = [(-2,2), (-2,2), (-0.3,0.3), (-0.15,0.15)]
-	lims2 = [(3,10),(4.5,9),(-0.2,0.8),(0.6,2.0)]
-	lims3 = [(6,9.3),(5,8.5),(-0.1,0.6),(1.0,1.45)]
+	lims2 = [(6,9.3),(5,8.5),(-0.1,0.6),(1.0,1.45)]
+	sn_cut = [0.2, 0.2, 0.1, 0.1]
 
 	### for each observable, pull out RMS
 	ndraw = int(1e5)
@@ -171,9 +168,9 @@ def plot_rms(pdata,outfolder,agn_idx=None,**popts):
 			mod_noagn.append(np.random.choice(pdata['no_agn']['rms']['mod'][key][jj],size=ndraw))
 			rms_noagn = np.sqrt((obs_noagn[-1]-mod_noagn[-1])**2)
 
-			### if we have more than 1/6 NaNs (i.e. places where obs < 0), then dump it
+			### cut on errors
 			diff = rms_noagn-rms_agn
-			if np.isnan(diff).sum() > diff.shape[0]/6.:
+			if (np.isnan(diff).sum() > diff.shape[0]/6.):
 				cent,up,down = np.nan,np.nan,np.nan
 			else:
 				cent,up,down = np.nanpercentile(diff,[50.0,84.0,16.0])
@@ -182,7 +179,7 @@ def plot_rms(pdata,outfolder,agn_idx=None,**popts):
 			q16.append(down)
 		
 		q50, q84, q16 = np.array(q50), np.array(q84), np.array(q16)
-		idx = np.isfinite(q50)
+		idx = (np.isfinite(q50))
 
 		### plot
 		errs = prosp_dutils.asym_errors(q50[idx], q84[idx], q16[idx])
@@ -203,114 +200,73 @@ def plot_rms(pdata,outfolder,agn_idx=None,**popts):
 		ax[ii].plot(x,y,color=red,lw=4,alpha=0.6)
 		ax[ii].plot(x,y,color=red,lw=4,alpha=0.6)
 
-		### plot both relations
-		# AGN first
-		q16o, q50o, q84o, q16m, q50m, q84m = [np.zeros(ngal) for i in range(6)]
-		for jj in xrange(ngal):
-			q50o[jj],q84o[jj],q16o[jj] = np.nanpercentile(obs_agn[jj],[50.0,84.0,16.0])
-			q50m[jj],q84m[jj],q16m[jj] = np.nanpercentile(mod_agn[jj],[50.0,84.0,16.0])
-		
-		errs_obs = prosp_dutils.asym_errors(q50o[idx], q84o[idx], q16o[idx])
-		errs_mod = prosp_dutils.asym_errors(q50m[idx], q84m[idx], q16m[idx])
+		####### observed vs model, AGN only, with arrows
+		q16o, q50o, q84o, q16m, q50m, q84m, q16o_no, q50o_no, q84o_no, q16m_no, q50m_no, q84m_no = [np.zeros(agn_idx.shape[0]) for i in range(12)]
+		for jj in xrange(agn_idx.shape[0]):
+			q50o[jj],q84o[jj],q16o[jj] = np.nanpercentile(obs_agn[agn_idx[jj]],[50.0,84.0,16.0])
+			q50m[jj],q84m[jj],q16m[jj] = np.nanpercentile(mod_agn[agn_idx[jj]],[50.0,84.0,16.0])
+			q50o_no[jj],q84o_no[jj],q16o_no[jj] = np.nanpercentile(obs_noagn[agn_idx[jj]],[50.0,84.0,16.0])
+			q50m_no[jj],q84m_no[jj],q16m_no[jj] = np.nanpercentile(mod_noagn[agn_idx[jj]],[50.0,84.0,16.0])
 
-		p2 = 2*ii
-		ax2[p2].errorbar(q50o[idx],q50m[idx],xerr=errs_obs,yerr=errs_mod,fmt='o', 
-			            ecolor=blue, capthick=1,elinewidth=1,ms=0.0,alpha=0.5,zorder=-5)
-		pts = ax2[p2].scatter(q50o[idx], q50m[idx], marker='o', c=fagn[idx], cmap=plt.cm.plasma,s=70,zorder=10)
+		good = ((np.isfinite(q50o)) & (np.isfinite(q50m)) & (np.isfinite(q50o_no)) & (np.isfinite(q50m_no)) &
+			   ((q84o-q16o)/2. < sn_cut[ii]))
 
-		ax2[p2].set_title(trans[key])
-		ax2[p2].set_xlabel(r'observed')
-		ax2[p2].set_ylabel(r'model (AGN)')
-		ax2[p2].xaxis.set_major_locator(MaxNLocator(5))
-		ax2[p2].yaxis.set_major_locator(MaxNLocator(5))
-		ax2[p2].set_xlim(lims2[ii][0],lims2[ii][1])
-		ax2[p2].set_ylim(lims2[ii][0],lims2[ii][1])
-		ax2[p2].plot(lims2[ii],lims2[ii],'--',color='0.5',alpha=0.5)
-		off,scat = prosp_dutils.offset_and_scatter(q50o[idx],q50m[idx],biweight=True)
-		ax2[p2].text(0.05,0.94, 'biweight scatter='+"{:.2f}".format(scat),
-                     transform = ax2[p2].transAxes,horizontalalignment='left')
-		ax2[p2].text(0.05,0.89, 'mean offset='+"{:.2f}".format(off),
-                     transform = ax2[p2].transAxes,horizontalalignment='left')
-
-		#### now no-AGN (same code)
-		q16o_no, q50o_no, q84o_no, q16m_no, q50m_no, q84m_no = [np.zeros(ngal) for i in range(6)]
-		for jj in xrange(ngal):
-			q50o_no[jj],q84o_no[jj],q16o_no[jj] = np.nanpercentile(obs_noagn[jj],[50.0,84.0,16.0])
-			q50m_no[jj],q84m_no[jj],q16m_no[jj] = np.nanpercentile(mod_noagn[jj],[50.0,84.0,16.0])
-		
-		errs_obs = prosp_dutils.asym_errors(q50o_no[idx], q84o_no[idx], q16o_no[idx])
-		errs_mod = prosp_dutils.asym_errors(q50m_no[idx], q84m_no[idx], q16m_no[idx])
-
-		p2+=1
-		ax2[p2].errorbar(q50o_no[idx],q50m_no[idx],xerr=errs_obs,yerr=errs_mod,fmt='o', 
-			            ecolor=blue, capthick=1,elinewidth=1,ms=0.0,alpha=0.5,zorder=-5)
-		pts = ax2[p2].scatter(q50o_no[idx], q50m_no[idx], marker='o', c=fagn[idx], cmap=plt.cm.plasma,s=70,zorder=10)
-		ax2[p2].set_title(trans[key])
-		ax2[p2].set_xlabel(r'observed')
-		ax2[p2].set_ylabel(r'model (no AGN)')
-		ax2[p2].xaxis.set_major_locator(MaxNLocator(5))
-		ax2[p2].yaxis.set_major_locator(MaxNLocator(5))
-		ax2[p2].set_xlim(lims2[ii][0],lims2[ii][1])
-		ax2[p2].set_ylim(lims2[ii][0],lims2[ii][1])
-		ax2[p2].plot(lims2[ii],lims2[ii],'--',color='0.5',alpha=0.5)
-		off,scat = prosp_dutils.offset_and_scatter(q50o_no[idx],q50m_no[idx],biweight=True)
-		ax2[p2].text(0.05,0.94, 'biweight scatter='+"{:.2f}".format(scat),
-                     transform = ax2[p2].transAxes,horizontalalignment='left')
-		ax2[p2].text(0.05,0.89, 'mean offset='+"{:.2f}".format(off),
-                     transform = ax2[p2].transAxes,horizontalalignment='left')
-
-		### label, add colorbar
-		cb = fig.colorbar(pts, ax=ax2[p2], aspect=10)
-		cb.set_label(r'f$_{\mathrm{MIR}}$')
-		cb.solids.set_rasterized(True)
-		cb.solids.set_edgecolor("face")
-
-		####### NEW FINAL PLOT
 		alpha = 0.7
-		ax3[ii].scatter(q50o_no[agn_idx], q50m_no[agn_idx], marker='o', color=popts['noagn_color'],s=70,zorder=10,alpha=alpha,edgecolors='k')
-		ax3[ii].scatter(q50o[agn_idx], q50m[agn_idx], marker='o', color=popts['agn_color'],s=70,zorder=10,alpha=alpha,edgecolors='k')
+		ax2[ii].scatter(q50o_no[good], q50m_no[good], marker='o', color=popts['noagn_color'],s=70,zorder=10,alpha=alpha,edgecolors='k')
+		ax2[ii].scatter(q50o[good], q50m[good], marker='o', color=popts['agn_color'],s=70,zorder=10,alpha=alpha,edgecolors='k')
+		
+		errs_obs = prosp_dutils.asym_errors(q50o_no[good], q84o_no[good], q16o_no[good])
+		errs_mod = prosp_dutils.asym_errors(q50m_no[good], q84m_no[good], q16m_no[good])
+
+		ax2[ii].errorbar(q50o_no[good], q50m_no[good], 
+			             yerr=errs_mod, xerr=errs_obs,
+			             fmt='o', ecolor='0.5', capthick=0.5,elinewidth=0.5,
+			             ms=0,alpha=0.4,zorder=-5)
+
+		errs_obs = prosp_dutils.asym_errors(q50o[good], q84o[good], q16o[good])
+		errs_mod = prosp_dutils.asym_errors(q50m[good], q84m[good], q16m[good])
+
+		ax2[ii].errorbar(q50o[good], q50m[good], 
+			             yerr=errs_mod, xerr=errs_obs,
+			             fmt='o', ecolor='0.5', capthick=0.5,elinewidth=0.5,
+			             ms=0,alpha=0.4,zorder=-5)
 
 		### draw in some SICK arrows
-		for kk in xrange(len(agn_idx)):
-			old = (q50o_no[agn_idx][kk],q50m_no[agn_idx][kk])
-			new = (q50o[agn_idx][kk],q50m[agn_idx][kk])
-			drawArrow(old,new,ax3[ii],scale=lims3[ii][1]-lims3[ii][0])
+		for kk in xrange(len(good)):
+			if not good[kk]:
+				continue
+			old = (q50o_no[kk],q50m_no[kk])
+			new = (q50o[kk],q50m[kk])
+			drawArrow(old,new,ax2[ii],scale=lims2[ii][1]-lims2[ii][0])
 
 		### labels and lines
-		ax3[ii].set_xlabel('observed '+trans[key])
-		ax3[ii].set_ylabel('model '+trans[key])
-		ax3[ii].xaxis.set_major_locator(MaxNLocator(5))
-		ax3[ii].yaxis.set_major_locator(MaxNLocator(5))
-		ax3[ii].set_xlim(lims3[ii][0],lims3[ii][1])
-		ax3[ii].set_ylim(lims3[ii][0],lims3[ii][1])
-		ax3[ii].plot(lims3[ii],lims3[ii],'--',color='0.5',alpha=0.5,zorder=-15)
+		ax2[ii].set_xlabel('observed '+trans[key])
+		ax2[ii].set_ylabel('model '+trans[key])
+		ax2[ii].xaxis.set_major_locator(MaxNLocator(5))
+		ax2[ii].yaxis.set_major_locator(MaxNLocator(5))
+		ax2[ii].set_xlim(lims2[ii][0],lims2[ii][1])
+		ax2[ii].set_ylim(lims2[ii][0],lims2[ii][1])
+		ax2[ii].plot(lims2[ii],lims2[ii],'--',color='0.5',alpha=0.5,zorder=-15)
 
-		good = ((np.isfinite(q50o)) & (np.isfinite(q50m)) & (np.isfinite(q50o_no)) & (np.isfinite(q50m_no)))[agn_idx]
-		off_agn,scat_agn = prosp_dutils.offset_and_scatter(q50o[agn_idx][good],q50m[agn_idx][good],biweight=True)
-		off_noagn,scat_noagn = prosp_dutils.offset_and_scatter(q50o_no[agn_idx][good],q50m_no[agn_idx][good],biweight=True)
-		topts = {'transform':ax3[ii].transAxes,'fontsize':13,'verticalalignment':'top'}
-		ax3[ii].text(0.04,0.95,'AGN-off', color=popts['noagn_color'],weight='bold', **topts)
-		ax3[ii].text(0.04,0.9,'scatter, offset=', color=popts['noagn_color'], **topts)
-		ax3[ii].text(0.04,0.85,"{:.2f}".format(scat_noagn)+", "+"{:.2f}".format(off_noagn), color=popts['noagn_color'], **topts)
-		ax3[ii].text(0.04,0.77,'AGN-on', color=popts['agn_color'], weight='semibold', **topts)
-		ax3[ii].text(0.04,0.72,'scatter, offset=', color=popts['agn_color'], **topts)
-		ax3[ii].text(0.04,0.67,"{:.2f}".format(scat_agn)+", "+"{:.2f}".format(off_agn), color=popts['agn_color'], **topts)
+		off_agn,scat_agn = prosp_dutils.offset_and_scatter(q50o[good],q50m[good],biweight=True)
+		off_noagn,scat_noagn = prosp_dutils.offset_and_scatter(q50o_no[good],q50m_no[good],biweight=True)
+		topts = {'transform':ax2[ii].transAxes,'fontsize':13,'verticalalignment':'top'}
+		ax2[ii].text(0.04,0.95,'AGN-off', color=popts['noagn_color'],weight='bold', **topts)
+		ax2[ii].text(0.04,0.9,'scatter, offset=', color=popts['noagn_color'], **topts)
+		ax2[ii].text(0.04,0.85,"{:.2f}".format(scat_noagn)+", "+"{:.2f}".format(off_noagn), color=popts['noagn_color'], **topts)
+		ax2[ii].text(0.04,0.77,'AGN-on', color=popts['agn_color'], weight='semibold', **topts)
+		ax2[ii].text(0.04,0.72,'scatter, offset=', color=popts['agn_color'], **topts)
+		ax2[ii].text(0.04,0.67,"{:.2f}".format(scat_agn)+", "+"{:.2f}".format(off_agn), color=popts['agn_color'], **topts)
+
+		print key
+		print 'change in observables:'
+		for k,idx in enumerate(agn_idx): print '\t'+pdata['agn']['objname'][idx]+': '+"{:.2f}".format(q50o_no[k]-q50o[k])
 
 	fig.tight_layout()
-	fig.savefig(outfolder+'delta_observables.png',dpi=120)
+	fig.savefig(outfolder+'delta_spec_rms.png',dpi=120)
 
 	fig2.tight_layout()
-	fig2.savefig(outfolder+'obs_vs_mod.png',dpi=120)
-
-	fig3.tight_layout()
-	fig3.savefig(outfolder+'obs_vs_mod_arrows.png',dpi=120)
+	fig2.savefig(outfolder+'obs_vs_mod_arrows.png',dpi=120)
 
 	plt.close()
-
-
-
-
-
-
-
 

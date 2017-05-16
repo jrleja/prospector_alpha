@@ -150,19 +150,13 @@ def calc_extra_quantities(sample_results, ncalc=3000, **kwargs):
         thetas = copy(sample_results['flatchain'][idx])
         spec[:,jj],mags[:,jj],sm = sample_results['model'].mean_model(thetas, sample_results['obs'], sps=sps)
 
-        ##### if we don't use these parameters, set them to defaults
+        ##### if we don't use these parameters, find them in SPS model
         dust1 = thetas[d1_idx]
         if dust1.shape[0] == 0:
-            try:
-                dust1 = sps.csp.params['dust1']
-            except AttributeError:
-                dust1 = sps.params['dust1']
+            dust1 = sps.params['dust1']
         dust_idx = thetas[didx]
         if dust_idx.shape[0] == 0:
-            try:
-                dust_idx = sps.csp.params['dust_index']
-            except AttributeError:
-                dust1 = sps.params['dust1']
+            dust_idx = sps.params['dust_index']
 
         ##### extract sfh parameters
         # pass stellar mass to avoid extra model call

@@ -385,7 +385,7 @@ model_params.append({'name': 'dust1_fraction', 'N': 1,
                         'isfree': True,
                         'init': 1.0,
                         'init_disp': 0.8,
-                        'disp_floor': 0.5,
+                        'disp_floor': 0.8,
                         'units': '',
                         'prior': priors.TopHat(mini=0.0, maxi=2.0)})
 
@@ -429,16 +429,16 @@ model_params.append({'name': 'add_dust_emission', 'N': 1,
 model_params.append({'name': 'duste_gamma', 'N': 1,
                         'isfree': True,
                         'init': 0.01,
-                        'init_disp': 0.2,
-                        'disp_floor': 0.15,
+                        'init_disp': 0.4,
+                        'disp_floor': 0.3,
                         'units': None,
                         'prior': priors.TopHat(mini=0.0, maxi=1.0)})
 
 model_params.append({'name': 'duste_umin', 'N': 1,
                         'isfree': True,
                         'init': 1.0,
-                        'init_disp': 5.0,
-                        'disp_floor': 4.5,
+                        'init_disp': 10.0,
+                        'disp_floor': 5.0,
                         'units': None,
                         'prior': priors.TopHat(mini=0.1, maxi=25.0)})
 
