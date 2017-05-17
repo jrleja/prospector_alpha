@@ -16,7 +16,7 @@ def ncorner(sresults, model, filename=None, show_titles=True, range=None):
 
     fig = corner.corner(chain,
                         labels=model.theta_labels(), plot_datapoints=False,
-                        quantiles=[0.16, 0.5, 0.84], title_kwargs = {'fontsize': 'medium'},
+                        quantiles=[0.16, 0.5, 0.84], title_kwargs = {'fontsize': 'medium'}, show_titles=True,
                         fill_contours=True, range=range,levels=[0.68,0.95],color='blue',hist_kwargs={'normed':True})
                         #contourf_kwargs={'alpha':0.5})
     
@@ -24,6 +24,17 @@ def ncorner(sresults, model, filename=None, show_titles=True, range=None):
     if filename is not None:
         plt.savefig(filename,dpi=120)
     return fig
+
+def ecorner(sresults,flatchain, fig, model, filename, range=None):
+
+    corner.corner(flatchain, color='red',
+                  labels=model.theta_labels(), plot_datapoints=False,quantiles=[0.16, 0.5, 0.84],
+                  title_kwargs = {'fontsize': 'medium'}, fig=fig, fill_contours=True,
+                  range=range,levels=[0.68,0.95],hist_kwargs={'normed':True})#contourf_kwargs={'alpha':0.5})
+    fig.text(0.3,0.92, 'emcee MAP='+"{:.2f}".format(sresults['lnprobability'].max()),color='red',fontsize=40)
+    plt.savefig(filename,dpi=120)
+    plt.close()
+
 
 def rcorner(sresults, model, filename=None, range=None, fig=None, nresamp=1000, nsamp_per_realization=1000):
 
@@ -67,17 +78,7 @@ def resample_run(res):
 
     return res_resample
 
-def ecorner(sresults,flatchain, fig, model, filename, range=None):
-
-    corner.corner(flatchain, color='red',
-                  labels=model.theta_labels(), plot_datapoints=False,quantiles=[0.16, 0.5, 0.84],
-                  title_kwargs = {'fontsize': 'medium'}, fig=fig, fill_contours=True,
-                  range=range,levels=[0.68,0.95],hist_kwargs={'normed':True})#contourf_kwargs={'alpha':0.5})
-    fig.text(0.3,0.92, 'emcee MAP='+"{:.2f}".format(sresults['lnprobability'].max()),color='red',fontsize=40)
-    plt.savefig(filename,dpi=120)
-    plt.close()
-
-def plot_chain(sresults, pnames, filename):
+def plot_chain(sresults, pnames, outfig_name):
 
     fig, ax = plt.subplots(4, 5, figsize = (15,11))
     ax = np.ravel(ax)
@@ -140,7 +141,7 @@ def plot_chain(sresults, pnames, filename):
             xt = xt+delx
 
     plt.tight_layout(rect=(0,0,1,0.9))
-    plt.savefig(filename,dpi=120)
+    plt.savefig(outfig_name,dpi=120)
     plt.close()
 
 def transform_zf_to_sf(zf):

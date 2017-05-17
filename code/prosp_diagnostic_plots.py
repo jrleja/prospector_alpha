@@ -681,7 +681,7 @@ def sed_figure(outname = None, truths = None,
     ax2=phot.twiny()
     ax2.set_xticks(np.arange(0,10,0.2))
     ax2.set_xlim(x1/(1+z_txt), x2/(1+z_txt))
-    ax2.set_xlabel(r'log($\lambda_{rest}$) [$\mu$m]')
+    ax2.set_xlabel(r'$\lambda_{\mathrm{rest}}$ [$\mu$m]')
     ax2.set_ylim(y1, y2)
     ax2.set_xscale('log',nonposx='clip',subsx=(2,5))
     ax2.xaxis.set_minor_formatter(minorFormatter)
