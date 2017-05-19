@@ -31,7 +31,7 @@ class tLinear1D(core.Fittable1DModel):
         """One dimensional Line model function"""
 
         out = np.zeros_like(x)
-        low = np.array(x) < 4000
+        low = (np.array(x) < 4000) & (np.array(x) > 3650)
         mid = (np.array(x) > 4000) & (np.array(x) < 5600)
         high = np.array(x) > 5600
         out[low] = slope_low*x[low]+intercept_low
@@ -44,7 +44,7 @@ class tLinear1D(core.Fittable1DModel):
     def fit_deriv(x, slope_low, intercept_low, slope_mid, intercept_mid, slope_high, intercept_high):
         """One dimensional Line model derivative with respect to parameters"""
 
-        low = np.array(x) < 4000
+        low = (np.array(x) < 4000) & (np.array(x) > 3650)
         mid = (np.array(x) > 4000) & (np.array(x) < 5600)
         high = np.array(x) > 5600
         
@@ -134,8 +134,15 @@ def tiedfunc_nii(g1):
 def tiedfunc_sig(g1):
     return g1.stddev_0
 
+# lam_tied = [None, loiii_2, None, None, lnii_2, None, None, loii_2]
+
+'''
 def loii_2(g1):
     zadj = g1.mean_0 / 4958.92 - 1
+    return (1+zadj) *  3728.8
+'''
+def loii_2(g1):
+    zadj = g1.mean_6 / 3726.1 - 1
     return (1+zadj) *  3728.8
 
 def loii_1(g1):
@@ -153,9 +160,13 @@ def lhbeta(g1):
 def lnii_1(g1):
     zadj = g1.mean_0 / 4958.92 - 1
     return (1+zadj) *  6548.03
-
+'''
 def lnii_2(g1):
     zadj = g1.mean_0 / 4958.92 - 1
+    return (1+zadj) *  6583.41
+'''
+def lnii_2(g1):
+    zadj = g1.mean_3 / 6548.03 - 1
     return (1+zadj) *  6583.41
 
 def lhalpha(g1):
@@ -208,9 +219,8 @@ def umbrella_model(lams, amp_tied, lam_tied, sig_tied,continuum_6400):
     #### NOW TIE THEM TOGETHER
     for ii in xrange(len(lams)):
         # position and widths
-        if ii != 0:
-            #getattr(model, 'stddev_'+str(ii)).tied = tiedfunc_sig
-            getattr(model, 'mean_'+str(ii)).tied = lam_tied[ii]
+        #if ii != 0:
+            #getattr(model, 'mean_'+str(ii)).tied = lam_tied[ii]
 
         # amplitudes, if necessary
         if amp_tied[ii] is not None:
@@ -255,7 +265,8 @@ def measure(sample_results, extra_output, obs_spec, sps, runname='brownseds_np',
     #### define emission lines to measure
     # we do this in sets of lines, which are unpacked at the end
     amp_tied = [None, tiedfunc_oiii, None, None, tiedfunc_nii, None, None, tiedfunc_oii]
-    lam_tied = [None, loiii_2, lhbeta, lnii_1, lnii_2, lhalpha,loii_1, loii_2]
+    lam_tied = [None, loiii_2, lhbeta, lnii_1, lnii_2, lhalpha, loii_1, loii_2]
+    lam_tied = [None, loiii_2, None, None, lnii_2, None, None, loii_2]
     sig_tied = [None, soiii, None, None, snii, None, None, soii]
     nline = len(emline)
 
@@ -361,8 +372,9 @@ def measure(sample_results, extra_output, obs_spec, sps, runname='brownseds_np',
             model_flux[mod_idx] = model_flux[mod_idx]*norm_factor
 
         #### adjust model wavelengths for the slight difference with published redshifts
-        zadj = gauss_fit.mean_0 / 4958.92 - 1
-        model_newlam = (1+zadj)*model_lam
+        #zadj = gauss_fit.mean_0 / 4958.92 - 1
+        #model_newlam = (1+zadj)*model_lam
+        model_newlam = model_lam
 
         #### absorption model versus emission model
         if test_plot:

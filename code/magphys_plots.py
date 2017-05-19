@@ -848,11 +848,13 @@ def plt_all(runname=None,startup=True,**extras):
         alldata = []
         sps = None
         for jj in xrange(len(filebase)):
+
             dictionary, sps = collate_data(filebase=filebase[jj],\
                                            outfolder=outfolder,
                                            runname=runname,
                                            sps=sps,
                                            **extras)
+
             alldata.append(dictionary)
         brown_io.save_alldata(alldata,runname=runname)
     else:

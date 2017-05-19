@@ -126,7 +126,7 @@ def make_plot():
         a.xaxis.set_minor_formatter(minorFormatter)
         a.xaxis.set_major_formatter(majorFormatter)
         a.set_xlim(to_plot)
-        a.set_ylim(17,23)
+        a.set_ylim(15.7,21)
 
         a.set_xlabel(r'wavelength [$\mu$m]')
         a.set_ylabel(r'log($\nu$f$_{\nu}$)')

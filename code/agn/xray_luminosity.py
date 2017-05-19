@@ -50,7 +50,7 @@ def collate_data(alldata, **extras):
     nsamp = 100000 # for newly defined variables
 
     #### for each object
-    fagn, fagn_up, fagn_down, agn_tau, agn_tau_up, agn_tau_down, mass, lir_luv, lir_luv_up, lir_luv_down, xray_lum, xray_lum_err, database, observatory = [[] for i in range(14)]
+    fagn, fagn_up, fagn_down, agn_tau, agn_tau_up, agn_tau_down, mass, mass_up, mass_down, lir_luv, lir_luv_up, lir_luv_down, xray_lum, xray_lum_err, database, observatory = [[] for i in range(16)]
     fagn_obs, fagn_obs_up, fagn_obs_down, lmir_lbol, lmir_lbol_up, lmir_lbol_down, xray_hardness, xray_hardness_err = [[] for i in range(8)]
     lagn, lagn_up, lagn_down, lsfr, lsfr_up, lsfr_down = [], [], [], [], [], []
     sfr, sfr_up, sfr_down, ssfr, ssfr_up, ssfr_down, d2, d2_up, d2_down = [[] for i in range(9)]
@@ -61,6 +61,8 @@ def collate_data(alldata, **extras):
 
         #### mass, SFR, sSFR, dust2
         mass.append(dat['pextras']['q50'][eparnames=='stellar_mass'][0])
+        mass_up.append(dat['pextras']['q84'][eparnames=='stellar_mass'][0])
+        mass_down.append(dat['pextras']['q16'][eparnames=='stellar_mass'][0])
         sfr.append(dat['pextras']['q50'][eparnames=='sfr_100'][0])
         sfr_up.append(dat['pextras']['q84'][eparnames=='sfr_100'][0])
         sfr_down.append(dat['pextras']['q16'][eparnames=='sfr_100'][0])
@@ -164,6 +166,8 @@ def collate_data(alldata, **extras):
     out['database'] = database
     out['observatory'] = observatory
     out['mass'] = mass
+    out['mass_up'] = mass_up
+    out['mass_down'] = mass_down
     out['sfr'] = sfr
     out['sfr_up'] = sfr_up
     out['sfr_down'] = sfr_down
@@ -218,7 +222,7 @@ def collate_data(alldata, **extras):
 
     return out
 
-def make_plot(runname='brownseds_agn',alldata=None,outfolder=None,maxradius=30,idx=Ellipsis,**popts):
+def make_plot(agn_evidence,runname='brownseds_agn',alldata=None,outfolder=None,maxradius=30,idx=Ellipsis,**popts):
 
     #### load alldata
     if alldata is None:
@@ -257,9 +261,16 @@ def make_plot(runname='brownseds_agn',alldata=None,outfolder=None,maxradius=30,i
     plt.savefig(outfolder+'fagn_versus_galaxy_properties.png',dpi=dpi)
     plt.close()
 
-def load_full_pdf(pdata,alldata,idx):
 
-    print 1/0
+    agn_evidence['xray_luminosity'] = pdata['xray_luminosity']
+    agn_evidence['xray_luminosity_err'] = pdata['xray_luminosity_err']
+    agn_evidence['xrb_flag'] = xray_cuts(pdata)
+    
+    return agn_evidence
+
+def xray_cuts(pdata):
+    lower_sigma = pdata['lsfr_down']
+    return lower_sigma > 1
 
 def plot_pdf_scatter(pdata, alldata, idx=Ellipsis, outname=None,
                      log=True, **popts):
@@ -279,7 +290,7 @@ def plot_pdf_scatter(pdata, alldata, idx=Ellipsis, outname=None,
     ### deal with x-axis
     xpar = 'xray_luminosity'
     pidx = (pdata[xpar][idx] > 0)
-    pdata = load_full_pdf(pdata,alldata,pidx)
+    #pdata = load_full_pdf(pdata,alldata,pidx)
     xplot = np.log10(pdata[xpar][idx][pidx])
     xerr_1d = pdata['xray_luminosity_err'][idx][pidx]
     xlabel = r'log(L$_{\mathrm{X}}$(observed)) [erg/s]'
@@ -288,57 +299,79 @@ def plot_pdf_scatter(pdata, alldata, idx=Ellipsis, outname=None,
     ### deal with y-axis
     ypars = ['fmir','agn_tau']
     ylabel = [r'f$_{\mathrm{MIR}}$',r'$\tau_{\mathrm{AGN}}$']
-    nbins = 30
+    nbins = 20
+    clip = [5,95]
 
+    lims = [(0.04,1),(5,100)]
+    sig = xray_cuts(pdata)[idx][pidx]
     ### loop over two y-parameters (AGN tau and fmir)
     for ii, yp in enumerate(ypars):
 
+        q50 = pdata[yp][idx][pidx]
+        q84 = pdata[yp+'_up'][idx][pidx]
+        q16 = pdata[yp+'_down'][idx][pidx]
+
+        for color,id in zip([red,blue],[sig,~sig]):
+            yerr = prosp_dutils.asym_errors(q50[id],q84[id],q16[id])
+            ax[ii].scatter(q50[id], xplot[id], marker='o', color=color,s=45,zorder=11,alpha=0.9,edgecolors='k')
+            ax[ii].errorbar(q50[id], xplot[id], xerr=yerr, zorder=-5,ms=0.0, ecolor='k', linestyle=' ',
+                            capthick=0.8, elinewidth=0.4, alpha=0.7)
+
+        ### labels
+        ax[ii].set_ylabel(xlabel)
+        ax[ii].set_xlabel(ylabel[ii])
+
+        ### limits
+        xlim = (xplot.min()-0.5,xplot.max()+0.5)
+        ax[ii].set_ylim(xlim)
+        ax[ii].yaxis.set_major_locator(MaxNLocator(5))
+        ax[ii].set_xlim(lims[ii])
+
+        ax[ii].set_xscale('log',nonposx='clip',subsx=(1,2,4,7))
+        ax[ii].xaxis.set_minor_formatter(minorFormatter)
+        ax[ii].xaxis.set_major_formatter(majorFormatter)
+
+            #ylim = (10**(agn_chain.min()-0.2),10**(agn_chain.max()+0.2)) # have to put in log if-statement
+
+
         ### grab chain, create histogram
+        '''
         agn_chain = pdata[yp+'_chain'][idx][pidx]
         if log:
             agn_chain = np.log10(agn_chain)
-
+    
         ### loop over each galaxy PDF
         polygons = []
         for k, chain in enumerate(agn_chain):
 
+            ### clip chain
+            ends = np.percentile(chain,clip)
+            clipped_chain = chain[(chain > ends[0]) & (chain < ends[1])]
+
             ### create polygon
-            hist, bins = np.histogram(chain,bins=nbins,density=True)
+            hist, bins = np.histogram(clipped_chain,bins=nbins,density=True)
+
             xpoints = (hist/hist.max()) * xwidth + xplot[k]
-            ypoints = (bins[:-1]+bins[1:])/2.            
+            xpoints = np.array([xplot[k]] + xpoints.tolist() + [xplot[k]]) # add padding
+
+            delta = bins[1]-bins[0]
+            ypoints = (bins[:-1]+bins[1:])/2.
+            ypoints = np.array([ypoints.min()-delta] + ypoints.tolist() + [ypoints.max()+delta]) # add padding
+
             if log:
                 ypoints = 10**ypoints
-            '''
-            spline = interpolate.UnivariateSpline(xpoints, ypoints,s=2)
-            xnew = np.linspace(xpoints.min(),xpoints.max(),100)
-            '''
+
             coords = np.vstack((xpoints,ypoints)).transpose()
 
             polygons.append(Polygon(coords,closed=True))
 
         p = PatchCollection(polygons, alpha=0.4, facecolor=blue, edgecolor='blue', linewidth=1)
         ax[ii].add_collection(p)
+        '''
 
-        ### labels
-        ax[ii].set_xlabel(xlabel)
-        ax[ii].set_ylabel(ylabel[ii])
-
-        ### limits
-        xlim = (xplot.min()-0.2,xplot.max()+0.2)
-        ax[ii].set_xlim(xlim)
-
-        if log:
-            ax[ii].set_yscale('log',nonposx='clip',subsx=(1,2,4))
-            ax[ii].yaxis.set_minor_formatter(minorFormatter)
-            ax[ii].yaxis.set_major_formatter(majorFormatter)
-
-            ylim = (10**(agn_chain.min()-0.2),10**(agn_chain.max()+0.2)) # have to put in log if-statement
-            ax[ii].set_ylim(ylim)
-
-    plt.show()
-    print 1/0
-
-
+    plt.tight_layout()
+    plt.savefig(outname,dpi=150)
+    plt.close()
 
 def plot(pdata,
          ypar=None, ylabel=None, 
@@ -375,7 +408,7 @@ def plot(pdata,
     if xrb_color_flag:
 
         for ind, shape, alph in zip([cidx,~cidx],[popts['nofmir_shape'],popts['fmir_shape']],[popts['nofmir_alpha'],popts['fmir_alpha']]):
-            lower_sigma = pdata['lsfr_down'][ind]
+            lower_sigma = xray_cuts(pdata)[ind]
             significant = lower_sigma > 1
 
             ax.errorbar(xplot[ind][significant], yplot[ind][significant], 
@@ -426,9 +459,9 @@ def plot_model_corrs(pdata,color_by=None,idx=None,**popts):
                                      pdata['fagn_down'],log=True)
 
     #### y-axis
-    ypar = ['sfr','ssfr','lmir_lbol','lir_luv']
-    ylabels = [r'log(SFR) [M$_{\odot}$/yr]', r'log(sSFR) [yr$^{-1}$]',
-               r'log(L$_{\mathrm{MIR}}$/L$_{\mathrm{bol}}$)',r'log(L$_{\mathrm{IR}}$/L$_{\mathrm{UV}}$)']
+    ypar = ['mass','sfr','ssfr','lir_luv']
+    ylabels = [r'log(M$_{*}$) [M$_{\odot}$/yr]', r'log(SFR) [M$_{\odot}$/yr]',
+               r'log(sSFR) [yr$^{-1}$]',r'log(L$_{\mathrm{IR}}$/L$_{\mathrm{UV}}$)']
     cb = pdata['d2']
     for ii, yp in enumerate(ypar):
 
@@ -442,16 +475,16 @@ def plot_model_corrs(pdata,color_by=None,idx=None,**popts):
         yerr =  prosp_dutils.asym_errors(pdata[yp], 
                                           pdata[yp+'_up'],
                                           pdata[yp+'_down'],log=log)
-        ax[ii].errorbar(x,y,yerr=yerr, xerr=xerr, ms=0.0,zorder=-2,**plotopts)
+        ax[ii].errorbar(y,x,xerr=yerr, yerr=xerr, ms=0.0,zorder=-2,**plotopts)
 
         vmin, vmax = cb.min(), cb.max()
-        ax[ii].scatter(x[cidx],y[cidx], marker=popts['nofmir_shape'],c=cb[cidx], cmap=popts['cmap'], \
+        ax[ii].scatter(y[cidx],x[cidx], marker=popts['nofmir_shape'],c=cb[cidx], cmap=popts['cmap'], \
                        s=90,zorder=10, vmin=vmin, vmax=vmax)
-        pts = ax[ii].scatter(x[idx],y[idx], marker=popts['fmir_shape'],c=cb[idx], cmap=popts['cmap'], \
+        pts = ax[ii].scatter(y[idx],x[idx], marker=popts['fmir_shape'],c=cb[idx], cmap=popts['cmap'], \
                              s=90,zorder=10, vmin=vmin, vmax=vmax)
 
-        ax[ii].set_xlabel(xlabel)
-        ax[ii].set_ylabel(ylabels[ii])
+        ax[ii].set_xlabel(ylabels[ii])
+        ax[ii].set_ylabel(xlabel)
         ax[ii].xaxis.set_major_locator(MaxNLocator(5))
 
     cb = fig.colorbar(pts, cax=cb_ax)
