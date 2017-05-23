@@ -19,7 +19,7 @@ jansky_mks = 1e-26
 APPS = os.getenv('APPS')
 run_params = {'verbose':True,
               'debug': False,
-              'outfile': APPS+'/threedhst_bsfh/results/td_massive/td_massive_579',
+              'outfile': APPS+'/threedhst_bsfh/results/td_massive/td_massive_AEGIS_531',
               'nofork': True,
               # Optimizer params
               'ftol':0.5e-5, 
@@ -41,27 +41,25 @@ run_params = {'verbose':True,
               'initial_disp':0.1,
               'interp_type': 'logarithmic',
               'agelims': [0.0,8.0,8.5,9.0,9.5,9.8,10.0],
-              # Data info
-              'photname':APPS+'/threedhst_bsfh/data/3dhst/COSMOS_td_massive.cat',
-              'datname':APPS+'/threedhst_bsfh/data/3dhst/COSMOS_td_massive.dat',
-              'fastname':APPS+'/threedhst_bsfh/data/3dhst/COSMOS_td_massive.fout',
-              'objname':'579',
+              # Data info (phot = .cat, dat = .dat, fast = .fout)
+              'datdir':APPS+'/threedhst_bsfh/data/3dhst/',
+              'runname': 'td_massive',
+              'objname':'AEGIS_531'
               }
 ############
 # OBS
 #############
 
-def load_obs(photname, objname, err_floor=0.05, zperr=True, **extras):
+def load_obs(objname=None, datdir=None, runname=None, err_floor=0.05, zperr=True, **extras):
 
     ''' 
-    photname: photometric file location
     objname: number of object in the 3D-HST COSMOS photometric catalog
     err_floor: the fractional error floor (0.05 = 5% floor)
     zp_err: inflate the errors by the zeropoint offsets from Skelton+14
     '''
 
-
     ### open file, load data
+    photname = datdir + objname.split('_')[0] + '_' + runname + '.cat'
     with open(photname, 'r') as f:
         hdr = f.readline().split()
     dtype = np.dtype([(hdr[1],'S20')] + [(n, np.float) for n in hdr[2:]])
@@ -70,7 +68,7 @@ def load_obs(photname, objname, err_floor=0.05, zperr=True, **extras):
 
     ### extract filters, fluxes, errors for object
     # from ReadMe: "All fluxes are normalized to an AB zeropoint of 25, such that: magAB = 25.0-2.5*log10(flux)
-    obj_idx = (dat['id'] == objname)
+    obj_idx = (dat['id'] == objname.split('_')[-1])
     filters = np.array([f[2:] for f in dat.dtype.names if f[0:2] == 'f_'])
     flux = np.squeeze([dat[obj_idx]['f_'+f] for f in filters])
     unc = np.squeeze([dat[obj_idx]['e_'+f] for f in filters])
@@ -134,7 +132,6 @@ def to_dust1(dust1_fraction=None, dust1=None, dust2=None, **extras):
 def transform_zfraction_to_sfrfraction(sfr_fraction=None, z_fraction=None, **extras):
     sfr_fraction[0] = 1-z_fraction[0]
     for i in xrange(1,sfr_fraction.shape[0]): sfr_fraction[i] =  np.prod(z_fraction[:i])*(1-z_fraction[i])
-    #sfr_fraction[-1] = np.prod(z)  #### THIS IS SET IMPLICITLY
     return sfr_fraction
 
 #############
@@ -523,12 +520,13 @@ def load_sps(**extras):
     sps = FracSFH(**extras)
     return sps
 
-def load_model(objname='',datname='',fastname='', agelims=[], **extras):
+def load_model(objname=None, datdir=None, runname=None, agelims=[], **extras):
 
     ###### REDSHIFT ######
     ### open file, load data
     '''
     # this is zbest
+    datname = datdir + field + '_' + runname + '.dat'
     with open(datname, 'r') as f:
         hdr = f.readline().split()
     dtype = np.dtype([(hdr[1],'S20')] + [(n, np.float) for n in hdr[2:]])
@@ -538,11 +536,13 @@ def load_model(objname='',datname='',fastname='', agelims=[], **extras):
     '''
     # this is zfast
 
+    fastname = datdir + objname.split('_')[0] + '_' + runname + '.fout'
+
     with open(fastname, 'r') as f:
         hdr = f.readline().split()
     dtype = np.dtype([(hdr[1],'S20')] + [(n, np.float) for n in hdr[2:]])
     fast = np.loadtxt(fastname, comments = '#', delimiter=' ', dtype = dtype)
-    zred = fast['z'][fast['id'] == objname][0]
+    zred = fast['z'][fast['id'] == objname.split('_')[-1]][0]
 
     #### CALCULATE TUNIV #####
     tuniv = WMAP9.age(zred).value

@@ -15,7 +15,7 @@ APPS = os.getenv('APPS')
 
 run_params = {'verbose':True,
               'debug': False,
-              'outfile': APPS+'/threedhst_bsfh/results/fast_mimic/fast_mimic_579',
+              'outfile': APPS+'/threedhst_bsfh/results/fast_mimic/fast_mimic_AEGIS_531',
               'nofork': True,
               # Optimizer params
               'ftol':0.5e-5, 
@@ -37,27 +37,25 @@ run_params = {'verbose':True,
               'initial_disp':0.1,
               'interp_type': 'logarithmic',
               'agelims': [0.0,8.0,8.5,9.0,9.5,9.8,10.0],
-              # Data info
-              'photname':APPS+'/threedhst_bsfh/data/3dhst/COSMOS_td_massive.cat',
-              'datname':APPS+'/threedhst_bsfh/data/3dhst/COSMOS_td_massive.dat',
-              'fastname':APPS+'/threedhst_bsfh/data/3dhst/COSMOS_td_massive.fout',
-              'objname':'579',
+              # Data info (phot = .cat, dat = .dat, fast = .fout)
+              'datdir':APPS+'/threedhst_bsfh/data/3dhst/',
+              'runname': 'fast_mimic',
+              'objname':'AEGIS_531'
               }
 
 ############
 # OBS
 #############
-def load_obs(photname, objname, err_floor=0.05, zperr=True, **extras):
+def load_obs(objname=None, datdir=None, err_floor=0.05, zperr=True, **extras):
 
     ''' 
-    photname: photometric file location
     objname: number of object in the 3D-HST COSMOS photometric catalog
     err_floor: the fractional error floor (0.05 = 5% floor)
     zp_err: inflate the errors by the zeropoint offsets from Skelton+14
     '''
 
-
     ### open file, load data
+    photname = datdir + objname.split('_')[0] + '_td_massive.cat'
     with open(photname, 'r') as f:
         hdr = f.readline().split()
     dtype = np.dtype([(hdr[1],'S20')] + [(n, np.float) for n in hdr[2:]])
@@ -66,7 +64,7 @@ def load_obs(photname, objname, err_floor=0.05, zperr=True, **extras):
 
     ### extract filters, fluxes, errors for object
     # from ReadMe: "All fluxes are normalized to an AB zeropoint of 25, such that: magAB = 25.0-2.5*log10(flux)
-    obj_idx = (dat['id'] == objname)
+    obj_idx = (dat['id'] == objname.split('_')[-1])
     filters = np.array([f[2:] for f in dat.dtype.names if f[0:2] == 'f_'])
     flux = np.squeeze([dat[obj_idx]['f_'+f] for f in filters])
     unc = np.squeeze([dat[obj_idx]['e_'+f] for f in filters])
@@ -199,13 +197,13 @@ model_params.append({'name': 'logtau', 'N': 1,
                         'init': 1,
                         'init_disp': 0.5,
                         'units': 'Gyr',
-                        'prior': priors.TopHat(mini=-1.0, maxi=2.0)})
+                        'prior': priors.TopHat(mini=-2.0, maxi=2.0)})
 
 model_params.append({'name': 'tage', 'N': 1,
                         'isfree': True,
                         'init': 1.0,
                         'units': 'Gyr',
-                        'prior': priors.TopHat(mini=0.001, maxi=14.0)})
+                        'prior': priors.TopHat(mini=0.01, maxi=14.0)})
 
 ########    IMF  ##############
 model_params.append({'name': 'imf_type', 'N': 1,
@@ -273,7 +271,7 @@ def load_sps(**extras):
     sps = CSPBasis(**extras)
     return sps
 
-def load_model(objname='',datname='',fastname='', agelims=[], **extras):
+def load_model(objname=None, datdir=None, agelims=[], **extras):
 
     ###### REDSHIFT ######
     ### open file, load data
@@ -284,11 +282,13 @@ def load_model(objname='',datname='',fastname='', agelims=[], **extras):
     dat = np.loadtxt(datname, comments = '#', delimiter=' ',
                      dtype = dtype)
     '''
+    fastname = datdir + objname.split('_')[0] + '_td_massive.fout'
+
     with open(fastname, 'r') as f:
         hdr = f.readline().split()
     dtype = np.dtype([(hdr[1],'S20')] + [(n, np.float) for n in hdr[2:]])
     fast = np.loadtxt(fastname, comments = '#', delimiter=' ', dtype = dtype)
-    idx = fast['id'] == objname
+    idx = fast['id'] == objname.split('_')[-1]
     zred = fast['z'][idx][0]
 
     #### INITIAL VALUES

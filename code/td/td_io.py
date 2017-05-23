@@ -33,6 +33,10 @@ def load_fast_v41(field):
 
 def load_zp_offsets(field):
 
+	### add in dash
+	if field == 'GOODSN' or field == 'GOODSS':
+		field = field[:5]+'-'+field[5]
+
 	filename = os.getenv('APPS')+'/threedhst_bsfh/data/3dhst/zp_offsets_tbl11_skel14.txt'
 	with open(filename, 'r') as f:
 		for jj in range(1): hdr = f.readline().split()

@@ -20,7 +20,7 @@
 #SBATCH --mail-user=joel.leja@gmail.com
 IDFILE=$APPS"/threedhst_bsfh/data/3dhst/COSMOS_td_massive.ids"
 OBJID=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$IDFILE")
-python $APPS/bsfh/scripts/prospector_nest.py \
---param_file="$APPS"/threedhst_bsfh/parameter_files/fast_mimic/fast_mimic_params.py \
+python $APPS/bsfh/scripts/prospector.py \
+--param_file="$APPS"/threedhst_bsfh/parameter_files/fast_mimic_params.py \
 --objname="$OBJID" \
---outfile="$APPS"/threedhst_bsfh/results/fast_mimic/fast_mimic_"$OBJID"
+--outfile="$APPS"/threedhst_bsfh/results/fast_mimic/"$OBJID"

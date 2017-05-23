@@ -3,18 +3,13 @@ import numpy as np
 
 APPS = os.getenv('APPS')
 
-def generate_resp_curves_from_photometry_file(photfile=APPS+'/threedhst_bsfh/data/COSMOS_td_massive.cat',
+def generate_resp_curves_from_photometry_file(photfile=APPS+'/threedhst_bsfh/data/3dhst/COSMOS_td_massive.cat',
 	                                          outfolder=APPS+'/sedpy/sedpy/data/filters'):
 
 	'''
 	given a 3D-HST photometry file
 	generate sedpy filter response files
 	'''
-
-	if photfile is None:
-		photfile = APPS+'/threedhst_bsfh/data/COSMOS_td_massive.cat'
-	if outfolder is None:
-		outfolder = APPS + '/sedpy/sedpy/data/filters'
 
 	### load filter names
 	with open(photfile, 'r') as f:

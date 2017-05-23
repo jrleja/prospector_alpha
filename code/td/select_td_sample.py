@@ -49,58 +49,66 @@ def build_massive_sample(rm_zp_offsets=True):
 	'''
 
 	### output
-	field = 'COSMOS'
+	fields = ['AEGIS','COSMOS','GOODSN','GOODSS','UDS']
 	basename = 'td_massive'
-	fast_str_out = '/Users/joel/code/python/threedhst_bsfh/data/3dhst/'+field+'_'+basename+'.fout'
-	ancil_str_out = '/Users/joel/code/python/threedhst_bsfh/data/3dhst/'+field+'_'+basename+'.dat'
-	phot_str_out = '/Users/joel/code/python/threedhst_bsfh/data/3dhst/'+field+'_'+basename+'.cat'
-	id_str_out   = '/Users/joel/code/python/threedhst_bsfh/data/3dhst/'+field+'_'+basename+'.ids'
+	id_str_out = '/Users/joel/code/python/threedhst_bsfh/data/3dhst/'+basename+'.ids'
+	ids = []
 
-	### load data
-	phot = td_io.load_phot_v41(field)
-	fast = td_io.load_fast_v41(field)
-	zbest = td_io.load_zbest(field)
-	mips = td_io.load_mips_data(field)
+	for field in fields:
+		outbase = '/Users/joel/code/python/threedhst_bsfh/data/3dhst/'+field+'_'+basename
+		fast_str_out = outbase+'.fout'
+		ancil_str_out = outbase+'.dat'
+		phot_str_out = outbase+'.cat'
+
+		### load data
+		phot = td_io.load_phot_v41(field)
+		fast = td_io.load_fast_v41(field)
+		zbest = td_io.load_zbest(field)
+		mips = td_io.load_mips_data(field)
 	
-	### make catalog cuts
-	# consider removing zbest['use_zgrism'] cut in the future!! no need for good grism data really
-	good = (phot['use_phot'] == 1) & (fast['lmass'] > 11) & (zbest['use_zgrism'] == 1)
+		### make catalog cuts
+		# consider removing zbest['use_zgrism'] cut in the future!! no need for good grism data really
+		good = (phot['use_phot'] == 1) & (fast['lmass'] > 11) & (zbest['use_zgrism'] == 1)
 
-	phot = phot[good]
-	fast = fast[good]
-	zbest = zbest[good]
-	mips = mips[good]
+		phot = phot[good]
+		fast = fast[good]
+		zbest = zbest[good]
+		mips = mips[good]
 
-	### add in mips
-	phot['f_MIPS_24um'] = mips['f24tot']
-	phot['e_MIPS_24um'] = mips['ef24tot']
+		### add in mips
+		phot['f_MIPS_24um'] = mips['f24tot']
+		phot['e_MIPS_24um'] = mips['ef24tot']
 
-	### save old SFRs in ancillary file
-	for name in mips.dtype.names:
-		if name != 'z' and name != 'id':
-			zbest[name] = mips[name]
-		elif name == 'z':
-			zbest['z_sfr'] = mips[name]
+		### save old SFRs in ancillary file
+		for name in mips.dtype.names:
+			if name != 'z' and name != 'id':
+				zbest[name] = mips[name]
+			elif name == 'z':
+				zbest['z_sfr'] = mips[name]
+		
+		### rename bands in photometric catalogs
+		for column in phot.colnames:
+			if column[:2] == 'f_' or column[:2] == 'e_':
+				phot.rename_column(column, column.lower()+'_'+field.lower())	
+
+		if rm_zp_offsets:
+			bands_exempt = ['irac1_cosmos','irac2_cosmos','irac3_cosmos','irac4_cosmos',\
+	                        'f606w_cosmos','f814w_cosmos','f125w_cosmos','f140w_cosmos',\
+	                        'f160w_cosmos','mips_24um_cosmos']
+			phot = remove_zp_offsets(field,phot,bands_exempt=bands_exempt)
+
+		ascii.write(phot, output=phot_str_out, 
+		            delimiter=' ', format='commented_header',overwrite=True)
+		ascii.write(fast, output=fast_str_out, 
+		            delimiter=' ', format='commented_header',
+		            include_names=fast.keys()[:11],overwrite=True)
+		ascii.write(zbest, output=ancil_str_out, 
+		            delimiter=' ', format='commented_header',overwrite=True)
 	
-	### rename bands in photometric catalogs
-	for column in phot.colnames:
-		if column[:2] == 'f_' or column[:2] == 'e_':
-			phot.rename_column(column, column.lower()+'_'+field.lower())	
+		### save IDs
+		ids = ids + [field+'_'+str(id) for id in phot['id']]
 
-	if rm_zp_offsets:
-		bands_exempt = ['irac1_cosmos','irac2_cosmos','irac3_cosmos','irac4_cosmos',\
-                        'f606w_cosmos','f814w_cosmos','f125w_cosmos','f140w_cosmos',\
-                        'f160w_cosmos','mips_24um_cosmos']
-		phot = remove_zp_offsets(field,phot,bands_exempt=bands_exempt)
-
-	ascii.write(phot, output=phot_str_out, 
-	            delimiter=' ', format='commented_header')
-	ascii.write(fast, output=fast_str_out, 
-	            delimiter=' ', format='commented_header',
-	            include_names=fast.keys()[:11])
-	ascii.write(zbest, output=ancil_str_out, 
-	            delimiter=' ', format='commented_header')
-	ascii.write([np.array(phot['id'],dtype='int')], output=id_str_out, Writer=ascii.NoHeader)
+	ascii.write([ids], output=id_str_out, Writer=ascii.NoHeader,overwrite=True)
 
 def build_sample_onekrun(rm_zp_offsets=True):
 
@@ -285,7 +293,6 @@ def remove_zp_offsets(field,phot,bands_exempt=None):
 	for kk in xrange(nbands):
 		filter = zp_offsets[kk]['Band'].lower()+'_'+field.lower()
 		if filter not in bands_exempt:
-			print filter
 			phot['f_'+filter] = phot['f_'+filter]/zp_offsets[kk]['Flux-Correction']
 			phot['e_'+filter] = phot['e_'+filter]/zp_offsets[kk]['Flux-Correction']
 

@@ -478,12 +478,6 @@ def return_sedplot_vars(sample_results, extra_output, nufnu=True):
     '''
 
     # observational information
-    '''
-    if 'truename' in sample_results['run_params']:
-        from nonparametric_mocks_params import load_obs
-        sample_results['obs'] = load_obs(os.getenv('APPS')+'/threed'+sample_results['run_params']['photname'].split('threed')[1], 
-                                         sample_results['run_params']['objname'])
-    '''
     mask = sample_results['obs']['phot_mask']
     wave_eff = sample_results['obs']['wave_effective'][mask]
     obs_maggies = sample_results['obs']['maggies'][mask]

@@ -11,7 +11,7 @@
 ### memory per cpu, in MB
 #SBATCH --mem-per-cpu=3000
 ### Job name
-#SBATCH -J '3d_mass'
+#SBATCH -J 'td_mass'
 ### output and error logs
 #SBATCH -o td_massive_%a.out
 #SBATCH -e td_massive_%a.err
@@ -20,7 +20,7 @@
 #SBATCH --mail-user=joel.leja@gmail.com
 IDFILE=$APPS"/threedhst_bsfh/data/3dhst/COSMOS_td_massive.ids"
 OBJID=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$IDFILE")
-python $APPS/bsfh/scripts/prospector_nest.py \
---param_file="$APPS"/threedhst_bsfh/parameter_files/td_massive/td_massive_params.py \
+python $APPS/bsfh/scripts/prospector.py \
+--param_file="$APPS"/threedhst_bsfh/parameter_files/td_massive_params.py \
 --objname="$OBJID" \
---outfile="$APPS"/threedhst_bsfh/results/td_massive/td_massive_"$OBJID"
+--outfile="$APPS"/threedhst_bsfh/results/td_massive/"$OBJID"
