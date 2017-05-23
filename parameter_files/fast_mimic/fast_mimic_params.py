@@ -15,7 +15,7 @@ APPS = os.getenv('APPS')
 
 run_params = {'verbose':True,
               'debug': False,
-              'outfile': os.getenv('APPS')+'/threedhst_bsfh/results/fast_mimic/fast_mimic',
+              'outfile': APPS+'/threedhst_bsfh/results/fast_mimic/fast_mimic_579',
               'nofork': True,
               # Optimizer params
               'ftol':0.5e-5, 
@@ -23,8 +23,14 @@ run_params = {'verbose':True,
               # MCMC params
               'nwalkers':140,
               'nburn':[50,100], 
-              'niter': 500,
+              'niter': 800,
               'interval': 0.2,
+              # Convergence criteria
+              'convergence_check_interval': 50,
+              'convergence_chunks': 325,
+              'convergence_kl_threshold': 0.00,
+              'convergence_stable_points_criteria': 8, 
+              'convergence_nhist': 50,
               # Model info
               'zcontinuous': 2,
               'compute_vega_mags': False,
@@ -37,7 +43,6 @@ run_params = {'verbose':True,
               'fastname':APPS+'/threedhst_bsfh/data/3dhst/COSMOS_td_massive.fout',
               'objname':'579',
               }
-run_params['outfile'] = run_params['outfile']+'_'+run_params['objname']
 
 ############
 # OBS
@@ -136,8 +141,7 @@ model_params.append({'name': 'zred', 'N': 1,
                         'isfree': False,
                         'init': 0.0,
                         'units': '',
-                        'prior_function': tophat,
-                        'prior_args': {'mini':0.0, 'maxi':4.0}})
+                        'prior': priors.TopHat(mini=0.0, maxi=4.0)})
 
 model_params.append({'name': 'add_igm_absorption', 'N': 1,
                         'isfree': False,
@@ -157,16 +161,14 @@ model_params.append({'name': 'logmass', 'N': 1,
                         'isfree': True,
                         'init': 10.0,
                         'units': 'Msun',
-                        'prior_function': priors.tophat,
-                        'prior_args':{'mini':1.0, 'maxi':14.0}})
+                        'prior': priors.TopHat(mini=5.0, maxi=13.0)})
 
 model_params.append({'name': 'mass', 'N': 1,
                         'isfree': False,
                         'init': 1e10,
                         'depends_on': transform_logmass_to_mass,
                         'units': 'Msun',
-                        'prior_function': priors.tophat,
-                        'prior_args':{'mini':1e1, 'maxi':1e14}})
+                        'prior': priors.TopHat(mini=1e5, maxi=1e13)})
 
 model_params.append({'name': 'logzsol', 'N': 1,
                         'isfree': False,
@@ -174,8 +176,7 @@ model_params.append({'name': 'logzsol', 'N': 1,
                         'init_disp': 0.4,
                         'log_param': True,
                         'units': r'$\log (Z/Z_\odot)$',
-                        'prior_function': tophat,
-                        'prior_args': {'mini':-2.0, 'maxi':0.19}})
+                        'prior': priors.TopHat(mini=-1.98, maxi=0.19)})
                         
 ###### SFH   ########
 model_params.append({'name': 'sfh', 'N': 1,
@@ -191,56 +192,20 @@ model_params.append({'name': 'tau', 'N': 1,
                         'depends_on': transform_logtau_to_tau,
                         'init_disp': 0.5,
                         'units': 'Gyr',
-                        'prior_function':tophat,
-                        'prior_args': {'mini':0.1,
-                                       'maxi':100.0}})
+                        'prior': priors.TopHat(mini=0.1, maxi=100)})
 
 model_params.append({'name': 'logtau', 'N': 1,
                         'isfree': True,
                         'init': 1,
                         'init_disp': 0.5,
                         'units': 'Gyr',
-                        'prior_function':tophat,
-                        'prior_args': {'mini':-1,
-                                       'maxi':2}})
+                        'prior': priors.TopHat(mini=-1.0, maxi=2.0)})
 
 model_params.append({'name': 'tage', 'N': 1,
                         'isfree': True,
                         'init': 1.0,
                         'units': 'Gyr',
-                        'prior_function': tophat,
-                        'prior_args': {'mini':0.01, 'maxi':14.0}})
-
-model_params.append({'name': 'tburst', 'N': 1,
-                        'isfree': False,
-                        'init': 0.0,
-                        'init_disp': 1.0,
-                        'units': '',
-                        'prior_function': tophat,
-                        'prior_args': {'mini':0.0, 'maxi':10.0}})
-
-model_params.append({'name': 'fburst', 'N': 1,
-                        'isfree': False,
-                        'init': 0.0,
-                        'init_disp': 0.5,
-                        'units': '',
-                        'prior_function': tophat,
-                        'prior_args': {'mini':0.0, 'maxi':0.2}})
-
-model_params.append({'name': 'fconst', 'N': 1,
-                        'isfree': False,
-                        'init': 0.0,
-                        'units': '',
-                        'prior_function': tophat,
-                        'prior_args': {'mini':0.0, 'maxi':1.0}})
-
-model_params.append({'name': 'sf_start', 'N': 1,
-                        'isfree': False,
-                        'init': 0.0,
-                        'units': 'Gyr',
-                        'prior_function': tophat,
-                        'prior_args': {'mini':0.0,
-                                       'maxi':14.0}})
+                        'prior': priors.TopHat(mini=0.001, maxi=14.0)})
 
 ########    IMF  ##############
 model_params.append({'name': 'imf_type', 'N': 1,
@@ -263,9 +228,7 @@ model_params.append({'name': 'dust2', 'N': 1,
                         'init': 0.0,
                         'init_disp': 0.2,
                         'units': '',
-                        'prior_function': tophat,
-                        'prior_args': {'mini':0.0,
-                                       'maxi':4.0}})
+                        'prior': priors.TopHat(mini=0.0, maxi=4.0)})
 
 ###### Dust Emission ##############
 model_params.append({'name': 'add_dust_emission', 'N': 1,
@@ -275,7 +238,6 @@ model_params.append({'name': 'add_dust_emission', 'N': 1,
                         'prior_function': None,
                         'prior_args': None})
 
-
 ###### Nebular Emission ###########
 model_params.append({'name': 'add_neb_emission', 'N': 1,
                         'isfree': False,
@@ -283,29 +245,9 @@ model_params.append({'name': 'add_neb_emission', 'N': 1,
                         'units': r'log Z/Z_\odot',
                         'prior_function_name': None,
                         'prior_args': None})
-                        
-model_params.append({'name': 'gas_logz', 'N': 1,
-                        'isfree': False,
-                        'init': 0.0,
-                        'units': r'log Z/Z_\odot',
-                        'prior_function': tophat,
-                        'prior_args': {'mini':-2.0, 'maxi':0.5}})
-
-model_params.append({'name': 'gas_logu', 'N': 1,
-                        'isfree': False,
-                        'init': -2.0,
-                        'units': '',
-                        'prior_function': tophat,
-                        'prior_args': {'mini':-4, 'maxi':-1}})
 
 
 ####### Calibration ##########
-model_params.append({'name': 'phot_jitter', 'N': 1,
-                        'isfree': False,
-                        'init': 0.0,
-                        'units': 'mags',
-                        'prior_function': tophat,
-                        'prior_args': {'mini':0.0, 'maxi':0.2}})
 model_params.append({'name': 'peraa', 'N': 1,
                      'isfree': False,
                      'init': False})
@@ -319,39 +261,12 @@ model_params.append({'name': 'mass_units', 'N': 1,
 #### resort list of parameters 
 #### so that major ones are fit first
 parnames = [m['name'] for m in model_params]
-fit_order = ['logmass','tage', 'logtau', 'dust2']
+fit_order = ['logmass','tage', 'tau', 'dust2']
 tparams = [model_params[parnames.index(i)] for i in fit_order]
 for param in model_params: 
     if param['name'] not in fit_order:
         tparams.append(param)
 model_params = tparams
-
-###### REDEFINE MODEL FOR MY OWN NEFARIOUS PURPOSES ######
-class BurstyModel(sedmodel.SedModel):
-
-    def prior_product(self, theta):
-        """
-        Return a scalar which is the ln of the product of the prior
-        probabilities for each element of theta.  Requires that the
-        prior functions are defined in the theta descriptor.
-
-        :param theta:
-            Iterable containing the free model parameter values.
-
-        :returns lnp_prior:
-            The log of the product of the prior probabilities for
-            these parameter values.
-        """  
-        lnp_prior = 0
-
-        for k, v in self.theta_index.iteritems():
-            this_prior = np.sum(self._config_dict[k]['prior_function']
-                                (theta[v], **self._config_dict[k]['prior_args']))
-
-            if (not np.isfinite(this_prior)):
-                print('WARNING: ' + k + ' is out of bounds')
-            lnp_prior += this_prior
-        return lnp_prior
 
 def load_sps(**extras):
 
@@ -390,15 +305,15 @@ def load_model(objname='',datname='',fastname='', agelims=[], **extras):
 
     #### CALCULATE TUNIV #####
     tuniv = WMAP9.age(zred).value
-    model_params[n.index('tage')]['prior_args']['maxi'] = tuniv
+    model_params[n.index('tage')]['prior'].maxi = tuniv
 
     #### INSERT REDSHIFT INTO MODEL PARAMETER DICTIONARY ####
     zind = n.index('zred')
     model_params[zind]['init'] = zred
 
     #### CREATE MODEL
-    model = BurstyModel(model_params)
+    model = sedmodel.SedModel(model_params)
 
     return model
 
-model_type = BurstyModel
+model_type = sedmodel.SedModel

@@ -5,7 +5,7 @@
 ### Requested number of nodes
 #SBATCH -N 1
 ### Requested computing time in minutes
-#SBATCH -t 1440
+#SBATCH -t 800
 ### Partition or queue name
 #SBATCH -p conroy-intel,conroy,general
 ### memory per cpu, in MB
@@ -18,4 +18,9 @@
 ### mail
 #SBATCH --mail-type=END
 #SBATCH --mail-user=joel.leja@gmail.com
-srun -n $SLURM_NTASKS --mpi=pmi2 python $APPS/bsfh/scripts/prospector.py --param_file=$APPS/threedhst_bsfh/parameter_files/fast_mimic/fast_mimic_params_$SLURM_ARRAY_TASK_ID.py 
+IDFILE=$APPS"/threedhst_bsfh/data/3dhst/COSMOS_td_massive.ids"
+OBJID=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$IDFILE")
+python $APPS/bsfh/scripts/prospector_nest.py \
+--param_file="$APPS"/threedhst_bsfh/parameter_files/fast_mimic/fast_mimic_params.py \
+--objname="$OBJID" \
+--outfile="$APPS"/threedhst_bsfh/results/fast_mimic/fast_mimic_"$OBJID"

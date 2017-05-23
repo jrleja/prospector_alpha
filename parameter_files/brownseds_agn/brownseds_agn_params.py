@@ -268,7 +268,6 @@ def to_dust1(dust1_fraction=None, dust1=None, dust2=None, **extras):
 def transform_zfraction_to_sfrfraction(sfr_fraction=None, z_fraction=None, **extras):
     sfr_fraction[0] = 1-z_fraction[0]
     for i in xrange(1,sfr_fraction.shape[0]): sfr_fraction[i] =  np.prod(z_fraction[:i])*(1-z_fraction[i])
-    #sfr_fraction[-1] = np.prod(z)  #### THIS IS SET IMPLICITLY
     return sfr_fraction
 
 #############

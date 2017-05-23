@@ -1178,7 +1178,7 @@ def measure_restframe_properties(sps, model = None, obs = None, thetas = None, e
 
     ##### do we need a smooth spectrum?
     if (abslines) or (emlines):
-        smooth_spec = smooth_spectrum(w,spec_flam,200.0,minlam=3e3,maxlam=8e3)
+        smooth_spec = smooth_spectrum(w,spec_flam,250.0,minlam=3e3,maxlam=8e3)
 
     ##### measure absorption lines and dn4000
     if abslines:

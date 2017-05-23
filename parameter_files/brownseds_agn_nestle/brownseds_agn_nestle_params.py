@@ -355,7 +355,6 @@ model_params.append({'name': 'imf_type', 'N': 1,
                              'units': None,
                              'prior': None})
 
-
 ######## Dust Absorption ##############
 model_params.append({'name': 'dust_type', 'N': 1,
                         'isfree': False,

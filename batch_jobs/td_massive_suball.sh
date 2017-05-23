@@ -18,4 +18,9 @@
 ### mail
 #SBATCH --mail-type=END
 #SBATCH --mail-user=joel.leja@gmail.com
-srun -n $SLURM_NTASKS --mpi=pmi2 python $APPS/bsfh/scripts/prospector.py --param_file=$APPS/threedhst_bsfh/parameter_files/td_massive/td_massive_params_$SLURM_ARRAY_TASK_ID.py 
+IDFILE=$APPS"/threedhst_bsfh/data/3dhst/COSMOS_td_massive.ids"
+OBJID=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$IDFILE")
+python $APPS/bsfh/scripts/prospector_nest.py \
+--param_file="$APPS"/threedhst_bsfh/parameter_files/td_massive/td_massive_params.py \
+--objname="$OBJID" \
+--outfile="$APPS"/threedhst_bsfh/results/td_massive/td_massive_"$OBJID"
