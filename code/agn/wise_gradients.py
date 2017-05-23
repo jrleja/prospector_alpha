@@ -239,11 +239,12 @@ def plot_composites(pdata,outfolder,contours,contour_colors=True,
     ### begin loop
     for idx in xrange(len(pdata['objname'])):
 
-        if 'CGCG 436' not in pdata['objname']:
+        '''
+        if 'CGCG 436' not in pdata['objname'][idx]:
             continue
         else:
-            print pdata['objname']
-
+            print pdata['objname'][idx]
+        '''
         ### load object information
         objname = pdata['objname'][idx]
         fagn = pdata['pars']['fagn']['q50'][idx]
@@ -341,41 +342,52 @@ def plot_composites(pdata,outfolder,contours,contour_colors=True,
         cbar.update_ticks()
         ax[0].set_title(contours[0]+'-'+contours[1]+' color')
 
-        ### plot W2 contours
+        ### plot W1 contours
         plot_contour(ax[0],np.log10(img2_slice),ncontours=20)
 
         ### find image center in W2 image, and mark it
         # do this by finding the source closest to center
         tbl = []
         nthresh, box_size = 20, 5
-        fake_noise1_error = copy.copy(noise1_slice)
-        bad = np.logical_or(np.isinf(noise1_slice),np.isnan(noise1_slice))
-        fake_noise1_error[bad] = fake_noise1_error[~bad].max()
+        fake_noise2_error = copy.copy(noise2_slice)
+        bad = np.logical_or(np.isinf(noise2_slice),np.isnan(noise2_slice))
+        fake_noise2_error[bad] = fake_noise2_error[~bad].max()
         while len(tbl) < 1:
             threshold = nthresh * std1 # peak threshold, @ 20 sigma
-            tbl = find_peaks(img1_slice, threshold, box_size=box_size, subpixel=True, border_width=4, error = fake_noise1_error)
+            tbl = find_peaks(img2_slice, threshold, box_size=box_size, subpixel=True, border_width=4, error = fake_noise2_error)
             nthresh -=1
         
             if nthresh < 2:
                 nthresh = 20
                 box_size = 3
 
+        # plot biggest source
+        '''
+        center = np.array(img2_slice.shape)/2.
+        idxmax = ((center[0]-tbl['x_centroid'])**2 + (center[1]-tbl['y_centroid'])**2).argmin()
+        fig, ax = plt.subplots(1,1, figsize=(6,6))
+        ax.plot(tbl['x_centroid'][idxmax],tbl['y_centroid'][idxmax],'x',color='red',ms=10)
+        ax.imshow(img2_slice,origin='lower')
+        plot_contour(ax, np.log10(img2_slice),ncontours=20)
+        plt.show()
+        print 1/0
+        '''
+
         ### find size of biggest one
         center = np.array(img2_slice.shape)/2.
         idxmax = ((center[0]-tbl['x_centroid'])**2 + (center[1]-tbl['y_centroid'])**2).argmin()
         ginit = models.Gaussian2D(amplitude=tbl['fit_peak_value'][idxmax],  x_mean=tbl['x_centroid'][idxmax],  y_mean=tbl['y_centroid'][idxmax], x_stddev=1,y_stddev=1)
         fit_g = fitting.LevMarLSQFitter()
-        tx, ty = np.mgrid[:img1_slice.shape[0], :img1_slice.shape[1]]
+        tx, ty = np.mgrid[:img2_slice.shape[0], :img2_slice.shape[1]]
         ginit.x_mean.fixed=True
         ginit.y_mean.fixed=True
         ginit.amplitude.fixed=True
-        g = fit_g(ginit, tx, ty, img1_slice)
+        g = fit_g(ginit, tx, ty, img2_slice)
         size_twosig = np.sqrt(g.x_stddev.value**2+g.y_stddev.value**2)*2*px_scale
-        print 1/0
 
         ### find center in arcseconds
-        xarcsec = (extent[1]-extent[0])*(tbl['x_centroid'][idxmax])/float(img2_slice.shape[0]) + extent[0]
-        yarcsec = (extent[3]-extent[2])*(tbl['y_centroid'][idxmax])/float(img2_slice.shape[1]) + extent[2]
+        xarcsec = (extent[1]-extent[0])*tbl['x_centroid'][idxmax]/float(img2_slice.shape[0]) + extent[0]
+        yarcsec = (extent[3]-extent[2])*tbl['y_centroid'][idxmax]/float(img2_slice.shape[1]) + extent[2]
         ax[0].scatter(xarcsec,yarcsec,color='black',marker='x',s=50,linewidth=2)
 
         ### add in WISE PSF

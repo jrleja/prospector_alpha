@@ -14,7 +14,7 @@ dpi=150
 
 emline = np.array(['[OIII] 4959','[OIII] 5007',r'H$\beta$','[NII] 6549', '[NII] 6583', r'H$\alpha$','[OII] 3726','[OII] 3728'])
 em_wave = np.array([4958.92,5006.84,4861.33,6548.03,6583.41,6562.80,3726.1,3728.8])
-em_bbox = [(4700,5100),(6350,6680),(3600,3800)]
+em_bbox = [(4800,5050),(6500,6640),(3680,3760)]
 
 class tLinear1D(core.Fittable1DModel):
 
@@ -96,7 +96,7 @@ def bootstrap(obslam, obsflux, model, fitter, noise, line_lam,
 
         ### catch error: what happens if sigma is at boundary?
         stddev = np.array([getattr(fit, 'stddev_'+str(j)).value for j in xrange(7)])
-        if np.all(stddev < 10) or (successflag == False):
+        if np.all(stddev < 12) or (successflag == False):
             nsuccess += 1
         else:
             nrand +=1
@@ -131,16 +131,6 @@ def tiedfunc_nii(g1):
     amp = 2.93 * g1.amplitude_3
     return amp
 
-def tiedfunc_sig(g1):
-    return g1.stddev_0
-
-# lam_tied = [None, loiii_2, None, None, lnii_2, None, None, loii_2]
-
-'''
-def loii_2(g1):
-    zadj = g1.mean_0 / 4958.92 - 1
-    return (1+zadj) *  3728.8
-'''
 def loii_2(g1):
     zadj = g1.mean_6 / 3726.1 - 1
     return (1+zadj) *  3728.8
@@ -154,17 +144,13 @@ def loiii_2(g1):
     return (1+zadj) *  5006.84
 
 def lhbeta(g1):
-    zadj = g1.mean_0 / 4958.92 - 1
+    zadj = g1.mean_5 / 6562.80 - 1
     return (1+zadj) *  4861.33
 
 def lnii_1(g1):
     zadj = g1.mean_0 / 4958.92 - 1
     return (1+zadj) *  6548.03
-'''
-def lnii_2(g1):
-    zadj = g1.mean_0 / 4958.92 - 1
-    return (1+zadj) *  6583.41
-'''
+
 def lnii_2(g1):
     zadj = g1.mean_3 / 6548.03 - 1
     return (1+zadj) *  6583.41
@@ -219,8 +205,8 @@ def umbrella_model(lams, amp_tied, lam_tied, sig_tied,continuum_6400):
     #### NOW TIE THEM TOGETHER
     for ii in xrange(len(lams)):
         # position and widths
-        #if ii != 0:
-            #getattr(model, 'mean_'+str(ii)).tied = lam_tied[ii]
+        if lam_tied[ii] is not None:
+            getattr(model, 'mean_'+str(ii)).tied = lam_tied[ii]
 
         # amplitudes, if necessary
         if amp_tied[ii] is not None:
@@ -230,7 +216,7 @@ def umbrella_model(lams, amp_tied, lam_tied, sig_tied,continuum_6400):
         if sig_tied[ii] is not None:
             getattr(model, 'stddev_'+str(ii)).tied = sig_tied[ii]
 
-        getattr(model, 'stddev_'+str(ii)).max = 10
+        getattr(model, 'stddev_'+str(ii)).max = 12
 
 
     return model
@@ -265,7 +251,7 @@ def measure(sample_results, extra_output, obs_spec, sps, runname='brownseds_np',
     #### define emission lines to measure
     # we do this in sets of lines, which are unpacked at the end
     amp_tied = [None, tiedfunc_oiii, None, None, tiedfunc_nii, None, None, tiedfunc_oii]
-    lam_tied = [None, loiii_2, lhbeta, lnii_1, lnii_2, lhalpha, loii_1, loii_2]
+    #lam_tied = [None, loiii_2, lhbeta, lnii_1, lnii_2, lhalpha, loii_1, loii_2]
     lam_tied = [None, loiii_2, None, None, lnii_2, None, None, loii_2]
     sig_tied = [None, soiii, None, None, snii, None, None, soii]
     nline = len(emline)
@@ -315,13 +301,13 @@ def measure(sample_results, extra_output, obs_spec, sps, runname='brownseds_np',
     # use to find sigma
     gauss_fit,_,_,_ = bootstrap(obslam[p_idx], obsflux[p_idx], emmod, fitter, np.min(np.abs(obsflux[p_idx]))*0.001, em_wave, 
                               flux_flag=False, nboot=1)
-    
+
     ### find proper smoothing
     # by taking two highest EQW lines, and using the width
     # this assumes no scaling w/ wavelength, and that gas ~ stellar velocity dispersion
     tmpflux = np.zeros(nline)
     for j in xrange(nline):tmpflux[j] = getattr(gauss_fit, 'amplitude_'+str(j)).value*np.sqrt(2*np.pi*getattr(gauss_fit, 'stddev_'+str(j)).value**2)
-    mlow = em_wave < 4000
+    mlow = (em_wave < 4000) & (em_wave > 3650)
     mmid = (em_wave >= 4000) & (em_wave < 5600)
     mhigh = em_wave >= 5600
 
@@ -347,6 +333,18 @@ def measure(sample_results, extra_output, obs_spec, sps, runname='brownseds_np',
 
     remove_10pc_dfactor = 4*np.pi*(pc*10)**2
 
+    #### adjust model wavelengths for the slight difference with published redshifts
+    top, bot = 0, 0
+    for i, (tiefunc, w_em) in enumerate(zip(lam_tied,em_wave)):
+        if tiefunc is None:
+            top += (getattr(gauss_fit, 'mean_'+str(i))/w_em - 1)
+            bot += 1
+    zadj = top / float(bot)
+    print 'z adjust: '+'{:.4f}'.format(zadj)
+    #zadj = gauss_fit.mean_0 / 4958.92 - 1
+    #model_newlam = (1+zadj)*model_lam
+    model_newlam = (1+zadj)*model_lam
+
     nboot = 100
     emline_noise, residuals = [], []
     for ii in range(nboot):
@@ -358,23 +356,18 @@ def measure(sample_results, extra_output, obs_spec, sps, runname='brownseds_np',
 
             ### average in bounding box. emission lines masked.
             mask_size = 30
-            mod_idx = (model_lam > em_bbox[kk][0]-30) & (model_lam < em_bbox[kk][1]+30)
+            mod_idx = (model_newlam > em_bbox[kk][0]-30) & (model_newlam < em_bbox[kk][1]+30)
             obs_idx = (obslam > em_bbox[kk][0]-30) & (obslam < em_bbox[kk][1]+30)
             for line in em_wave: 
-                mod_idx[(model_lam > line - mask_size) & (model_lam < line + mask_size)] = False
+                mod_idx[(model_newlam > line - mask_size) & (model_newlam < line + mask_size)] = False
                 obs_idx[(obslam > line - mask_size) & (obslam < line + mask_size)] = False
 
             norm_factor = np.mean(obsflux[obs_idx])/np.mean(model_flux[mod_idx])
 
-            mod_idx = (model_lam > em_bbox[kk][0]-30) & (model_lam < em_bbox[kk][1]+30)
+            mod_idx = (model_newlam > em_bbox[kk][0]-30) & (model_newlam < em_bbox[kk][1]+30)
             obs_idx = (obslam > em_bbox[kk][0]-30) & (obslam < em_bbox[kk][1]+30)
 
             model_flux[mod_idx] = model_flux[mod_idx]*norm_factor
-
-        #### adjust model wavelengths for the slight difference with published redshifts
-        #zadj = gauss_fit.mean_0 / 4958.92 - 1
-        #model_newlam = (1+zadj)*model_lam
-        model_newlam = model_lam
 
         #### absorption model versus emission model
         if test_plot:
@@ -462,8 +455,10 @@ def measure(sample_results, extra_output, obs_spec, sps, runname='brownseds_np',
                                emline[kk]+': '+emline_str,
                                fontsize=16, transform = axarr[ii].transAxes)
                 nplot+=1
-        axarr[ii].text(0.03, 0.69, r'$\sigma$='+"{:.2f}".format(sigma_spec), transform = axarr[ii].transAxes)
-
+        for kk in xrange(len(emline)):
+            if e_idx[kk]:
+                axarr[ii].text(0.03, 0.93-0.085*nplot, emline[kk]+r'$\sigma$='+"{:.2f}".format(getattr(bfit_mod, 'stddev_'+str(kk)).value/em_wave[kk]*c_kms), transform = axarr[ii].transAxes)
+                nplot+=1
         ylim = axarr[ii].get_ylim()
         axarr[ii].set_ylim(ylim[0],ylim[1]*1.4)
 
@@ -483,13 +478,10 @@ def measure(sample_results, extra_output, obs_spec, sps, runname='brownseds_np',
     ##############################################
     # use redshift from emission line fit
     # currently, NO spectral smoothing; inspect to see if it's important for HDELTA ONLY
-    zadj = bfit_mod.mean_0.value / 4958.92 - 1
-    zadj = 0.0 # DON'T SHIFT ABSORPTION LINES
 
     # if sigma_spec < 200:
-    if True:
-        to_convolve = (200.**2 - sigma_spec**2)**0.5
-        to_convolve = 180
+    if sigma_spec < 250:
+        to_convolve = (250.**2 - sigma_spec**2)**0.5
         obsflux = prosp_dutils.smooth_spectrum(obslam/(1+zadj),obsflux,to_convolve,minlam=3e3,maxlam=1e4)
 
     #### bootstrap

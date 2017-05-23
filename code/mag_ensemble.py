@@ -1203,8 +1203,9 @@ def ionization_parameter(e_pinfo, hflag, alldata, outfolder=''):
     sn_oii = e_pinfo['obs']['f_oii'][:,0] / np.abs(e_pinfo['obs']['err_oii'])
     sn_oiii = e_pinfo['obs']['f_oiii'][:,0] / np.abs(e_pinfo['obs']['err_oiii'])
 
-    sn_cut = 5
-    keep_idx = np.squeeze((sn_oiii > sn_cut) & (sn_oii > sn_cut))
+    sn_cut = 3
+    keep_idx = np.squeeze((sn_oiii > sn_cut) & (sn_oii > sn_cut) & \
+                          (np.abs(e_pinfo['obs']['err_oiii']) > 0) & (np.abs(e_pinfo['obs']['err_oii']) > 0))
 
     sfing, composite, agn = brown_io.return_agn_str(keep_idx)
     keys = [sfing, composite, agn]
@@ -1229,8 +1230,8 @@ def ionization_parameter(e_pinfo, hflag, alldata, outfolder=''):
 
         #### draw OII, OIII fluxes from a Gaussian
         # OII is 3278, OIII is 5007. convert to total flux in [OII] and [OIII]
-        oii = np.random.normal(loc=e_pinfo['obs']['f_oii'][i,0], scale = e_pinfo['obs']['err_oii'][i],size=ndraw)*(1+1./0.35)
-        oiii = np.random.normal(loc=e_pinfo['obs']['f_oiii'][i,0], scale = e_pinfo['obs']['err_oiii'][i],size=ndraw)*(1+1./2.98)
+        oii = np.random.normal(loc=e_pinfo['obs']['f_oii'][i,0], scale = np.abs(e_pinfo['obs']['err_oii'][i]),size=ndraw)*(1+1./0.35)
+        oiii = np.random.normal(loc=e_pinfo['obs']['f_oiii'][i,0], scale = np.abs(e_pinfo['obs']['err_oiii'][i]),size=ndraw)*(1+1./2.98)
 
         #### de-dust
         oii_dcor = oii/prosp_dutils.charlot_and_fall_extinction(3727,d1,d2,-1.0,didx, kriek=True)
