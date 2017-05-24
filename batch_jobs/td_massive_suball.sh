@@ -20,7 +20,7 @@
 #SBATCH --mail-user=joel.leja@gmail.com
 IDFILE=$APPS"/threedhst_bsfh/data/3dhst/td_massive.ids"
 OBJID=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$IDFILE")
-python $APPS/bsfh/scripts/prospector.py \
+srun -n $SLURM_NTASKS --mpi=pmi2 python $APPS/bsfh/scripts/prospector.py \
 --param_file="$APPS"/threedhst_bsfh/parameter_files/td_massive_params.py \
 --objname="$OBJID" \
 --outfile="$APPS"/threedhst_bsfh/results/td_massive/"$OBJID"
