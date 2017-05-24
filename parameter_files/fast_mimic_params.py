@@ -131,7 +131,6 @@ def transform_logtau_to_tau(tau=None, logtau=None, **extras):
 #############
 # MODEL_PARAMS
 #############
-
 model_params = []
 
 ###### BASIC PARAMETERS ##########
