@@ -18,4 +18,9 @@
 ### mail
 #SBATCH --mail-type=END
 #SBATCH --mail-user=joel.leja@gmail.com
-python $APPS/threedhst_bsfh/code/extra_output.py $APPS/threedhst_bsfh/parameter_files/td_massive/td_massive_params.py 
+IDFILE=$APPS"/threedhst_bsfh/data/3dhst/td_massive.ids"
+OBJID=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$IDFILE")
+
+python $APPS/threedhst_bsfh/code/extra_output.py 
+$APPS/threedhst_bsfh/parameter_files/td_massive/td_massive_params.py \
+--outname="$APPS"/threedhst_bsfh/results/td_massive/"$OBJID"

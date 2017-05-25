@@ -4,6 +4,7 @@ import os, prosp_dutils, hickle, sys, time
 import numpy as np
 from copy import copy
 from astropy import constants
+import argparse
 
 try:
     import prosp_diagnostic_plots
@@ -379,7 +380,7 @@ def update_all(runname, **kwargs):
     for param in parm_basename:
         post_processing(param, **kwargs)
 
-def post_processing(param_name, **kwargs):
+def post_processing(param_name, outname=None, **kwargs):
 
     '''
     Driver. Loads output, runs post-processing routine.
@@ -388,8 +389,9 @@ def post_processing(param_name, **kwargs):
     from brown_io import load_prospector_data, create_prosp_filename
 
     # I/O
-    parmfile = model_setup.import_module_from_file(param_name)
-    outname = parmfile.run_params['outfile']
+    if outname is None:
+        parmfile = model_setup.import_module_from_file(param_name)
+        outname = parmfile.run_params['outfile']
     outfolder = os.getenv('APPS')+'/threedhst_bsfh/plots/'+outname.split('/')[-2]+'/'
 
     # check for output folder, create if necessary
@@ -422,13 +424,19 @@ def post_processing(param_name, **kwargs):
         pass
 
 if __name__ == "__main__":
-    
-    # note that this only processes booleans!
-    kwargs = {}
-    for arg in sys.argv:
-        if arg[:2] == '--':
-            split = arg[2:].split('=')
-            kwargs[split[0]] = split[1].lower() in ['true', 't', 'yes']
 
-    post_processing(sys.argv[1],**kwargs)
+    ### don't create keyword if not passed in!
+    parser = argparse.ArgumentParser(argument_default=argparse.SUPPRESS)
+    parser.add_argument('parfile', type=str)
+    parser.add_argument('--outname')
+    parser.add_argument('--measure_spectral_features',type=bool)
+    parser.add_argument('--mags_nodust',type=bool)
+    parser.add_argument('--ir_priors',type=bool)
+    parser.add_argument('--ncalc',type=int)
+
+    args = vars(parser.parse_args())
+    kwargs = {}
+    for key in args.keys(): kwargs[key] = args[key]
+
+    post_processing(kwargs['parfile'],**kwargs)
 
