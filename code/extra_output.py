@@ -423,15 +423,21 @@ def post_processing(param_name, outname=None, **kwargs):
         print "Unable to make plots for "+sample_results['run_params']['objname']+" due to import error. Passing."
         pass
 
+def str2bool(v):
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+
 if __name__ == "__main__":
 
     ### don't create keyword if not passed in!
     parser = argparse.ArgumentParser(argument_default=argparse.SUPPRESS)
     parser.add_argument('parfile', type=str)
     parser.add_argument('--outname')
-    parser.add_argument('--measure_spectral_features',type=bool)
-    parser.add_argument('--mags_nodust',type=bool)
-    parser.add_argument('--ir_priors',type=bool)
+    parser.add_argument('--measure_spectral_features',type=str2bool)
+    parser.add_argument('--mags_nodust',type=str2bool)
+    parser.add_argument('--ir_priors',type=str2bool)
     parser.add_argument('--ncalc',type=int)
 
     args = vars(parser.parse_args())
