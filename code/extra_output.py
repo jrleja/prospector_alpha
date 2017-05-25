@@ -438,5 +438,6 @@ if __name__ == "__main__":
     kwargs = {}
     for key in args.keys(): kwargs[key] = args[key]
 
+    print kwargs
     post_processing(kwargs['parfile'],**kwargs)
 
