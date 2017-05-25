@@ -257,21 +257,6 @@ def test_likelihood(sps,model,obs,thetas,param_file):
 
     return lnp_prior + lnp_phot + lnp_spec
 
-def setup_sps(zcontinuous=2,compute_vega_magnitudes=False,custom_filter_key=None):
-
-    '''
-    easy way to define an SPS
-    must rewrite filter_key functionality after update to most recent python-fsps filter functionality (8/3/15)
-    '''
-
-    # load stellar population, set up custom filters
-    sps = fsps.StellarPopulation(zcontinuous=zcontinuous, compute_vega_mags=compute_vega_magnitudes)
-    if custom_filter_key is not None:
-        # os.getenv('APPS')+'/threedhst_bsfh/filters/filter_keys_threedhst.txt'
-        fsps.filters.FILTERS = model_setup.custom_filter_dict(custom_filter_key)
-
-    return sps
-
 def synthetic_halpha(sfr,dust1,dust2,dust1_index,dust2_index,kriek=False):
 
     '''
@@ -1081,13 +1066,16 @@ def measure_lbol(sps,mass):
     ## get SPS lbol, weighted by SSP weights
     # two options due to very different meanings of ssp.log_lbol when using
     # tabular or "regular" SSPs
-    if np.isscalar(sps.ssp.log_lbol):
-        weighted_lbol = 10**sps.ssp.log_lbol
-    else:
-        ssp_lbol = np.insert(10**sps.ssp.log_lbol, 0, 10**sps.ssp.log_lbol[0])
-        weights = sps.all_ssp_weights
-        weighted_lbol = (ssp_lbol * weights).sum() / weights.sum() * mass
-
+    # THIRD OPTION: access csp
+    try:
+        if np.isscalar(sps.ssp.log_lbol):
+            weighted_lbol = 10**sps.ssp.log_lbol
+        else:
+            ssp_lbol = np.insert(10**sps.ssp.log_lbol, 0, 10**sps.ssp.log_lbol[0])
+            weights = sps.all_ssp_weights
+            weighted_lbol = (ssp_lbol * weights).sum() / weights.sum() * mass
+    except AttributeError:
+        weighted_lbol = 10**sps.csp.log_lbol
     return weighted_lbol
 
 def measure_agn_luminosity(fagn,sps,mass):

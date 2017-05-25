@@ -27,7 +27,7 @@ run_params = {'verbose':True,
               # MCMC params
               'nwalkers':620,
               'nburn':[150,200,400,600], 
-              'niter': 2500,
+              'niter': 5000,
               'interval': 0.2,
               # Convergence parameters
               'convergence_check_interval': 50,
@@ -83,7 +83,7 @@ def load_obs(objname=None, datdir=None, runname=None, err_floor=0.05, zperr=True
     unc[mips_idx] *= dflux[0]
 
     ### define photometric mask, convert to maggies
-    phot_mask = (flux != unc) & (flux != -99.0)
+    phot_mask = (flux != unc) & (flux != -99.0) & (unc > 0)
     maggies = flux/(1e10)
     maggies_unc = unc/(1e10)
 
@@ -100,6 +100,10 @@ def load_obs(objname=None, datdir=None, runname=None, err_floor=0.05, zperr=True
             if match.sum():
                 maggies_unc[ii] = ( (maggies_unc[ii]**2) + (maggies[ii]*(1-zp_offsets[match]['Flux-Correction'][0]))**2 ) **0.5
 
+    ### if we have super negative flux, then mask it !
+    ### where super negative is <0 with 95% certainty
+    neg = (maggies < 0) & (np.abs(maggies/maggies_unc) > 2)
+    phot_mask[neg] = False
 
     ### build output dictionary
     obs = {}
@@ -242,7 +246,7 @@ model_params.append({'name': 'dust1_fraction', 'N': 1,
                         'init_disp': 0.8,
                         'disp_floor': 0.8,
                         'units': '',
-                        'prior': priors.TopHat(mini=0.0, maxi=2.0)})
+                        'prior': priors.ClippedNormal(mini=0.0, maxi=2.0, mean=1.0, sigma=0.3)})
 
 model_params.append({'name': 'dust2', 'N': 1,
                         'isfree': True,
@@ -281,7 +285,7 @@ model_params.append({'name': 'add_dust_emission', 'N': 1,
                         'prior': None})
 
 model_params.append({'name': 'duste_gamma', 'N': 1,
-                        'isfree': True,
+                        'isfree': False,
                         'init': 0.01,
                         'init_disp': 0.2,
                         'disp_floor': 0.15,
@@ -289,7 +293,7 @@ model_params.append({'name': 'duste_gamma', 'N': 1,
                         'prior': priors.TopHat(mini=0.0, maxi=1.0)})
 
 model_params.append({'name': 'duste_umin', 'N': 1,
-                        'isfree': True,
+                        'isfree': False,
                         'init': 1.0,
                         'init_disp': 5.0,
                         'disp_floor': 4.5,
@@ -343,15 +347,15 @@ model_params.append({'name': 'add_agn_dust', 'N': 1,
                         'prior': None})
 
 model_params.append({'name': 'fagn', 'N': 1,
-                        'isfree': False,
-                        'init': 0.1,
-                        'init_disp': 0.2,
-                        'disp_floor': 0.1,
+                        'isfree': True,
+                        'init': 0.01,
+                        'init_disp': 0.03,
+                        'disp_floor': 0.02,
                         'units': '',
                         'prior': priors.LogUniform(mini=1e-5, maxi=3.0)})
 
 model_params.append({'name': 'agn_tau', 'N': 1,
-                        'isfree': False,
+                        'isfree': True,
                         'init': 4.0,
                         'init_disp': 5,
                         'disp_floor': 2,
@@ -378,7 +382,7 @@ model_params.append({'name': 'mass_units', 'N': 1,
 #### resort list of parameters 
 #### so that major ones are fit first
 parnames = [m['name'] for m in model_params]
-fit_order = ['logmass','z_fraction', 'dust2', 'logzsol', 'dust_index', 'dust1_fraction', 'duste_qpah', 'duste_gamma', 'duste_umin']
+fit_order = ['logmass','z_fraction', 'dust2', 'logzsol', 'dust_index', 'dust1_fraction', 'duste_qpah', 'fagn', 'agn_tau']
 tparams = [model_params[parnames.index(i)] for i in fit_order]
 for param in model_params: 
     if param['name'] not in fit_order:
@@ -548,9 +552,11 @@ def load_model(objname=None, datdir=None, runname=None, agelims=[], **extras):
     tuniv = WMAP9.age(zred).value
 
     #### NONPARAMETRIC SFH #####
-    # six bins, four spaced equally in logarithmic space AFTER t=100 Myr + BEFORE tuniv-300 Myr
-    agelims = agelims = [0.0,8.0,8.5,9.0,9.5,9.8,10.0]
-    tbinmax = tuniv*1e9-3e8
+    # six bins, four spaced equally in logarithmic space AFTER t=100 Myr + BEFORE tuniv-1 Gyr
+    if tuniv > 5:
+        tbinmax = (tuniv-2)*1e9
+    else:
+        tbinmax = (tuniv-1)*1e9
     agelims = [agelims[0]] + np.linspace(agelims[1],np.log10(tbinmax),5).tolist() + [np.log10(tuniv*1e9)]
     agebins = np.array([agelims[:-1], agelims[1:]])
     ncomp = len(agelims) - 1

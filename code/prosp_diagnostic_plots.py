@@ -317,7 +317,7 @@ def add_sfh_plot(exout,fig,ax_loc=None,
     axlim_sfh=[xmax, xmin, ymin*.7, ymax*1.4]
     ax_inset.axis(axlim_sfh)
     ax_inset.set_ylabel(r'SFR [M$_{\odot}$/yr]',fontsize=axfontsize*3,labelpad=2*text_size)
-    ax_inset.set_xlabel('t [Gyr]',fontsize=axfontsize*3,labelpad=2*text_size)
+    ax_inset.set_xlabel(r't$_{\mathrm{lookback}}$ [Gyr]',fontsize=axfontsize*3,labelpad=2*text_size)
     
     ax_inset.set_xscale('log',nonposx='clip',subsx=([1]))
     ax_inset.xaxis.set_major_formatter(majorFormatter)

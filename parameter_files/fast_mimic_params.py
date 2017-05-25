@@ -23,7 +23,7 @@ run_params = {'verbose':True,
               # MCMC params
               'nwalkers':140,
               'nburn':[50,100], 
-              'niter': 800,
+              'niter': 1100,
               'interval': 0.2,
               # Convergence criteria
               'convergence_check_interval': 50,
@@ -79,7 +79,7 @@ def load_obs(objname=None, datdir=None, err_floor=0.05, zperr=True, **extras):
     unc[mips_idx] *= dflux[0]
 
     ### define photometric mask, convert to maggies
-    phot_mask = (flux != unc) & (flux != -99.0)
+    phot_mask = (flux != unc) & (flux != -99.0) & (unc > 0)
     phot_mask[mips_idx] = False # NO DUST EMISSION FOR FAST!
     maggies = flux/(1e10)
     maggies_unc = unc/(1e10)
@@ -96,6 +96,11 @@ def load_obs(objname=None, datdir=None, err_floor=0.05, zperr=True, **extras):
             match = band_names == f
             if match.sum():
                 maggies_unc[ii] = ( (maggies_unc[ii]**2) + (maggies[ii]*(1-zp_offsets[match]['Flux-Correction'][0]))**2 ) **0.5
+
+    ### if we have super negative flux, then mask it !
+    ### where super negative is <0 with 95% certainty
+    neg = (maggies < 0) & (np.abs(maggies/maggies_unc) > 2)
+    phot_mask[neg] = False
 
     ### build output dictionary
     obs = {}
