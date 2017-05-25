@@ -154,10 +154,16 @@ def calc_extra_quantities(sample_results, ncalc=3000, **kwargs):
         ##### if we don't use these parameters, find them in SPS model
         dust1 = thetas[d1_idx]
         if dust1.shape[0] == 0:
-            dust1 = sps.params['dust1']
+            try:
+                dust1 = sps.params['dust1']
+            except:
+                dust1 = sps.csp.params['dust1']
         dust_idx = thetas[didx]
         if dust_idx.shape[0] == 0:
-            dust_idx = sps.params['dust_index']
+            try:
+                dust_idx = sps.params['dust_index']
+            except:
+                dust_idx = sps.csp.params['dust_index']
 
         ##### extract sfh parameters
         # pass stellar mass to avoid extra model call
@@ -168,8 +174,6 @@ def calc_extra_quantities(sample_results, ncalc=3000, **kwargs):
         intsfr[:,jj] = prosp_dutils.return_full_sfh(t, sfh_params)
 
         ##### solve for half-mass assembly time
-        # this is half-time in the sense of integral of SFR, i.e.
-        # mass loss is NOT taken into account.
         half_time[jj] = prosp_dutils.halfmass_assembly_time(sfh_params)
 
         ##### calculate time-averaged SFR
