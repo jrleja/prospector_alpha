@@ -25,13 +25,13 @@ run_params = {'verbose':True,
               'ftol':0.5e-5, 
               'maxfev':5000,
               # MCMC params
-              'nwalkers':620,
+              'nwalkers':310,
               'nburn':[150,200,200], 
-              'niter': 7500,
+              'niter': 15000,
               'interval': 0.2,
               # Convergence parameters
               'convergence_check_interval': 50,
-              'convergence_chunks': 325,
+              'convergence_chunks': 650,
               'convergence_kl_threshold': 0.016,
               'convergence_stable_points_criteria': 8, 
               'convergence_nhist': 50,
@@ -386,7 +386,7 @@ model_params.append({'name': 'dust1_fraction', 'N': 1,
                         'init_disp': 0.8,
                         'disp_floor': 0.8,
                         'units': '',
-                        'prior': priors.TopHat(mini=0.0, maxi=2.0)})
+                        'prior': priors.ClippedNormal(mini=0.0, maxi=2.0, mean=1.0, sigma=0.3)})
 
 model_params.append({'name': 'dust2', 'N': 1,
                         'isfree': True,
