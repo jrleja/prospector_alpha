@@ -194,14 +194,14 @@ model_params.append({'name': 'tau', 'N': 1,
                         'depends_on': transform_logtau_to_tau,
                         'init_disp': 0.5,
                         'units': 'Gyr',
-                        'prior': priors.TopHat(mini=0.01, maxi=100)})
+                        'prior': priors.TopHat(mini=0.03, maxi=100)})
 
 model_params.append({'name': 'logtau', 'N': 1,
                         'isfree': True,
                         'init': 1,
                         'init_disp': 0.5,
                         'units': 'Gyr',
-                        'prior': priors.TopHat(mini=-2.0, maxi=2.0)})
+                        'prior': priors.TopHat(mini=-1.52, maxi=2.0)})
 
 model_params.append({'name': 'tage', 'N': 1,
                         'isfree': True,
