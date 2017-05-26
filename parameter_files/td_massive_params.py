@@ -19,7 +19,7 @@ jansky_mks = 1e-26
 APPS = os.getenv('APPS')
 run_params = {'verbose':True,
               'debug': False,
-              'outfile': APPS+'/threedhst_bsfh/results/td_massive/td_massive_AEGIS_531',
+              'outfile': APPS+'/threedhst_bsfh/results/td_massive/AEGIS_531',
               'nofork': True,
               # Optimizer params
               'ftol':0.5e-5, 

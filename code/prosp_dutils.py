@@ -554,7 +554,7 @@ def generate_basenames(runname,ancilname=None):
 
     elif runname == 'td_massive' or runname == 'fast_mimic':
 
-        id_list = os.getenv('APPS')+"/threedhst_bsfh/data/3dhst/COSMOS_td_massive.ids"
+        id_list = os.getenv('APPS')+"/threedhst_bsfh/data/3dhst/td_massive.ids"
         ids = np.loadtxt(id_list, dtype='|S60',delimiter=',')
         ngals = len(ids)
 
@@ -562,8 +562,8 @@ def generate_basenames(runname,ancilname=None):
         ancilname=None
 
         for jj in xrange(ngals):
-            filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+runname+'_'+ids[jj])
-            parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py') 
+            filebase.append(os.getenv('APPS')+'/threedhst_bsfh/results/'+runname+'/'+ids[jj])
+            parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+parm_basename+'.py') 
 
 
     else:
@@ -937,6 +937,10 @@ def integrate_sfh(t1,t2,sfh_params):
 
     # if we're using a parameterized SFH
     if sfh_params['sfh'] > 0:
+
+        # make sure we have an sf_start
+        if (sfh['sf_start'].shape[0] == 0):
+            sfh['sf_start'] = 0.0
 
         # here is our coordinate transformation to match fsps
         t1 = t1-sfh['sf_start']
