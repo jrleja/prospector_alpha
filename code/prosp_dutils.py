@@ -899,7 +899,7 @@ def transform_zfraction_to_sfrfraction(zfraction):
 
 def integrate_exp_tau(t1,t2,sfh):
 
-    return sfh['tau']*(np.exp(-t1/sfh['tau'])-np.exp(-t2/sfh['tau']))
+    return sfh['tau'][0]*(np.exp(-t1/sfh['tau'][0])-np.exp(-t2/sfh['tau'][0]))
 
 def integrate_delayed_tau(t1,t2,sfh):
 
@@ -940,11 +940,11 @@ def integrate_sfh(t1,t2,sfh_params):
 
         # make sure we have an sf_start
         if (sfh['sf_start'].shape[0] == 0):
-            sfh['sf_start'] = 0.0
+            sfh['sf_start'] = np.atleast_1d(0.0)
 
         # here is our coordinate transformation to match fsps
-        t1 = t1-sfh['sf_start']
-        t2 = t2-sfh['sf_start']
+        t1 = t1-sfh['sf_start'][0]
+        t2 = t2-sfh['sf_start'][0]
 
         # match dimensions, if two-tau model
         ndim = len(np.atleast_1d(sfh['mass']))
@@ -959,15 +959,15 @@ def integrate_sfh(t1,t2,sfh_params):
 
         # if we're outside of the time boundaries, clip to boundary values
         # this only affects integrals which would have been questionable in the first place
-        t1 = np.clip(t1,0,sfh['tage']-sfh['sf_start'])
-        t2 = np.clip(t2,0,sfh['tage']-sfh['sf_start'])
+        t1 = np.clip(t1,0,float(sfh['tage']-sfh['sf_start']))
+        t2 = np.clip(t2,0,float(sfh['tage']-sfh['sf_start']))
 
         # if we're using normal tau
         if (sfh['sfh'] == 1):
 
             # add tau model
-            intsfr =  integrate_exp_tau(t1,t2,sfh)
-            norm =    sfh['tau']*(1-np.exp(-(sfh['sf_trunc']-sfh['sf_start'])/sfh['tau']))
+            intsfr = integrate_exp_tau(t1,t2,sfh)
+            norm = sfh['tau'][0]*(1-np.exp(-(sfh['sf_trunc'][0]-sfh['sf_start'][0])/sfh['tau'][0]))
             intsfr = intsfr/norm
 
         # if we're using delayed tau
@@ -975,8 +975,8 @@ def integrate_sfh(t1,t2,sfh_params):
 
             # add tau model
             intsfr =  integrate_delayed_tau(t1,t2,sfh)
-            norm =    1.0-np.exp(-(sfh['sf_trunc']-sfh['sf_start'])/sfh['tau'])*(1+(sfh['sf_trunc']-sfh['sf_start'])/sfh['tau'])
-            intsfr = intsfr/(norm*sfh['tau']**2)
+            norm =    1.0-np.exp(-(sfh['sf_trunc'][0]-sfh['sf_start'][0])/sfh['tau'][0])*(1+(sfh['sf_trunc'][0]-sfh['sf_start'][0])/sfh['tau'][0])
+            intsfr = intsfr/(norm*sfh['tau'][0]**2)
 
         # else, add lin-ramp
         elif (sfh['sfh'] == 5):

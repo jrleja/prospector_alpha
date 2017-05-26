@@ -44,13 +44,6 @@ def subcorner(sample_results,  sps, model, extra_output, flatchain,
     fig = add_to_corner(fig, sample_results, extra_output, sps, model, outname=outname,
                         truths=truths, maxprob=True, title_kwargs=title_kwargs,powell_results=powell_results)
 
-    #### add SFH plot
-    sfh_ax = fig.add_axes([0.7,0.425,0.25,0.25],zorder=32)
-    add_sfh_plot([extra_output], fig,
-                 main_color = ['black'],
-                 ax_inset=sfh_ax,
-                 text_size=3,lw=5)
-
     if outname is not None:
         fig.savefig('{0}.corner.png'.format(outname))
         plt.close(fig)
@@ -193,15 +186,29 @@ def add_to_corner(fig, sample_results, extra_output, sps, model,truths=None,outn
             extents.append((np.percentile(flatchain[:,i],0.1),
                             np.percentile(flatchain[:,i],99.9)))
 
-        fig2 = corner.corner(flatchain, labels = ptitle,
-                             quantiles=[0.16, 0.5, 0.84], verbose = False,
-                             range = extents, title_kwargs=title_kwargs,
-                             show_titles = True, plot_datapoints=False)
-
+        fig2 = corner.corner(flatchain, labels=ptitle, levels=[0.68,0.95,0.997], fill_contours=True, color='#0038A8',
+                             quantiles=[0.16, 0.5, 0.84], verbose = False, range = extents, hist_kwargs=dict(color='k'),
+                             show_titles = True, plot_datapoints=False, title_kwargs=title_kwargs)
+       
+        #### add SFH plot
+        sfh_ax = fig2.add_axes([0.7,0.7,0.25,0.25],zorder=32)
+        add_sfh_plot([extra_output], fig2,
+                     main_color = ['black'],
+                     ax_inset=sfh_ax,
+                     text_size=1.5,lw=2)
         fig2.savefig('{0}.corner.extra.png'.format(outname))
+
         plt.close(fig2)
 
     else:
+        
+        #### add SFH plot
+        sfh_ax = fig.add_axes([0.7,0.425,0.25,0.25],zorder=32)
+        add_sfh_plot([extra_output], fig,
+                     main_color = ['black'],
+                     ax_inset=sfh_ax,
+                     text_size=3,lw=5)
+
         #### create my own axes here
         # size them using size of other windows
         axis_size = fig.get_axes()[0].get_position().size
