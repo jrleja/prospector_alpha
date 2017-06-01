@@ -301,8 +301,8 @@ model_params.append({'name': 'duste_umin', 'N': 1,
                         'prior': priors.TopHat(mini=0.1, maxi=25.0)})
 
 model_params.append({'name': 'duste_qpah', 'N': 1,
-                        'isfree': True,
-                        'init': 3.0,
+                        'isfree': False,
+                        'init': 2.0,
                         'init_disp': 3.0,
                         'disp_floor': 3.0,
                         'units': 'percent',
@@ -342,20 +342,20 @@ model_params.append({'name': 'gas_logu', 'N': 1,
 ##### AGN dust ##############
 model_params.append({'name': 'add_agn_dust', 'N': 1,
                         'isfree': False,
-                        'init': True,
+                        'init': False,
                         'units': '',
                         'prior': None})
 
 model_params.append({'name': 'fagn', 'N': 1,
-                        'isfree': True,
-                        'init': 0.01,
+                        'isfree': False,
+                        'init': 0.00,
                         'init_disp': 0.03,
                         'disp_floor': 0.02,
                         'units': '',
                         'prior': priors.LogUniform(mini=1e-5, maxi=3.0)})
 
 model_params.append({'name': 'agn_tau', 'N': 1,
-                        'isfree': True,
+                        'isfree': False,
                         'init': 4.0,
                         'init_disp': 5,
                         'disp_floor': 2,
