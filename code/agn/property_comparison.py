@@ -145,7 +145,7 @@ def add_identifier(ax,idx,pdata,fs=12,x=0.94,y=0.88,dy=0.08,weight='bold'):
 	text = text.format(fmt(mid), \
 		               fmt(mid-pdata['agn']['model_pars']['fagn']['q16'][idx]), \
 		               fmt(pdata['agn']['model_pars']['fagn']['q84'][idx]-mid))
-	text = "{0} = {1}".format(r'f$_{\mathrm{MIR}}$=', text)
+	text = "{0} = {1}".format(r'f$_{\mathrm{AGN,MIR}}$=', text)
 
 	ax.text(x,y-dy,text,fontsize=fs,transform=ax.transAxes,ha='right')
 

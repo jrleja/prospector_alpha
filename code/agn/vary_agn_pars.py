@@ -73,7 +73,7 @@ def make_plot():
 
     #### set up parameters
     nsamp = 5
-    to_samp = [r'f$_{\mathrm{MIR}}$',r'$\tau_{\mathrm{AGN}}$']
+    to_samp = [r'f$_{\mathrm{AGN,MIR}}$',r'$\tau_{\mathrm{AGN}}$']
     samp_pars = [[0.0, 0.05, 0.1, 0.2, 0.5],[5,10,20,50,150]] 
 
     idx = [didx,tidx]
@@ -115,10 +115,10 @@ def make_plot():
         itheta[idx[k]] = model.initial_theta[idx[k]]
 
     #### legend + labels
-    ax[0].legend(loc=4,prop={'size':12},title='f$_{\mathrm{MIR}}$',ncol=2)
+    ax[0].legend(loc=4,prop={'size':12},title='f$_{\mathrm{AGN,MIR}}$',ncol=2)
     ax[1].legend(loc=4,prop={'size':12},title=to_samp[1],ncol=2)
     ax[0].text(0.05,0.075,r'$\tau_{\mathrm{AGN}}$=20',transform=ax[0].transAxes,fontsize=12)
-    ax[1].text(0.05,0.075,r'f$_{\mathrm{MIR}}$=0.8',transform=ax[1].transAxes,fontsize=12)
+    ax[1].text(0.05,0.075,r'f$_{\mathrm{AGN,MIR}}$=0.8',transform=ax[1].transAxes,fontsize=12)
 
     for a in ax:
         a.get_legend().get_title().set_fontsize('16')

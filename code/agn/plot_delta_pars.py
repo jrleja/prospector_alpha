@@ -147,7 +147,7 @@ def plot(runname='brownseds_agn',runname_noagn='brownseds_np',alldata=None,allda
 
 	### delta parameters plot
 	fig,ax = plot_dpars(pdata,
-		                xpar='fagn',xparlabel=r'log(f$_{\mathrm{MIR}}$)',
+		                xpar='fagn',xparlabel=r'log(f$_{\mathrm{AGN,MIR}}$)',
 		                log_xpar=True,
 		                agn_idx=idx,
 		                **popts)

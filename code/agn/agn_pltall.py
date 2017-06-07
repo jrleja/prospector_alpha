@@ -80,7 +80,6 @@ def plot(runname='brownseds_agn',runname_noagn='brownseds_np',
                                            alldata_noagn=alldata_noagn,agn_idx=agn_idx,regenerate=False,outfolder=outfolder, **popts)
     print 'PLOTTING AGN EVIDENCE HISTOGRAM'
     agn_evidence_hist.plot(agn_evidence,alldata, outfolder, **popts)
-    print 1/0
     print 'PLOTTING DELTA OBSERVABLES'
     plot_spec_rms.plot_comparison(runname=runname,alldata=alldata_sub,alldata_noagn=alldata_noagn,outfolder=outfolder,idx=agn_idx,**popts)
     print 'PLOTTING MASS-METALLICITY DIAGRAM'

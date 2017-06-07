@@ -243,14 +243,14 @@ def make_plot(agn_evidence,runname='brownseds_agn',alldata=None,outfolder=None,m
     ### PLOT VERSUS OBSERVED X-RAY FLUX
     outname = 'xray_lum_fagn_model.png'
     fig,ax = plot(pdata,
-                  ypar='fagn',ylabel = r'f$_{\mathrm{MIR}}$',xrb_color_flag=True, idx=idx, **popts)
+                  ypar='fagn',ylabel = r'f$_{\mathrm{AGN,MIR}}$',xrb_color_flag=True, idx=idx, **popts)
     plt.savefig(outfolder+outname,dpi=dpi)
     plt.close()
 
     ### PLOT VERSUS 'TRUE' X-RAY FLUX
     outname = 'xray_lum_sfrcorr_fagn_model.png'
     fig,ax = plot(pdata,
-                  ypar='fagn',ylabel = r'f$_{\mathrm{MIR}}$',
+                  ypar='fagn',ylabel = r'f$_{\mathrm{AGN,MIR}}$',
                   xpar='lsfr',xlabel = r'L$_{\mathrm{X}}$(observed)/L$_{\mathrm{XRB}}$(model)',
                   idx = idx, **popts)
     plt.savefig(outfolder+outname,dpi=dpi)
@@ -298,11 +298,11 @@ def plot_pdf_scatter(pdata, alldata, idx=Ellipsis, outname=None,
 
     ### deal with y-axis
     ypars = ['fmir','agn_tau']
-    ylabel = [r'f$_{\mathrm{MIR}}$',r'$\tau_{\mathrm{AGN}}$']
+    ylabel = [r'f$_{\mathrm{AGN,MIR}}$',r'$\tau_{\mathrm{AGN}}$']
     nbins = 20
     clip = [5,95]
 
-    lims = [(0.04,1),(5,100)]
+    lims = [(0.02,1),(2,100)]
     sig = xray_cuts(pdata)[idx][pidx]
     ### loop over two y-parameters (AGN tau and fmir)
     for ii, yp in enumerate(ypars):
@@ -313,7 +313,7 @@ def plot_pdf_scatter(pdata, alldata, idx=Ellipsis, outname=None,
 
         for color,id in zip([red,blue],[sig,~sig]):
             yerr = prosp_dutils.asym_errors(q50[id],q84[id],q16[id])
-            ax[ii].scatter(q50[id], xplot[id], marker='o', color=color,s=45,zorder=11,alpha=0.9,edgecolors='k')
+            ax[ii].scatter(q50[id], xplot[id], marker='o', color=color,s=52,zorder=11,alpha=0.9,edgecolors='k')
             ax[ii].errorbar(q50[id], xplot[id], xerr=yerr, zorder=-5,ms=0.0, ecolor='k', linestyle=' ',
                             capthick=0.8, elinewidth=0.4, alpha=0.7)
 
@@ -327,7 +327,7 @@ def plot_pdf_scatter(pdata, alldata, idx=Ellipsis, outname=None,
         ax[ii].yaxis.set_major_locator(MaxNLocator(5))
         ax[ii].set_xlim(lims[ii])
 
-        ax[ii].set_xscale('log',nonposx='clip',subsx=(1,2,4,7))
+        ax[ii].set_xscale('log',nonposx='clip',subsx=(1,2,4))
         ax[ii].xaxis.set_minor_formatter(minorFormatter)
         ax[ii].xaxis.set_major_formatter(majorFormatter)
 
@@ -452,7 +452,7 @@ def plot_model_corrs(pdata,color_by=None,idx=None,**popts):
     ax = np.ravel(ax)
 
     #### fagn labeling
-    xlabel = r'log(f$_{\mathrm{MIR}}$)'
+    xlabel = r'log(f$_{\mathrm{AGN,MIR}}$)'
     x = np.log10(pdata['fagn'])
     xerr =  prosp_dutils.asym_errors(pdata['fagn'], 
                                      pdata['fagn_up'],

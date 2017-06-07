@@ -147,8 +147,9 @@ def plot_rms(pdata,outfolder,agn_idx=None,**popts):
              'bdec':r'log(F/F$_0$)$_{\mathrm{H}\alpha}$ - log(F/F$_0$)$_{\mathrm{H}\beta}$'
             }
     lims = [(-2,2), (-2,2), (-0.3,0.3), (-0.15,0.15)]
-    lims2 = [(6,9.3),(5,8.5),(-0.1,0.6),(1.0,1.45)]
-    sn_cut = [0.2, 0.2, 0.1, 0.1]
+    lims2 = [(6,9.3),(5,8.5),(-0.1,0.65),(1.0,1.45)]
+    sn_cut = [0.1, 0.1, 0.1, 0.1]
+    minarrow = [0.03, 0.03, 0.01, 0.01]
 
     ### for each observable, pull out RMS
     ndraw = int(1e5)
@@ -185,7 +186,7 @@ def plot_rms(pdata,outfolder,agn_idx=None,**popts):
         errs = prosp_dutils.asym_errors(q50[idx], q84[idx], q16[idx])
         ax[ii].errorbar(fagn[idx],q50[idx],yerr=errs,fmt='o', ecolor=blue, capthick=1,elinewidth=1,ms=8,alpha=0.5,zorder=-5)
         ax[ii].set_title(trans[key])
-        ax[ii].set_xlabel(r'log(f$_{\mathrm{MIR}}$)')
+        ax[ii].set_xlabel(r'log(f$_{\mathrm{AGN,MIR}}$)')
         ax[ii].set_ylabel(r'RMS(NO AGN) - RMS(AGN)')
         ax[ii].axhline(0, linestyle='--', color='0.2')
         ax[ii].xaxis.set_major_locator(MaxNLocator(5))
@@ -200,43 +201,49 @@ def plot_rms(pdata,outfolder,agn_idx=None,**popts):
         ax[ii].plot(x,y,color=red,lw=4,alpha=0.6)
         ax[ii].plot(x,y,color=red,lw=4,alpha=0.6)
 
+        ### SWITCH GEARS: ARROW PLOTS
         ####### observed vs model, AGN only, with arrows
-        q16o, q50o, q84o, q16m, q50m, q84m, q16o_no, q50o_no, q84o_no, q16m_no, q50m_no, q84m_no = [np.zeros(agn_idx.shape[0]) for i in range(12)]
-        for jj in xrange(agn_idx.shape[0]):
-            q50o[jj],q84o[jj],q16o[jj] = np.nanpercentile(obs_agn[agn_idx[jj]],[50.0,84.0,16.0])
-            q50m[jj],q84m[jj],q16m[jj] = np.nanpercentile(mod_agn[agn_idx[jj]],[50.0,84.0,16.0])
-            q50o_no[jj],q84o_no[jj],q16o_no[jj] = np.nanpercentile(obs_noagn[agn_idx[jj]],[50.0,84.0,16.0])
-            q50m_no[jj],q84m_no[jj],q16m_no[jj] = np.nanpercentile(mod_noagn[agn_idx[jj]],[50.0,84.0,16.0])
+        ngal = q50.shape[0]
+        q16o, q50o, q84o, q16m, q50m, q84m, q16o_no, q50o_no, q84o_no, q16m_no, q50m_no, q84m_no = [np.zeros(ngal) for i in range(12)]
+        for jj in xrange(ngal):
+            q50o[jj],q84o[jj],q16o[jj] = np.nanpercentile(obs_agn[jj],[50.0,84.0,16.0])
+            q50m[jj],q84m[jj],q16m[jj] = np.nanpercentile(mod_agn[jj],[50.0,84.0,16.0])
+            q50o_no[jj],q84o_no[jj],q16o_no[jj] = np.nanpercentile(obs_noagn[jj],[50.0,84.0,16.0])
+            q50m_no[jj],q84m_no[jj],q16m_no[jj] = np.nanpercentile(mod_noagn[jj],[50.0,84.0,16.0])
 
         good = ((np.isfinite(q50o)) & (np.isfinite(q50m)) & (np.isfinite(q50o_no)) & (np.isfinite(q50m_no)) &
                ((q84o-q16o)/2. < sn_cut[ii]))
+        good_agn = good[agn_idx]
+
+        ax2[ii].scatter(q50o[good], q50m[good], marker='o', color='0.4',s=10,zorder=-10,alpha=0.4)
 
         alpha = 0.7
-        ax2[ii].scatter(q50o_no[good], q50m_no[good], marker='o', color=popts['noagn_color'],s=70,zorder=10,alpha=alpha,edgecolors='k')
-        ax2[ii].scatter(q50o[good], q50m[good], marker='o', color=popts['agn_color'],s=70,zorder=10,alpha=alpha,edgecolors='k')
+        ax2[ii].scatter(q50o_no[agn_idx][good_agn], q50m_no[agn_idx][good_agn], marker='o', color=popts['noagn_color'],s=70,zorder=10,alpha=alpha,edgecolors='k')
+        ax2[ii].scatter(q50o[agn_idx][good_agn], q50m[agn_idx][good_agn], marker='o', color=popts['agn_color'],s=70,zorder=10,alpha=alpha,edgecolors='k')
         
-        errs_obs = prosp_dutils.asym_errors(q50o_no[good], q84o_no[good], q16o_no[good])
-        errs_mod = prosp_dutils.asym_errors(q50m_no[good], q84m_no[good], q16m_no[good])
+        errs_obs = prosp_dutils.asym_errors(q50o_no[agn_idx][good_agn], q84o_no[agn_idx][good_agn], q16o_no[agn_idx][good_agn])
+        errs_mod = prosp_dutils.asym_errors(q50m_no[agn_idx][good_agn], q84m_no[agn_idx][good_agn], q16m_no[agn_idx][good_agn])
 
-        ax2[ii].errorbar(q50o_no[good], q50m_no[good], 
+        ax2[ii].errorbar(q50o_no[agn_idx][good_agn], q50m_no[agn_idx][good_agn], 
                          yerr=errs_mod, xerr=errs_obs,
                          fmt='o', ecolor='0.5', capthick=0.5,elinewidth=0.5,
                          ms=0,alpha=0.4,zorder=-5)
 
-        errs_obs = prosp_dutils.asym_errors(q50o[good], q84o[good], q16o[good])
-        errs_mod = prosp_dutils.asym_errors(q50m[good], q84m[good], q16m[good])
+        errs_obs = prosp_dutils.asym_errors(q50o[agn_idx][good_agn], q84o[agn_idx][good_agn], q16o[agn_idx][good_agn])
+        errs_mod = prosp_dutils.asym_errors(q50m[agn_idx][good_agn], q84m[agn_idx][good_agn], q16m[agn_idx][good_agn])
 
-        ax2[ii].errorbar(q50o[good], q50m[good], 
+        ax2[ii].errorbar(q50o[agn_idx][good_agn], q50m[agn_idx][good_agn], 
                          yerr=errs_mod, xerr=errs_obs,
                          fmt='o', ecolor='0.5', capthick=0.5,elinewidth=0.5,
                          ms=0,alpha=0.4,zorder=-5)
 
         ### draw in some SICK arrows
-        for kk in xrange(len(good)):
-            if not good[kk]:
+        for kk in xrange(len(agn_idx)):
+            old = (q50o_no[agn_idx][kk],q50m_no[agn_idx][kk])
+            new = (q50o[agn_idx][kk],q50m[agn_idx][kk])
+            if (not good_agn[kk]) or (np.linalg.norm(np.array(old)-np.array(new))) < minarrow[ii]:
                 continue
-            old = (q50o_no[kk],q50m_no[kk])
-            new = (q50o[kk],q50m[kk])
+
             drawArrow(old,new,ax2[ii],scale=lims2[ii][1]-lims2[ii][0])
 
         ### labels and lines
@@ -248,19 +255,25 @@ def plot_rms(pdata,outfolder,agn_idx=None,**popts):
         ax2[ii].set_ylim(lims2[ii][0],lims2[ii][1])
         ax2[ii].plot(lims2[ii],lims2[ii],'--',color='0.5',alpha=0.5,zorder=-15)
 
-        off_agn,scat_agn = prosp_dutils.offset_and_scatter(q50o[good],q50m[good],biweight=True)
-        off_noagn,scat_noagn = prosp_dutils.offset_and_scatter(q50o_no[good],q50m_no[good],biweight=True)
+        off_agn,scat_agn = prosp_dutils.offset_and_scatter(q50o[agn_idx][good_agn],q50m[agn_idx][good_agn],biweight=True)
+        off_noagn,scat_noagn = prosp_dutils.offset_and_scatter(q50o_no[agn_idx][good_agn],q50m_no[agn_idx][good_agn],biweight=True)
         topts = {'transform':ax2[ii].transAxes,'fontsize':13,'verticalalignment':'top'}
-        ax2[ii].text(0.04,0.95,'AGN-off', color=popts['noagn_color'],weight='bold', **topts)
-        ax2[ii].text(0.04,0.9,'scatter, offset=', color=popts['noagn_color'], **topts)
-        ax2[ii].text(0.04,0.85,"{:.2f}".format(scat_noagn)+", "+"{:.2f}".format(off_noagn), color=popts['noagn_color'], **topts)
-        ax2[ii].text(0.04,0.77,'AGN-on', color=popts['agn_color'], weight='semibold', **topts)
-        ax2[ii].text(0.04,0.72,'scatter, offset=', color=popts['agn_color'], **topts)
-        ax2[ii].text(0.04,0.67,"{:.2f}".format(scat_agn)+", "+"{:.2f}".format(off_agn), color=popts['agn_color'], **topts)
+
+        xt, ha = 0.04, 'left'
+        yt, ydel = 0.95, 0.05
+        if ii == 2:
+            xt, ha = 0.95, 'right'
+            yt = 0.4
+        ax2[ii].text(xt,yt,'AGN-off', color=popts['noagn_color'],weight='bold', ha=ha, **topts)
+        ax2[ii].text(xt,yt-ydel,'scatter, offset=', color=popts['noagn_color'],ha=ha, **topts)
+        ax2[ii].text(xt,yt-2*ydel,"{:.2f}".format(scat_noagn)+", "+"{:.2f}".format(off_noagn), color=popts['noagn_color'], ha=ha,**topts)
+        ax2[ii].text(xt,yt-3*ydel-0.03,'AGN-on', color=popts['agn_color'], weight='semibold',ha=ha, **topts)
+        ax2[ii].text(xt,yt-4*ydel-0.03,'scatter, offset=', color=popts['agn_color'],ha=ha, **topts)
+        ax2[ii].text(xt,yt-5*ydel-0.03,"{:.2f}".format(scat_agn)+", "+"{:.2f}".format(off_agn), color=popts['agn_color'],ha=ha, **topts)
 
         print key
         print 'change in observables:'
-        for k,idx in enumerate(agn_idx): print '\t'+pdata['agn']['objname'][idx]+': '+"{:.2f}".format(q50o_no[k]-q50o[k])
+        for k,idx in enumerate(agn_idx[good_agn]): print '\t'+pdata['agn']['objname'][idx]+': '+"{:.2f}".format(q50o_no[k]-q50o[k])
 
     fig.tight_layout()
     fig.savefig(outfolder+'delta_spec_rms.png',dpi=120)

@@ -25,6 +25,8 @@ def collate_data(alldata):
     for p in pnames: model_pars[p] = []
     parnames = alldata[0]['pquantiles']['parnames']
     objname = []
+    oiii_hb_chain = []
+    nii_ha_chain = []
 
     #### load information
     for ii, dat in enumerate(alldata):
@@ -39,29 +41,13 @@ def collate_data(alldata):
             oiii_hb[ii,1] = np.inf
             nii_ha[ii,1] = np.inf
             continue
-        
-        '''
-        f_oiii = dat['residuals']['emlines']['obs']['lum'][oiii_em]
-        f_hb = dat['residuals']['emlines']['obs']['lum'][hb_em]
-        err_oiii = (dat['residuals']['emlines']['obs']['lum_errup'][oiii_em] - dat['residuals']['emlines']['obs']['lum_errdown'][oiii_em])/2.
-        err_hb = (dat['residuals']['emlines']['obs']['lum_errup'][hb_em] - dat['residuals']['emlines']['obs']['lum_errdown'][hb_em])/2.
-        oiii_hb[ii,0] = f_oiii / f_hb
-        oiii_hb[ii,1] = oiii_hb[ii,0] * np.sqrt((err_oiii/f_oiii)**2+(err_hb/f_hb)**2)
-
-        f_nii = dat['residuals']['emlines']['obs']['lum'][nii_em]
-        f_ha = dat['residuals']['emlines']['obs']['lum'][ha_em]
-        err_nii = (dat['residuals']['emlines']['obs']['lum_errup'][nii_em] - dat['residuals']['emlines']['obs']['lum_errdown'][nii_em])/2.
-        err_ha = (dat['residuals']['emlines']['obs']['lum_errup'][ha_em] - dat['residuals']['emlines']['obs']['lum_errdown'][ha_em])/2.
-        nii_ha[ii,0] = f_nii / f_ha
-        nii_ha[ii,1] = nii_ha[ii,0] * np.sqrt((err_nii/f_nii)**2+(err_ha/f_ha)**2)
-        '''
 
         #### calculate ratios from the chain
-        ratio = np.log10(dat['residuals']['emlines']['obs']['lum_chain'][:,oiii_em].squeeze() / dat['residuals']['emlines']['obs']['lum_chain'][:,hb_em].squeeze())
-        oiii_hb[ii,:] = np.percentile(ratio, [50, 84, 16])
+        oiii_hb_chain.append(np.log10(dat['residuals']['emlines']['obs']['lum_chain'][:,oiii_em].squeeze() / dat['residuals']['emlines']['obs']['lum_chain'][:,hb_em].squeeze()))
+        oiii_hb[ii,:] = np.percentile(oiii_hb_chain[-1], [50, 84, 16])
             
-        ratio = np.log10(dat['residuals']['emlines']['obs']['lum_chain'][:,nii_em].squeeze() / dat['residuals']['emlines']['obs']['lum_chain'][:,ha_em].squeeze())
-        nii_ha[ii,:] = np.percentile(ratio, [50, 84, 16])
+        nii_ha_chain.append(np.log10(dat['residuals']['emlines']['obs']['lum_chain'][:,nii_em].squeeze() / dat['residuals']['emlines']['obs']['lum_chain'][:,ha_em].squeeze()))
+        nii_ha[ii,:] = np.percentile(nii_ha_chain[-1], [50, 84, 16])
 
     #### numpy arrays
     for key in model_pars.keys(): model_pars[key] = np.array(model_pars[key])
@@ -71,6 +57,8 @@ def collate_data(alldata):
     out['objname'] = objname
     out['oiii_hb'] = oiii_hb
     out['nii_ha'] = nii_ha
+    out['oiii_hb_chain'] = oiii_hb_chain
+    out['nii_ha_chain'] = nii_ha_chain
     return out
 
 def plot_bpt(agn_evidence,runname='brownseds_agn',alldata=None,outfolder=None,idx=None,**popts):
@@ -89,7 +77,7 @@ def plot_bpt(agn_evidence,runname='brownseds_agn',alldata=None,outfolder=None,id
     pdata = collate_data(alldata)
 
     ### BPT PLOT
-    fig,ax = plot_scatterplot(pdata,colorpar='fagn',colorparlabel=r'log(f$_{\mathrm{MIR}}$)',
+    fig,ax = plot_scatterplot(pdata,colorpar='fagn',colorparlabel=r'log(f$_{\mathrm{AGN,MIR}}$)',
                                      log_cpar=True, cpar_range=[-2,0], idx=idx, **popts)
     add_kewley_classifications(ax)
     plt.tight_layout()
@@ -98,20 +86,38 @@ def plot_bpt(agn_evidence,runname='brownseds_agn',alldata=None,outfolder=None,id
 
     agn_evidence['bpt_type'] = return_bpt_type(pdata)
     agn_evidence['bpt_use_flag'] = bpt_cuts(pdata)
+    agn_evidence['objname'] = pdata['objname']
+
     return agn_evidence
 
 def return_bpt_type(pdata):
 
-    bpt_flag = np.chararray(pdata['oiii_hb'].shape[0],itemsize=5)
+    bpt_flag = np.chararray(pdata['oiii_hb'].shape[0],itemsize=12)
 
+    #### 50th percentile determinations
     sf_line1 = 0.61 / (pdata['nii_ha'][:,0] - 0.05) + 1.3
     sf_line2 = 0.61 / (pdata['nii_ha'][:,0] - 0.47) + 1.19
     composite = (pdata['oiii_hb'][:,0] > sf_line1) & (pdata['oiii_hb'][:,0] < sf_line2)
     agn = pdata['oiii_hb'][:,0] > sf_line2
 
-    bpt_flag[:] = 'sf'
-    bpt_flag[composite] = 'comp'
-    bpt_flag[agn] = 'agn'
+    #### from the chains
+    for i, (oiii_hb,nii_ha) in enumerate(zip(pdata['oiii_hb_chain'],pdata['nii_ha_chain'])):
+        sf_line1 = 0.61 / (nii_ha - 0.05) + 1.3
+        sf_line2 = 0.61 / (nii_ha - 0.47) + 1.19
+
+        ### 1 sigma composite
+        composite_one = (oiii_hb > sf_line1) & (oiii_hb < sf_line2)
+        if composite_one.sum()/float(composite_one.shape[0]) > 0.16:
+            composite[i] = True
+        
+        ### 1 sigma AGN
+        agn_one = oiii_hb > sf_line2
+        if agn_one.sum()/float(agn_one.shape[0]) > 0.16:
+            agn[i] = True
+
+    bpt_flag[:] = 'star-forming'
+    bpt_flag[composite] = 'composite'
+    bpt_flag[agn] = 'AGN'
 
     return bpt_flag
 

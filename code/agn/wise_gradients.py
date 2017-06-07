@@ -2,7 +2,6 @@ from matplotlib import pyplot as plt
 from astropy.io import fits
 from astropy.wcs import WCS
 from astropy.stats import sigma_clipped_stats
-from astropy.modeling import models, fitting
 import os
 import numpy as np
 from astropy.coordinates import SkyCoord  # High-level coordinates
@@ -159,9 +158,7 @@ def plot_all(agn_evidence,runname='brownseds_agn',runname_noagn='brownseds_np',a
     return agn_evidence
 
 def data_cuts(outdict,idx=1):
-    resolved = (outdict['arcsec'][:,idx] > 3) & \
-               (outdict['gradient_error'][:,idx] < 0.25) & \
-               (outdict['obj_size_brown_kpc'] > (idx+1)*2)
+    resolved = (outdict['arcsec'][:,idx] > 3) & np.all(outdict['background_fraction'][:,:idx*2+2] < 0.2,axis=1) & (outdict['gradient_error'][:,idx] < 0.25)
     return resolved
 
 def plot_summary(pdata, outfolder, outdict,idx, agn_idx=Ellipsis, **popts):
@@ -211,7 +208,7 @@ def plot_summary(pdata, outfolder, outdict,idx, agn_idx=Ellipsis, **popts):
                 zorder=-3, fmt=popts['fmir_shape'],
                 alpha=popts['fmir_alpha'],**opts)
 
-    ax.set_xlabel(r'log(f$_{\mathrm{MIR}}$)')
+    ax.set_xlabel(r'log(f$_{\mathrm{AGN,MIR}}$)')
     ax.set_ylabel(r'$\nabla$(W1-W2) at r=2 kpc [mag/kpc]')
 
     ax.axhline(0, linestyle='--', color='0.2',lw=2,zorder=-1,alpha=0.4)
@@ -234,7 +231,7 @@ def plot_composites(pdata,outfolder,contours,contour_colors=True,
     kernel = None
 
     ### output blobs
-    gradient, gradient_error, arcsec, obj_size,objname_out,obj_size_gauss, obj_size_kpc = [], [], [], [], [], [], []
+    gradient, gradient_error, arcsec,objname_out, obj_size_kpc, background_out = [], [], [], [], [], []
 
     ### begin loop
     for idx in xrange(len(pdata['objname'])):
@@ -284,7 +281,6 @@ def plot_composites(pdata,outfolder,contours,contour_colors=True,
                     pix_center = wcs.all_world2pix([[ra[0],dec[0]]],1)
                     print pix_center, img1.shape
         except:
-            print 1/0
             gradient.append(None)
             gradient_error.append(None)
             arcsec.append(None)
@@ -293,7 +289,6 @@ def plot_composites(pdata,outfolder,contours,contour_colors=True,
             continue
 
         size = calc_dist(wcs, pix_center, phot_size, img1.data.shape)
-        print pix_center, img1.data.shape
 
         ### convert inverse variance to noise
         noise1.data = (1./noise1.data)**0.5
@@ -318,18 +313,21 @@ def plot_composites(pdata,outfolder,contours,contour_colors=True,
         noise2_slice = noise2[size[2]:size[3],size[0]:size[1]]
 
         ### subtract background from both images
+        # identify background pixels.
+        # background is any pixel consistent within 1sigma of background!
         mean1, median1, std1 = sigma_clipped_stats(w1_convolved, sigma=3.0,iters=10)
+        background1 = img1_slice < (median1+std1) 
         img1_slice -= median1
         mean2, median2, std2 = sigma_clipped_stats(data2, sigma=3.0, iters=10)
+        background2 = img2_slice < (median2+std2)
         img2_slice -= median2
 
         #### calculate the color
         flux_color  = convert_to_color(img1_slice, img2_slice,None,None,contours[0],contours[1],
                                        minflux=-np.inf, vega_conversions=brown_data)
 
-        ### don't show anything with S/N < 2!
-        sigmask = 2
-        background = (img2_slice/noise2_slice < sigmask) | (img1_slice/noise1_slice < sigmask)
+        ### don't show any "background" pixels!
+        background = background1 | background2
         flux_color[background] = np.nan
 
         ### plot colormap
@@ -348,46 +346,48 @@ def plot_composites(pdata,outfolder,contours,contour_colors=True,
         ### find image center in W2 image, and mark it
         # do this by finding the source closest to center
         tbl = []
-        nthresh, box_size = 20, 5
+        nthresh, box_size = 20, 4
         fake_noise2_error = copy.copy(noise2_slice)
         bad = np.logical_or(np.isinf(noise2_slice),np.isnan(noise2_slice))
         fake_noise2_error[bad] = fake_noise2_error[~bad].max()
         while len(tbl) < 1:
             threshold = nthresh * std1 # peak threshold, @ 20 sigma
-            tbl = find_peaks(img2_slice, threshold, box_size=box_size, subpixel=True, border_width=4, error = fake_noise2_error)
-            nthresh -=1
+            tbl = find_peaks(img2_slice, threshold, box_size=box_size, subpixel=True, border_width=3, error = fake_noise2_error)
+            nthresh -=2
         
             if nthresh < 2:
                 nthresh = 20
-                box_size = 3
+                box_size += 1
 
-        # plot biggest source
         '''
         center = np.array(img2_slice.shape)/2.
-        idxmax = ((center[0]-tbl['x_centroid'])**2 + (center[1]-tbl['y_centroid'])**2).argmin()
+        idxmax = ((center[0]-tbl['x_peak'])**2 + (center[1]-tbl['y_peak'])**2).argmin()
         fig, ax = plt.subplots(1,1, figsize=(6,6))
-        ax.plot(tbl['x_centroid'][idxmax],tbl['y_centroid'][idxmax],'x',color='red',ms=10)
+        ax.plot(tbl['x_peak'][idxmax],tbl['y_peak'][idxmax],'x',color='red',ms=10)
         ax.imshow(img2_slice,origin='lower')
         plot_contour(ax, np.log10(img2_slice),ncontours=20)
         plt.show()
-        print 1/0
         '''
 
-        ### find size of biggest one
-        center = np.array(img2_slice.shape)/2.
-        idxmax = ((center[0]-tbl['x_centroid'])**2 + (center[1]-tbl['y_centroid'])**2).argmin()
-        ginit = models.Gaussian2D(amplitude=tbl['fit_peak_value'][idxmax],  x_mean=tbl['x_centroid'][idxmax],  y_mean=tbl['y_centroid'][idxmax], x_stddev=1,y_stddev=1)
-        fit_g = fitting.LevMarLSQFitter()
-        tx, ty = np.mgrid[:img2_slice.shape[0], :img2_slice.shape[1]]
-        ginit.x_mean.fixed=True
-        ginit.y_mean.fixed=True
-        ginit.amplitude.fixed=True
-        g = fit_g(ginit, tx, ty, img2_slice)
-        size_twosig = np.sqrt(g.x_stddev.value**2+g.y_stddev.value**2)*2*px_scale
 
-        ### find center in arcseconds
-        xarcsec = (extent[1]-extent[0])*tbl['x_centroid'][idxmax]/float(img2_slice.shape[0]) + extent[0]
-        yarcsec = (extent[3]-extent[2])*tbl['y_centroid'][idxmax]/float(img2_slice.shape[1]) + extent[2]
+        ### find size of biggest one
+        imgcenter = np.array(img2_slice.shape)/2.
+        idxmax = ((imgcenter[0]-tbl['x_centroid'])**2 + (imgcenter[1]-tbl['y_centroid'])**2).argmin()
+        center = [tbl['x_centroid'][idxmax], tbl['y_centroid'][idxmax]]
+
+        ### find center in arcseconds (NEW)
+        center_coordinates = SkyCoord.from_pixel(imgcenter[0],imgcenter[1],wcs)
+        x_pos_obj = SkyCoord.from_pixel(center[0],imgcenter[1],wcs)
+        y_pos_obj = SkyCoord.from_pixel(imgcenter[0],center[1],wcs)
+        xarcsec = x_pos_obj.separation(center_coordinates).arcsec
+        if center[0] < imgcenter[0]:
+            xarcsec = -xarcsec
+        yarcsec = y_pos_obj.separation(center_coordinates).arcsec
+        if center[1] < imgcenter[1]:
+            yarcsec = -yarcsec
+
+        #xarcsec = (extent[1]-extent[0])*center[0]/float(img2_slice.shape[0]) + extent[0]
+        #yarcsec = (extent[3]-extent[2])*center[1]/float(img2_slice.shape[1]) + extent[2]
         ax[0].scatter(xarcsec,yarcsec,color='black',marker='x',s=50,linewidth=2)
 
         ### add in WISE PSF
@@ -401,14 +401,17 @@ def plot_composites(pdata,outfolder,contours,contour_colors=True,
 
         ### gradient
         phys_scale = float(1./WMAP9.arcsec_per_kpc_proper(pdata['z'][idx]).value)
-        grad, graderr, x_arcsec, size_arcsec = measure_gradient(img1_slice,img2_slice, 
-                                  noise1_slice, noise2_slice, 
-                                  ax, 
-                                  (tbl['x_centroid'][idxmax], tbl['y_centroid'][idxmax]),
-                                  tbl['fit_peak_value'][idxmax], (xarcsec,yarcsec), size_twosig,
+        if objname == 'CGCG 436-030':
+            center[1] = center[1]+1.5
+            yarcsec += px_scale*1.5
+
+        grad, graderr, x_arcsec, back = measure_gradient(img1_slice,img2_slice, 
+                                  noise1_slice, noise2_slice, background,
+                                  ax, center,
+                                  tbl['peak_value'][idxmax], (xarcsec,yarcsec),
                                   phys_scale)
 
-        ax[1].text(0.05,0.06,r'f$_{\mathrm{MIR}}$='+"{:.2f}".format(pdata['pars']['fagn']['q50'][idx])+\
+        ax[1].text(0.05,0.06,r'f$_{\mathrm{AGN,MIR}}$='+"{:.2f}".format(pdata['pars']['fagn']['q50'][idx])+\
                                 ' ('+"{:.2f}".format(pdata['pars']['fagn']['q84'][idx]) +
                                 ') ('+"{:.2f}".format(pdata['pars']['fagn']['q16'][idx])+')',
                                 transform=ax[1].transAxes,color='black',fontsize=9)
@@ -419,10 +422,10 @@ def plot_composites(pdata,outfolder,contours,contour_colors=True,
         gradient.append(grad)
         gradient_error.append(graderr)
         arcsec.append(x_arcsec)
-        obj_size.append(size_arcsec)
-        obj_size_gauss.append(size_twosig)
         obj_size_kpc.append(obj_size_phys)
         objname_out.append(objname)
+        background_out.append(back)
+        print objname, back
 
         plt.tight_layout()
         plt.savefig(outfolder+'/'+objname+'.png',dpi=150)
@@ -432,15 +435,14 @@ def plot_composites(pdata,outfolder,contours,contour_colors=True,
             'gradient': np.array(gradient),
             'gradient_error': np.array(gradient_error),
             'arcsec': np.array(arcsec),
-            'obj_size': np.array(obj_size),
-            'obj_size_gauss': np.array(obj_size_gauss),
             'obj_size_brown_kpc': np.array(obj_size_kpc),
-            'objname': objname_out
+            'objname': objname_out,
+            'background_fraction': np.array(background_out)
           }
 
     pickle.dump(out,open(outfile, "wb"))
 
-def measure_gradient(flux1, flux2, noise1, noise2, ax, center, peakflux, center_arcsec, gauss_size, phys_scale):
+def measure_gradient(flux1, flux2, noise1, noise2, background, ax, center, peakflux, center_arcsec, phys_scale):
     # http://photutils.readthedocs.io/en/stable/api/photutils.aperture.SkyCircularAnnulus.html#photutils.aperture.SkyCircularAnnulus
     # http://photutils.readthedocs.io/en/stable/photutils/aperture.html
 
@@ -454,24 +456,27 @@ def measure_gradient(flux1, flux2, noise1, noise2, ax, center, peakflux, center_
 
     # add most important apertures: 0-1 kpc, 1-2 kpc (so gradient at 2kpc)
     r_in_calc = np.array([0.,1.,0.,2.])/phys_scale/px_scale
-    r_out_calc = np.array([1.,2.,2.,4.])/phys_scale/px_scale
+    r_out_calc = np.array([1.,1.62,2.,3.6])/phys_scale/px_scale
     apertures_calc = [CircularAperture(center,r_out_calc[0]), 
                       CircularAnnulus(center,r_in_calc[1],r_out=r_out_calc[1]),
                       CircularAperture(center,r_out_calc[2]),
                       CircularAnnulus(center,r_in_calc[3],r_out=r_out_calc[3])]
     calcdict = {'r_in':r_in_calc,'r_out':r_out_calc,'apertures':apertures_calc}
+    mask = np.logical_or(np.isinf(noise1),np.isnan(noise1))
 
     for dic in [pdict, calcdict]:
 
         ### photometer
-        phot1 = aperture_photometry(flux1,dic['apertures'],error=noise1, mask=np.logical_or(np.isinf(noise1),np.isnan(noise1)))
-        phot2 = aperture_photometry(flux2,dic['apertures'],error=noise2, mask=np.logical_or(np.isinf(noise2),np.isnan(noise2)))
+        phot1 = aperture_photometry(flux1,dic['apertures'],error=noise1, mask=mask)
+        phot2 = aperture_photometry(flux2,dic['apertures'],error=noise2, mask=mask)
+        background_aperture = aperture_photometry(background, dic['apertures'], mask=mask)
 
         nap = len(dic['apertures'])
         f1 = np.array([phot1['aperture_sum_'+str(i)][0] for i in xrange(nap)])
         e1 = np.array([phot1['aperture_sum_err_'+str(i)][0] for i in xrange(nap)])
         f2 = np.array([phot2['aperture_sum_'+str(i)][0] for i in xrange(nap)])
         e2 = np.array([phot2['aperture_sum_err_'+str(i)][0] for i in xrange(nap)])
+        back = np.array([background_aperture['aperture_sum_'+str(i)][0]/dic['apertures'][i].area() for i in xrange(nap)])
 
         ### turn into gradient
         color, err = convert_to_color(f1,f2,e1,e2,'WISE W1', 'WISE W2',minflux=1e-20,vega_conversions=False)
@@ -487,29 +492,17 @@ def measure_gradient(flux1, flux2, noise1, noise2, ax, center, peakflux, center_
             graderr_plot = gradient_err
             x_arcsec = dic['r_out'][:-1]*px_scale
 
-            ### limit. when you first dip below s/n = 10, don't plot the remainder
-            sn_lim = 10
-            good = ((f1/e1) > sn_lim) & ((f2/e2) > sn_lim)
+            ### limit. when you first dip below background contribution of 20%, don't plot remainder
+            background_lim = 0.2
+            good = back < background_lim
             good[np.where(good == False)[0].min():] = False
             ### account for gradient
-            # require BOTH ENDS of gradient have S/N > x
+            # require BOTH ENDS of gradient are "good"
             good = good[1:]
 
             ### plot
             ax[1].errorbar(x_arcsec[good],grad_plot[good],yerr=graderr_plot[good], 
                            fmt='o',ms=8,elinewidth=1.5,color='k',ecolor='k',linestyle='-')
-
-            ### show object size
-            # find FIRST TIME it dips below 5% of peak
-            avg_pix_flux = f1 / (np.pi*(r_out**2 - r_in**2))
-            lim = np.where(avg_pix_flux / peakflux < 0.05)[0].min()+1
-
-            obj_size = np.interp(0.1,avg_pix_flux[:lim]/peakflux,r_avg[:lim]*px_scale)
-
-            circ=plt.Circle(center_arcsec, radius=gauss_size, fill=False,lw=2,color='red',alpha=0.8,zorder=5)
-            ax[0].add_patch(circ)
-            ax[1].text(0.95,0.05,r'size='+"{:.2f}".format(obj_size)+'"',transform=ax[1].transAxes,color='red',ha='right',fontsize=9)
-            ax[1].text(0.95,0.1,r'gauss size='+"{:.2f}".format(gauss_size)+'"',transform=ax[1].transAxes,color='red',ha='right',fontsize=9)
 
         else:
 
@@ -526,6 +519,12 @@ def measure_gradient(flux1, flux2, noise1, noise2, ax, center, peakflux, center_
             ### add in important gradients
             ax[1].errorbar(arcsec_calc,grad_calc,yerr=graderr_calc,
                            fmt='o',ms=10,elinewidth=2.0,color='red',ecolor='red',linestyle=' ')
+
+            ### show circles for physical gradients
+            circ=plt.Circle(center_arcsec, radius=r_out_calc[-2]*px_scale, fill=False,lw=1.5,color='red',linestyle='--',alpha=0.8,zorder=5)
+            ax[0].add_patch(circ)
+            circ=plt.Circle(center_arcsec, radius=r_out_calc[-1]*px_scale, fill=False,lw=1.5,color='red',linestyle='--',alpha=0.8,zorder=5)
+            ax[0].add_patch(circ)
 
             ### add text
             ax[1].text(0.05,0.93,r'$\nabla$(1 kpc)='+"{:.3f}".format(grad_kpc[0])+r'$\pm$'+"{:.3f}".format(graderr_kpc[0]),
@@ -550,7 +549,7 @@ def measure_gradient(flux1, flux2, noise1, noise2, ax, center, peakflux, center_
     ax2.set_xlabel(r'kpc from center')
     ax2.set_ylim(y1, y2)
     
-    return grad_kpc, graderr_kpc, arcsec_calc, obj_size
+    return grad_kpc, graderr_kpc, arcsec_calc, back
 
 def calc_dist(wcs, pix_center, size, im_shape):
 

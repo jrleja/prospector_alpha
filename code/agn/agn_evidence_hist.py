@@ -1,8 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
+from astropy.table import Table
 
-def assemble_flags(edict):
+def assemble_flags(edict, composite=True):
     '''return flags based on binary EVIDENCE or NO EVIDENCE
     '''
 
@@ -11,8 +12,10 @@ def assemble_flags(edict):
 
     ### BPT AGN
     # AGN + COMPOSITE (for now)
-    good = np.where( ((edict['bpt_type'] == 'agn') | (edict['bpt_type'] == 'compo')) & edict['bpt_use_flag'])[0]
-    #good = np.where( (edict['bpt_type'] == 'agn') & edict['bpt_use_flag'])[0]
+    if composite:
+        good = np.where( ((edict['bpt_type'] == 'AGN') | (edict['bpt_type'] == 'composite')) & edict['bpt_use_flag'])[0]
+    else:
+        good = np.where( (edict['bpt_type'] == 'AGN') & edict['bpt_use_flag'])[0]
     agn_flag[good] = True
 
     ### WISE GRADIENT AGN
@@ -32,48 +35,110 @@ def assemble_flags(edict):
 def plot(agn_evidence, alldata, outfolder,**popts):
 
     ### get flag
-    flag, measure_flag = assemble_flags(agn_evidence)
+    flag, measure_flag = assemble_flags(agn_evidence, composite=False)
+    compflag_agn, _ = assemble_flags(agn_evidence, composite=True)
     objname = np.array([dat['objname'] for dat in alldata])
 
     ### get fmir
     fmir_idx = alldata[0]['pextras']['parnames'] == 'fmir'
     fmir = np.log10([dat['pextras']['q50'][fmir_idx][0] for dat in alldata])
 
-    ### split into groups
-    fmir_all = fmir[(flag) | (measure_flag)]
-    fmir_agn = fmir[flag]
-    fmir_noagn = fmir[(measure_flag) & (~flag)]
+    agn_evidence['fmir'] = fmir
+    agn_evidence['fmir_up'] = np.log10([dat['pextras']['q84'][fmir_idx][0] for dat in alldata]) - fmir
+    agn_evidence['fmir_down'] = fmir - np.log10([dat['pextras']['q16'][fmir_idx][0] for dat in alldata])
 
-    ### make histogram
-    fig, ax = plt.subplots(1,1, figsize=(7, 7))
+    ### create master histogram, plus bins
     nbins = 8
-    alpha = 0.7
-    lw = 3.5
-
-    hist, bins = np.histogram(fmir_all,bins=nbins,density=False) # get the bins for all
-    hist_agn, _ = np.histogram(fmir_agn,bins=bins,density=False)
-    hist_noagn, _ = np.histogram(fmir_noagn,bins=bins,density=False)
-    
-    ### build plottable histograms
-    # make bins into xplot
-    # add 0-padding to bins and data
+    all_flag = (flag) | (measure_flag)
+    hist, bins = np.histogram(fmir[all_flag],bins=nbins,density=False) # get the bins for all
     delta_bin = bins[1]-bins[0]
     bins_mid = (bins[1:]+bins[:-1])/2.
     bins_mid = np.array([[bins_mid[0]-delta_bin]+bins_mid.tolist()+[bins_mid[-1]+delta_bin]]).squeeze()
-    hist_agn = np.array([0]+hist_agn.tolist()+[0])
-    hist_noagn = np.array([0]+hist_noagn.tolist()+[0])
 
-    ### plot
-    ax.plot(bins_mid,hist_agn,color=popts['agn_color'],drawstyle='steps-mid',alpha=alpha,lw=lw)
-    ax.plot(bins_mid,hist_noagn,color=popts['noagn_color'],drawstyle='steps-mid',alpha=alpha,lw=lw)
+    ### split into groups
+    agn_flag = flag
+    noagn_flag = ((measure_flag) & (~flag))# & (~compflag_agn))
+    #comp_flag = ((measure_flag) & (~flag) & (compflag_agn))
+    flags = [agn_flag, noagn_flag]#, comp_flag]
+    colors = [popts['agn_color'], popts['noagn_color']]#, 'orange']
+    labels = ['AGN', 'no AGN']#, 'BPT composite']
+
+    ### make histogram
+    fig, ax = plt.subplots(1,1, figsize=(7, 7))
+    alpha = 0.7
+    lw = 3.5
+    for label, color, flag in zip(labels,colors,flags):
+        hist_flag, _ = np.histogram(fmir[flag],bins=bins,density=False)
+        hist = np.array([0]+hist_flag.tolist()+[0])
+        ax.plot(bins_mid,hist,color=color,drawstyle='steps-mid',alpha=alpha,lw=lw, label=label)
 
     ax.set_ylabel('N')
-    ax.set_xlabel(r'log(f$_{\mathrm{MIR}}$)')
+    ax.set_xlabel(r'log(f$_{\mathrm{AGN,MIR}}$)')
     ax.set_ylim(0,ax.get_ylim()[1]+3)
-    plt.show()
+
+    ax.legend(loc=0,prop={'size':12})
+
+    plt.savefig(outfolder+'agn_evidence_histogram.png',dpi=150)
+    plt.close()
+
+    output_table(agn_evidence, agn_flag, noagn_flag)
+
+def format_output(i,data,name,edict,idx):
+
+    if data[i][name] == -99.0:
+        return '---'
+
+    if name == 'Name' or name == 'BPT':
+        return data[i][name]
+
+    if name == r'log(f$_{\mathrm{MIR,AGN}}$)':
+        fmt = "{{0:{0}}}".format(".2f").format
+        title = r"${{{0}}}_{{-{1}}}^{{+{2}}}$"
+        return title.format(fmt(data[i][name]), fmt(edict['fmir_up'][idx][i]), fmt(edict['fmir_down'][idx][i]))
+
+    if name == r'log(L$_X$)':
+        return "{:.2f}".format(np.log10(data[i][name]))
+
+    if name == r'$\nabla$(W1-W2)':
+        fmt = "{{0:{0}}}".format(".4f").format
+        title = r"${{{0}}}\pm{{{1}}}$"
+        return title.format(fmt(data[i][name]), fmt(edict['wise_gradient_err'][idx][i]))
+
+def output_table(edict, agn_flag, noagn_flag):
+
+    outtable = '/Users/joel/my_papers/agn_dust/table.tex'
+
+    idx = np.where(agn_flag | noagn_flag)[0]
+    idx = idx[edict['fmir'][idx].argsort()][::-1]
+    ngal = idx.shape[0]
+    ordered_namelist = ('Name', r'log(f$_{\mathrm{MIR,AGN}}$)', 'BPT', r'$\nabla$(W1-W2)', r'log(L$_X$)')
+    data = Table({
+                  'Name':  [str(np.array(edict['objname'])[idx][i]) for i in xrange(ngal)],
+                  r'log(f$_{\mathrm{MIR,AGN}}$)': [edict['fmir'][idx][i] for i in xrange(ngal)],
+                  'BPT': [edict['bpt_type'][idx][i] if edict['bpt_use_flag'][idx][i] else '---' for i in xrange(ngal)],
+                  r'$\nabla$(W1-W2)': [edict['wise_gradient'][idx][i] if edict['wise_gradient_flag'][idx][i] else -99.0 for i in xrange(ngal)],
+                  r'log(L$_X$)': [edict['xray_luminosity'][idx][i] if edict['xray_luminosity'][idx][i] > 0 else -99.0 for i in xrange(ngal)]
+                })
+    data = data[ordered_namelist]
+
+    units = {
+             r'log(L$_X$)': 'erg/s',
+             r'$\nabla$(W1-W2)': r"mag/kpc",
+             'Name': ' ',
+             'BPT': ' ',
+             r'log(f$_{\mathrm{MIR,AGN}}$)': ' '
+            }
+
+    with open(outtable, 'w') as f:
+        f.write('\\begin{deluxetable*}{ccccc}\n')
+        f.write('\\begin{center}\n')
+        f.write('\\tablecaption{My Table}\n')
+        f.write('\\tablehead{' + "& ".join(["\colhead{"+name+"} " for name in ordered_namelist])+ '\\\\ ')
+        f.write(" & ".join(["\colhead{"+units[name]+"} " for name in ordered_namelist])+ '} \n')
+        f.write('\\startdata\n')
+        for i in xrange(ngal):
+            f.write(" & ".join([format_output(i,data,name,edict,idx) for name in ordered_namelist]) + '\\\\\n')
+        f.write('\\enddata\n')
+        f.write('\\end{center}\n')
+        f.write('\\end{deluxetable*}')
     print 1/0
-
-
-
-
-

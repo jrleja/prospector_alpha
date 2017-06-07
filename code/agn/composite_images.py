@@ -331,7 +331,7 @@ def plot_composites(pdata,idx_plot,outfolder,contours,contour_colors=True,calibr
 
 		### labels and limits
 		ax[5].text(0.98,0.93,objname,transform=ax[5].transAxes,ha='right')
-		ax[5].text(0.98,0.88,r'f$_{\mathrm{MIR}}$='+"{:.2f}".format(fagn),transform=ax[5].transAxes, ha='right')
+		ax[5].text(0.98,0.88,r'f$_{\mathrm{AGN,MIR}}$='+"{:.2f}".format(fagn),transform=ax[5].transAxes, ha='right')
 		ax[5].set_title('WISE colors on\nSDSS imaging')
 
 		#### CALIBRATION PLOT

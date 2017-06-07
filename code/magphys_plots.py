@@ -860,6 +860,70 @@ def plt_all(runname=None,startup=True,**extras):
     else:
         alldata = brown_io.load_alldata(runname=runname)
 
+    ssfr, ssfr_up, ssfr_down, uvir_ssfr, uvir_ssfr_up, uvir_ssfr_down = [[] for i in range(6)]
+    for dat in alldata:
+        idx = dat['pextras']['parnames'] == 'ssfr_100'
+        ssfr.append(dat['pextras']['q50'][idx])
+        ssfr_up.append(dat['pextras']['q84'][idx])
+        ssfr_down.append(dat['pextras']['q16'][idx])
+
+        luv, lir = dat['luv'], dat['lir']
+        stellar_mass = dat['pextras']['flatchain'][:,dat['pextras']['parnames'] == 'stellar_mass'].squeeze()
+        ssfr_chain = prosp_dutils.sfr_uvir(lir,luv) / stellar_mass
+        out = np.percentile(ssfr_chain, [50, 84, 16])
+        uvir_ssfr.append(out[0])
+        uvir_ssfr_up.append(out[1])
+        uvir_ssfr_down.append(out[2])
+
+    '''
+    popts = {'fmt':'o', 'capthick':1.5,'elinewidth':1.5,'ms':9,'alpha':0.8,'color':'0.2'}
+
+    ssfr = np.squeeze(ssfr)
+    ssfr_up = np.squeeze(ssfr_up)
+    ssfr_down = np.squeeze(ssfr_down)
+    uvir_ssfr = np.squeeze(uvir_ssfr)
+    uvir_ssfr_up = np.squeeze(uvir_ssfr_up)
+    uvir_ssfr_down = np.squeeze(uvir_ssfr_down)
+
+    ssfr_err = prosp_dutils.asym_errors(ssfr, ssfr_up, ssfr_down)
+    uvir_ssfr_err = prosp_dutils.asym_errors(uvir_ssfr, uvir_ssfr_up, uvir_ssfr_down)
+
+    fig, ax = plt.subplots(1,2,figsize=(12,6))
+    ax = np.ravel(ax)
+
+    ### UV_IR SFR plot
+    ax[0].errorbar(uvir_ssfr, ssfr, yerr=ssfr_err, xerr=uvir_ssfr_err, **popts)
+
+    sub = ([1])
+    ax[0].set_xlabel('sSFR$_{\mathrm{UVIR}}$')
+    ax[0].set_ylabel('sSFR$_{\mathrm{Prosp}}$')
+    ax[0].set_yscale('log',nonposy='clip',subsy=sub)
+    ax[0].yaxis.set_major_formatter(majorFormatter)
+    ax[0].yaxis.set_minor_formatter(minorFormatter)
+    ax[0].set_xscale('log',nonposy='clip',subsx=sub)
+    ax[0].xaxis.set_major_formatter(majorFormatter)
+    ax[0].xaxis.set_minor_formatter(minorFormatter)
+
+    off,scat = prosp_dutils.offset_and_scatter(np.log10(uvir_ssfr),np.log10(ssfr),biweight=True)
+    scatunits = ' dex'
+    ax[0].text(0.05,0.94, 'offset='+"{:.2f}".format(off)+scatunits, transform = ax[0].transAxes)
+    ax[0].text(0.05,0.89, 'biweight scatter='+"{:.2f}".format(scat)+scatunits, transform = ax[0].transAxes)
+    lim = ax[0].get_xlim()
+    ax[0].plot([lim[0],lim[1]],[lim[0],lim[1]],'--', color='red', zorder=2)
+
+    ax[1].errorbar(ssfr, np.log10(ssfr/uvir_ssfr), **popts)
+    ax[1].set_xlabel('sSFR$_{\mathrm{Prosp}}$')
+    ax[1].set_ylabel('log(sSFR$_{\mathrm{Prosp}}$/sSFR$_{\mathrm{UVIR}}$)')
+    ax[1].axhline(0, linestyle='--', color='red',lw=2,zorder=-1)
+
+    ax[1].set_xscale('log',nonposy='clip',subsx=([1]))
+    ax[1].xaxis.set_major_formatter(majorFormatter)
+    ax[1].xaxis.set_minor_formatter(minorFormatter)
+
+    plt.tight_layout()
+    plt.show()
+    print 1/0
+    '''
     #### herschel flag
     hflag = np.array([True if np.sum(dat['residuals']['phot']['lam_obs'] > 5e5) else False for dat in alldata])
     
