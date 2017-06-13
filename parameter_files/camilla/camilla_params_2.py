@@ -82,7 +82,7 @@ def load_obs(objname=None, datname=None, **extras):
 
     ### convert to maggies
     # Magnitudes are in AB system, as m = -2.5 * log10(F_nu/uJy) +23.9
-    maggies = 10**((mag - 23.9)/(-2.5)) * 1e6 / 3631
+    maggies = 10**((mag - 23.9)/(-2.5)) / 1e6 / 3631
     maggies_unc = mag_unc*maggies/1.086
     phot_mask = (maggies != maggies_unc)
 
