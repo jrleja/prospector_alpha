@@ -77,7 +77,6 @@ def load_obs(objname=None, datname=None, **extras):
 
     ### extract filters, fluxes, errors for object
     obj_idx = dat['ID'] == int(objname)
-    print 1/0
     filters = trans_filters.keys()
     fnames = trans_filters.values()
     mag = np.squeeze([dat[obj_idx][f] for f in filters])
