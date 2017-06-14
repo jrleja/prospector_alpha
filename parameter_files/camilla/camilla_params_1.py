@@ -45,6 +45,8 @@ run_params = {'verbose':True,
               'datname':APPS+'/threedhst_bsfh/data/CANDELS_2objects.dat',
               'objname': '3767'
               }
+run_params['outfile'] = run_params['outfile']+'_'+run_params['objname']
+
 ############
 # OBS
 #############
@@ -75,6 +77,7 @@ def load_obs(objname=None, datname=None, **extras):
 
     ### extract filters, fluxes, errors for object
     obj_idx = dat['ID'] == int(objname)
+    print 1/0
     filters = trans_filters.keys()
     fnames = trans_filters.values()
     mag = np.squeeze([dat[obj_idx][f] for f in filters])

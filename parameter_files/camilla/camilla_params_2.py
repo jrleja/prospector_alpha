@@ -45,6 +45,8 @@ run_params = {'verbose':True,
               'datname':APPS+'/threedhst_bsfh/data/CANDELS_2objects.dat',
               'objname': '20168'
               }
+run_params['outfile'] = run_params['outfile']+'_'+run_params['objname']
+
 ############
 # OBS
 #############
