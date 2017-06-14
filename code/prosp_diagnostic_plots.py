@@ -142,7 +142,7 @@ def add_to_corner(fig, sample_results, extra_output, sps, model,truths=None,outn
 
             # add parameter names if not covered by truths
             if truths is None:
-                plt.figtext(0.8, ttop-0.02*(kk+1), maxprob_parnames[kk]+'='+"{:.2f}".format(yplot),
+                plt.figtext(0.84, ttop-0.02*(kk+1), maxprob_parnames[kk]+'='+"{:.2f}".format(yplot),
                        horizontalalignment='right',fontsize=fs)
             else:
                 plt.figtext(0.75, ttop-0.02*(kk+1), "{:.2f}".format(yplot),
@@ -203,7 +203,7 @@ def add_to_corner(fig, sample_results, extra_output, sps, model,truths=None,outn
     else:
         
         #### add SFH plot
-        sfh_ax = fig.add_axes([0.7,0.425,0.25,0.25],zorder=32)
+        sfh_ax = fig.add_axes([0.72,0.425,0.25,0.25],zorder=32)
         add_sfh_plot([extra_output], fig,
                      main_color = ['black'],
                      ax_inset=sfh_ax,
@@ -212,7 +212,7 @@ def add_to_corner(fig, sample_results, extra_output, sps, model,truths=None,outn
         #### create my own axes here
         # size them using size of other windows
         axis_size = fig.get_axes()[0].get_position().size
-        xs, ys = 0.4, 0.91
+        xs, ys = 0.44, 0.85
         xdelta, ydelta = axis_size[0]*1.6, axis_size[1]*1.7
         plotloc = 0
 

@@ -582,7 +582,7 @@ def generate_basenames(runname,ancilname=None):
     return filebase,parm,ancilname
 
 def chop_chain(chain,convergence_check_interval=None, convergence_chunks=325,
-               convergence_stable_points_criteria=3, nchop=1.33, weights=None,size=3e5,**extras):
+               convergence_stable_points_criteria=3, nchop=1.15, weights=None,size=3e5,**extras):
     '''
     if we used emcee, either (a) use the final 1/4th of the chain, or (b) use KL divergence convergence criteria
     if we used nestle, sample chain nestle_nsample times according to weights
