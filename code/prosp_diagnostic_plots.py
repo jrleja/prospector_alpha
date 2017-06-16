@@ -432,7 +432,7 @@ def show_chain(sample_results,legend=True, outname=None):
 
     # remove stuck walkers
     nstuck = outliers.sum()
-    print str(nstuck)+' stuck walkers found for '+sample_results['run_params'].get('objname','object')
+    print str(nstuck)+' stuck walkers found for '+sample_results['run_params'].get('objname','galaxy')
     if nstuck:
         chain = chain[~outliers,:,:]
         lnprob = lnprob[~outliers,:]
@@ -732,7 +732,7 @@ def make_all_plots(filebase=None,
     print 'MAKING PLOTS FOR ' + filebase.split('/')[-1] + ' in ' + outfolder
     
     # do we know the truths?
-    objname = sample_results['run_params']['objname']
+    objname = sample_results['run_params'].get('objname','galaxy')
     try:
         truths = prosp_dutils.load_truths(os.getenv('APPS')+'/threed'+sample_results['run_params']['param_file'].split('/threed')[1],
                                            model=sample_results['model'],obs=sample_results['obs'], sps=sps)
