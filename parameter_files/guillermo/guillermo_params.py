@@ -32,7 +32,7 @@ run_params = {'verbose':True,
               # Convergence parameters
               'convergence_check_interval': 50,
               'convergence_chunks': 650,
-              'convergence_kl_threshold': 0.0,
+              'convergence_kl_threshold': 0.0175,
               'convergence_stable_points_criteria': 8, 
               'convergence_nhist': 50,
               # Model info
@@ -49,8 +49,7 @@ run_params = {'verbose':True,
 ############
 # OBS
 #############
-fname_map = {'REDZ': 'bessell_U', ## use U band b/c it is masked below anyway
-             'VIMOS_U': 'bessell_U', 
+fname_map = {'VIMOS_U': 'bessell_U', 
              'U_ctio': 'bessell_U',
              'ACS_bccd':'ACS_f435W',
              'ACS_vccd':'ACS_f606W',
@@ -101,30 +100,27 @@ fname_map = {'REDZ': 'bessell_U', ## use U band b/c it is masked below anyway
 
 def load_obs(cat=None, objinfo=None,**extras):
     
+    ### load data and filter file
     dat = np.genfromtxt(cat)
     dtype = np.dtype([('filter', 'S20'),
                       ('fluxcol', np.int), ('errcol', np.int),
                       ('flag', np.int)])
-
-    '''
-    # this isn't implemented but should be before passing parameter file to guillermo!
-    # add correction to MIPS AB magnitudes (only MIPS 24 right now!)
-    mips_corr = np.array([-0.03542,-0.07669,-0.03807]) # 24, 70, 160
-    mag_adj[mag_fields.index('[24]') ] += mips_corr[0]
-    '''
-
     info = np.genfromtxt(objinfo, dtype=dtype)
-    info = info[1:] # drop the header
-    #use = info['flag'] > 0
+    info = info[2:] # drop the header + redshift
+
+    ### extract fluxes, filternames
     use = np.ones_like(info['flag'],dtype=bool)
-    mjy = dat[info[use]['fluxcol']]
-    mjy_unc = dat[info[use]['errcol']]
+    mjy = dat[info[use]['fluxcol']-1]
+    mjy_unc = dat[info[use]['errcol']-1]
     filters = info[use]['filter']
     filternames = [fname_map[f] for f in filters]
+
+    ### add ALMA filters
     mjy = np.concatenate((mjy, np.array([5.43e03, 3.1e+03])))
     mjy_unc = np.concatenate((mjy_unc, np.array([0.19e+03, 0.1e+03])))
     filternames = filternames + ['ALMAshort', 'ALMAlong']
 
+    ### build obs dictionary
     obs = {}
     obs['redshift'] =  2.3091
     obs['maggies'] = mjy / 1e6/3631.
@@ -135,16 +131,28 @@ def load_obs(cat=None, objinfo=None,**extras):
     obs['phot_mask'] = obs['phot_mask'] & \
                        ((obs['wave_effective'] / (obs['redshift'] + 1)) > 1300) & \
                        (obs['maggies'] > 0)
-    obs['phot_mask'][-4] = False # second Herschel/PACS 160 measurement is no good
     obs['spectrum'] = None
     obs['wavelength'] = None
     obs['unc'] = None
 
+    ### correct MIPS magnitudes due to weird MIPS conventions
+    '''
+    fnames = [f.name for f in obs['filters']]
+    mips_corr = np.array([-0.03542,-0.07669,-0.03807]) # 24, 70, 160
+    mips_names = ['spitzer_mips_24','spitzer_mips_70']
+    for i,name in enumerate(mips_names):
+      idx = fnames.index(name)
+      mab = -(5./2)*np.log10(obs['maggies'][idx]) + mips_corr[i]
+    # mag_adj[mag_fields.index('[24]') ] += mips_corr[0]
+    '''
+    '''
     # make simple SED plot for debugging purposes
-    # idx = obs['phot_mask']
-    #yerr = np.log10(obs['maggies'])[idx] - np.log10(np.array(obs['maggies'])[idx]-np.array(obs['maggies_unc'])[idx])
-    #plt.errorbar(np.log10(obs['wave_effective'])[idx],np.log10(obs['maggies'])[idx],yerr=yerr,linestyle=' ',fmt='o',ms=10)
-    #plt.show()
+    import matplotlib.pyplot as plt
+    idx = obs['phot_mask']
+    yerr = np.log10(obs['maggies'])[idx] - np.log10(np.array(obs['maggies'])[idx]-np.array(obs['maggies_unc'])[idx])
+    plt.errorbar(np.log10(obs['wave_effective'])[idx],np.log10(obs['maggies'])[idx],yerr=yerr,linestyle=' ',fmt='o',ms=10)
+    plt.show()
+    '''
     return obs
 
 ##########################
@@ -275,7 +283,7 @@ model_params.append({'name': 'dust1_fraction', 'N': 1,
                         'init_disp': 0.8,
                         'disp_floor': 0.8,
                         'units': '',
-                        'prior': priors.TopHat(mini=0.0, maxi=3.0)})
+                        'prior': priors.TopHat(mini=0.0, maxi=4.0)})
 
 model_params.append({'name': 'dust2', 'N': 1,
                         'isfree': True,
