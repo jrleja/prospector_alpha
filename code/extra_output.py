@@ -397,6 +397,7 @@ def post_processing(param_name, outname=None, **kwargs):
         parmfile = model_setup.import_module_from_file(param_name)
         outname = parmfile.run_params['outfile']
     outfolder = os.getenv('APPS')+'/threedhst_bsfh/plots/'+outname.split('/')[-2]+'/'
+    objname = sample_results['run_params'].get('objname','<unknown name>')
 
     # check for output folder, create if necessary
     if not os.path.isdir(outfolder):
@@ -405,10 +406,10 @@ def post_processing(param_name, outname=None, **kwargs):
     try:
         sample_results, powell_results, model, _ = load_prospector_data(outname,hdf5=True,load_extra_output=False)
     except AttributeError:
-        print 'Failed to load chain for '+sample_results['run_params']['objname']+'. Returning.'
+        print 'Failed to load chain for '+objname+'. Returning.'
         return
 
-    print 'Performing post-processing on ' + sample_results['run_params']['objname']
+    print 'Performing post-processing on ' + objname
 
     ### create flatchain, run post-processing
     sample_results['flatchain'] = prosp_dutils.chop_chain(sample_results['chain'],**sample_results['run_params'])
@@ -424,7 +425,7 @@ def post_processing(param_name, outname=None, **kwargs):
         prosp_diagnostic_plots.make_all_plots(sample_results=sample_results,extra_output=extra_output,
                                       filebase=outname,outfolder=outfolder,param_name=param_name+'.py')
     except NameError:
-        print "Unable to make plots for "+sample_results['run_params']['objname']+" due to import error. Passing."
+        print "Unable to make plots for "+objname+" due to import error. Passing."
         pass
 
 def str2bool(v):
