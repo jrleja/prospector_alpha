@@ -779,7 +779,7 @@ def fmt_emline_info(alldata,add_abs_err = False):
 
     ##### SIGNAL TO NOISE AND EQW CUTS
     # cuts
-    obslines['sn_cut'] = 5.0
+    obslines['sn_cut'] = 8.0
     obslines['eqw_cut'] = 0.0
     obslines['hdelta_sn_cut'] = 4.0
     obslines['hdelta_eqw_cut'] = -np.inf

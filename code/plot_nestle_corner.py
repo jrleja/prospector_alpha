@@ -5,6 +5,7 @@ from prospect.io import read_results
 from prospect.models import model_setup
 from brown_io import load_prospector_data
 from prosp_dutils import generate_basenames, chop_chain, asym_errors
+from prosp_diagnostic_plots import transform_chain
 from matplotlib.ticker import MaxNLocator
 import os
 
@@ -13,9 +14,10 @@ plt.ioff()
 def ncorner(sresults, model, filename=None, show_titles=True, range=None):
 
     chain = sresults['chain'][np.random.choice(sresults['chain'].shape[0], int(1e6), p=sresults['weights'], replace=True),:]
+    chain, pnames = transform_chain(chain, model)
 
     fig = corner.corner(chain,
-                        labels=model.theta_labels(), plot_datapoints=False,
+                        labels=pnames, plot_datapoints=False,
                         quantiles=[0.16, 0.5, 0.84], title_kwargs = {'fontsize': 'medium'}, show_titles=True,
                         fill_contours=True, range=range,levels=[0.68,0.95],color='blue',hist_kwargs={'normed':True})
                         #contourf_kwargs={'alpha':0.5})
@@ -23,60 +25,26 @@ def ncorner(sresults, model, filename=None, show_titles=True, range=None):
     fig.text(0.3,0.95, 'nestle MAP='+"{:.2f}".format(sresults['lnprobability'].max()),color='blue',fontsize=40)
     if filename is not None:
         plt.savefig(filename,dpi=120)
-    return fig
+    return fig, pnames
 
-def ecorner(sresults,flatchain, fig, model, filename, range=None):
+def ecorner(sresults,flatchain, fig, epnames, filename, n_pnames=None, range=None):
+
+    ### resort by n_pnames (sigh)
+    if n_pnames is not None:
+        idx = np.zeros(flatchain.shape[1],dtype=int)
+        for i, nn in enumerate(n_pnames): idx[i] = np.where(epnames==nn)[0]
+        flatchain = flatchain[:,idx]
+        labels = n_pnames
+    else:
+        labels = epnames
 
     corner.corner(flatchain, color='red',
-                  labels=model.theta_labels(), plot_datapoints=False,quantiles=[0.16, 0.5, 0.84],
+                  labels=labels, plot_datapoints=False,quantiles=[0.16, 0.5, 0.84],
                   title_kwargs = {'fontsize': 'medium'}, fig=fig, fill_contours=True,
                   range=range,levels=[0.68,0.95],hist_kwargs={'normed':True})#contourf_kwargs={'alpha':0.5})
     fig.text(0.3,0.92, 'emcee MAP='+"{:.2f}".format(sresults['lnprobability'].max()),color='red',fontsize=40)
     plt.savefig(filename,dpi=120)
     plt.close()
-
-
-def rcorner(sresults, model, filename=None, range=None, fig=None, nresamp=1000, nsamp_per_realization=1000):
-
-    chain = np.empty(shape=(nresamp*nsamp_per_realization,sresults['chain'].shape[-1]))
-    for i in xrange(nresamp):
-         weights = np.exp(resample_run(sresults)['logwt'])
-         chain[i*nsamp_per_realization:(i+1)*nsamp_per_realization,:] = sresults['chain'][np.random.choice(sresults['chain'].shape[0], nsamp_per_realization, p=weights, replace=True),:]
-
-    fig = corner.corner(chain,fig=fig,
-                        labels=model.theta_labels(), plot_datapoints=False,
-                        quantiles=[0.16, 0.5, 0.84], title_kwargs = {'fontsize': 'medium'},
-                        fill_contours=True, range=range,levels=[0.68,0.95],color='red',hist_kwargs={'normed':True})
-    
-    if filename is not None:
-        plt.savefig(filename,dpi=120)
-    return fig
-
-def resample_run(res):
-    #https://github.com/joshspeagle/prospector/blob/nested-better/demo/Nestle%20Demo.ipynb
-
-    from scipy.misc import logsumexp
-    res_resample = {}
-    niter = res['niter']
-    nsamps = len(res['logvol'])
-    npoints = nsamps - niter
-    t_arr = np.random.beta(a=npoints, b=1, size=niter)
-    y_arr = np.random.exponential(scale=1.0, size=npoints+1)
-    logvol = np.log(t_arr).cumsum()
-    log_unif_order = np.log(y_arr.cumsum()[::-1])[1:] - np.log(y_arr.sum())
-    logvol = np.concatenate(([0], logvol, logvol[-1] + log_unif_order, [-1e300]))
-    logdvol = logsumexp(a=np.c_[logvol[:-2], logvol[2:]], axis=1,  b=np.c_[np.ones(nsamps), -np.ones(nsamps)])
-    logdvol += np.log(0.5)
-    logwt = logdvol + res['lnprobability']
-    logz = logsumexp(logwt)
-    logwt -= logz
-
-    res_resample['logz'] = logz
-    res_resample['logwt'] = logwt
-    res_resample['logvol'] = logvol[1:-1]
-    res_resample['logdvol'] = logdvol
-
-    return res_resample
 
 def plot_chain(sresults, pnames, outfig_name):
 
@@ -144,35 +112,23 @@ def plot_chain(sresults, pnames, outfig_name):
     plt.savefig(outfig_name,dpi=120)
     plt.close()
 
-def transform_zf_to_sf(zf):
+def return_dat(runname, runname_comp, pltcorner=False, pltchain=False):
 
-    import operator
-    def prod(factors):
-        return reduce(operator.mul, factors, 1)
-
-    sf = np.zeros_like(zf)
-    sf[:,0] = 1-zf[:,0]
-    for i in xrange(1,sf.shape[1]): 
-        for j in xrange(sf.shape[0]): sf[j,i] =  prod(zf[j,:i])*(1-zf[j,i])
-    #sfr_fraction[-1] = prod(z)  #### THIS IS SET IMPLICITLY
-    return sf
-
-def return_dat(runname, runname_comp, pltcorner=False, pltchain=False,resample_flag = False):
-
-    filebase, pfile, ancilname = generate_basenames(runname)
-    filebase2, pfile2, ancilname2 = generate_basenames(runname_comp)
+    #filebase, pfile, ancilname = generate_basenames(runname)
+    #filebase2, pfile2, ancilname2 = generate_basenames(runname_comp)
     size = 500000
 
-    # original "bad" sample
-    # bad = ['NGC 0584', 'UGCA 166', 'UGC 05101', 'Mrk 1450', 'UM 461', 'NGC 4125', 'NGC 4551', 'Mrk 0475']
-    # after adding a log(fagn) prior, refactoring dust1, changing volume filling factor and ellipse regeneration intervals
-    bad =  ['NGC 0584','UGCA 166','Mrk 1450','UM 461','UGC 06850','NGC 4125','NGC 4551','Mrk 0475']
+    filebase = ['/Users/joel/code/python/threedhst_bsfh/results/guillermo_nestle/guillermo_nestle']
+    pfile = ['/Users/joel/code/python/threedhst_bsfh/parameter_files/guillermo_nestle/guillermo_nestle_params.py']
+    filebase2 = ['/Users/joel/code/python/threedhst_bsfh/results/guillermo/guillermo']
+    pfile2 = ['/Users/joel/code/python/threedhst_bsfh/parameter_files/guillermo/guillermo_params.py']
+
+
+    #bad =  ['NGC 0584','UGCA 166','Mrk 1450','UM 461','UGC 06850','NGC 4125','NGC 4551','Mrk 0475']
 
     objname, hinformation, logz, logzerr, dlogz, ncall = [], [], [], [], [], []
     for i, file in enumerate(filebase):
         
-        print i
-
         sresults, _, model, _ = load_prospector_data(file,load_extra_output=False)
 
         ### some of the nestle runs terminated due to time limit
@@ -184,10 +140,7 @@ def return_dat(runname, runname_comp, pltcorner=False, pltchain=False,resample_f
 
         sresults_mcmc, _, model_mcmc, _ = load_prospector_data(filebase2[i],load_extra_output=False)
         flatchain = chop_chain(sresults_mcmc['chain'],**sresults_mcmc['run_params'])
-
-        ### convert z_fraction to SFR_fraction
-        zind = np.array([sresults['theta_labels'].index(s) for s in sresults['theta_labels'] if 'z_fraction' in s],dtype=int)
-        sresults['chain'][:,zind] = transform_zf_to_sf(sresults['chain'][:,zind])
+        flatchain, pnames_emcee = transform_chain(flatchain, model_mcmc)
 
         ### save some stuff
         # logz_est.append(sresults['logvol'][sresults['lnprobability'].argmax()]+np.log10(np.exp(sresults['lnprobability'].max()))
@@ -218,11 +171,8 @@ def return_dat(runname, runname_comp, pltcorner=False, pltchain=False,resample_f
             # outname = outname+'.corner.png'
             range = [tuple(np.percentile(flatchain[:,i],[1,99]).tolist()) for i in xrange(flatchain.shape[1])]
             range = None
-            fig = ncorner(sresults, model, range=range)
-            if not resample_flag:
-                ecorner(sresults_mcmc, flatchain, fig, model, outname+'.corner.png', range=range)
-            else:
-                rcorner(sresults, model, range=range, fig=fig, filename=outname+'.corner.png')
+            fig, nestle_pnames = ncorner(sresults, model, range=range)
+            ecorner(sresults_mcmc, flatchain, fig, pnames_emcee, outname+'.corner.png',n_pnames = nestle_pnames, range=range)
         if pltchain:
             plot_chain(sresults, parnames, outname+'.chain.png')
 
@@ -235,7 +185,8 @@ def return_dat(runname, runname_comp, pltcorner=False, pltchain=False,resample_f
 
         nestle['maxlnprob'].append(sresults['lnprobability'].max())
         mcmc['maxlnprob'].append(sresults_mcmc['lnprobability'].max())
-        objname.append(sresults['run_params']['objname'])
+        objname.append(sresults['run_params'].get('objname','galaxy'))
+        print 1/0
     dat = {'nestle': nestle, 'emcee': mcmc}
     dat['labels'] = model.theta_labels()
     dat['objname'] = objname
@@ -251,10 +202,10 @@ def return_dat(runname, runname_comp, pltcorner=False, pltchain=False,resample_f
     return dat
 
 def plot_all(runname='brownseds_agn_nestle',runname_comp = 'brownseds_agn',pltcorner=False, pltchain=False,
-             dat=None, outfolder=None, resample_flag=False):
+             dat=None, outfolder=None):
     
     if dat is None:
-        dat = return_dat(runname, runname_comp, pltcorner=pltcorner, pltchain=pltchain, resample_flag=resample_flag)
+        dat = return_dat(runname, runname_comp, pltcorner=pltcorner, pltchain=pltchain)
         return dat
 
     outfolder = os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/nestle_plots/'

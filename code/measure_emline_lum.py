@@ -79,9 +79,25 @@ def bootstrap(obslam, obsflux, model, fitter, noise, line_lam,
     while nsuccess < nboot:
 
         ### if we can't get a successful fit after many tries
-        ### probably no emission lines there, let's call it quits
-        if nrand == 10:
-            successflag = False
+        ### fix the emission line sigmas!
+        # don't use OII for this purpose 
+        if nrand >= 10:
+            stddev = np.array([getattr(fit, 'stddev_'+str(j)).value for j in xrange(nlines)])
+            bad = (np.abs(stddev) >= 12)
+            good = (~bad) & ('[OII]' not in emline)
+            try:
+                fixed_sig = np.max(stddev[good])
+            except ValueError:
+                fixed_sig = 10
+
+            for i,flag in enumerate(bad):
+                if not flag:
+                    continue
+                
+                ### fix it to the average of all other sigmas
+                getattr(model, 'stddev_'+str(i)).fixed = True
+                getattr(model, 'stddev_'+str(i)).value = fixed_sig
+                print 'FAILURE: fixing '+emline[i]+' to ' "{:.2f}".format(fixed_sig/em_wave[i]*c_kms)
 
         ### do we have a range of continuua?
         if type(obsflux[0]) == np.float64:
@@ -95,13 +111,18 @@ def bootstrap(obslam, obsflux, model, fitter, noise, line_lam,
         params[:,nsuccess] = fit.parameters
 
         ### catch error: what happens if sigma is at boundary?
-        stddev = np.array([getattr(fit, 'stddev_'+str(j)).value for j in xrange(7)])
-        if np.all(stddev < 12) or (successflag == False):
+        stddev = np.array([getattr(fit, 'stddev_'+str(j)).value for j in xrange(nlines)])
+        if np.all(np.abs(stddev) < 12):
+            nsuccess += 1
+        elif nrand == 30:
+            print 'BIG FAILURE, skipping'
             nsuccess += 1
         else:
             nrand +=1
             continue
+        
         nrand = 0
+        for j in xrange(nlines): getattr(model, 'stddev_'+str(j)).fixed = False
 
         if flux_flag:
             ### calculate emission line flux
@@ -117,7 +138,7 @@ def bootstrap(obslam, obsflux, model, fitter, noise, line_lam,
     # we want errors for flux and eqw
     flux_point_estimates = np.percentile(flux_chain, [50,84,16],axis=0)
 
-    return fit, flux_point_estimates, flux_chain, successflag
+    return fit, flux_point_estimates, flux_chain
 
 def tiedfunc_oii(g1):
     amp = 0.35 * g1.amplitude_6
@@ -299,7 +320,7 @@ def measure(sample_results, extra_output, obs_spec, sps, runname='brownseds_np',
 
     ### initial fit to emission
     # use to find sigma
-    gauss_fit,_,_,_ = bootstrap(obslam[p_idx], obsflux[p_idx], emmod, fitter, np.min(np.abs(obsflux[p_idx]))*0.001, em_wave, 
+    gauss_fit,_,_ = bootstrap(obslam[p_idx], obsflux[p_idx], emmod, fitter, np.min(np.abs(obsflux[p_idx]))*0.001, em_wave, 
                               flux_flag=False, nboot=1)
 
     ### find proper smoothing
@@ -370,7 +391,7 @@ def measure(sample_results, extra_output, obs_spec, sps, runname='brownseds_np',
             model_flux[mod_idx] = model_flux[mod_idx]*norm_factor
 
         #### absorption model versus emission model
-        if test_plot:
+        if False:
             p_idx_mod = ((model_newlam > em_bbox[0][0]) & (model_newlam < em_bbox[0][1])) | \
                         ((model_newlam > em_bbox[1][0]) & (model_newlam < em_bbox[1][1])) | \
                         ((model_newlam > em_bbox[2][0]) & (model_newlam < em_bbox[2][1]))
@@ -413,11 +434,8 @@ def measure(sample_results, extra_output, obs_spec, sps, runname='brownseds_np',
 
     #### now measure emission line fluxes
     t1 = time.time()
-    bfit_mod, emline_flux, emline_chain, successflag = bootstrap(obslam[p_idx],residuals,emmod,fitter,emline_noise,em_wave,nboot=nboot)
+    bfit_mod, emline_flux, emline_chain = bootstrap(obslam[p_idx],residuals,emmod,fitter,emline_noise,em_wave,nboot=nboot)
     print('main bootstrapping took {0}s'.format(time.time()-t1))
-
-    if not successflag:
-        print sample_results['run_params']['objname'] +' has poorly behaved emission lines, suspect a quiescent galaxy'
 
     #############################
     #### PLOT ALL THE THINGS ####
@@ -465,9 +483,6 @@ def measure(sample_results, extra_output, obs_spec, sps, runname='brownseds_np',
         axarr[ii].text(0.98, 0.93, 'em+abs model', fontsize=16, transform = axarr[ii].transAxes,ha='right',color='red')
         axarr[ii].text(0.98, 0.85, 'abs model', fontsize=16, transform = axarr[ii].transAxes,ha='right',color='#1E90FF')
         axarr[ii].text(0.98, 0.77, 'observations', fontsize=16, transform = axarr[ii].transAxes,ha='right')
-        axarr[ii].text(0.98, 0.69, 'success:'+str(successflag), fontsize=16, transform = axarr[ii].transAxes,ha='right')
-
-
 
     plt.tight_layout()
     plt.savefig(out_em, dpi=dpi)
@@ -540,7 +555,6 @@ def measure(sample_results, extra_output, obs_spec, sps, runname='brownseds_np',
 
     obs['continuum_obs'] = obs_abs_flux[:,0] / obs_abs_eqw[:,0] 
     obs['continuum_lam'] = obs_lam_cont
-    obs['success_flag'] = successflag
 
     out['obs'] = obs
 

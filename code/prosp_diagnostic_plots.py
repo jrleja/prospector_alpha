@@ -619,6 +619,7 @@ def sed_figure(outname = None, truths = None,
         for x0 in xplot[~positive_flux]: phot.plot(x0, y0, linestyle='none',marker=u'$\u2193$',markersize=16,alpha=alpha,mew=0.0,color=obs_color)
 
     #### add RGB image
+    '''
     try:
         imgname = os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/rgb/'+sresults[0]['run_params']['objname'].replace(' ','_')+'.png'
         import matplotlib.image as mpimg
@@ -628,7 +629,7 @@ def sed_figure(outname = None, truths = None,
         ax_inset2.set_axis_off()
     except IOError:
         print 'no RGB image'
-
+    '''
     ### plot truths
     if truths is not None:
         

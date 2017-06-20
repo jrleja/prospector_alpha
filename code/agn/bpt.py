@@ -114,6 +114,7 @@ def return_bpt_type(pdata):
         agn_one = oiii_hb > sf_line2
         if agn_one.sum()/float(agn_one.shape[0]) > 0.16:
             agn[i] = True
+            #continue
 
     bpt_flag[:] = 'star-forming'
     bpt_flag[composite] = 'composite'

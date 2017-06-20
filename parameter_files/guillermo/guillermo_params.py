@@ -150,12 +150,18 @@ def load_obs(cat=None, objinfo=None,**extras):
     import matplotlib.pyplot as plt
     idx = obs['phot_mask']
     yerr = np.log10(obs['maggies'])[idx] - np.log10(np.array(obs['maggies'])[idx]-np.array(obs['maggies_unc'])[idx])
-    plt.errorbar(np.log10(obs['wave_effective'])[idx],np.log10(obs['maggies'])[idx],yerr=yerr,linestyle=' ',fmt='o',ms=10)
+    lam = np.log10(obs['wave_effective']/1e4)[idx]
+    nufnu = np.log10(obs['maggies']*3e18/obs['wave_effective'])[idx]
+    plt.errorbar(lam,nufnu,yerr=yerr,linestyle=' ',fmt='o',ms=6)
+    plt.xlabel(r'log(wavelength/$\mu$m)')
+    plt.ylabel(r'log($\nu$ f$_{\nu}$)')
+    plt.xlim(-1,2.2)
     plt.show()
     '''
     return obs
 
 ##########################
+
 # TRANSFORMATION FUNCTIONS
 ##########################
 def transform_logmass_to_mass(mass=None, logmass=None, **extras):
@@ -171,6 +177,12 @@ def to_dust1(dust1_fraction=None, dust1=None, dust2=None, **extras):
     return dust1_fraction*dust2
 
 def transform_zfraction_to_sfrfraction(sfr_fraction=None, z_fraction=None, **extras):
+    """This transforms from latent, independent `z` variables to sfr
+    fractions [see Leja+16 for definition of sfr_fractions]. 
+    The transformation is such that sfr fractions are drawn from a
+    Dirichlet prior (Betancourt et al. 2010)
+    """
+
     sfr_fraction[0] = 1-z_fraction[0]
     for i in xrange(1,sfr_fraction.shape[0]): sfr_fraction[i] =  np.prod(z_fraction[:i])*(1-z_fraction[i])
     return sfr_fraction

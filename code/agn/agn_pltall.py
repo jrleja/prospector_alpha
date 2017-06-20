@@ -71,6 +71,18 @@ def plot(runname='brownseds_agn',runname_noagn='brownseds_np',
                     alldata=alldata_sub,alldata_noagn=alldata_noagn,outfolder=outfolder,**popts)
     '''
     agn_evidence = {}
+    print 'PLOTTING WISE COLORS'
+    wise_colors.plot_mir_colors(runname=runname,alldata=alldata_sub,outfolder=outfolder,idx=agn_idx,**popts)
+
+    print 'PLOTTING PROPERTY COMPARISON'
+    property_comparison.plot_comparison(idx_plot=agn_idx,runname=runname,runname_noagn=runname_noagn,
+                                        alldata=alldata_sub,alldata_noagn=alldata_noagn,outfolder=outfolder,**popts)
+    print 'PLOTTING DELTA PARS'
+    plot_delta_pars.plot(runname=runname,runname_noagn=runname_noagn,alldata=alldata_sub,alldata_noagn=alldata_noagn,outfolder=outfolder,idx=agn_idx,**popts)  
+    print 'PLOTTING DELTA OBSERVABLES'
+    plot_spec_rms.plot_comparison(runname=runname,alldata=alldata_sub,alldata_noagn=alldata_noagn,outfolder=outfolder,idx=agn_idx,**popts)
+    print 'PLOTTING MASS-METALLICITY DIAGRAM'
+    delta_mass_met.plot_comparison(runname=runname,alldata=alldata_sub,alldata_noagn=alldata_noagn,outfolder=outfolder,plt_idx=agn_idx,**popts) 
     print 'PLOTTING XRAY LUMINOSITY'
     agn_evidence = xray_luminosity.make_plot(agn_evidence,runname=runname,alldata=alldata_sub,outfolder=outfolder,idx=agn_idx,**popts)
     print 'PLOTTING BPT DIAGRAM'
@@ -79,18 +91,7 @@ def plot(runname='brownseds_agn',runname_noagn='brownseds_np',
     agn_evidence = wise_gradients.plot_all(agn_evidence,runname=runname,runname_noagn=runname_noagn,alldata=alldata_sub,
                                            alldata_noagn=alldata_noagn,agn_idx=agn_idx,regenerate=False,outfolder=outfolder, **popts)
     print 'PLOTTING AGN EVIDENCE HISTOGRAM'
-    agn_evidence_hist.plot(agn_evidence,alldata, outfolder, **popts)
-    print 'PLOTTING DELTA OBSERVABLES'
-    plot_spec_rms.plot_comparison(runname=runname,alldata=alldata_sub,alldata_noagn=alldata_noagn,outfolder=outfolder,idx=agn_idx,**popts)
-    print 'PLOTTING MASS-METALLICITY DIAGRAM'
-    delta_mass_met.plot_comparison(runname=runname,alldata=alldata_sub,alldata_noagn=alldata_noagn,outfolder=outfolder,plt_idx=agn_idx,**popts)
-    print 'PLOTTING PROPERTY COMPARISON'
-    property_comparison.plot_comparison(idx_plot=agn_idx,runname=runname,runname_noagn=runname_noagn,
-                                        alldata=alldata_sub,alldata_noagn=alldata_noagn,outfolder=outfolder,**popts)
-    print 'PLOTTING DELTA PARS'
-    plot_delta_pars.plot(runname=runname,runname_noagn=runname_noagn,alldata=alldata_sub,alldata_noagn=alldata_noagn,outfolder=outfolder,idx=agn_idx,**popts)
-    print 'PLOTTING WISE COLORS'
-    wise_colors.plot_mir_colors(runname=runname,alldata=alldata_sub,outfolder=outfolder,idx=agn_idx,**popts)
+    agn_evidence_hist.plot(agn_evidence,alldata, outfolder, agn_idx=agn_idx, **popts)
 
     #print 'PLOTTING OPTICAL COLOR COLOR DIAGRAM'
     #optical_color_color.plot(runname=runname,alldata=alldata_sub,outfolder=outfolder)

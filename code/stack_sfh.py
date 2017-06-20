@@ -167,11 +167,13 @@ def stack_data(alldata,sigma_sf=None,nbins_horizontal=None,low_mass_cutoff=None,
         tdict = {}
         tdict['mean'],tdict['err'],tdict['errup'],tdict['errdown'] = [],[],[],[]
 
+        sigup, sigdown = sigma_sf*2*(j-1.5), sigma_sf*2*(j-2.5)
+
         ### what's in the bin?
         if j != 0 :
-            in_bin = (outdict['logm'] > low_mass_cutoff) & ((outdict['logsfr'] - outdict['logsfr_ms']) >= sigma_sf*2*(j-3)) & ((outdict['logsfr'] - outdict['logsfr_ms']) < sigma_sf*2*(j-2))
+            in_bin = (outdict['logm'] > low_mass_cutoff) & ((outdict['logsfr'] - outdict['logsfr_ms']) >= sigdown) & ((outdict['logsfr'] - outdict['logsfr_ms']) < sigup)
         else:
-            in_bin = (outdict['logm'] > low_mass_cutoff) & ((outdict['logsfr'] - outdict['logsfr_ms']) < sigma_sf*2*(j-2))
+            in_bin = (outdict['logm'] > low_mass_cutoff) & ((outdict['logsfr'] - outdict['logsfr_ms']) < sigup)
 
         tdict['logm'],tdict['logsfr'] = outdict['logm'][in_bin],outdict['logsfr'][in_bin]
 
@@ -382,10 +384,10 @@ def plot_stacked_sfh(alldata,outfolder,lowmet=True):
     ### labels and ranges
     ax[0].set_xlabel(r'log(M$_{*}$)')
     ax[0].set_ylabel(r'log(SFR)')
-    xlim = (minmass-0.3,maxmass+0.3)
-    ylim = (minsfr-0.3,maxsfr+0.3)
+    xlim = (minmass-0.6,maxmass+0.3)
+    #ylim = (minsfr-0.3,maxsfr+0.5)
     ax[0].set_xlim(xlim)
-    ax[0].set_ylim(ylim)
+    ax[0].set_ylim(-4,2.3)
 
     ax[1].set_xlim(10**(agebins.min()-0.3),10**(agebins.max()+0.3))
     ax[1].set_xlabel(r'time [yr]')
@@ -394,6 +396,7 @@ def plot_stacked_sfh(alldata,outfolder,lowmet=True):
     ax[1].set_yscale('log',nonposx='clip',subsx=(1,2,4))
 
     #### plot mass ranges + labels
+    labels = ['quiescent','<2$\sigma$ MS','on MS','>2$\sigma$ MS']
     ymid = np.array([salim_mainsequence(xlim[0]),salim_mainsequence(xlim[1])])
     for i in xrange(config['nbins_vertical']):
         idx = 'massbin'+str(i)
@@ -406,24 +409,18 @@ def plot_stacked_sfh(alldata,outfolder,lowmet=True):
         else:
             dhighbin = -0.017
 
+        sigup, sigdown = config['sigma_sf']*2*(i-1.5), config['sigma_sf']*2*(i-2.5)
+
         if i != 0:
-            ax[0].plot(xlim,ymid+config['sigma_sf']*2*(i-3)+dlowbin,
+            ax[0].plot(xlim,ymid+sigdown+dlowbin,
                        color=config['vertical_bin_colors'][i],
                        **ms_line_plot_opts)
-        else:
-            xarr = np.array([9.5, 10.25, 11])
-            yms = salim_mainsequence(xarr) 
-            ax[0].plot(xarr, yms, linestyle='-',lw=3,color='k')
-            for x, y in zip(xarr,yms):
-                ax[0].arrow(x, y + config['sigma_sf']*2*(i-2), 0.0, -0.5, head_width=0.1, width=0.03,length_includes_head=True,
-                            color=config['vertical_bin_colors'][i],alpha=0.9)
 
-        ax[0].plot(xlim,ymid+config['sigma_sf']*2*(i-2)+dhighbin,
-                   color=config['vertical_bin_colors'][i],
-                   **ms_line_plot_opts)
-
-        ymid = config['sigma_sf']*2*(i-2.5)
-
+        if i != config['nbins_vertical']-1:
+            ax[0].plot(xlim,ymid+sigup+dhighbin,
+                       color=config['vertical_bin_colors'][i],
+                       **ms_line_plot_opts)
+        ax[0].text(xlim[0]+0.1,(sigup+sigdown)/2.-0.6,labels[i],color=config['vertical_bin_colors'][i], rotation=22)
 
     plt.tight_layout()
     plt.savefig(outname_ms_vertical,dpi=150)

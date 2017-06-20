@@ -397,7 +397,6 @@ def post_processing(param_name, outname=None, **kwargs):
         parmfile = model_setup.import_module_from_file(param_name)
         outname = parmfile.run_params['outfile']
     outfolder = os.getenv('APPS')+'/threedhst_bsfh/plots/'+outname.split('/')[-2]+'/'
-    objname = sample_results['run_params'].get('objname','<unknown name>')
 
     # check for output folder, create if necessary
     if not os.path.isdir(outfolder):
@@ -406,9 +405,10 @@ def post_processing(param_name, outname=None, **kwargs):
     try:
         sample_results, powell_results, model, _ = load_prospector_data(outname,hdf5=True,load_extra_output=False)
     except AttributeError:
-        print 'Failed to load chain for '+objname+'. Returning.'
+        print 'Failed to load chain. Returning.'
         return
 
+    objname = sample_results['run_params'].get('objname','<unknown name>')
     print 'Performing post-processing on ' + objname
 
     ### create flatchain, run post-processing

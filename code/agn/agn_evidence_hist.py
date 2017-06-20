@@ -32,7 +32,7 @@ def assemble_flags(edict, composite=True):
 
     return agn_flag, has_measurement
 
-def plot(agn_evidence, alldata, outfolder,**popts):
+def plot(agn_evidence, alldata, outfolder,agn_idx=None,**popts):
 
     ### get flag
     flag, measure_flag = assemble_flags(agn_evidence, composite=False)
@@ -48,7 +48,7 @@ def plot(agn_evidence, alldata, outfolder,**popts):
     agn_evidence['fmir_down'] = fmir - np.log10([dat['pextras']['q16'][fmir_idx][0] for dat in alldata])
 
     ### create master histogram, plus bins
-    nbins = 8
+    nbins = 6
     all_flag = (flag) | (measure_flag)
     hist, bins = np.histogram(fmir[all_flag],bins=nbins,density=False) # get the bins for all
     delta_bin = bins[1]-bins[0]
@@ -81,43 +81,53 @@ def plot(agn_evidence, alldata, outfolder,**popts):
     plt.savefig(outfolder+'agn_evidence_histogram.png',dpi=150)
     plt.close()
 
-    output_table(agn_evidence, agn_flag, noagn_flag)
+    output_table(agn_evidence, agn_flag, noagn_flag, agn_idx)
 
 def format_output(i,data,name,edict,idx):
 
     if data[i][name] == -99.0:
         return '---'
 
-    if name == 'Name' or name == 'BPT':
-        return data[i][name]
-
-    if name == r'log(f$_{\mathrm{MIR,AGN}}$)':
+    elif name == r'log(f$_{\mathrm{MIR,AGN}}$)':
         fmt = "{{0:{0}}}".format(".2f").format
         title = r"${{{0}}}_{{-{1}}}^{{+{2}}}$"
         return title.format(fmt(data[i][name]), fmt(edict['fmir_up'][idx][i]), fmt(edict['fmir_down'][idx][i]))
 
-    if name == r'log(L$_X$)':
+    elif name == r'log(L$_X$)':
         return "{:.2f}".format(np.log10(data[i][name]))
 
-    if name == r'$\nabla$(W1-W2)':
+    elif name == r'$\nabla$(W1-W2)':
         fmt = "{{0:{0}}}".format(".4f").format
         title = r"${{{0}}}\pm{{{1}}}$"
         return title.format(fmt(data[i][name]), fmt(edict['wise_gradient_err'][idx][i]))
 
-def output_table(edict, agn_flag, noagn_flag):
+    else:
+        return data[i][name]
+
+def output_table(edict, agn_flag, noagn_flag,agn_idx):
 
     outtable = '/Users/joel/my_papers/agn_dust/table.tex'
 
+    ### load literature notes
+    loc = '/Users/joel/my_papers/agn_dust/agn_literature.txt'
+    litdat = np.loadtxt(loc, comments = '#', delimiter='|', dtype = {'names':(['name','notes']),'formats':(np.concatenate((np.atleast_1d('S20'),np.atleast_1d('S200'))))})
+    litdat['name'] = np.char.strip(litdat['name'])
+
+    ### what goes in the table?
     idx = np.where(agn_flag | noagn_flag)[0]
+    idx = np.unique(np.concatenate((idx,agn_idx))) # add in AGN
     idx = idx[edict['fmir'][idx].argsort()][::-1]
     ngal = idx.shape[0]
-    ordered_namelist = ('Name', r'log(f$_{\mathrm{MIR,AGN}}$)', 'BPT', r'$\nabla$(W1-W2)', r'log(L$_X$)')
+
+    ### generate data
+    ordered_namelist = ('Name', r'log(f$_{\mathrm{MIR,AGN}}$)', 'BPT', r'$\nabla$(W1-W2)', r'log(L$_X$)', 'Literature Notes')
     data = Table({
                   'Name':  [str(np.array(edict['objname'])[idx][i]) for i in xrange(ngal)],
                   r'log(f$_{\mathrm{MIR,AGN}}$)': [edict['fmir'][idx][i] for i in xrange(ngal)],
                   'BPT': [edict['bpt_type'][idx][i] if edict['bpt_use_flag'][idx][i] else '---' for i in xrange(ngal)],
                   r'$\nabla$(W1-W2)': [edict['wise_gradient'][idx][i] if edict['wise_gradient_flag'][idx][i] else -99.0 for i in xrange(ngal)],
-                  r'log(L$_X$)': [edict['xray_luminosity'][idx][i] if edict['xray_luminosity'][idx][i] > 0 else -99.0 for i in xrange(ngal)]
+                  r'log(L$_X$)': [edict['xray_luminosity'][idx][i] if edict['xray_luminosity'][idx][i] > 0 else -99.0 for i in xrange(ngal)],
+                  r'Literature Notes': [litdat['notes'][litdat['name'] == np.array(edict['objname'])[idx][i]][0] if np.array(edict['objname'])[idx][i] in litdat['name'] else '---' for i in xrange(ngal)]
                 })
     data = data[ordered_namelist]
 
@@ -126,13 +136,14 @@ def output_table(edict, agn_flag, noagn_flag):
              r'$\nabla$(W1-W2)': r"mag/kpc",
              'Name': ' ',
              'BPT': ' ',
-             r'log(f$_{\mathrm{MIR,AGN}}$)': ' '
+             r'log(f$_{\mathrm{MIR,AGN}}$)': ' ',
+             r'Literature Notes': ' '
             }
 
     with open(outtable, 'w') as f:
-        f.write('\\begin{deluxetable*}{ccccc}\n')
+        f.write('\\begin{deluxetable*}{cccccp{40mm}}\n')
         f.write('\\begin{center}\n')
-        f.write('\\tablecaption{My Table}\n')
+        f.write('\\tablecaption{Summary of AGN Evidence}\n')
         f.write('\\tablehead{' + "& ".join(["\colhead{"+name+"} " for name in ordered_namelist])+ '\\\\ ')
         f.write(" & ".join(["\colhead{"+units[name]+"} " for name in ordered_namelist])+ '} \n')
         f.write('\\startdata\n')
@@ -141,4 +152,3 @@ def output_table(edict, agn_flag, noagn_flag):
         f.write('\\enddata\n')
         f.write('\\end{center}\n')
         f.write('\\end{deluxetable*}')
-    print 1/0

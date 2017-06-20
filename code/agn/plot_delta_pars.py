@@ -173,9 +173,9 @@ def plot_dpars(pdata,xpar=None,xparlabel=None,log_xpar=False, agn_idx=None, **po
 	ax = np.ravel(ax)
 
 	opts = {
-	        'color': blue,
-	        'mew': 1.5,
-	        'ms': 10
+	        #'color': blue,
+	        'mew': 1.5
+	        #'ms': 10
 	       }
 
 	toplot = ['stellar_mass','logzsol','dust2','ssfr_100','half_time','m23_frac']
@@ -192,9 +192,9 @@ def plot_dpars(pdata,xpar=None,xparlabel=None,log_xpar=False, agn_idx=None, **po
 
 		errs = pdata['errs'][par]
 		ax[idx].errorbar(xpar_plot[cidx],pdata['median'][par][cidx], yerr=[errs[0][cidx],errs[1][cidx]], zorder=-3, 
-			             fmt=popts['nofmir_shape'],alpha=popts['nofmir_alpha'],**opts)
+			             fmt=popts['nofmir_shape'],alpha=popts['nofmir_alpha'],ms=5,color='0.4',**opts)
 		ax[idx].errorbar(xpar_plot[agn_idx],pdata['median'][par][agn_idx], yerr=[errs[0][agn_idx],errs[1][agn_idx]], zorder=-3, 
-			             fmt=popts['fmir_shape'],alpha=popts['fmir_alpha'],**opts)
+			             fmt=popts['fmir_shape'],alpha=popts['fmir_alpha'],ms=10,**opts)
 
 		ax[idx].set_ylabel('AGN(on)-AGN(off)')
 		ax[idx].set_xlabel(xparlabel)
@@ -208,6 +208,7 @@ def plot_dpars(pdata,xpar=None,xparlabel=None,log_xpar=False, agn_idx=None, **po
 
 		ylim = np.abs(ax[idx].get_ylim()).max()
 		ax[idx].set_ylim(-ylim,ylim)
+		ax[idx].set_xlim(-4,0.2)
 
 		idx +=1
 

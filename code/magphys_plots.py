@@ -11,7 +11,7 @@ import matplotlib as mpl
 from prospect.models import model_setup
 from astropy import constants
 from allpar_plot import allpar_plot
-from stack_sfh import plot_stacked_sfh
+import stack_sfh
 import stack_irs_spectra
 import time
 
@@ -926,12 +926,14 @@ def plt_all(runname=None,startup=True,**extras):
     '''
     #### herschel flag
     hflag = np.array([True if np.sum(dat['residuals']['phot']['lam_obs'] > 5e5) else False for dat in alldata])
-    
+    stack_sfh.plot_stacked_sfh(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/pcomp/')
+    print 1/0
     mag_ensemble.plot_emline_comp(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/magphys/emlines_comp/',hflag)
     mag_ensemble.prospector_comparison(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/pcomp/',hflag)
     mag_ensemble.plot_relationships(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/magphys/')
     mag_ensemble.plot_comparison(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/magphys/')
-    plot_stacked_sfh(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/pcomp/')
+
+
     brown_io.write_results(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/pcomp/')
     allpar_plot(alldata,hflag,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/pcomp/')
     plot_all_residuals(alldata,runname)

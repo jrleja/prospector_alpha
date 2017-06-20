@@ -83,6 +83,7 @@ def collate_data(alldata):
     out['model_phot'] = model_phot
     out['obs_phot'] = obs_phot
     out['model_pars'] = model_pars
+    out['objname'] = objname
     return out
 
 def plot_mir_colors(runname='brownseds_agn',alldata=None,outfolder=None, vega=True, idx=None, **opts):
@@ -126,7 +127,7 @@ def plot_mir_colors(runname='brownseds_agn',alldata=None,outfolder=None, vega=Tr
                                      colorpar='fagn',colorparlabel=r'log(f$_{\mathrm{AGN,MIR}}$)',
                                      log_cpar=True, cpar_range=cpar_range,vega=vega,
                                      idx=idx,**opts)
-    plot_nenkova_templates(ax, xfilt=xfilt,yfilt=yfilt,vega=vega)
+    #plot_nenkova_templates(ax, xfilt=xfilt,yfilt=yfilt,vega=vega)
 
     #plot_prospector_templates(ax, xfilt=xfilt,yfilt=yfilt,outfolder=outfolder,vega=vega)
     outstring = 'wise_hotcolors'
@@ -134,6 +135,7 @@ def plot_mir_colors(runname='brownseds_agn',alldata=None,outfolder=None, vega=Tr
         outstring += '_vega'
     plt.savefig(outfolder+outstring+'.png',dpi=dpi)
     plt.close()
+    print 1/0
 
     plot_color_vs_fmir(pdata,xfilt=yfilt,xlabel='WISE [3.4]-[4.6] '+system,
                            outname=outfolder+'w1_w2_fmir.png', vega=True, **opts)
@@ -301,24 +303,32 @@ def plot_color_scatterplot(pdata,xfilt=None,yfilt=None,xlabel=None,ylabel=None,
         cpar_plot = np.clip(cpar_plot,cpar_range[0],cpar_range[1])
 
     #### plot photometry
-    fig, ax = plt.subplots(1,1, figsize=(8, 6))
+    fig, ax = plt.subplots(1,1, figsize=(6.5, 6))
+    '''
     ax.scatter(xplot[cidx], yplot[cidx], marker=popts['nofmir_shape'], c=cpar_plot[cidx],
                vmin=cpar_plot.min(), vmax=cpar_plot.max(), cmap=plt.cm.plasma,s=70,alpha=0.9)
     ax.scatter(xplot[~cidx], yplot[~cidx], marker=popts['fmir_shape'], c=cpar_plot[~cidx], 
                vmin=cpar_plot.min(), vmax=cpar_plot.max(), cmap=plt.cm.plasma,s=70,alpha=0.9)
     pts = ax.scatter(xplot, yplot, marker='o', c=cpar_plot, cmap=plt.cm.plasma,s=0.0,alpha=0.9)
 
+               '''
+    pts = ax.scatter(xplot, yplot, marker='o', color='0.4',s=50,alpha=0.4, linewidths=1.4,edgecolors='black')
+    idx = (np.array(pdata['objname'])[good] == 'UGC 05101') | (np.array(pdata['objname'])[good] == 'IC 5298')
+    pts = ax.scatter(xplot[idx], yplot[idx], marker='o', color='red',s=80, linewidths=1.4,edgecolors='black')
+
     #### label and add colorbar
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
+    '''
     cb = fig.colorbar(pts, ax=ax, aspect=10)
     cb.set_label(colorparlabel)
     cb.solids.set_rasterized(True)
     cb.solids.set_edgecolor("face")
-
+    
     #### text
     ax.text(0.05,0.92,'N='+str(good.sum()),transform=ax.transAxes,fontsize=16)
-
+    '''
+    plt.tight_layout()
     return fig, ax
 
 def load_dl07_models(outfolder=None,string=''):
