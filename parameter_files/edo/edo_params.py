@@ -87,7 +87,6 @@ def load_obs(cat='', **extras):
     fnames = [ftrans[f] for f in dat['filter']]
 
     ### correction for IRAS
-    # add 30% error because we don't trust it
     # see http://irsa.ipac.caltech.edu/IRASdocs/exp.sup/ch6/C3.html, correction pulled
     # from table here:http://irsa.ipac.caltech.edu/IRASdocs/exp.sup/ch2/tabC5.html
     iras_filters = ['IRAS_12um','IRAS_25mu','IRAS_60mu','IRAS_100mu']
@@ -95,8 +94,17 @@ def load_obs(cat='', **extras):
     for i, f in enumerate(iras_filters):
         if f in fnames:
             idx = fnames.index(f)
-            flux_err[idx] = np.clip(flux_err[idx], flux[idx]*0.25, np.inf) / K[i]
+            #flux_err[idx] = np.clip(flux_err[idx], flux[idx]*0.25, np.inf) / K[i]
             flux[idx] /= K[i]
+            flux_err[idx] /= K[i]
+
+    ### correction for WISE apertures
+    wise_filters = ['wise_w1','wise_w2','wise_w3','wise_w4']
+    K = [2.4, 2.4, 1.75, 1.4]
+    for i, f in enumerate(wise_filters):
+        idx = fnames.index(f)
+        flux[idx] *= K[i]
+        flux_err[idx] *= K[i]
 
     ### implement 5% error floor
     flux_err = np.clip(flux_err, flux*0.05, np.inf)
