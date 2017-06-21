@@ -82,8 +82,8 @@ def load_obs(cat='', **extras):
     dat = np.genfromtxt(cat,dtype=dtype, delimiter=',',comments='#')
 
     ### load fluxes, convert from mJy to maggies
-    flux = dat['flux'] / 1e6 / 3631
-    flux_err = dat['flux_err'] / 1e6 / 3631
+    flux = dat['flux'] / 1e3 / 3631
+    flux_err = dat['flux_err'] / 1e3 / 3631
     fnames = [ftrans[f] for f in dat['filter']]
 
     ### correction for IRAS
