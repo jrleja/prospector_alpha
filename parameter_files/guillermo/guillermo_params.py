@@ -227,7 +227,7 @@ model_params.append({'name': 'logzsol', 'N': 1,
                         'init_disp': 0.25,
                         'disp_floor': 0.2,
                         'units': r'$\log (Z/Z_\odot)$',
-                        'prior': priors.TopHat(mini=-1.98, maxi=0.19)})
+                        'prior': priors.ClippedNormal(mini=-1.98, maxi=0.19, mean=0.0, sigma=0.5)})
                         
 ###### SFH   ########
 model_params.append({'name': 'sfh', 'N':1,

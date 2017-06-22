@@ -73,19 +73,14 @@ def transform_chain(flatchain, model):
 def add_to_corner(fig, sample_results, extra_output, sps, model,truths=None,outname=None,
                   maxprob=True,powell_results=None,title_kwargs=None,twofigure=False):
 
-    '''
-    adds in posterior distributions for 'select' parameters
+    """
+    adds in posterior distributions for specific parameters
     if we have truths, list them as text
-    '''
+    """
     
     plotquant = extra_output['extras'].get('flatchain',None)
     plotname  = extra_output['extras'].get('parnames',None)
 
-    '''
-    to_show = ['half_time','ssfr_100','sfr_100','stellar_mass']
-    ptitle = [r't$_{\mathrm{half}}$ [Gyr]',r'log(sSFR) (100 Myr) [yr$^{-1}$]',
-              r'log(SFR) (100 Myr) [M$_{\odot}$ yr$^{-1}$]',r'log(M$_*$) [M$_{\odot}$]']
-    '''
     to_show = ['stellar_mass','sfr_100','ssfr_100','half_time']
     ptitle = [r'log(M$_*$)',r'log(SFR$_{\mathrm{100 Myr}}$)',
               r'log(sSFR$_{\mathrm{100 Myr}}$)',r't$_{\mathrm{half}}$ [Gyr]']
@@ -516,7 +511,7 @@ def sed_figure(outname = None, truths = None,
                labels = ['spectrum (50th percentile)'],
                model_photometry = True, main_color=['black'],
                fir_extra = False, ml_spec=False,transcurves=False,
-               ergs_s_cm=True,
+               ergs_s_cm=True, add_sfh=True,
                **kwargs):
     """
     Plot the photometry for the model and data (with error bars), and
@@ -699,11 +694,75 @@ def sed_figure(outname = None, truths = None,
     # remove ticks
     phot.set_xticklabels([])
     
+    #### add SFH 
+    if add_sfh:
+        sfh_ax = fig.add_axes([0.42,0.63,0.18,0.24],zorder=32)
+        add_sfh_plot(extra_output, fig,
+                     main_color = ['black'],
+                     ax_inset=sfh_ax,
+                     text_size=0.9,lw=1.8)
+
+    #### add insets
+    if False:
+        inset_ax = [fig.add_axes([0.63,0.71,0.11,0.14],zorder=32), fig.add_axes([0.76,0.71,0.11,0.14],zorder=32)]
+        add_inset_pdf(extra_output[0],inset_ax,['stellar_mass','logzsol'],
+                      [r'log(M/M$_{\odot}$)',r'log(Z/Z$_{\odot}$)'],text_size=0.5)
+
     if outname is not None:
         fig.savefig(outname, bbox_inches='tight', dpi=dpi)
         plt.close()
 
     #os.system('open '+outname)
+
+def add_inset_pdf(extra_output,ax,pars,pnames,text_size=1,lw=1):
+    
+    axfontsize=4*text_size
+
+    for i, p in enumerate(pars):
+        
+        if p in extra_output['quantiles']['parnames']:
+            idx = extra_output['quantiles']['parnames'] == p
+            plot = extra_output['quantiles']['sample_chain'][:,idx]
+            qvalues = [extra_output['quantiles']['q16'][idx],
+                       extra_output['quantiles']['q50'][idx],
+                       extra_output['quantiles']['q84'][idx]]
+        else:
+            idx = extra_output['extras']['parnames'] == p
+            plot = np.log10(extra_output['extras']['flatchain'][:,idx])
+            qvalues = [np.log10(extra_output['extras']['q16'][idx]),
+                       np.log10(extra_output['extras']['q50'][idx]),
+                       np.log10(extra_output['extras']['q84'][idx])]
+
+        ### Plot histogram.
+        n, b, p = ax[i].hist(plot, bins=50,
+                          histtype="step",color='k',
+                          range=[np.min(plot),np.max(plot)])
+
+        for q in qvalues: ax[i].axvline(q, ls=':', color='k')
+
+        # display quantiles
+        q_m = qvalues[1]-qvalues[0]
+        q_p = qvalues[2]-qvalues[1]
+
+        # format quantile display
+        fmt = "{{0:{0}}}".format(".2f").format
+        title = r"${{{0}}}_{{-{1}}}^{{+{2}}}$"
+        title = title.format(fmt(qvalues[1][0]), fmt(q_m[0]), fmt(q_p[0]))
+        ax[i].set_title(title,fontsize=axfontsize*4)
+        ax[i].set_xlabel(pnames[i],fontsize=axfontsize*4,labelpad=2*text_size)
+
+        # axes
+        # set min/max
+        ax[i].set_xlim(np.percentile(plot,0.5),
+                    np.percentile(plot,99.5))
+        ax[i].set_ylim(0, 1.1 * np.max(n))
+        ax[i].set_yticklabels([])
+        ax[i].xaxis.set_major_locator(MaxNLocator(4))
+        #[l.set_rotation(45) for l in ax[i].get_xticklabels()]
+        ax[i].xaxis.set_tick_params(labelsize=axfontsize*3)
+        ax[i].yaxis.set_tick_params(labelsize=axfontsize*3)
+        ax[i].tick_params('both', length=lw*3, width=lw*.6, which='major')
+
 
 def make_all_plots(filebase=None,
                    extra_output=None,
