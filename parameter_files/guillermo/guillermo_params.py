@@ -326,6 +326,12 @@ model_params.append({'name': 'dust_tesc', 'N': 1,
                         'prior_function_name': None,
                         'prior_args': None})
 
+model_params.append({'name': 'frac_obrun', 'N': 1,
+                        'isfree': True,
+                        'init': 0.1,
+                        'units': 'fraction',
+                        'prior': priors.TopHat(mini=0.0, maxi=1.0)})
+
 ###### Dust Emission ##############
 model_params.append({'name': 'add_dust_emission', 'N': 1,
                         'isfree': False,
@@ -431,7 +437,7 @@ model_params.append({'name': 'mass_units', 'N': 1,
 #### resort list of parameters 
 #### so that major ones are fit first
 parnames = [m['name'] for m in model_params]
-fit_order = ['logmass','z_fraction', 'dust2', 'logzsol', 'dust_index', 'dust1_fraction', 'duste_gamma', 'duste_qpah', 'duste_umin']
+fit_order = ['logmass','z_fraction', 'dust2', 'logzsol', 'dust_index', 'dust1_fraction', 'duste_gamma', 'duste_qpah', 'duste_umin', 'frac_obrun']
 tparams = [model_params[parnames.index(i)] for i in fit_order]
 for param in model_params: 
     if param['name'] not in fit_order:
