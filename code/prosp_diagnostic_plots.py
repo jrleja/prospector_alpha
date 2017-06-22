@@ -478,7 +478,7 @@ def show_chain(sample_results,legend=True, outname=None):
         plt.savefig(outname+'.chain.png', bbox_inches='tight',dpi=110)
         plt.close()
 
-def return_sedplot_vars(sample_results, extra_output, nufnu=True):
+def return_sedplot_vars(sample_results, extra_output, nufnu=True, ergs_s_cm=False):
 
     '''
     if nufnu == True: return in units of nu * fnu. Else, return maggies.
@@ -497,6 +497,8 @@ def return_sedplot_vars(sample_results, extra_output, nufnu=True):
     # output units
     if nufnu == True:
         factor = 3e18
+        if ergs_s_cm:
+            factor *= 3631*1e-23
         mu *= factor/wave_eff
         spec *= factor/extra_output['observables']['lam_obs']
         obs_maggies *= factor/wave_eff
@@ -514,6 +516,7 @@ def sed_figure(outname = None, truths = None,
                labels = ['spectrum (50th percentile)'],
                model_photometry = True, main_color=['black'],
                fir_extra = False, ml_spec=False,transcurves=False,
+               ergs_s_cm=True,
                **kwargs):
     """
     Plot the photometry for the model and data (with error bars), and
@@ -545,7 +548,7 @@ def sed_figure(outname = None, truths = None,
     for i,sample_results in enumerate(sresults):
 
         #### grab data for maximum probability model
-        wave_eff, obsmags, obsmags_unc, modmags, chi, modspec, modlam = return_sedplot_vars(sample_results,extra_output[i])
+        wave_eff, obsmags, obsmags_unc, modmags, chi, modspec, modlam = return_sedplot_vars(sample_results,extra_output[i],ergs_s_cm=ergs_s_cm)
 
         #### plot maximum probability model
         if model_photometry:
@@ -564,6 +567,8 @@ def sed_figure(outname = None, truths = None,
         for jj in xrange(len(w)): spec_pdf[jj,:] = np.percentile(extra_output[i]['observables']['spec'][jj,:],[5.0,50.0,95.0])
         
         sfactor = 3e18/w
+        if ergs_s_cm:
+            sfactor *= 3631*1e-23
         nz = modspec > 0
         if ml_spec:
             phot.plot(modlam[nz], modspec[nz], linestyle='-',
@@ -610,7 +615,6 @@ def sed_figure(outname = None, truths = None,
         dyn = 10**(np.log10(ymin)+(np.log10(ymax)-np.log10(ymin))*0.2)
         for f in sample_results['obs']['filters']: phot.plot(f.wavelength/1e4, f.transmission/f.transmission.max()*dyn+ymin,lw=1.5,color='0.3',alpha=0.7)
     phot.set_ylim(ymin, ymax)
-
 
     # if we have negatives:
     if positive_flux.sum() != len(obsmags):
@@ -665,7 +669,10 @@ def sed_figure(outname = None, truths = None,
                 
     # set labels
     res.set_ylabel( r'$\chi$')
-    phot.set_ylabel(r'$\nu f_{\nu}$ [erg/s/cm$^2$]')
+    if ergs_s_cm:
+        phot.set_ylabel(r'$\nu f_{\nu}$ [erg/s/cm$^2$]')
+    else:
+        phot.set_ylabel(r'$\nu f_{\nu}$ [maggie Hz]')
     res.set_xlabel(r'$\lambda_{\mathrm{obs}}$ [$\mu$m]')
     phot.set_yscale('log',nonposx='clip')
     phot.set_xscale('log',nonposx='clip')
