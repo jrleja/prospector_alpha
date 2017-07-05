@@ -43,7 +43,7 @@ run_params = {'verbose':True,
               'agelims': [0.0,8.0,8.5,9.0,9.5,9.8,10.0],
               # Data info (phot = .cat, dat = .dat, fast = .fout)
               'datdir':APPS+'/threedhst_bsfh/data/3dhst/',
-              'runname': 'td_massive_noagb',
+              'runname': 'td_massive',
               'objname':'AEGIS_531'
               }
 ############
