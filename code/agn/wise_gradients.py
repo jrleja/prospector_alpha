@@ -158,7 +158,10 @@ def plot_all(agn_evidence,runname='brownseds_agn',runname_noagn='brownseds_np',a
     return agn_evidence
 
 def data_cuts(outdict,idx=1):
-    resolved = (outdict['arcsec'][:,idx] > 3) & np.all(outdict['background_fraction'][:,:idx*2+2] < 0.2,axis=1) & (outdict['gradient_error'][:,idx] < 0.25)
+    resolved = (outdict['arcsec'][:,idx] > 3) & \
+               np.all(outdict['background_fraction'][:,:idx*2+2] < 0.2,axis=1) & \
+               (outdict['gradient_error'][:,idx] < 0.25)
+    print "WISE cuts return " + str(resolved.sum()) + " galaxies."
     return resolved
 
 def plot_summary(pdata, outfolder, outdict,idx, agn_idx=Ellipsis, **popts):
@@ -171,12 +174,10 @@ def plot_summary(pdata, outfolder, outdict,idx, agn_idx=Ellipsis, **popts):
     #### plot options
     blue = '#1C86EE' 
     opts = {
-            'color': blue,
             'mew': 1.5,
             'capthick':0.6,
             'elinewidth':0.6,
             'ecolor':'0.2',
-            'ms': 12
         } 
 
     fig, ax = plt.subplots(1,1, figsize=(7.5, 7))
@@ -201,12 +202,12 @@ def plot_summary(pdata, outfolder, outdict,idx, agn_idx=Ellipsis, **popts):
                 xerr=[xerr[0][cidx],xerr[1][cidx]],
                 yerr=yerr[cidx],
                 zorder=-3, fmt=popts['nofmir_shape'],
-                alpha=popts['nofmir_alpha'],**opts)
+                alpha=popts['nofmir_alpha'],ms=6,color=popts['nofmir_color'],**opts)
     ax.errorbar(xp[~cidx],yp[~cidx], 
                 xerr=[xerr[0][~cidx],xerr[1][~cidx]],
                 yerr=yerr[~cidx],
                 zorder=-3, fmt=popts['fmir_shape'],
-                alpha=popts['fmir_alpha'],**opts)
+                alpha=popts['fmir_alpha'],ms=12,color=popts['fmir_color'],**opts)
 
     ax.set_xlabel(r'log(f$_{\mathrm{AGN,MIR}}$)')
     ax.set_ylabel(r'$\nabla$(W1-W2) at r=2 kpc [mag/kpc]')

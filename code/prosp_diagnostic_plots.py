@@ -511,7 +511,7 @@ def sed_figure(outname = None, truths = None,
                labels = ['spectrum (50th percentile)'],
                model_photometry = True, main_color=['black'],
                fir_extra = False, ml_spec=False,transcurves=False,
-               ergs_s_cm=True, add_sfh=True,
+               ergs_s_cm=True, add_sfh=False,
                **kwargs):
     """
     Plot the photometry for the model and data (with error bars), and

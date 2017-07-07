@@ -447,17 +447,17 @@ def load_xray_cat(xmatch = True,maxradius=30):
             ### find matches in the query with nonzero flux entries within MAXIMUM radius in arcseconds (max is 1')
             idx_csc = (csc['match'] == name) & \
                       (csc['fb_flux_ap'] > 0.0) & \
-                      (csc['offset'] < maxradius/60.) & \
+                      (csc['offset'] < maxradius/30.) & \
                       (np.core.defchararray.strip(csc['extent_flag']) == 'F')
             
             idx_cxo = (cxo['match'] == name) & \
                       (cxo['flux'] > 0.0) & \
-                      (cxo['offset'] < maxradius/60.) & \
+                      (cxo['offset'] < maxradius/30.) & \
                       (np.core.defchararray.strip(cxo['extent_flag']) == 'F')
 
             idx_chng = (chng['match'] == name) & \
                        (chng['flux'] > 0.0) & \
-                       (chng['offset'] < maxradius/60.)
+                       (chng['offset'] < maxradius/30.)
 
             ### PREFER CXO > CSC > CHNG
             if idx_cxo.sum() > 0:

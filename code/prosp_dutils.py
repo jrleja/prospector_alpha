@@ -56,8 +56,7 @@ def return_lmir(lam,spec,z=None,alt_file=None):
     # input must be Lsun / hz
     # returns erg/s
 
-    # fake LUV filter
-    # over 1216-3000 angstroms
+    # over 4-20um
     # note that lam must be in angstroms
     botlam = np.atleast_1d(4e4-1)
     toplam = np.atleast_1d(20e4+1)
@@ -552,7 +551,7 @@ def generate_basenames(runname,ancilname=None):
         else:
             parm = parbase+'.py'
 
-    elif runname == 'td_massive' or runname == 'fast_mimic':
+    elif 'td_massive' in runname or runname == 'fast_mimic':
 
         id_list = os.getenv('APPS')+"/threedhst_bsfh/data/3dhst/td_massive.ids"
         ids = np.loadtxt(id_list, dtype='|S60',delimiter=',')

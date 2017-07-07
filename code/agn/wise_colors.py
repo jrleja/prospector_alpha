@@ -116,7 +116,6 @@ def plot_mir_colors(runname='brownseds_agn',alldata=None,outfolder=None, vega=Tr
                            colorpar='fagn',colorparlabel=r'log(f$_{\mathrm{AGN,MIR}}$)',log_cpar=True, cpar_range=cpar_range,
                            idx=idx,**opts)
     plot_nenkova_templates(ax, xfilt=xfilt,yfilt=yfilt)
-    #plot_prospector_templates(ax, xfilt=xfilt,yfilt=yfilt,outfolder=outfolder)
     plt.savefig(outfolder+'irac_colors.png',dpi=dpi)
     plt.close()
 
@@ -127,7 +126,7 @@ def plot_mir_colors(runname='brownseds_agn',alldata=None,outfolder=None, vega=Tr
                                      colorpar='fagn',colorparlabel=r'log(f$_{\mathrm{AGN,MIR}}$)',
                                      log_cpar=True, cpar_range=cpar_range,vega=vega,
                                      idx=idx,**opts)
-    #plot_nenkova_templates(ax, xfilt=xfilt,yfilt=yfilt,vega=vega)
+    plot_nenkova_templates(ax, xfilt=xfilt,yfilt=yfilt,vega=vega)
 
     #plot_prospector_templates(ax, xfilt=xfilt,yfilt=yfilt,outfolder=outfolder,vega=vega)
     outstring = 'wise_hotcolors'
@@ -135,7 +134,6 @@ def plot_mir_colors(runname='brownseds_agn',alldata=None,outfolder=None, vega=Tr
         outstring += '_vega'
     plt.savefig(outfolder+outstring+'.png',dpi=dpi)
     plt.close()
-    print 1/0
 
     plot_color_vs_fmir(pdata,xfilt=yfilt,xlabel='WISE [3.4]-[4.6] '+system,
                            outname=outfolder+'w1_w2_fmir.png', vega=True, **opts)
@@ -151,7 +149,6 @@ def plot_mir_colors(runname='brownseds_agn',alldata=None,outfolder=None, vega=Tr
                            colorpar='fagn',colorparlabel=r'log(f$_{\mathrm{AGN,MIR}}$)',log_cpar=True, cpar_range=cpar_range,vega=vega,
                            idx=idx,**opts)
     plot_nenkova_templates(ax, xfilt=xfilt,yfilt=yfilt,vega=vega)
-    #plot_prospector_templates(ax, xfilt=xfilt,yfilt=yfilt,outfolder=outfolder,vega=vega)
 
     plt.savefig(outfolder+outstring+'.png',dpi=dpi)
     plt.close()
@@ -177,10 +174,10 @@ def plot_nenkova_templates(ax, xfilt=None,yfilt=None,vega=False):
     xp = np.array(xp)
     xp.sort()
 
-    ax.plot(xp,yp,'o',alpha=0.7,ms=11,color=modcolor,mew=2.2)
-    ax.plot(xp,yp,' ',alpha=0.5,color=modcolor, linestyle='-',lw=3)
+    ax.plot(xp,yp,'o',alpha=0.8,ms=11,color=modcolor,mew=2.2)
+    ax.plot(xp,yp,' ',alpha=0.6,color=modcolor, linestyle='-',lw=3)
 
-    ax.text(0.05,0.82,'Nenkova+08 \n AGN Templates',transform=ax.transAxes,fontsize=16,color=modcolor,weight='bold',alpha=0.6)
+    ax.text(0.05,0.86,'Nenkova+08 \n AGN Templates',transform=ax.transAxes,fontsize=16,color=modcolor,weight='bold')
 
 def plot_prospector_templates(ax, xfilt=None, yfilt=None, outfolder=None, vega=False,multiple=True):
 
@@ -189,12 +186,11 @@ def plot_prospector_templates(ax, xfilt=None, yfilt=None, outfolder=None, vega=F
     _sfrX is all SFR in bin X
     '''
 
-    prospcolor = ['#FFB6C1','#c264ff']
+    prospcolor = ['#c264ff','#ff4c4c','#1C86EE']
 
     xp, yp = [], []
-    strings = ['', '_sfr1','_sfr2','_sfr4','_sfr6']
-    strings = ['_sfr1','_sfr6']
-    label = [' young', ' old']
+    strings = ['_sfr1','_sfr6', '_sfr2']
+    label = [' young stars',' old stars', 'intermediate stars']
     for string in strings:
         prosp = load_dl07_models(outfolder=outfolder,string=string)
         if multiple:
@@ -227,11 +223,11 @@ def plot_prospector_templates(ax, xfilt=None, yfilt=None, outfolder=None, vega=F
         pts.insert(len(pts), pts[0])
 
         poly = Polygon((np.array(pts)- cent) + cent,
-                       facecolor=prospcolor[i], alpha=0.8,zorder=-35)
+                       facecolor=prospcolor[i], alpha=0.6,zorder=-35)
         poly.set_capstyle('round')
         plt.gca().add_patch(poly)
 
-        ax.text(0.05,0.72-0.11*i,'Prospector-$\\alpha$ \n'+label[i]+' models',transform=ax.transAxes,fontsize=16,color=prospcolor[i],weight='bold')
+        ax.text(0.05,0.76-0.11*i,'Prospector-$\\alpha$ \n'+label[i],transform=ax.transAxes,fontsize=16,color=prospcolor[i],weight='bold')
         i += 1
 
 def plot_color_vs_fmir(pdata,xfilt=None,xlabel=None,
@@ -303,31 +299,29 @@ def plot_color_scatterplot(pdata,xfilt=None,yfilt=None,xlabel=None,ylabel=None,
         cpar_plot = np.clip(cpar_plot,cpar_range[0],cpar_range[1])
 
     #### plot photometry
-    fig, ax = plt.subplots(1,1, figsize=(6.5, 6))
-    '''
+    fig, ax = plt.subplots(1,1, figsize=(8, 6))
     ax.scatter(xplot[cidx], yplot[cidx], marker=popts['nofmir_shape'], c=cpar_plot[cidx],
                vmin=cpar_plot.min(), vmax=cpar_plot.max(), cmap=plt.cm.plasma,s=70,alpha=0.9)
     ax.scatter(xplot[~cidx], yplot[~cidx], marker=popts['fmir_shape'], c=cpar_plot[~cidx], 
                vmin=cpar_plot.min(), vmax=cpar_plot.max(), cmap=plt.cm.plasma,s=70,alpha=0.9)
     pts = ax.scatter(xplot, yplot, marker='o', c=cpar_plot, cmap=plt.cm.plasma,s=0.0,alpha=0.9)
 
-               '''
-    pts = ax.scatter(xplot, yplot, marker='o', color='0.4',s=50,alpha=0.4, linewidths=1.4,edgecolors='black')
-    idx = (np.array(pdata['objname'])[good] == 'UGC 05101') | (np.array(pdata['objname'])[good] == 'IC 5298')
-    pts = ax.scatter(xplot[idx], yplot[idx], marker='o', color='red',s=80, linewidths=1.4,edgecolors='black')
+    #pts = ax.scatter(xplot, yplot, marker='o', color='0.4',s=50,alpha=0.4, linewidths=1.4,edgecolors='black')
+    #idx = (np.array(pdata['objname'])[good] == 'UGC 05101') | (np.array(pdata['objname'])[good] == 'IC 5298')
+    #pts = ax.scatter(xplot[idx], yplot[idx], marker='o', color='red',s=80, linewidths=1.4,edgecolors='black')
 
     #### label and add colorbar
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
-    '''
+
     cb = fig.colorbar(pts, ax=ax, aspect=10)
     cb.set_label(colorparlabel)
     cb.solids.set_rasterized(True)
     cb.solids.set_edgecolor("face")
     
     #### text
-    ax.text(0.05,0.92,'N='+str(good.sum()),transform=ax.transAxes,fontsize=16)
-    '''
+    #ax.text(0.05,0.92,'N='+str(good.sum()),transform=ax.transAxes,fontsize=16)
+    
     plt.tight_layout()
     return fig, ax
 
@@ -339,17 +333,13 @@ def load_dl07_models(outfolder=None,string=''):
     except IOError as e:
         print e
         print 'generating DL07 models'
-        outdict = generate_dl07_models(outfolder=outfolder)
+        outdict = generate_dl07_models(outfolder=outfolder,string=string)
 
     return outdict
 
+def generate_dl07_models(outfolder='/Users/joel/code/python/threedhst_bsfh/plots/brownseds_agn/agn_plots/',string=None):
 
-def generate_dl07_models(outfolder='/Users/joel/code/python/threedhst_bsfh/plots/brownseds_agn/agn_plots/'):
-
-    ### this will break now because sfr_fraction isn't a parameter!
-    ### either create a new parameter file or build the reverse map sfrfraction --> zfraction
-
-    import brownseds_agn_params as nonparam
+    import bseds_test as nonparam
 
     #### load test model, build sps, build important variables ####
     sps = nonparam.load_sps(**nonparam.run_params)
@@ -381,8 +371,11 @@ def generate_dl07_models(outfolder='/Users/joel/code/python/threedhst_bsfh/plots
     theta[pnames.index('fagn')] = 0.0
     indices = [i for i, s in enumerate(pnames) if ('sfr_fraction' in s)]
     theta[indices] = 0.0
-    theta[pnames.index('sfr_fraction_4')] = 1.0
-
+    sfr_idx = [idx for idx in indices if string[-1] in pnames[idx]]
+    theta[sfr_idx] = 1.0
+    theta[pnames.index('dust2')] = 1.5
+    theta[pnames.index('dust1')] = 1.5
+    print theta
     for logzsol in grid[3]:
         for gamma in grid[0]:
             for qpah in grid[1]:
@@ -396,16 +389,17 @@ def generate_dl07_models(outfolder='/Users/joel/code/python/threedhst_bsfh/plots
                     for c in colors: outdict[" ".join(c)].append(-2.5*np.log10(mags[fnames.index(c[0])])+2.5*np.log10(mags[fnames.index(c[1])]))
         
     # now do it again with no dust
+    '''
     theta[pnames.index('dust2')] = 0.0
+    theta[pnames.index('dust1')] = 0.0
     for logzsol in grid[3]:
         theta[pnames.index('logzsol')] = logzsol
         sps.ssp.params.dirtiness = 1
         spec,mags,sm = model.mean_model(theta, obs, sps=sps)
         for c in colors: outdict[" ".join(c)].append(-2.5*np.log10(mags[fnames.index(c[0])])+2.5*np.log10(mags[fnames.index(c[1])]))
+    '''
 
-
-
-    pickle.dump(outdict,open(outfolder+'prospector_template_colors_sfr4.pickle', "wb"))
+    pickle.dump(outdict,open(outfolder+'prospector_template_colors_sfr'+string[-1]+'.pickle', "wb"))
     return outdict
 
 

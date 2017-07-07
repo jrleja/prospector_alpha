@@ -131,8 +131,8 @@ def drawArrow(A, B, ax, scale=1):
 def plot_rms(pdata,outfolder,agn_idx=None,**popts):
 
     #### plot geometry
-    fig, ax = plt.subplots(2,2, figsize=(10, 10))
-    fig2, ax2 = plt.subplots(2,2, figsize=(11, 11))
+    fig, ax = plt.subplots(1,3, figsize=(15.5, 5))
+    fig2, ax2 = plt.subplots(1,3, figsize=(15.5, 5))
 
     ax = ax.ravel()
     ax2 = ax2.ravel()
@@ -154,7 +154,7 @@ def plot_rms(pdata,outfolder,agn_idx=None,**popts):
     ### for each observable, pull out RMS
     ndraw = int(1e5)
     fagn = np.log10(pdata['agn']['model_pars']['fagn']['q50'])
-    ordered_keys = ['halpha','hbeta','bdec','dn4000']
+    ordered_keys = ['halpha','hbeta','bdec']#,'dn4000']
     for ii,key in enumerate(ordered_keys):
         ### for each galaxy
         q50, q84, q16 = [], [], []

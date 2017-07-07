@@ -56,7 +56,7 @@ def plot(agn_evidence, alldata, outfolder,agn_idx=None,**popts):
     bins_mid = np.array([[bins_mid[0]-delta_bin]+bins_mid.tolist()+[bins_mid[-1]+delta_bin]]).squeeze()
 
     ### split into groups
-    agn_flag = flag
+    agn_flag = compflag
     noagn_flag = ((measure_flag) & (~flag))# & (~compflag_agn))
     #comp_flag = ((measure_flag) & (~flag) & (compflag_agn))
     flags = [agn_flag, noagn_flag]#, comp_flag]

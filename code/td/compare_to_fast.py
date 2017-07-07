@@ -73,7 +73,7 @@ def collate_data(runname, runname_fast, filename=None, regenerate=False):
 		try:
 			prosp = load_prospector_extra(name)
 			prosp_fast = load_prospector_extra(basenames_fast[i])
-		except TypeError:
+		except:
 			print name.split('/')[-1]+' failed to load. skipping.'
 			continue
 
@@ -367,7 +367,7 @@ def uvir_comparison(data, outname):
 	ax[1].set_xscale('log',nonposy='clip',subsx=([1]))
 	ax[1].xaxis.set_major_formatter(majorFormatter)
 	ax[1].xaxis.set_minor_formatter(minorFormatter)
-	print 1/0
+
 	if ax.shape[0] > 2:
 		ax[2].errorbar(qpah[good], sfr_ratio[good], xerr=qpah_err, yerr=sfr_ratio_err, **popts)
 		ax[3].errorbar(fagn[good], sfr_ratio[good], xerr=fagn_err, yerr=sfr_ratio_err, **popts)

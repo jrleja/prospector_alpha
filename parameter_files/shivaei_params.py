@@ -442,8 +442,8 @@ class FracSFH(FastStepBasis):
             phot = 0.0
 
         ### if we don't have emission lines, add them
-        #if (not self.params['nebemlineinspec']) and self.params['add_neb_emission']:
-        #    phot += self.nebline_photometry(filters,a-1)*to_cgs
+        if (not self.params['nebemlineinspec']) and self.params['add_neb_emission']:
+            phot += self.nebline_photometry(filters,a-1)*to_cgs
 
         # Spectral smoothing.
         do_smooth = (('sigma_smooth' in self.params) and

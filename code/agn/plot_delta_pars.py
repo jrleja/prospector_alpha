@@ -192,9 +192,9 @@ def plot_dpars(pdata,xpar=None,xparlabel=None,log_xpar=False, agn_idx=None, **po
 
 		errs = pdata['errs'][par]
 		ax[idx].errorbar(xpar_plot[cidx],pdata['median'][par][cidx], yerr=[errs[0][cidx],errs[1][cidx]], zorder=-3, 
-			             fmt=popts['nofmir_shape'],alpha=popts['nofmir_alpha'],ms=5,color='0.4',**opts)
+			             fmt=popts['nofmir_shape'],alpha=popts['nofmir_alpha'],ms=5,color=popts['nofmir_color'],**opts)
 		ax[idx].errorbar(xpar_plot[agn_idx],pdata['median'][par][agn_idx], yerr=[errs[0][agn_idx],errs[1][agn_idx]], zorder=-3, 
-			             fmt=popts['fmir_shape'],alpha=popts['fmir_alpha'],ms=10,**opts)
+			             fmt=popts['fmir_shape'],alpha=popts['fmir_alpha'],ms=10,color=popts['fmir_color'],**opts)
 
 		ax[idx].set_ylabel('AGN(on)-AGN(off)')
 		ax[idx].set_xlabel(xparlabel)

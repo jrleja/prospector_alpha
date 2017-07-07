@@ -294,7 +294,6 @@ def plot_pdf_scatter(pdata, alldata, idx=Ellipsis, outname=None,
     xplot = np.log10(pdata[xpar][idx][pidx])
     xerr_1d = pdata['xray_luminosity_err'][idx][pidx]
     xlabel = r'log(L$_{\mathrm{X}}$(observed)) [erg/s]'
-    xwidth = 0.3 # HALF width, in dex
 
     ### deal with y-axis
     ypars = ['fmir','agn_tau']
@@ -302,7 +301,7 @@ def plot_pdf_scatter(pdata, alldata, idx=Ellipsis, outname=None,
     nbins = 20
     clip = [5,95]
 
-    lims = [(0.02,1),(2,100)]
+    lims = [(0.03,1),(2,100)]
     sig = xray_cuts(pdata)[idx][pidx]
     ### loop over two y-parameters (AGN tau and fmir)
     for ii, yp in enumerate(ypars):
@@ -313,23 +312,23 @@ def plot_pdf_scatter(pdata, alldata, idx=Ellipsis, outname=None,
 
         for color,id in zip([red,blue],[sig,~sig]):
             yerr = prosp_dutils.asym_errors(q50[id],q84[id],q16[id])
-            ax[ii].scatter(q50[id], xplot[id], marker='o', color=color,s=52,zorder=11,alpha=0.9,edgecolors='k')
-            ax[ii].errorbar(q50[id], xplot[id], xerr=yerr, zorder=-5,ms=0.0, ecolor='k', linestyle=' ',
+            ax[ii].scatter(xplot[id], q50[id], marker='o', color=color,s=52,zorder=11,alpha=0.9,edgecolors='k')
+            ax[ii].errorbar(xplot[id], q50[id], yerr=yerr, zorder=-5,ms=0.0, ecolor='k', linestyle=' ',
                             capthick=0.8, elinewidth=0.4, alpha=0.7)
 
         ### labels
-        ax[ii].set_ylabel(xlabel)
-        ax[ii].set_xlabel(ylabel[ii])
+        ax[ii].set_ylabel(ylabel[ii])
+        ax[ii].set_xlabel(xlabel)
 
         ### limits
         xlim = (xplot.min()-0.5,xplot.max()+0.5)
-        ax[ii].set_ylim(xlim)
-        ax[ii].yaxis.set_major_locator(MaxNLocator(5))
-        ax[ii].set_xlim(lims[ii])
+        ax[ii].set_xlim(xlim)
+        ax[ii].xaxis.set_major_locator(MaxNLocator(5))
+        ax[ii].set_ylim(lims[ii])
 
-        ax[ii].set_xscale('log',nonposx='clip',subsx=(1,2,4))
-        ax[ii].xaxis.set_minor_formatter(minorFormatter)
-        ax[ii].xaxis.set_major_formatter(majorFormatter)
+        ax[ii].set_yscale('log',nonposx='clip',subsy=(1,2,4))
+        ax[ii].yaxis.set_minor_formatter(minorFormatter)
+        ax[ii].yaxis.set_major_formatter(majorFormatter)
 
             #ylim = (10**(agn_chain.min()-0.2),10**(agn_chain.max()+0.2)) # have to put in log if-statement
 
