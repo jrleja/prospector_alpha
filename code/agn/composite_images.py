@@ -188,7 +188,7 @@ def plot_all(runname='brownseds_agn',runname_noagn='brownseds_np',alldata=None,a
 
 	#### make output folder if necessary
 	if outfolder is None:
-		outfolder = os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/agn_plots/sdss_overlays'
+		outfolder = os.getenv('APPS')+'/prospector_alpha/plots/'+runname+'/agn_plots/sdss_overlays'
 		if not os.path.isdir(outfolder):
 			os.makedirs(outfolder)
 
@@ -480,7 +480,7 @@ def load_image(objname,filter):
 	loads Brown+14 cutouts in a given filter
 	'''
 
-	folder = os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/fits/'
+	folder = os.getenv('APPS')+'/prospector_alpha/data/brownseds_data/fits/'
 
 	filter = filter.replace(' ','_')
 	objname = objname.replace(' ','_')
@@ -495,7 +495,7 @@ def load_structure(objname,long_axis=False):
 	loads structure information from Brown+14 catalog
 	'''
 
-	loc = os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/structure.dat'
+	loc = os.getenv('APPS')+'/prospector_alpha/data/brownseds_data/photometry/structure.dat'
 
 	with open(loc, 'r') as f: hdr = f.readline().split()[1:]
 	dat = np.loadtxt(loc, comments = '#', delimiter=' ',
@@ -613,7 +613,7 @@ def load_wise_psf(filter):
 	fnumber = [s for s in filter if s.isdigit()][0]
 
 	### load PSF
-	location = '/Users/joel/code/python/threedhst_bsfh/data/brownseds_data/fits/PSF_W'+fnumber+'.V4.fits'
+	location = '/Users/joel/code/python/prospector_alpha/data/brownseds_data/fits/PSF_W'+fnumber+'.V4.fits'
 	hdu = fits.open(location)[0]
 
 	resolution = hdu.header['PSCALE']

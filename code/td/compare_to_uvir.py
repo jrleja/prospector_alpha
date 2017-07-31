@@ -179,7 +179,7 @@ def collate_data(runname, filename=None, regenerate=False, nsamp=100):
 def do_all(runname='td_massive', outfolder=None,**opts):
 
     if outfolder is None:
-        outfolder = os.getenv('APPS') + '/threedhst_bsfh/plots/'+runname+'/fast_plots/'
+        outfolder = os.getenv('APPS') + '/prospector_alpha/plots/'+runname+'/fast_plots/'
         if not os.path.isdir(outfolder):
             os.makedirs(outfolder)
             os.makedirs(outfolder+'data/')

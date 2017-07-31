@@ -5,13 +5,13 @@ import numpy as np
 from prospect.likelihood import LikelihoodFunction
 
 
-param_name = '/Users/joel/code/python/threedhst_bsfh/parameter_files/nonparametric_mocks/nonparametric_mocks_params_1.py'
+param_name = '/Users/joel/code/python/prospector_alpha/parameter_files/nonparametric_mocks/nonparametric_mocks_params_1.py'
 
 
 ###### POST_PROCESSING
 param_file = model_setup.import_module_from_file(param_name)
 outname = param_file.run_params['outfile']
-outfolder = os.getenv('APPS')+'/threedhst_bsfh/plots/'+outname.split('/')[-2]+'/'
+outfolder = os.getenv('APPS')+'/prospector_alpha/plots/'+outname.split('/')[-2]+'/'
 
 sample_results, powell_results, model = prosp_dutils.load_prospector_data(outname)
 

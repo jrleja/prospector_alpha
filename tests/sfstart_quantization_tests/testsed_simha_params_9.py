@@ -12,7 +12,7 @@ logarithmic = priors.logarithmic
 #############
 
 run_params = {'verbose':True,
-              'outfile':os.getenv('APPS')+'/threedhst_bsfh/results/testsed_simha/testsed_simha',
+              'outfile':os.getenv('APPS')+'/prospector_alpha/results/testsed_simha/testsed_simha',
               'ftol':0.5e-5, 
               'maxfev':5000,
               'nwalkers':496,
@@ -24,8 +24,8 @@ run_params = {'verbose':True,
               'abs_error': False,
               'spec': False, 
               'phot':True,
-              'photname':os.getenv('APPS')+'/threedhst_bsfh/data/testsed_simha.cat',
-              'truename':os.getenv('APPS')+'/threedhst_bsfh/data/testsed_simha.dat',
+              'photname':os.getenv('APPS')+'/prospector_alpha/data/testsed_simha.cat',
+              'truename':os.getenv('APPS')+'/prospector_alpha/data/testsed_simha.dat',
               'objname':'9',
               }
 

@@ -20,7 +20,7 @@ jansky_mks = 1e-26
 
 run_params = {'verbose':True,
               'debug': False,
-              'outfile': os.getenv('APPS')+'/threedhst_bsfh/results/nick/nick',
+              'outfile': os.getenv('APPS')+'/prospector_alpha/results/nick/nick',
               'nofork': True,
               # Optimizer params
               'ftol':0.5e-5, 
@@ -43,7 +43,7 @@ run_params = {'verbose':True,
               'interp_type': 'logarithmic',
               'agelims': [0.0,8.0,8.5,9.0,9.3,9.6,10.0],
               # Data info
-              'photname':os.getenv('APPS')+'/threedhst_bsfh//data/nick/40416-prospector.cat',
+              'photname':os.getenv('APPS')+'/prospector_alpha//data/nick/40416-prospector.cat',
               'objname':'40416',
               }
 run_params['outfile'] = run_params['outfile']+'_'+run_params['objname']

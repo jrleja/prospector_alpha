@@ -151,7 +151,7 @@ def do_all(runname='brownseds_np',alldata=None,outfolder=None):
 
 	#### make output folder if necessary
 	if outfolder is None:
-		outfolder = os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/pcomp/'
+		outfolder = os.getenv('APPS')+'/prospector_alpha/plots/'+runname+'/pcomp/'
 		if not os.path.isdir(outfolder):
 			os.makedirs(outfolder)
 

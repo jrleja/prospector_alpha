@@ -10,11 +10,11 @@ def uv_ir_sfrs():
 	# INTERPOLATED METALLICITY
 	# setup stellar populations
 	sps = fsps.StellarPopulation(zcontinuous=1, compute_vega_mags=False)
-	custom_filter_keys = os.getenv('APPS')+'/threedhst_bsfh/filters/filter_keys_threedhst.txt'
+	custom_filter_keys = os.getenv('APPS')+'/prospector_alpha/filters/filter_keys_threedhst.txt'
 	fsps.filters.FILTERS = model_setup.custom_filter_dict(custom_filter_keys)
 
 	# load custom model
-	param_file=os.getenv('APPS')+'/threedhst_bsfh/parameter_files/dtau_nebon/dtau_nebon_params.py'
+	param_file=os.getenv('APPS')+'/prospector_alpha/parameter_files/dtau_nebon/dtau_nebon_params.py'
 	model = model_setup.load_model(param_file=param_file, sps=sps)
 	obs = model_setup.load_obs(param_file=param_file)
 
@@ -70,7 +70,7 @@ def uv_ir_sfrs():
 	ax.set_xlabel(r'log($\lambda$) [$\AA$]')
 	ax.set_ylabel(r'log($\nu f_{\nu}$)')
 
-	outname=os.getenv('APPS')+'/threedhst_bsfh/tests/testfigs/uv_ir_sfrs.png'
+	outname=os.getenv('APPS')+'/prospector_alpha/tests/testfigs/uv_ir_sfrs.png'
 	plt.savefig(outname, bbox_inches='tight',dpi=200)
 	plt.close()
 	os.system('open '+outname)
@@ -80,11 +80,11 @@ def uv_ir_sfrs():
 	# INTERPOLATED METALLICITY
 	# setup stellar populations
 	sps = fsps.StellarPopulation(zcontinuous=1, compute_vega_mags=False)
-	custom_filter_keys = os.getenv('APPS')+'/threedhst_bsfh/filters/filter_keys_threedhst.txt'
+	custom_filter_keys = os.getenv('APPS')+'/prospector_alpha/filters/filter_keys_threedhst.txt'
 	fsps.filters.FILTERS = model_setup.custom_filter_dict(custom_filter_keys)
 
 	# load custom model
-	param_file=os.getenv('APPS')+'/threedhst_bsfh/parameter_files/dtau_nebon/dtau_nebon_params.py'
+	param_file=os.getenv('APPS')+'/prospector_alpha/parameter_files/dtau_nebon/dtau_nebon_params.py'
 	model = model_setup.load_model(param_file=param_file, sps=sps)
 	obs = model_setup.load_obs(param_file=param_file)
 
@@ -123,7 +123,7 @@ def uv_ir_sfrs():
 
 	ax.axis([3,8,0.5,5.5])
 
-	outname=os.getenv('APPS')+'/threedhst_bsfh/tests/testfigs/duston_dustoff.png'
+	outname=os.getenv('APPS')+'/prospector_alpha/tests/testfigs/duston_dustoff.png'
 	plt.savefig(outname, bbox_inches='tight',dpi=200)
 	plt.close()
 	os.system('open '+outname)

@@ -3,7 +3,7 @@ import numpy as np
 
 APPS = os.getenv('APPS')
 
-def generate_resp_curves_from_photometry_file(photfile=APPS+'/threedhst_bsfh/data/3dhst/COSMOS_td_massive.cat',
+def generate_resp_curves_from_photometry_file(photfile=APPS+'/prospector_alpha/data/3dhst/COSMOS_td_massive.cat',
 	                                          outfolder=APPS+'/sedpy/sedpy/data/filters'):
 
 	'''
@@ -48,7 +48,7 @@ def generate_resp_curves_from_photometry_file(photfile=APPS+'/threedhst_bsfh/dat
 
 def read_translate(field):
 	
-	trans_filename=os.getenv('APPS')+'/threedhst_bsfh/filters/translate/'+field.lower()+"_3dhst.v4.1.translate"
+	trans_filename=os.getenv('APPS')+'/prospector_alpha/filters/translate/'+field.lower()+"_3dhst.v4.1.translate"
 	dat = np.loadtxt(trans_filename, dtype=np.dtype('|S16'))
 	
 	return dat
@@ -60,7 +60,7 @@ def read_threedhst_filters(filtnum):
 		print "ERROR"
 		sys.exit()
 		
-	filter_response_curve = APPS+'/threedhst_bsfh/filters/FILTER.RES.latest'
+	filter_response_curve = APPS+'/prospector_alpha/filters/FILTER.RES.latest'
 
 	# initialize output arrays
 	lam,res = (np.zeros(0) for i in range(2))

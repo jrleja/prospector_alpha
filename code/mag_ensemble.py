@@ -1156,7 +1156,7 @@ def fmt_emline_info(alldata,add_abs_err = False):
     ##### INCLINATION
     # match to local galaxies
     # full catalog in a .fits format is also available in same directory
-    inc_fldr = '/Users/joel/code/python/threedhst_bsfh/data/brownseds_data/inclination/'
+    inc_fldr = '/Users/joel/code/python/prospector_alpha/data/brownseds_data/inclination/'
     inc = np.loadtxt(inc_fldr+'moustakas06_inclination.dat', {'names':('name','inclination'), 'formats':('S20','f16')},comments='#')
     inclination = np.zeros(ngals)
     for kk, dat in enumerate(alldata):
@@ -1458,7 +1458,7 @@ def bpt_diagram(e_pinfo,hflag,outname=None):
     bpt_flag_idx[agn] = 'AGN'
     bpt_flag[:] = 'None'
     bpt_flag[keep_idx] = bpt_flag_idx
-    pickle.dump(bpt_flag,open(os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/joel_bpt.pickle', "wb"))
+    pickle.dump(bpt_flag,open(os.getenv('APPS')+'/prospector_alpha/data/brownseds_data/photometry/joel_bpt.pickle', "wb"))
 
     ax1[0].text(0.04,0.1, r'S/N (H$\alpha$,H$\beta$,[OIII],[NII]) > '+str(int(e_pinfo['obs']['sn_cut'])), transform = ax1[0].transAxes,horizontalalignment='left')
     ax1[0].set_xlabel(r'log([NII 6583]/H$_{\alpha}$) [observed]')
@@ -1676,7 +1676,7 @@ def fit_and_save(met,ha_ratio):
 
     z = np.polyfit(fit_met, fit_ha_ratio, 7)
 
-    outloc = '/Users/joel/code/python/threedhst_bsfh/data/pickles/ha_ratio.pickle'
+    outloc = '/Users/joel/code/python/prospector_alpha/data/pickles/ha_ratio.pickle'
     pickle.dump(z,open(outloc, "wb"))
 
 def bdec_corr_eqn(x, hdel_eqw_obs, hdel_eqw_model,
@@ -2854,7 +2854,7 @@ def plot_emline_comp(alldata,outfolder,hflag):
     '''
     #### CHECKING DIFFERENT WAYS TO REPRODUCE VISUAL CLASSIFICATION
     #### FOR HDELTA INDEX
-    index_flags = np.loadtxt('/Users/joel/code/python/threedhst_bsfh/data/brownseds_data/hdelta_index.txt',
+    index_flags = np.loadtxt('/Users/joel/code/python/prospector_alpha/data/brownseds_data/hdelta_index.txt',
                              dtype = {'names':('name','flag'),'formats':('S40','i4')})
     halftime, flag = [], []
     sfrfrac = np.zeros(shape=(129,6))
@@ -3118,7 +3118,7 @@ def plot_relationships(alldata,outfolder):
     # shape: mass q50 q16 q84
     # IMF is probably Kroupa, though not stated in paper
     # must add correction...
-    massmet = np.loadtxt(os.getenv('APPS')+'/threedhst_bsfh/data/gallazzi_05_massmet.txt')
+    massmet = np.loadtxt(os.getenv('APPS')+'/prospector_alpha/data/gallazzi_05_massmet.txt')
 
     mz.plot(massmet[:,0], massmet[:,1],
                   color='green',

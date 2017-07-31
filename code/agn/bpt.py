@@ -69,7 +69,7 @@ def plot_bpt(agn_evidence,runname='brownseds_agn',alldata=None,outfolder=None,id
 
     #### make output folder if necessary
     if outfolder is None:
-        outfolder = os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/agn_plots/'
+        outfolder = os.getenv('APPS')+'/prospector_alpha/plots/'+runname+'/agn_plots/'
         if not os.path.isdir(outfolder):
             os.makedirs(outfolder)
 

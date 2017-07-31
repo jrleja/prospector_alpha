@@ -11,7 +11,7 @@ mpl.rc('text', usetex=True)
 mpl.rcParams['text.latex.preamble']=[r"\usepackage{bm}"]
 mpl.rcParams.update({'font.size': 18})
 
-param_file = os.getenv('APPS') + '/threedhst_bsfh/parameter_files/brownseds_tightbc/brownseds_tightbc_params_1.py'
+param_file = os.getenv('APPS') + '/prospector_alpha/parameter_files/brownseds_tightbc/brownseds_tightbc_params_1.py'
 
 model = model_setup.load_model(param_file)
 model.params['zred'] = np.atleast_1d(0.0)

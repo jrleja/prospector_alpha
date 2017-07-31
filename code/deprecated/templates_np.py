@@ -43,7 +43,7 @@ majorFormatter = jLogFormatter(base=10, labelOnlyBase=True)
 def main():
 
 	#### information
-	param_file = '/Users/joel/code/python/threedhst_bsfh/parameter_files/np_mocks/np_mocks_params.py'
+	param_file = '/Users/joel/code/python/prospector_alpha/parameter_files/np_mocks/np_mocks_params.py'
 	labels = ['0 Myr-100 Myr','100 Myr-300 Myr', '300 Myr-1 Gyr','1 Gyr-3 Gyr','3 Gyr-6 Gyr','6 Gyr-13.6 Gyr']
 	y_offsets = [0.68,0.1,-0.2,-0.35,-1.1,-1.45]
 	x_offsets = [-.03,-0.02,-.05,-.09,.3,0.2]

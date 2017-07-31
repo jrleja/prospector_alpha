@@ -64,7 +64,7 @@ def make_plot():
     #### open figure
     itheta = copy.deepcopy(model.initial_theta)
     fig, ax = plt.subplots(1,2,figsize=(10,5))
-    outname = '/Users/joel/code/python/threedhst_bsfh/plots/brownseds_agn/agn_plots/AGN_parameters.png'
+    outname = '/Users/joel/code/python/prospector_alpha/plots/brownseds_agn/agn_plots/AGN_parameters.png'
 
     #### find indexes
     pnames = np.array(model.theta_labels())

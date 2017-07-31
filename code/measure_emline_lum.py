@@ -262,7 +262,7 @@ def measure(sample_results, extra_output, obs_spec, sps, runname='brownseds_np',
 
     #### output names
     objname_short = sample_results['run_params']['objname'].replace(' ','_')
-    base = '/Users/joel/code/python/threedhst_bsfh/plots/'+runname+'/magphys/line_fits/'
+    base = '/Users/joel/code/python/prospector_alpha/plots/'+runname+'/magphys/line_fits/'
     if not os.path.isdir(base):
         os.makedirs(base)
     out_em = base+objname_short+'_em_prosp.png'

@@ -58,7 +58,7 @@ nsamp = 15
 cmap = get_cmap(nsamp)
 
 ### load shit
-param_file = '/Users/joel/code/python/threedhst_bsfh/parameter_files/np_mocks_smooth/np_mocks_smooth_params.py'
+param_file = '/Users/joel/code/python/prospector_alpha/parameter_files/np_mocks_smooth/np_mocks_smooth_params.py'
 run_params = model_setup.get_run_params(param_file=param_file)
 sps = model_setup.load_sps(**run_params)
 

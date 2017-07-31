@@ -65,11 +65,11 @@ def main(control=False):
 
 	# setup stellar populations
 	sps = fsps.StellarPopulation(zcontinuous=1, compute_vega_mags=False)
-	custom_filter_keys = os.getenv('APPS')+'/threedhst_bsfh/filters/filter_keys_threedhst.txt'
+	custom_filter_keys = os.getenv('APPS')+'/prospector_alpha/filters/filter_keys_threedhst.txt'
 	fsps.filters.FILTERS = model_setup.custom_filter_dict(custom_filter_keys)
 
 	# load model
-	pfile = '/Users/joel/code/python/threedhst_bsfh/parameter_files/fast_mimic/fast_mimic.py'
+	pfile = '/Users/joel/code/python/prospector_alpha/parameter_files/fast_mimic/fast_mimic.py'
 	model = model_setup.load_model(param_file=pfile)
 	parnames = np.array(model.theta_labels())
 
@@ -84,7 +84,7 @@ def main(control=False):
 		phot.append(photcat[index])
 
 	# set up filters
-	keys = np.loadtxt(os.getenv('APPS')+'/threedhst_bsfh/filters/filter_keys_threedhst.txt', dtype='S20',usecols=[1])
+	keys = np.loadtxt(os.getenv('APPS')+'/prospector_alpha/filters/filter_keys_threedhst.txt', dtype='S20',usecols=[1])
 	filterlist = [x for x in keys if x[-7:] == 'GOODS-S']
 	obs = {'filters':filterlist,'wavelength':None}
 	lamefflist = [x.lower() for x in filterlist]

@@ -62,7 +62,7 @@ def plot_comparison(runname='brownseds_agn',runname_noagn='brownseds_np',alldata
 
     #### make output folder if necessary
     if outfolder is None:
-        outfolder = os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/agn_plots/'
+        outfolder = os.getenv('APPS')+'/prospector_alpha/plots/'+runname+'/agn_plots/'
         if not os.path.isdir(outfolder):
             os.makedirs(outfolder)
     
@@ -123,7 +123,7 @@ def plot_massmet(pdata,plt_idx,**popts):
         new = (mass_agn[plt_idx][ii],pdata['agn']['logzsol']['q50'][plt_idx[ii]])
         drawArrow(old,new,ax)
 
-    massmet = np.loadtxt(os.getenv('APPS')+'/threedhst_bsfh/data/gallazzi_05_massmet.txt')
+    massmet = np.loadtxt(os.getenv('APPS')+'/prospector_alpha/data/gallazzi_05_massmet.txt')
     lw = 2.5
     color = 'green'
     ax.plot(massmet[:,0], massmet[:,1],

@@ -42,14 +42,14 @@ def norm_resid(fit,truth):
 
 def make_plots(runname='nonparametric_mocks', recollate_data = False):
 
-	outpickle = os.getenv('APPS')+'/threedhst_bsfh/data/'+runname+'_extradat.pickle'
+	outpickle = os.getenv('APPS')+'/prospector_alpha/data/'+runname+'_extradat.pickle'
 	if not os.path.isfile(outpickle) or recollate_data == True:
 		alldata = collate_data(runname=runname,outpickle=outpickle)
 	else:
 		with open(outpickle, "rb") as f:
 			alldata=pickle.load(f)
 
-	outfolder = os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/paper_plots/'
+	outfolder = os.getenv('APPS')+'/prospector_alpha/plots/'+runname+'/paper_plots/'
 	if not os.path.exists(outfolder):
 		os.makedirs(outfolder)
 

@@ -37,7 +37,7 @@ def construct_mocks(basename,outname=None,add_zp_err=False, plot_mock=False):
 	'''
 
 	#### output names ####
-	outname = '/Users/joel/code/python/threedhst_bsfh/data/'+basename
+	outname = '/Users/joel/code/python/prospector_alpha/data/'+basename
 
 	#### basic parameters ####
 	noise               = 0.05            # perturb fluxes

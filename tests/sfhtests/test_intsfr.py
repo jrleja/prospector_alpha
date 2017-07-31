@@ -6,8 +6,8 @@ import prosp_dutils
 if __name__ == "__main__":
 
     # load model,sps 
-    #model = model_setup.load_model('/Users/joel/code/python/threedhst_bsfh/parameter_files/testsed_simha/testsed_simha_params.py')
-    model = model_setup.load_model('/Users/joel/code/python/threedhst_bsfh/parameter_files/testsed_simha/testsed_simha_params_2.py')
+    #model = model_setup.load_model('/Users/joel/code/python/prospector_alpha/parameter_files/testsed_simha/testsed_simha_params.py')
+    model = model_setup.load_model('/Users/joel/code/python/prospector_alpha/parameter_files/testsed_simha/testsed_simha_params_2.py')
     sps   = prosp_dutils.setup_sps(zcontinuous=2,compute_vega_magnitudes=False)
 
     # custom-set parameters
@@ -88,8 +88,8 @@ if __name__ == "__main__":
 def test_sfh5():
 
     # load model,sps 
-    model = model_setup.load_model('/Users/joel/code/python/threedhst_bsfh/parameter_files/testsed_simha/testsed_simha_params.py')
-    #model = model_setup.load_model('/Users/joel/code/python/threedhst_bsfh/parameter_files/testsed_nonoise_fastgen/testsed_nonoise_fastgen_params.py')
+    model = model_setup.load_model('/Users/joel/code/python/prospector_alpha/parameter_files/testsed_simha/testsed_simha_params.py')
+    #model = model_setup.load_model('/Users/joel/code/python/prospector_alpha/parameter_files/testsed_nonoise_fastgen/testsed_nonoise_fastgen_params.py')
     sps   = prosp_dutils.setup_sps(zcontinuous=2,compute_vega_magnitudes=False)
 
     # custom-set parameters

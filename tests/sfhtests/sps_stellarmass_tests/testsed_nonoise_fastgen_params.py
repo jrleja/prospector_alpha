@@ -12,7 +12,7 @@ logarithmic = priors.logarithmic
 #############
 
 run_params = {'verbose':True,
-              'outfile':'/threedhst_bsfh/results/testsed_nonoise_fastgen/testsed_nonoise_fastgen',
+              'outfile':'/prospector_alpha/results/testsed_nonoise_fastgen/testsed_nonoise_fastgen',
               'ftol':0.5e-5, 
               'maxfev':5000,
               'nwalkers':496,
@@ -29,8 +29,8 @@ run_params = {'verbose':True,
               'abs_error': False,
               'spec': False, 
               'phot':True,
-              'photname':'/threedhst_bsfh/data/testsed_nonoise_fast.cat',
-              'truename':'/threedhst_bsfh/data/testsed_nonoise_fast.dat',
+              'photname':'/prospector_alpha/data/testsed_nonoise_fast.cat',
+              'truename':'/prospector_alpha/data/testsed_nonoise_fast.dat',
               'objname':'1',
               }
 

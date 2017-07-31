@@ -15,7 +15,7 @@ APPS = os.getenv('APPS')
 
 run_params = {'verbose':True,
               'debug': False,
-              'outfile': APPS+'/threedhst_bsfh/results/fast_mimic/AEGIS_531',
+              'outfile': APPS+'/prospector_alpha/results/fast_mimic/AEGIS_531',
               'nofork': True,
               # Optimizer params
               'ftol':0.5e-5, 
@@ -37,7 +37,7 @@ run_params = {'verbose':True,
               'initial_disp':0.1,
               'interp_type': 'logarithmic',
               # Data info (phot = .cat, dat = .dat, fast = .fout)
-              'datdir':APPS+'/threedhst_bsfh/data/3dhst/',
+              'datdir':APPS+'/prospector_alpha/data/3dhst/',
               'runname': 'fast_mimic',
               'objname':'AEGIS_531'
               }

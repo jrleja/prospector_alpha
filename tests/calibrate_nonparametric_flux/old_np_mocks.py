@@ -14,7 +14,7 @@ logarithmic = priors.logarithmic
 
 run_params = {'verbose':True,
               'debug': False,
-              'outfile': os.getenv('APPS')+'/threedhst_bsfh/results/nonparametric_mocks/nonparametric_mocks',
+              'outfile': os.getenv('APPS')+'/prospector_alpha/results/nonparametric_mocks/nonparametric_mocks',
               'nofork': True,
               # Optimizer params
               'ftol':0.5e-5, 
@@ -30,8 +30,8 @@ run_params = {'verbose':True,
               'interp_type': 'logarithmic',
               'agelims': [0.0,7.0,8.0,8.5,9.0,9.5,10.0],
               # Data info
-              'photname':os.getenv('APPS')+'/threedhst_bsfh/data/nonparametric_mocks.cat',
-              'truename':os.getenv('APPS')+'/threedhst_bsfh/data/nonparametric_mocks.dat',
+              'photname':os.getenv('APPS')+'/prospector_alpha/data/nonparametric_mocks.cat',
+              'truename':os.getenv('APPS')+'/prospector_alpha/data/nonparametric_mocks.dat',
               'objname':'1'
               }
 run_params['outfile'] = run_params['outfile']+'_'+run_params['objname']

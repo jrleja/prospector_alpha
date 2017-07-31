@@ -68,7 +68,7 @@ def plot():
     ax.set_xlim(0.04,150)
     ax.set_ylim(1e-3,1.5)
 
-    outname = '/Users/joel/code/python/threedhst_bsfh/plots/brownseds_agn/agn_plots/agn_templates.png'
+    outname = '/Users/joel/code/python/prospector_alpha/plots/brownseds_agn/agn_plots/agn_templates.png'
     plt.tight_layout()
     plt.savefig(outname,dpi=150)
     import os

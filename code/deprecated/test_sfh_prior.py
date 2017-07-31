@@ -7,7 +7,7 @@ from copy import copy
 
 def plot_all(recollate_idp=False,recollate_dir=False):
 
-	outfolder = '/Users/joel/code/python/threedhst_bsfh/results/prior_test/'
+	outfolder = '/Users/joel/code/python/prospector_alpha/results/prior_test/'
 	mcmc_filename = outfolder+'prior_test_dp_mcmc'
 	model_filename = outfolder+'prior_test_dp_model'
 	sample_results, powell_results, model = read_results.read_pickles(mcmc_filename, model_file=model_filename,inmod=None)

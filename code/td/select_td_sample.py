@@ -51,11 +51,11 @@ def build_massive_sample(rm_zp_offsets=True):
 	### output
 	fields = ['AEGIS','COSMOS','GOODSN','GOODSS','UDS']
 	basename = 'td_massive'
-	id_str_out = '/Users/joel/code/python/threedhst_bsfh/data/3dhst/'+basename+'.ids'
+	id_str_out = '/Users/joel/code/python/prospector_alpha/data/3dhst/'+basename+'.ids'
 	ids = []
 
 	for field in fields:
-		outbase = '/Users/joel/code/python/threedhst_bsfh/data/3dhst/'+field+'_'+basename
+		outbase = '/Users/joel/code/python/prospector_alpha/data/3dhst/'+field+'_'+basename
 		fast_str_out = outbase+'.fout'
 		ancil_str_out = outbase+'.dat'
 		phot_str_out = outbase+'.cat'
@@ -122,10 +122,10 @@ def build_sample_onekrun(rm_zp_offsets=True):
 	# output
 	field = 'COSMOS'
 	basename = 'onek'
-	fast_str_out = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_'+basename+'.fout'
-	ancil_str_out = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_'+basename+'.dat'
-	phot_str_out = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_'+basename+'.cat'
-	id_str_out   = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_'+basename+'.ids'
+	fast_str_out = '/Users/joel/code/python/prospector_alpha/data/'+field+'_'+basename+'.fout'
+	ancil_str_out = '/Users/joel/code/python/prospector_alpha/data/'+field+'_'+basename+'.dat'
+	phot_str_out = '/Users/joel/code/python/prospector_alpha/data/'+field+'_'+basename+'.cat'
+	id_str_out   = '/Users/joel/code/python/prospector_alpha/data/'+field+'_'+basename+'.ids'
 
 	# load data
 	# use grism redshift
@@ -219,10 +219,10 @@ def build_sample_general():
 	# output
 	field = 'COSMOS'
 	basename = 'gensamp'
-	fast_str_out = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_'+basename+'.fout'
-	ancil_str_out = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_'+basename+'.dat'
-	phot_str_out = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_'+basename+'.cat'
-	id_str_out   = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_'+basename+'.ids'
+	fast_str_out = '/Users/joel/code/python/prospector_alpha/data/'+field+'_'+basename+'.fout'
+	ancil_str_out = '/Users/joel/code/python/prospector_alpha/data/'+field+'_'+basename+'.dat'
+	phot_str_out = '/Users/joel/code/python/prospector_alpha/data/'+field+'_'+basename+'.cat'
+	id_str_out   = '/Users/joel/code/python/prospector_alpha/data/'+field+'_'+basename+'.ids'
 
 	# load data
 	# use grism redshift
@@ -230,7 +230,7 @@ def build_sample_general():
 	fast = read_sextractor.load_fast_v41(field)
 	rf = read_sextractor.load_rf_v41(field)
 	lineinfo = load_linelist()
-	mips = prosp_dutils.load_mips_data(os.getenv('APPS')+'/threedhst_bsfh/data/MIPS/cosmos_3dhst.v4.1.4.sfr')
+	mips = prosp_dutils.load_mips_data(os.getenv('APPS')+'/prospector_alpha/data/MIPS/cosmos_3dhst.v4.1.4.sfr')
 	
 	# remove junk
 	# 153, 155, 161 are U, V, J
@@ -308,16 +308,16 @@ def build_sample_halpha(rm_zp_offsets=True):
 	# output
 	field = 'COSMOS'
 	basename = 'testsamp'
-	fast_str_out = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_'+basename+'.fout'
-	ancil_str_out = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_'+basename+'.dat'
-	phot_str_out = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_'+basename+'.cat'
-	id_str_out   = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_'+basename+'.ids'
+	fast_str_out = '/Users/joel/code/python/prospector_alpha/data/'+field+'_'+basename+'.fout'
+	ancil_str_out = '/Users/joel/code/python/prospector_alpha/data/'+field+'_'+basename+'.dat'
+	phot_str_out = '/Users/joel/code/python/prospector_alpha/data/'+field+'_'+basename+'.cat'
+	id_str_out   = '/Users/joel/code/python/prospector_alpha/data/'+field+'_'+basename+'.ids'
 
 	if rm_zp_offsets:
-		fast_str_out = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_'+basename+'_zp.fout'
-		ancil_str_out = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_'+basename+'_zp.dat'
-		phot_str_out = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_'+basename+'_zp.cat'
-		id_str_out   = '/Users/joel/code/python/threedhst_bsfh/data/'+field+'_'+basename+'_zp.ids'
+		fast_str_out = '/Users/joel/code/python/prospector_alpha/data/'+field+'_'+basename+'_zp.fout'
+		ancil_str_out = '/Users/joel/code/python/prospector_alpha/data/'+field+'_'+basename+'_zp.dat'
+		phot_str_out = '/Users/joel/code/python/prospector_alpha/data/'+field+'_'+basename+'_zp.cat'
+		id_str_out   = '/Users/joel/code/python/prospector_alpha/data/'+field+'_'+basename+'_zp.ids'
 
 	# load data
 	# use grism redshift
@@ -325,7 +325,7 @@ def build_sample_halpha(rm_zp_offsets=True):
 	fast = read_sextractor.load_fast_v41(field)
 	rf = read_sextractor.load_rf_v41(field)
 	lineinfo = load_linelist()
-	mips = prosp_dutils.load_mips_data(os.getenv('APPS')+'/threedhst_bsfh/data/MIPS/cosmos_3dhst.v4.1.4.sfr')
+	mips = prosp_dutils.load_mips_data(os.getenv('APPS')+'/prospector_alpha/data/MIPS/cosmos_3dhst.v4.1.4.sfr')
 	
 	# remove junk
 	# 153, 155, 161 are U, V, J
@@ -417,7 +417,7 @@ def build_sample_halpha(rm_zp_offsets=True):
 
 def load_rachel_sample():
 
-	loc = os.getenv('APPS')+'/threedhst_bsfh/data/bezanson_2015_disps.txt'
+	loc = os.getenv('APPS')+'/prospector_alpha/data/bezanson_2015_disps.txt'
 	data = ascii.read(loc,format='cds') 
 	return data
 
@@ -447,10 +447,10 @@ def build_sample_dynamics():
 	field = ['COSMOS','UDS']
 	bez = load_rachel_sample()
 
-	fast_str_out = '/Users/joel/code/python/threedhst_bsfh/data/twofield_dynsamp.fout'
-	ancil_str_out = '/Users/joel/code/python/threedhst_bsfh/data/twofield_dynsamp.dat'
-	phot_str_out = '/Users/joel/code/python/threedhst_bsfh/data/twofield_dynsamp.cat'
-	id_str_out   = '/Users/joel/code/python/threedhst_bsfh/data/twofield_dynsamp.ids'
+	fast_str_out = '/Users/joel/code/python/prospector_alpha/data/twofield_dynsamp.fout'
+	ancil_str_out = '/Users/joel/code/python/prospector_alpha/data/twofield_dynsamp.dat'
+	phot_str_out = '/Users/joel/code/python/prospector_alpha/data/twofield_dynsamp.cat'
+	id_str_out   = '/Users/joel/code/python/prospector_alpha/data/twofield_dynsamp.ids'
 
 	for bb in xrange(len(field)):
 
@@ -463,7 +463,7 @@ def build_sample_dynamics():
 
 		# do this properly... not just COSMOS
 		lineinfo = Table(load_linelist(field=field[bb]))
-		mips = Table(prosp_dutils.load_mips_data(os.getenv('APPS')+'/threedhst_bsfh/data/MIPS/'+field[bb].lower()+'_3dhst.v4.1.4.sfr'))
+		mips = Table(prosp_dutils.load_mips_data(os.getenv('APPS')+'/prospector_alpha/data/MIPS/'+field[bb].lower()+'_3dhst.v4.1.4.sfr'))
 		
 		# remove phot_flag=0
 		good = phot['use_phot'] == 1

@@ -396,7 +396,7 @@ def post_processing(param_name, outname=None, **kwargs):
     if outname is None:
         parmfile = model_setup.import_module_from_file(param_name)
         outname = parmfile.run_params['outfile']
-    outfolder = os.getenv('APPS')+'/threedhst_bsfh/plots/'+outname.split('/')[-2]+'/'
+    outfolder = os.getenv('APPS')+'/prospector_alpha/plots/'+outname.split('/')[-2]+'/'
 
     # check for output folder, create if necessary
     if not os.path.isdir(outfolder):

@@ -95,7 +95,7 @@ def plot_mir_colors(runname='brownseds_agn',alldata=None,outfolder=None, vega=Tr
 
     #### make output folder if necessary
     if outfolder is None:
-        outfolder = os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/agn_plots/'
+        outfolder = os.getenv('APPS')+'/prospector_alpha/plots/'+runname+'/agn_plots/'
         if not os.path.isdir(outfolder):
             os.makedirs(outfolder)
 
@@ -344,7 +344,7 @@ def load_dl07_models(outfolder=None,string=''):
 
     return outdict
 
-def generate_dl07_models(outfolder='/Users/joel/code/python/threedhst_bsfh/plots/brownseds_agn/agn_plots/',string=None):
+def generate_dl07_models(outfolder='/Users/joel/code/python/prospector_alpha/plots/brownseds_agn/agn_plots/',string=None):
 
     import bseds_test as nonparam
 

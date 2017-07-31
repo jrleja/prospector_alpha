@@ -19,7 +19,7 @@ jansky_mks = 1e-26
 APPS = os.getenv('APPS')
 run_params = {'verbose':True,
               'debug': False,
-              'outfile': APPS+'/threedhst_bsfh/results/camilla/camilla',
+              'outfile': APPS+'/prospector_alpha/results/camilla/camilla',
               'nofork': True,
               # Optimizer params
               'ftol':0.5e-5, 
@@ -42,7 +42,7 @@ run_params = {'verbose':True,
               'interp_type': 'logarithmic',
               'agelims': [0.0,8.0,8.5,9.0,9.5,9.8],
               # Data info (phot = .cat, dat = .dat, fast = .fout)
-              'datname':APPS+'/threedhst_bsfh/data/CANDELS_2objects.dat',
+              'datname':APPS+'/prospector_alpha/data/CANDELS_2objects.dat',
               'objname': '3767'
               }
 run_params['outfile'] = run_params['outfile']+'_'+run_params['objname']

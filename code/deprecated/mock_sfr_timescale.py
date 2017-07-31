@@ -38,14 +38,14 @@ def gaussian(x, mu, sig):
 
 def make_plots(runname='ha_80myr', recollate_data = False):
 
-	outpickle = '/Users/joel/code/python/threedhst_bsfh/data/'+runname+'_extradat.pickle'
+	outpickle = '/Users/joel/code/python/prospector_alpha/data/'+runname+'_extradat.pickle'
 	if not os.path.isfile(outpickle) or recollate_data == True:
 		alldata = collate_data(runname=runname,outpickle=outpickle)
 	else:
 		with open(outpickle, "rb") as f:
 			alldata=pickle.load(f)
 
-	outfolder = '/Users/joel/code/python/threedhst_bsfh/plots/'+runname+'/paper_plots/'
+	outfolder = '/Users/joel/code/python/prospector_alpha/plots/'+runname+'/paper_plots/'
 	if not os.path.exists(outfolder):
 		os.makedirs(outfolder)
 

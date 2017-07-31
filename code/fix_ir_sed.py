@@ -13,11 +13,11 @@ pc = 3.085677581467192e18  # in cm
 dfactor_10pc = 4*np.pi*(10*pc)**2
 to_ergs = 3631e-23
 
-dale_helou_txt = '/Users/joel/code/python/threedhst_bsfh/data/MIPS/dale_helou.txt'
+dale_helou_txt = '/Users/joel/code/python/prospector_alpha/data/MIPS/dale_helou.txt'
 with open(dale_helou_txt, 'r') as f: hdr = f.readline().split()[1:]
 conversion = np.loadtxt(dale_helou_txt, comments = '#', dtype = np.dtype([(n, np.float) for n in hdr]))
 
-outdir = '/Users/joel/code/python/threedhst_bsfh/tests/irsed/'
+outdir = '/Users/joel/code/python/prospector_alpha/tests/irsed/'
 
 def dl07_to_dh02():
 

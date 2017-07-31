@@ -13,7 +13,7 @@ def simha_sfh_test():
 	sps = prosp_dutils.setup_sps(zcontinuous=2)
 
 	# load custom model
-	param_file=os.getenv('APPS')+'/threedhst_bsfh/parameter_files/testsed_simha/testsed_simha_params.py'
+	param_file=os.getenv('APPS')+'/prospector_alpha/parameter_files/testsed_simha/testsed_simha_params.py'
 	model = model_setup.load_model(param_file=param_file, sps=sps)
 	obs = model_setup.load_obs(param_file=param_file)
 
@@ -90,7 +90,7 @@ def simha_sfh_test():
 	ax[1].set_xlabel(r'log($\lambda$) [$\AA$]')
 	ax[1].set_ylabel(r'log($\nu f_{\nu}$)')
 
-	outname=os.getenv('APPS')+'/threedhst_bsfh/tests/testfigs/simha_sfh_test.png'
+	outname=os.getenv('APPS')+'/prospector_alpha/tests/testfigs/simha_sfh_test.png'
 	plt.savefig(outname, bbox_inches='tight',dpi=500)
 	plt.close()
 	os.system('open '+outname)
@@ -101,11 +101,11 @@ def new_metals_test():
 	
 	# setup stellar populations
 	sps = fsps.StellarPopulation(zcontinuous=2, compute_vega_mags=False)
-	custom_filter_keys = os.getenv('APPS')+'/threedhst_bsfh/filters/filter_keys_threedhst.txt'
+	custom_filter_keys = os.getenv('APPS')+'/prospector_alpha/filters/filter_keys_threedhst.txt'
 	fsps.filters.FILTERS = model_setup.custom_filter_dict(custom_filter_keys)
 
 	# load custom model
-	param_file=os.getenv('APPS')+'/threedhst_bsfh/parameter_files/testsed_nonoise_fast/testsed_nonoise_fast_params.py'
+	param_file=os.getenv('APPS')+'/prospector_alpha/parameter_files/testsed_nonoise_fast/testsed_nonoise_fast_params.py'
 	model = model_setup.load_model(param_file=param_file, sps=sps)
 	obs = model_setup.load_obs(param_file=param_file)
 	
@@ -144,7 +144,7 @@ def new_metals_test():
 	ax.set_xlabel(r'log($\lambda$) [$\AA$]')
 	ax.set_ylabel(r'log($\nu f_{\nu}$)')
 
-	outname=os.getenv('APPS')+'/threedhst_bsfh/tests/testfigs/new_metals.png'
+	outname=os.getenv('APPS')+'/prospector_alpha/tests/testfigs/new_metals.png'
 	plt.savefig(outname, bbox_inches='tight',dpi=500)
 	plt.close()
 	os.system('open '+outname)
@@ -154,11 +154,11 @@ def interp_metals():
 	# INTERPOLATED METALLICITY
 	# setup stellar populations
 	sps = fsps.StellarPopulation(zcontinuous=1, compute_vega_mags=False)
-	custom_filter_keys = os.getenv('APPS')+'/threedhst_bsfh/filters/filter_keys_threedhst.txt'
+	custom_filter_keys = os.getenv('APPS')+'/prospector_alpha/filters/filter_keys_threedhst.txt'
 	fsps.filters.FILTERS = model_setup.custom_filter_dict(custom_filter_keys)
 
 	# load custom model
-	param_file=os.getenv('APPS')+'/threedhst_bsfh/parameter_files/dtau_nebon/dtau_nebon_params.py'
+	param_file=os.getenv('APPS')+'/prospector_alpha/parameter_files/dtau_nebon/dtau_nebon_params.py'
 	model = model_setup.load_model(param_file=param_file, sps=sps)
 	obs = model_setup.load_obs(param_file=param_file)
 
@@ -197,11 +197,11 @@ def interp_metals():
 	# USE PMETALS
 	# setup stellar populations
 	sps = fsps.StellarPopulation(zcontinuous=2, compute_vega_mags=False)
-	custom_filter_keys = os.getenv('APPS')+'/threedhst_bsfh/filters/filter_keys_threedhst.txt'
+	custom_filter_keys = os.getenv('APPS')+'/prospector_alpha/filters/filter_keys_threedhst.txt'
 	fsps.filters.FILTERS = model_setup.custom_filter_dict(custom_filter_keys)
 
 	# load custom model
-	param_file=os.getenv('APPS')+'/threedhst_bsfh/parameter_files/dtau_nebon/dtau_nebon_params.py'
+	param_file=os.getenv('APPS')+'/prospector_alpha/parameter_files/dtau_nebon/dtau_nebon_params.py'
 	model = model_setup.load_model(param_file=param_file, sps=sps)
 	obs = model_setup.load_obs(param_file=param_file)
 
@@ -232,7 +232,7 @@ def interp_metals():
 	ax.set_xlabel(r'log($\lambda$) [$\AA$]')
 	ax.set_ylabel(r'log($\nu f_{\nu}$)')
 
-	outname=os.getenv('APPS')+'/threedhst_bsfh/tests/testfigs/interp_metals.png'
+	outname=os.getenv('APPS')+'/prospector_alpha/tests/testfigs/interp_metals.png'
 	plt.savefig(outname, bbox_inches='tight',dpi=500)
 	plt.close()
 	os.system('open '+outname)
@@ -243,11 +243,11 @@ def test_metals():
 	
 	# setup stellar populations
 	sps = fsps.StellarPopulation(zcontinuous=2, compute_vega_mags=False)
-	custom_filter_keys = os.getenv('APPS')+'/threedhst_bsfh/filters/filter_keys_threedhst.txt'
+	custom_filter_keys = os.getenv('APPS')+'/prospector_alpha/filters/filter_keys_threedhst.txt'
 	fsps.filters.FILTERS = model_setup.custom_filter_dict(custom_filter_keys)
 
 	# load custom model
-	param_file=os.getenv('APPS')+'/threedhst_bsfh/parameter_files/testsed_nonoise_fast/testsed_nonoise_fast_params.py'
+	param_file=os.getenv('APPS')+'/prospector_alpha/parameter_files/testsed_nonoise_fast/testsed_nonoise_fast_params.py'
 	model = model_setup.load_model(param_file=param_file, sps=sps)
 	obs = model_setup.load_obs(param_file=param_file)
 	
@@ -352,7 +352,7 @@ def test_metals():
 			axarr[itone,ittwo].axis(axlim)
 			axarr[itone,ittwo].text(2.3,6.5, param_fixedname+'='+"{:.2f}".format(param_fixed[kk]),fontsize=8)
 	
-		outname=os.getenv('APPS')+'/threedhst_bsfh/tests/testfigs/mettest_vary_'+param_iterablename[jj]+'.png'
+		outname=os.getenv('APPS')+'/prospector_alpha/tests/testfigs/mettest_vary_'+param_iterablename[jj]+'.png'
 		plt.savefig(outname, bbox_inches='tight',dpi=500)
 		plt.close()
 		os.system('open '+outname)

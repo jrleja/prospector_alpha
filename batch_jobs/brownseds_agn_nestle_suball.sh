@@ -18,9 +18,9 @@
 ### mail
 #SBATCH --mail-type=END
 #SBATCH --mail-user=joel.leja@gmail.com
-IDFILE=$APPS"/threedhst_bsfh/data/brownseds_agn.ids"
+IDFILE=$APPS"/prospector_alpha/data/brownseds_agn.ids"
 OBJID=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$IDFILE")
 python $APPS/bsfh/scripts/prospector_nest.py \
---param_file="$APPS"/threedhst_bsfh/parameter_files/brownseds_agn_nestle/brownseds_agn_nestle_params.py \
+--param_file="$APPS"/prospector_alpha/parameter_files/brownseds_agn_nestle/brownseds_agn_nestle_params.py \
 --objname="$OBJID" \
---outfile="$APPS"/threedhst_bsfh/results/brownseds_agn_nestle/brownseds_agn_nestle_"$OBJID"
+--outfile="$APPS"/prospector_alpha/results/brownseds_agn_nestle/brownseds_agn_nestle_"$OBJID"

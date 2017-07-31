@@ -19,7 +19,7 @@ jansky_mks = 1e-26
 
 run_params = {'verbose':True,
               'debug': False,
-              'outfile': os.getenv('APPS')+'/threedhst_bsfh/results/edo/edo',
+              'outfile': os.getenv('APPS')+'/prospector_alpha/results/edo/edo',
               'nofork': True,
               # Optimizer params
               'ftol':0.5e-5, 
@@ -42,7 +42,7 @@ run_params = {'verbose':True,
               'interp_type': 'logarithmic',
               'agelims': [0.0,8.0,8.5,9.0,9.5,9.8,10.0],
               # Data info
-              'cat':os.getenv('APPS')+'/threedhst_bsfh/data/berger_data.txt',
+              'cat':os.getenv('APPS')+'/prospector_alpha/data/berger_data.txt',
               'objname':'galaxy',
               }
 run_params['outfile'] = run_params['outfile']+'_'+run_params['objname']

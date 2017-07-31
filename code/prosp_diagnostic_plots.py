@@ -620,7 +620,7 @@ def sed_figure(outname = None, truths = None,
     #### add RGB image
     '''
     try:
-        imgname = os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/rgb/'+sresults[0]['run_params']['objname'].replace(' ','_')+'.png'
+        imgname = os.getenv('APPS')+'/prospector_alpha/data/brownseds_data/rgb/'+sresults[0]['run_params']['objname'].replace(' ','_')+'.png'
         import matplotlib.image as mpimg
         img = mpimg.imread(imgname)
         ax_inset2 = fig.add_axes([0.46,0.34,0.15,0.15],zorder=32)
@@ -766,7 +766,7 @@ def add_inset_pdf(extra_output,ax,pars,pnames,text_size=1,lw=1):
 
 def make_all_plots(filebase=None,
                    extra_output=None,
-                   outfolder=os.getenv('APPS')+'/threedhst_bsfh/plots/',
+                   outfolder=os.getenv('APPS')+'/prospector_alpha/plots/',
                    sample_results=None,
                    param_name=None,
                    plt_chain=True,
@@ -846,7 +846,7 @@ def plot_all_driver(runname=None,**extras):
         print 'iteration '+str(jj) 
 
         make_all_plots(filebase=filebase[jj],\
-                       outfolder=os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/',
+                       outfolder=os.getenv('APPS')+'/prospector_alpha/plots/'+runname+'/',
                        param_name=parm_basename[jj],
                        **extras)
     

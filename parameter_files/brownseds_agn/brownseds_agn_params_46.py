@@ -19,7 +19,7 @@ jansky_mks = 1e-26
 
 run_params = {'verbose':True,
               'debug': False,
-              'outfile': os.getenv('APPS')+'/threedhst_bsfh/results/brownseds_agn/brownseds_agn',
+              'outfile': os.getenv('APPS')+'/prospector_alpha/results/brownseds_agn/brownseds_agn',
               'nofork': True,
               # Optimizer params
               'ftol':0.5e-5, 
@@ -42,10 +42,10 @@ run_params = {'verbose':True,
               'interp_type': 'logarithmic',
               'agelims': [0.0,8.0,8.5,9.0,9.5,9.8,10.0],
               # Data info
-              'datname':os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/table1.fits',
-              'photname':os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/table3.txt',
-              'extinctname':os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/table4.fits',
-              'herschname':os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/kingfish.brownapertures.flux.fits',
+              'datname':os.getenv('APPS')+'/prospector_alpha/data/brownseds_data/photometry/table1.fits',
+              'photname':os.getenv('APPS')+'/prospector_alpha/data/brownseds_data/photometry/table3.txt',
+              'extinctname':os.getenv('APPS')+'/prospector_alpha/data/brownseds_data/photometry/table4.fits',
+              'herschname':os.getenv('APPS')+'/prospector_alpha/data/brownseds_data/photometry/kingfish.brownapertures.flux.fits',
               'objname':'NGC 3870',
               }
 run_params['outfile'] = run_params['outfile']+'_'+run_params['objname']

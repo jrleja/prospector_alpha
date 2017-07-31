@@ -18,10 +18,10 @@
 ### mail
 #SBATCH --mail-type=END
 #SBATCH --mail-user=joel.leja@gmail.com
-IDFILE=$APPS"/threedhst_bsfh/data/3dhst/td_massive.ids"
+IDFILE=$APPS"/prospector_alpha/data/3dhst/td_massive.ids"
 OBJID=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$IDFILE")
 
-python $APPS/threedhst_bsfh/code/extra_output.py \
-$APPS/threedhst_bsfh/parameter_files/fast_mimic_params.py \
---outname="$APPS"/threedhst_bsfh/results/fast_mimic/"$OBJID" \
+python $APPS/prospector_alpha/code/extra_output.py \
+$APPS/prospector_alpha/parameter_files/fast_mimic_params.py \
+--outname="$APPS"/prospector_alpha/results/fast_mimic/"$OBJID" \
 --ir_priors=False --measure_spectral_features=False --mags_nodust=False

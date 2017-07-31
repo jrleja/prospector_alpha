@@ -30,7 +30,7 @@ def save_alldata(alldata,runname='brownseds'):
 def return_agn_str(idx, string=False):
 
     # NEW VERSION, WITH MY FLUXES
-    with open(os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/joel_bpt.pickle', "rb") as f:
+    with open(os.getenv('APPS')+'/prospector_alpha/data/brownseds_data/photometry/joel_bpt.pickle', "rb") as f:
         agn_str=pickle.load(f)
 
     agn_str = agn_str[idx]
@@ -57,7 +57,7 @@ def load_prospector_data(filebase,no_sample_results=False,objname=None,runname=N
 
     #### shortcut: pass None to filebase and objname + runname keywords
     if (objname is not None) & (runname is not None):
-        filebase = os.getenv('APPS')+'/threedhst_bsfh/results/'+runname+'/'+runname+'_'+objname
+        filebase = os.getenv('APPS')+'/prospector_alpha/results/'+runname+'/'+runname+'_'+objname
     mcmc_filename, model_filename, extra_name = create_prosp_filename(filebase)
 
     if not hdf5:
@@ -86,7 +86,7 @@ def load_prospector_extra(filebase,objname=None,runname=None):
 
     #### shortcut: pass None to filebase and objname + runname keywords
     if (objname is not None) & (runname is not None):
-        filebase = os.getenv('APPS')+'/threedhst_bsfh/results/'+runname+'/'+runname+'_'+objname
+        filebase = os.getenv('APPS')+'/prospector_alpha/results/'+runname+'/'+runname+'_'+objname
     mcmc_filename, model_filename, extra_name = create_prosp_filename(filebase)
 
     with open(extra_name, "r") as f:
@@ -138,7 +138,7 @@ def load_moustakas_data(objnames = None):
     #### load data
     # arcane vizier formatting means I'm using astropy tables here
     from astropy.io import ascii
-    foldername = os.getenv('APPS')+'/threedhst_bsfh/data/Moustakas+10/'
+    foldername = os.getenv('APPS')+'/prospector_alpha/data/Moustakas+10/'
     filename = 'table3.dat'
     readme = 'ReadMe'
     table = ascii.read(foldername+filename, readme=foldername+readme)
@@ -175,7 +175,7 @@ def load_moustakas_newdat(objnames = None):
 
     #### load data
     from astropy.io import fits
-    filename = os.getenv('APPS')+'/threedhst_bsfh/data/Moustakas_new/atlas_specdata_solar_drift_v1.1.fits'
+    filename = os.getenv('APPS')+'/prospector_alpha/data/Moustakas_new/atlas_specdata_solar_drift_v1.1.fits'
     hdulist = fits.open(filename)
 
     ##### match
@@ -249,7 +249,7 @@ def load_spectra(objname, nufnu=True):
     # 2 = Akari
     # 3 = Spitzer IRS
 
-    foldername = '/Users/joel/code/python/threedhst_bsfh/data/brownseds_data/spectra/'
+    foldername = '/Users/joel/code/python/prospector_alpha/data/brownseds_data/spectra/'
     rest_lam, flux, obs_lam, source = np.loadtxt(foldername+objname.replace(' ','_')+'_spec.dat',comments='#',unpack=True)
 
     lsun = 3.846e33  # ergs/s
@@ -274,7 +274,7 @@ def load_coordinates(dec_in_string=False):
 
     from astropy.io import fits
 
-    location = '/Users/joel/code/python/threedhst_bsfh/data/brownseds_data/photometry/table1.fits'
+    location = '/Users/joel/code/python/prospector_alpha/data/brownseds_data/photometry/table1.fits'
     hdulist = fits.open(location)
 
     ### convert from hours to degrees
@@ -295,7 +295,7 @@ def load_coordinates(dec_in_string=False):
 
 def write_coordinates():
 
-    outloc = '/Users/joel/code/python/threedhst_bsfh/data/brownseds_data/photometry/coords.dat'
+    outloc = '/Users/joel/code/python/prospector_alpha/data/brownseds_data/photometry/coords.dat'
     ra, dec, name = load_coordinates(dec_in_string=True)
     with open(outloc, 'w') as f:
         for r, d in zip(ra,dec):
@@ -322,7 +322,7 @@ def agn_str_match(dat, bcoords, objname):
 
 def load_csc(bcoords,objname):
 
-    location = '/Users/joel/code/python/threedhst_bsfh/data/brownseds_data/photometry/xray/csc_table.dat'
+    location = '/Users/joel/code/python/prospector_alpha/data/brownseds_data/photometry/xray/csc_table.dat'
 
     #### extract headers
     with open(location, 'r') as f:
@@ -349,7 +349,7 @@ def load_csc(bcoords,objname):
 
 def load_cxo(bcoords,objname):
 
-    location = '/Users/joel/code/python/threedhst_bsfh/data/brownseds_data/photometry/xray/cxoxassist_table.dat'
+    location = '/Users/joel/code/python/prospector_alpha/data/brownseds_data/photometry/xray/cxoxassist_table.dat'
 
     #### extract headers
     with open(location, 'r') as f:
@@ -375,7 +375,7 @@ def load_cxo(bcoords,objname):
 
 def load_chng(bcoords,objname):
 
-    location = '/Users/joel/code/python/threedhst_bsfh/data/brownseds_data/photometry/xray/chngpscliu_table.dat'
+    location = '/Users/joel/code/python/prospector_alpha/data/brownseds_data/photometry/xray/chngpscliu_table.dat'
 
     #### extract headers
     with open(location, 'r') as f:
@@ -522,7 +522,7 @@ def load_xray_mastercat(xmatch = True,maxradius=30):
         if we could translate COUNT_RATE into FLUX for ARBITRARY TELESCOPE AND DATA TABLE then we could include many more sources
     '''
 
-    location = '/Users/joel/code/python/threedhst_bsfh/data/brownseds_data/photometry/xray/xray_mastercat.dat'
+    location = '/Users/joel/code/python/prospector_alpha/data/brownseds_data/photometry/xray/xray_mastercat.dat'
 
     #### extract headers
     with open(location, 'r') as f:
@@ -768,7 +768,7 @@ def write_villar_data():
 
         names.append(filebase[jj].split('_')[-1])
 
-    outmod = os.getenv('APPS')+'/threedhst_bsfh/data/ashley/ashley_out.dat'
+    outmod = os.getenv('APPS')+'/prospector_alpha/data/ashley/ashley_out.dat'
 
     outdict ={
               'mass': mass,
@@ -854,8 +854,8 @@ def write_eufrasio_data():
 
         names.append("_".join(sample_results['run_params']['objname'].split(' ')))
         print tauv[:,jj]
-    outmod = '/Users/joel/code/python/threedhst_bsfh/data/eufrasio_model_parameters.txt'
-    outdat = '/Users/joel/code/python/threedhst_bsfh/data/eufrasio_photometry_'
+    outmod = '/Users/joel/code/python/prospector_alpha/data/eufrasio_model_parameters.txt'
+    outdat = '/Users/joel/code/python/prospector_alpha/data/eufrasio_photometry_'
 
     outdict ={
               'mass': mass,
@@ -1016,8 +1016,8 @@ def write_kinney_txt():
                       sample_results['model_emline']['q16'][ha_ind]]
         names.append(sample_results['run_params']['objname'])
 
-    outobs = '/Users/joel/code/python/threedhst_bsfh/data/virgo/observables.txt'
-    outpars = '/Users/joel/code/python/threedhst_bsfh/data/virgo/parameters.txt'
+    outobs = '/Users/joel/code/python/prospector_alpha/data/virgo/observables.txt'
+    outpars = '/Users/joel/code/python/prospector_alpha/data/virgo/parameters.txt'
 
     # write out observables
     with open(outpars, 'w') as f:

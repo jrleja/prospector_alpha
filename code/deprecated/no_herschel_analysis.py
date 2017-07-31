@@ -79,14 +79,14 @@ def bdec_to_ext(bdec):
 
 def make_plots(runname_nh='brownseds_np_nohersch',runname_h='brownseds_np', runname_nh_weighted=None,recollate_data = False):
 
-	outpickle = '/Users/joel/code/python/threedhst_bsfh/data/'+runname_nh+'_extradat.pickle'
+	outpickle = '/Users/joel/code/python/prospector_alpha/data/'+runname_nh+'_extradat.pickle'
 	if not os.path.isfile(outpickle) or recollate_data == True:
 		alldata = collate_data(runname_nh=runname_nh,runname_h=runname_h,outpickle=outpickle,runname_nh_weighted=runname_nh_weighted)
 	else:
 		with open(outpickle, "rb") as f:
 			alldata=pickle.load(f)
 
-	outfolder = '/Users/joel/code/python/threedhst_bsfh/plots/'+runname_nh+'/paper_plots/'
+	outfolder = '/Users/joel/code/python/prospector_alpha/plots/'+runname_nh+'/paper_plots/'
 	if not os.path.exists(outfolder):
 		os.makedirs(outfolder)
 
@@ -128,7 +128,7 @@ def create_step(x,add_edges=False):
 def plot_draine_li_posteriors(alldata,outfolder):
 
 	### load data
-	dl_pars = np.loadtxt(os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/draine+07_table4.txt',comments='#', dtype = {'names':('qpah','umin','gamma'),'formats':(np.float,np.float,np.float)})
+	dl_pars = np.loadtxt(os.getenv('APPS')+'/prospector_alpha/data/brownseds_data/draine+07_table4.txt',comments='#', dtype = {'names':('qpah','umin','gamma'),'formats':(np.float,np.float,np.float)})
 	xname = [r'dust emission Q$_{\mathrm{PAH}}$',r'dust emission U$_{\mathrm{min}}$',r'dust emission $\gamma$']
 
 	### plot options

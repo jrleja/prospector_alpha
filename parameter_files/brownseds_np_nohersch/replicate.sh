@@ -2,8 +2,8 @@
 # script to replicate parameter file
 # for multiple galaxy IDs
 # set location of ID file, base parameter file
-IDFILE=$APPS"/threedhst_bsfh/data/herschel_names.txt"
-PARAMFOLDER=$APPS"/threedhst_bsfh/parameter_files/brownseds_np_nohersch/"
+IDFILE=$APPS"/prospector_alpha/data/herschel_names.txt"
+PARAMFOLDER=$APPS"/prospector_alpha/parameter_files/brownseds_np_nohersch/"
 PARAMBASE="brownseds_np_nohersch_params"
 PARAMEXT=".py"
 

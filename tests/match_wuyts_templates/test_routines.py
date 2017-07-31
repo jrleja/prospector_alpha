@@ -10,11 +10,11 @@ c =2.99792458e8
 # INTERPOLATED METALLICITY
 # setup stellar populations
 sps = fsps.StellarPopulation(zcontinuous=1, compute_vega_mags=False)
-custom_filter_keys = os.getenv('APPS')+'/threedhst_bsfh/filters/filter_keys_threedhst.txt'
+custom_filter_keys = os.getenv('APPS')+'/prospector_alpha/filters/filter_keys_threedhst.txt'
 fsps.filters.FILTERS = model_setup.custom_filter_dict(custom_filter_keys)
 
 # load custom model
-param_file=os.getenv('APPS')+'/threedhst_bsfh/parameter_files/dtau_intmet/dtau_intmet_params.py'
+param_file=os.getenv('APPS')+'/prospector_alpha/parameter_files/dtau_intmet/dtau_intmet_params.py'
 model = model_setup.load_model(param_file=param_file, sps=sps)
 obs = model_setup.load_obs(param_file=param_file)
 obs['filters'] = np.array(['mips_24um_cosmos'])

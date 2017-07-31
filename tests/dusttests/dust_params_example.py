@@ -22,7 +22,7 @@ def get_cmap(N):
 
 # setup model, sps
 sps = prosp_dutils.setup_sps()
-param_file=os.getenv('APPS')+'/threedhst_bsfh/parameter_files/brownseds_tightbc/brownseds_tightbc_params.py'
+param_file=os.getenv('APPS')+'/prospector_alpha/parameter_files/brownseds_tightbc/brownseds_tightbc_params.py'
 
 model = model_setup.load_model(param_file)
 obs = model_setup.load_obs(param_file)

@@ -19,7 +19,7 @@ jansky_mks = 1e-26
 APPS = os.getenv('APPS')
 run_params = {'verbose':True,
               'debug': False,
-              'outfile': APPS+'/threedhst_bsfh/results/td_massive_noagb/AEGIS_531',
+              'outfile': APPS+'/prospector_alpha/results/td_massive_noagb/AEGIS_531',
               'nofork': True,
               # Optimizer params
               'ftol':0.5e-5, 
@@ -42,7 +42,7 @@ run_params = {'verbose':True,
               'interp_type': 'logarithmic',
               'agelims': [0.0,8.0,8.5,9.0,9.5,9.8,10.0],
               # Data info (phot = .cat, dat = .dat, fast = .fout)
-              'datdir':APPS+'/threedhst_bsfh/data/3dhst/',
+              'datdir':APPS+'/prospector_alpha/data/3dhst/',
               'runname': 'td_massive',
               'objname':'AEGIS_531'
               }

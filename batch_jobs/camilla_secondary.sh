@@ -18,4 +18,4 @@
 ### mail
 #SBATCH --mail-type=END
 #SBATCH --mail-user=joel.leja@gmail.com
-python $APPS/threedhst_bsfh/code/extra_output.py $APPS/threedhst_bsfh/parameter_files/camilla/camilla_params_$SLURM_ARRAY_TASK_ID.py 
+python $APPS/prospector_alpha/code/extra_output.py $APPS/prospector_alpha/parameter_files/camilla/camilla_params_$SLURM_ARRAY_TASK_ID.py 

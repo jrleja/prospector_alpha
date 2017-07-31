@@ -94,7 +94,7 @@ def add_png(ax,objname,swapaxes=False):
 		             ax.get_position().height+0.004])
 	# add RGB
 	try:
-		imgname=os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/rgb/'+objname.replace(' ','_')+'.png'
+		imgname=os.getenv('APPS')+'/prospector_alpha/data/brownseds_data/rgb/'+objname.replace(' ','_')+'.png'
 		img=mpimg.imread(imgname)
 		
 		if swapaxes:
@@ -152,7 +152,7 @@ def plot_sfh(ax,t,sfh,sfrmin):
 def main_plot(runname='brownseds_np'):
 
 	### output folder
-	outfolder = os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/pcomp/'
+	outfolder = os.getenv('APPS')+'/prospector_alpha/plots/'+runname+'/pcomp/'
 
 	### load data
 	alldata = brown_io.load_alldata(runname=runname)

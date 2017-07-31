@@ -83,8 +83,8 @@ def build_sample_constrained(basename,outname=None,add_zp_err=False):
 
 	#### output names ####
 	if outname == None:
-		outname = '/Users/joel/code/python/threedhst_bsfh/data/'+basename
-	parmfile='/Users/joel/code/python/threedhst_bsfh/parameter_files/'+basename+'/'+basename+'_params.py'
+		outname = '/Users/joel/code/python/prospector_alpha/data/'+basename
+	parmfile='/Users/joel/code/python/prospector_alpha/parameter_files/'+basename+'/'+basename+'_params.py'
 
 	#### load test model, build sps  ####
 	model = model_setup.load_model(parmfile)
@@ -251,8 +251,8 @@ def build_sample_test(basename,outname=None,add_zp_err=False):
 
 	#### output names ####
 	if outname == None:
-		outname = '/Users/joel/code/python/threedhst_bsfh/data/'+basename
-	parmfile='/Users/joel/code/python/threedhst_bsfh/parameter_files/'+basename+'/'+basename+'_params.py'
+		outname = '/Users/joel/code/python/prospector_alpha/data/'+basename
+	parmfile='/Users/joel/code/python/prospector_alpha/parameter_files/'+basename+'/'+basename+'_params.py'
 
 	#### load test model, build sps  ####
 	model = model_setup.load_model(parmfile)

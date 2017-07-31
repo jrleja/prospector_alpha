@@ -96,7 +96,7 @@ def cloudy_spectrum(ax):
 
 	from prospect.models import model_setup
 
-	param_file = '/Users/joel/code/python/threedhst_bsfh/parameter_files/brownseds_np/brownseds_np_params.py'
+	param_file = '/Users/joel/code/python/prospector_alpha/parameter_files/brownseds_np/brownseds_np_params.py'
 	
 	run_params = model_setup.get_run_params(param_file=param_file)
 	sps = model_setup.load_sps(**run_params)
@@ -143,7 +143,7 @@ def plot_stacks(outfolder=None,alldata=None,runname='brownseds_np',log_qpah=Fals
 	if alldata is None:
 		alldata = brown_io.load_alldata(runname=runname)
 	if outfolder is None:
-		outfolder = os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/pcomp/'
+		outfolder = os.getenv('APPS')+'/prospector_alpha/plots/'+runname+'/pcomp/'
 
 	if log_qpah:
 		qpah_label = r'<log(Q$_{\mathrm{PAH}}$)<'

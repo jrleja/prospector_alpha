@@ -38,7 +38,7 @@ alpha = 0.8
 lw = 3
 
 #### define model
-param_file='/Users/joel/code/python/threedhst_bsfh/parameter_files/brownseds_np/brownseds_np_params.py'
+param_file='/Users/joel/code/python/prospector_alpha/parameter_files/brownseds_np/brownseds_np_params.py'
 run_params = model_setup.get_run_params(param_file=param_file)
 sps = model_setup.load_sps(**run_params)
 model = model_setup.load_model(**run_params)

@@ -5,7 +5,7 @@ from calc_ml import load_filter_response
 
 def read_translate(field):
 	
-	trans_filename=os.getenv('APPS')+'/threedhst_bsfh/filters/translate/'+field.lower()+"_3dhst.v4.1.translate"
+	trans_filename=os.getenv('APPS')+'/prospector_alpha/filters/translate/'+field.lower()+"_3dhst.v4.1.translate"
 	dat = np.loadtxt(trans_filename, dtype=np.dtype('|S16'))
 	
 	return dat
@@ -17,7 +17,7 @@ def read_threedhst_filters(filtnum):
 		print "ERROR"
 		sys.exit()
 		
-	filter_response_curve = '/Users/joel/code/python/threedhst_bsfh/filters/FILTER.RES.latest'
+	filter_response_curve = '/Users/joel/code/python/prospector_alpha/filters/FILTER.RES.latest'
 
 	# initialize output arrays
 	lam,res = (np.zeros(0) for i in range(2))
@@ -165,7 +165,7 @@ def main(field=False):
 		for jj in xrange(len(fsps_filters)):
 			temp_filters[jj]['filt_name']="_".join(fsps_filters[jj].split(' '))+'_'+field[kk]
 			temp_filters[jj]['lam'],temp_filters[jj]['response']=load_filter_response(fsps_filters[jj], 
-			                     alt_file='/Users/joel/code/python/threedhst_bsfh/filters/extra_filters.txt')
+			                     alt_file='/Users/joel/code/python/prospector_alpha/filters/extra_filters.txt')
 			print ('\t Translating {0}'.format(temp_filters[jj]['filt_name']))		
 		filters = filters + temp_filters
 	
@@ -190,12 +190,12 @@ def main(field=False):
 				f.write(str(filters[jj]['lam'][ll])+'\t'+str(filters[jj]['response'][ll])+'\n')
 		
 	''' WRITE OUT FILTER KEYS '''
-	outfile=os.getenv('APPS')+'/threedhst_bsfh/filters/filter_keys_threedhst.txt'
+	outfile=os.getenv('APPS')+'/prospector_alpha/filters/filter_keys_threedhst.txt'
 	with open(outfile, 'w') as f:
 		for jj in xrange(nfilters): f.write(str(jj+1).strip()+'\t'+filters[jj]['filt_name'].strip()+'\n')
 	
 	''' WRITE OUT EFFECTIVE WAVELENGTHS '''
-	outfile=os.getenv('APPS')+'/threedhst_bsfh/filters/lameff_threedhst.txt'
+	outfile=os.getenv('APPS')+'/prospector_alpha/filters/lameff_threedhst.txt'
 	with open(outfile,'w') as f:
 		for jj in xrange(nfilters): f.write("{0}\n".format(lameff[jj]))
 		

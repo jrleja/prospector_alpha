@@ -15,12 +15,12 @@ can be run in different environments to ensure underlying stellar pops are consi
 def test_likelihood(param_file=None, sps=None, model=None, obs=None, thetas=None):
 
 	if not param_file:
-		param_file = os.getenv('APPS')+'/threedhst_bsfh/parameter_files/dtau_intmet/dtau_intmet_params_66.py'
+		param_file = os.getenv('APPS')+'/prospector_alpha/parameter_files/dtau_intmet/dtau_intmet_params_66.py'
 
 	if not sps:
 		# load stellar population, set up custom filters
 		sps = fsps.StellarPopulation(zcontinuous=1, compute_vega_mags=False)
-		custom_filter_keys = os.getenv('APPS')+'/threedhst_bsfh/filters/filter_keys_threedhst.txt'
+		custom_filter_keys = os.getenv('APPS')+'/prospector_alpha/filters/filter_keys_threedhst.txt'
 		fsps.filters.FILTERS = model_setup.custom_filter_dict(custom_filter_keys)
 
 	if not model:

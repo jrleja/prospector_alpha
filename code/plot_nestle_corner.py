@@ -118,10 +118,10 @@ def return_dat(runname, runname_comp, pltcorner=False, pltchain=False):
     #filebase2, pfile2, ancilname2 = generate_basenames(runname_comp)
     size = 500000
 
-    filebase = ['/Users/joel/code/python/threedhst_bsfh/results/guillermo_nestle/guillermo_nestle']
-    pfile = ['/Users/joel/code/python/threedhst_bsfh/parameter_files/guillermo_nestle/guillermo_nestle_params.py']
-    filebase2 = ['/Users/joel/code/python/threedhst_bsfh/results/guillermo/guillermo']
-    pfile2 = ['/Users/joel/code/python/threedhst_bsfh/parameter_files/guillermo/guillermo_params.py']
+    filebase = ['/Users/joel/code/python/prospector_alpha/results/guillermo_nestle/guillermo_nestle']
+    pfile = ['/Users/joel/code/python/prospector_alpha/parameter_files/guillermo_nestle/guillermo_nestle_params.py']
+    filebase2 = ['/Users/joel/code/python/prospector_alpha/results/guillermo/guillermo']
+    pfile2 = ['/Users/joel/code/python/prospector_alpha/parameter_files/guillermo/guillermo_params.py']
 
 
     #bad =  ['NGC 0584','UGCA 166','Mrk 1450','UM 461','UGC 06850','NGC 4125','NGC 4551','Mrk 0475']
@@ -208,7 +208,7 @@ def plot_all(runname='brownseds_agn_nestle',runname_comp = 'brownseds_agn',pltco
         dat = return_dat(runname, runname_comp, pltcorner=pltcorner, pltchain=pltchain)
         return dat
 
-    outfolder = os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/nestle_plots/'
+    outfolder = os.getenv('APPS')+'/prospector_alpha/plots/'+runname+'/nestle_plots/'
     if not os.path.isdir(outfolder):
         os.makedirs(outfolder)
 

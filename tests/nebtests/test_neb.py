@@ -58,8 +58,8 @@ Cha = np.zeros(ns)
 gtage = np.random.uniform(7.0, 14.0, ns)
 gtau = np.random.uniform(0.1, 10.0, ns)
 
-mcmc_filename = os.getenv('APPS')+'/threedhst_bsfh/results/dtau_intmet/dtau_intmet_0181_15268_1424608305_mcmc'
-model_filename = os.getenv('APPS')+'/threedhst_bsfh/results/dtau_intmet/dtau_intmet_0181_15268_1424608305_model'
+mcmc_filename = os.getenv('APPS')+'/prospector_alpha/results/dtau_intmet/dtau_intmet_0181_15268_1424608305_mcmc'
+model_filename = os.getenv('APPS')+'/prospector_alpha/results/dtau_intmet/dtau_intmet_0181_15268_1424608305_model'
 sample_results, powell_results, model = read_results.read_pickles(mcmc_filename, model_file=model_filename,inmod=None)
 
 # set redshift

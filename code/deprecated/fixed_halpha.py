@@ -35,7 +35,7 @@ if model.params['add_neb_emission'] == 2:
 	model.params['add_neb_continuum'] = np.array(True)
 
 #### load relationship between CLOUDY/empirical Halpha and metallicity
-outloc = '/Users/joel/code/python/threedhst_bsfh/data/pickles/ha_ratio.pickle'
+outloc = '/Users/joel/code/python/prospector_alpha/data/pickles/ha_ratio.pickle'
 with open(outloc, "rb") as f:
 	coeff=pickle.load(f)
 fit = np.poly1d(coeff)
@@ -257,7 +257,7 @@ def main(redraw_thetas=True,pass_guesses=False,redraw_lbol_thetas=True):
 	lw = 2
 
 	#### load or create fixed halpha draws
-	outpickle_fixedha = '/Users/joel/code/python/threedhst_bsfh/data/pickles/ha_fixed.pickle'
+	outpickle_fixedha = '/Users/joel/code/python/prospector_alpha/data/pickles/ha_fixed.pickle'
 	if redraw_thetas:
 		ndraw = 200
 		delta = 0.05
@@ -290,7 +290,7 @@ def main(redraw_thetas=True,pass_guesses=False,redraw_lbol_thetas=True):
 			ndraw = thetas.values()[0].values()[0].shape[0]
 
 	#### load or create lbol draws
-	outpickle_fixedlbol = '/Users/joel/code/python/threedhst_bsfh/data/pickles/lbol_fixed.pickle'
+	outpickle_fixedlbol = '/Users/joel/code/python/prospector_alpha/data/pickles/lbol_fixed.pickle'
 	if redraw_lbol_thetas:
 		ndraw_lbol = 50
 		delta_lbol = 0.02

@@ -37,7 +37,7 @@ def load_zp_offsets(field):
 	if field == 'GOODSN' or field == 'GOODSS':
 		field = field[:5]+'-'+field[5]
 
-	filename = os.getenv('APPS')+'/threedhst_bsfh/data/3dhst/zp_offsets_tbl11_skel14.txt'
+	filename = os.getenv('APPS')+'/prospector_alpha/data/3dhst/zp_offsets_tbl11_skel14.txt'
 	with open(filename, 'r') as f:
 		for jj in range(1): hdr = f.readline().split()
 	dtype = [np.dtype((str, 35)),np.dtype((str, 35)),np.float,np.float]
@@ -161,7 +161,7 @@ def return_fast_sed(fastname,objname, sps=None, obs=None, dustem = False):
 	fields = np.array(fields)
 
 	# load fast model
-	param_file = os.getenv('APPS')+'/threedhst_bsfh/parameter_files/fast_mimic/fast_mimic.py'
+	param_file = os.getenv('APPS')+'/prospector_alpha/parameter_files/fast_mimic/fast_mimic.py'
 	model = model_setup.load_model(param_file)
 	parnames = np.array(model.theta_labels())
 

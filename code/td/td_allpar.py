@@ -102,7 +102,7 @@ def allpar_plot(runname='td_massive',outfolder=None,lowmet=True,regenerate=False
 
     ### I/O stuff
     if outfolder is None:
-        outfolder = os.getenv('APPS') + '/threedhst_bsfh/plots/'+runname+'/fast_plots/'
+        outfolder = os.getenv('APPS') + '/prospector_alpha/plots/'+runname+'/fast_plots/'
     if not os.path.isdir(outfolder):
         os.makedirs(outfolder)
         os.makedirs(outfolder+'data/')

@@ -16,7 +16,7 @@ def plot(runname='brownseds_agn',runname_noagn='brownseds_np',
         alldata_noagn = brown_io.load_alldata(runname=runname_noagn)
 
     #### outfolder
-    outfolder = os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/agn_plots/'
+    outfolder = os.getenv('APPS')+'/prospector_alpha/plots/'+runname+'/agn_plots/'
     if not os.path.isdir(outfolder):
         os.makedirs(outfolder)
 

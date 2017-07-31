@@ -11,7 +11,7 @@ def setup_sps(zcontinuous=2,compute_vega_magnitudes=False):
 
     # load stellar population, set up custom filters
     sps = fsps.StellarPopulation(zcontinuous=zcontinuous, compute_vega_mags=compute_vega_magnitudes)
-    #custom_filter_keys = os.getenv('APPS')+'/threedhst_bsfh/filters/filter_keys_threedhst.txt'
+    #custom_filter_keys = os.getenv('APPS')+'/prospector_alpha/filters/filter_keys_threedhst.txt'
     #fsps.filters.FILTERS = model_setup.custom_filter_dict(custom_filter_keys)
 
     return sps

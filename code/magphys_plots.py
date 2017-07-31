@@ -351,7 +351,7 @@ def plot_all_residuals(alldata,runname):
         plots_hist[i].set_xlabel(r'RMS [dex]')
         plots_hist[i].xaxis.set_major_locator(MaxNLocator(4))
 
-    outfolder = os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/magphys/'
+    outfolder = os.getenv('APPS')+'/prospector_alpha/plots/'+runname+'/magphys/'
     
     plt.savefig(outfolder+'median_residuals.png',dpi=dpi)
     plt.close()
@@ -771,7 +771,7 @@ def sed_comp_figure(sample_results, extra_output, sps, model, magphys,
     return residuals
     
 def collate_data(filebase=None,
-                 outfolder=os.getenv('APPS')+'/threedhst_bsfh/plots/',
+                 outfolder=os.getenv('APPS')+'/prospector_alpha/plots/',
                  sample_results=None,
                  sps=None, elines_only=True,
                  runname=None,
@@ -841,7 +841,7 @@ def plt_all(runname=None,startup=True,**extras):
     if runname == None:
         runname = 'brownseds'
 
-    outfolder = os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/magphys/sed_residuals/'
+    outfolder = os.getenv('APPS')+'/prospector_alpha/plots/'+runname+'/magphys/sed_residuals/'
 
     if startup == True:
         filebase, parm_basename, ancilname=prosp_dutils.generate_basenames(runname)
@@ -926,18 +926,18 @@ def plt_all(runname=None,startup=True,**extras):
     '''
     #### herschel flag
     hflag = np.array([True if np.sum(dat['residuals']['phot']['lam_obs'] > 5e5) else False for dat in alldata])
-    stack_sfh.plot_stacked_sfh(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/pcomp/')
+    stack_sfh.plot_stacked_sfh(alldata,os.getenv('APPS')+'/prospector_alpha/plots/'+runname+'/pcomp/')
     print 1/0
-    mag_ensemble.plot_emline_comp(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/magphys/emlines_comp/',hflag)
-    mag_ensemble.prospector_comparison(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/pcomp/',hflag)
-    mag_ensemble.plot_relationships(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/magphys/')
-    mag_ensemble.plot_comparison(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/magphys/')
+    mag_ensemble.plot_emline_comp(alldata,os.getenv('APPS')+'/prospector_alpha/plots/'+runname+'/magphys/emlines_comp/',hflag)
+    mag_ensemble.prospector_comparison(alldata,os.getenv('APPS')+'/prospector_alpha/plots/'+runname+'/pcomp/',hflag)
+    mag_ensemble.plot_relationships(alldata,os.getenv('APPS')+'/prospector_alpha/plots/'+runname+'/magphys/')
+    mag_ensemble.plot_comparison(alldata,os.getenv('APPS')+'/prospector_alpha/plots/'+runname+'/magphys/')
 
 
-    brown_io.write_results(alldata,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/pcomp/')
-    allpar_plot(alldata,hflag,os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/pcomp/')
+    brown_io.write_results(alldata,os.getenv('APPS')+'/prospector_alpha/plots/'+runname+'/pcomp/')
+    allpar_plot(alldata,hflag,os.getenv('APPS')+'/prospector_alpha/plots/'+runname+'/pcomp/')
     plot_all_residuals(alldata,runname)
-    stack_irs_spectra.plot_stacks(alldata=alldata,outfolder=os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/pcomp/')
+    stack_irs_spectra.plot_stacks(alldata=alldata,outfolder=os.getenv('APPS')+'/prospector_alpha/plots/'+runname+'/pcomp/')
 
 def perform_wavelength_cal(spec_dict, objname):
     '''
@@ -987,7 +987,7 @@ def compute_specmags(runname=None, outfolder=None):
 
     #### load up prospector results
     filebase, parm_basename, ancilname=prosp_dutils.generate_basenames(runname)
-    outname = os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/pcomp/sfrcomp.png'
+    outname = os.getenv('APPS')+'/prospector_alpha/plots/'+runname+'/pcomp/sfrcomp.png'
     alldata = brown_io.load_alldata(runname=runname)
     sps = prosp_dutils.setup_sps(custom_filter_key=None)
 
@@ -1056,7 +1056,7 @@ def compute_specmags(runname=None, outfolder=None):
 
             # limits, save
             plt.xlim(2800,7200)
-            plt.savefig('/Users/joel/code/python/threedhst_bsfh/plots/'+runname+'/pcomp/specnorm/'+dat['objname']+'.png',dpi=100)
+            plt.savefig('/Users/joel/code/python/prospector_alpha/plots/'+runname+'/pcomp/specnorm/'+dat['objname']+'.png',dpi=100)
             plt.close()
 
         #### convert combspec from maggies to Lsun/Hz
@@ -1096,7 +1096,7 @@ def compute_specmags(runname=None, outfolder=None):
         ax.set_xlabel(tits[ii])
         ax.set_xlim(save_xlim)
         ax.xaxis.set_major_locator(MaxNLocator(5))
-    plt.savefig('/Users/joel/code/python/threedhst_bsfh/plots/'+runname+'/pcomp/spectral_integration.png',dpi=dpi)
+    plt.savefig('/Users/joel/code/python/prospector_alpha/plots/'+runname+'/pcomp/spectral_integration.png',dpi=dpi)
     plt.close()
 
     out = {'obs_phot':obsphot,'spec_phot':optphot}

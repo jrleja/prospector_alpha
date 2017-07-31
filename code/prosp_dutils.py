@@ -521,7 +521,7 @@ def generate_basenames(runname,ancilname=None):
 
     if runname == 'brownseds_agn':
 
-        id_list = os.getenv('APPS')+"/threedhst_bsfh/data/"+runname+".ids"
+        id_list = os.getenv('APPS')+"/prospector_alpha/data/"+runname+".ids"
         ids = np.loadtxt(id_list, dtype='|S20',delimiter=',')
         ngals = len(ids)
 
@@ -529,12 +529,12 @@ def generate_basenames(runname,ancilname=None):
         ancilname=None
 
         for jj in xrange(ngals):
-            filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+runname+'_'+ids[jj])
-            parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py') 
+            filebase.append(os.getenv('APPS')+"/prospector_alpha/results/"+runname+'/'+runname+'_'+ids[jj])
+            parm.append(os.getenv('APPS')+"/prospector_alpha/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py') 
 
     elif 'brownseds' in runname:
 
-        id_list = os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/namelist.txt'
+        id_list = os.getenv('APPS')+'/prospector_alpha/data/brownseds_data/photometry/namelist.txt'
         ids = np.loadtxt(id_list, dtype='|S20',delimiter=',')
         ngals = len(ids)
 
@@ -542,10 +542,10 @@ def generate_basenames(runname,ancilname=None):
         parm_basename = basename+"_params"
         ancilname=None
 
-        for jj in xrange(ngals): filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+basename+'_'+ids[jj])
+        for jj in xrange(ngals): filebase.append(os.getenv('APPS')+"/prospector_alpha/results/"+runname+'/'+basename+'_'+ids[jj])
         
         # check for multiple parameter files
-        parbase = os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename
+        parbase = os.getenv('APPS')+"/prospector_alpha/parameter_files/"+runname+'/'+parm_basename
         if os.path.isfile(parbase+'_1.py'):
             for jj in xrange(ngals): parm.append(parbase+'_'+str(jj+1)+'.py')
         else:
@@ -553,7 +553,7 @@ def generate_basenames(runname,ancilname=None):
 
     elif 'td_massive' in runname or runname == 'fast_mimic':
 
-        id_list = os.getenv('APPS')+"/threedhst_bsfh/data/3dhst/td_massive.ids"
+        id_list = os.getenv('APPS')+"/prospector_alpha/data/3dhst/td_massive.ids"
         ids = np.loadtxt(id_list, dtype='|S60',delimiter=',')
         ngals = len(ids)
 
@@ -561,13 +561,13 @@ def generate_basenames(runname,ancilname=None):
         ancilname=None
 
         for jj in xrange(ngals):
-            filebase.append(os.getenv('APPS')+'/threedhst_bsfh/results/'+runname+'/'+ids[jj])
-            parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+parm_basename+'.py') 
+            filebase.append(os.getenv('APPS')+'/prospector_alpha/results/'+runname+'/'+ids[jj])
+            parm.append(os.getenv('APPS')+"/prospector_alpha/parameter_files/"+parm_basename+'.py') 
 
 
     else:
 
-        id_list = os.getenv('APPS')+"/threedhst_bsfh/data/"+runname+".ids"
+        id_list = os.getenv('APPS')+"/prospector_alpha/data/"+runname+".ids"
         ids = np.loadtxt(id_list, dtype='|S20')
         ngals = len(ids)
 
@@ -575,8 +575,8 @@ def generate_basenames(runname,ancilname=None):
         ancilname=None
 
         for jj in xrange(ngals):
-            filebase.append(os.getenv('APPS')+"/threedhst_bsfh/results/"+runname+'/'+runname+'_'+ids[jj])
-            parm.append(os.getenv('APPS')+"/threedhst_bsfh/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py') 
+            filebase.append(os.getenv('APPS')+"/prospector_alpha/results/"+runname+'/'+runname+'_'+ids[jj])
+            parm.append(os.getenv('APPS')+"/prospector_alpha/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py') 
 
     return filebase,parm,ancilname
 
@@ -613,7 +613,7 @@ def return_mwave_custom(filters):
     returns effective wavelength based on filter names
     """
 
-    loc = os.getenv('APPS')+'/threedhst_bsfh/filters/'
+    loc = os.getenv('APPS')+'/prospector_alpha/filters/'
     key_str = 'filter_keys_threedhst.txt'
     lameff_str = 'lameff_threedhst.txt'
     
@@ -759,7 +759,7 @@ def create_prosp_filename(filebase):
 def av_to_dust2(av):
     return av/1.086
 
-def integrate_mag(spec_lam,spectra,filter, z=None, alt_file='/Users/joel/code/python/threedhst_bsfh/filters/allfilters_threedhst.dat'):
+def integrate_mag(spec_lam,spectra,filter, z=None, alt_file='/Users/joel/code/python/prospector_alpha/filters/allfilters_threedhst.dat'):
 
     '''
     borrowed from calc_ml

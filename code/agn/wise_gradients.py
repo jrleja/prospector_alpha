@@ -28,7 +28,7 @@ majorFormatter = jLogFormatter(base=10, labelOnlyBase=True)
 
 # https://arxiv.org/pdf/1603.05664.pdf
 px_scale = 2.75
-outfile = '/Users/joel/code/python/threedhst_bsfh/data/brownseds_data/fits/unWISE/gradients.pickle'
+outfile = '/Users/joel/code/python/prospector_alpha/data/brownseds_data/fits/unWISE/gradients.pickle'
 wise_psf = 6
 
 def test_z(x,c):
@@ -136,7 +136,7 @@ def plot_all(agn_evidence,runname='brownseds_agn',runname_noagn='brownseds_np',a
         alldata_noagn = brown_io.load_alldata(runname=runname_noagn)
 
     #### make output folder if necessary
-    outfolder_overlays = os.getenv('APPS')+'/threedhst_bsfh/plots/'+runname+'/agn_plots/sdss_overlays'
+    outfolder_overlays = os.getenv('APPS')+'/prospector_alpha/plots/'+runname+'/agn_plots/sdss_overlays'
     if not os.path.isdir(outfolder_overlays):
         os.makedirs(outfolder_overlays)
 
@@ -627,7 +627,7 @@ def load_image(objname,filter):
     loads Brown+14 cutouts in a given filter
     '''
 
-    folder = os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/fits/'
+    folder = os.getenv('APPS')+'/prospector_alpha/data/brownseds_data/fits/'
 
     filter = filter.replace(' ','_')
     objname = objname.replace(' ','_')
@@ -640,7 +640,7 @@ def download_wise_data(alldata, idx=Ellipsis):
 
     # unWISE images (http://unwise.me/imgsearch/)
 
-    dir = '/Users/joel/code/python/threedhst_bsfh/data/brownseds_data/fits/unWISE/'
+    dir = '/Users/joel/code/python/prospector_alpha/data/brownseds_data/fits/unWISE/'
     url = '"http://unwise.me/cutout_fits?version=neo1&size=60&bands=12&file_img_m=on&file_invvar_m=on&'
     ra,dec,objnames = brown_io.load_coordinates()
     with open(dir+'download.sh', 'w') as f:
@@ -663,7 +663,7 @@ def download_wise_data(alldata, idx=Ellipsis):
 
 def load_wise_data(objname,filter,load_other=False):
 
-    dir = '/Users/joel/code/python/threedhst_bsfh/data/brownseds_data/fits/unWISE/'+objname.replace(' ','_')+'/'
+    dir = '/Users/joel/code/python/prospector_alpha/data/brownseds_data/fits/unWISE/'+objname.replace(' ','_')+'/'
     files = [f for f in os.listdir(dir) if filter.lower() in f]
     if load_other:
         files = files[2:]
@@ -679,7 +679,7 @@ def load_structure(objname,long_axis=False):
     loads structure information from Brown+14 catalog
     '''
 
-    loc = os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/structure.dat'
+    loc = os.getenv('APPS')+'/prospector_alpha/data/brownseds_data/photometry/structure.dat'
 
     with open(loc, 'r') as f: hdr = f.readline().split()[1:]
     dat = np.loadtxt(loc, comments = '#', delimiter=' ',
@@ -749,7 +749,7 @@ def load_wise_psf(filter):
     fnumber = [s for s in filter if s.isdigit()][0]
 
     ### load PSF
-    location = '/Users/joel/code/python/threedhst_bsfh/data/brownseds_data/fits/PSF_W'+fnumber+'.V4.fits'
+    location = '/Users/joel/code/python/prospector_alpha/data/brownseds_data/fits/PSF_W'+fnumber+'.V4.fits'
     hdu = fits.open(location)[0]
 
     resolution = hdu.header['PSCALE']

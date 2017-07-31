@@ -55,7 +55,7 @@ def make_plot(runname='brownseds_np'):
 			break
 
 		#### load png
-		imgname=os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/rgb/'+name.replace(' ','_')+'.png'
+		imgname=os.getenv('APPS')+'/prospector_alpha/data/brownseds_data/rgb/'+name.replace(' ','_')+'.png'
 		img=mpimg.imread(imgname)
 
 		#### background

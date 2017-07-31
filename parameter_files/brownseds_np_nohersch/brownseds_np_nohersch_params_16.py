@@ -14,7 +14,7 @@ logarithmic = priors.logarithmic
 
 run_params = {'verbose':True,
               'debug': False,
-              'outfile': os.getenv('APPS')+'/threedhst_bsfh/results/brownseds_np_nohersch/brownseds_np_nohersch',
+              'outfile': os.getenv('APPS')+'/prospector_alpha/results/brownseds_np_nohersch/brownseds_np_nohersch',
               'nofork': True,
               # Optimizer params
               'ftol':0.5e-5, 
@@ -30,10 +30,10 @@ run_params = {'verbose':True,
               'interp_type': 'logarithmic',
               'agelims': [0.0,8.0,8.5,9.0,9.5,9.8,10.0],
               # Data info
-              'datname':os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/table1.fits',
-              'photname':os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/table3.fits',
-              'extinctname':os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/table4.fits',
-              'herschname':os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/kingfish.brownapertures.flux.fits',
+              'datname':os.getenv('APPS')+'/prospector_alpha/data/brownseds_data/photometry/table1.fits',
+              'photname':os.getenv('APPS')+'/prospector_alpha/data/brownseds_data/photometry/table3.fits',
+              'extinctname':os.getenv('APPS')+'/prospector_alpha/data/brownseds_data/photometry/table4.fits',
+              'herschname':os.getenv('APPS')+'/prospector_alpha/data/brownseds_data/photometry/kingfish.brownapertures.flux.fits',
               'objname':'NGC 4559',
               }
 run_params['outfile'] = run_params['outfile']+'_'+run_params['objname']

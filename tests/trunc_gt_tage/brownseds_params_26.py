@@ -11,7 +11,7 @@ logarithmic = priors.logarithmic
 #############
 
 run_params = {'verbose':True,
-              'outfile':os.getenv('APPS')+'/threedhst_bsfh/results/brownseds/brownseds',
+              'outfile':os.getenv('APPS')+'/prospector_alpha/results/brownseds/brownseds',
               'ftol':0.5e-5, 
               'maxfev':5000,
               'nwalkers':496,
@@ -21,10 +21,10 @@ run_params = {'verbose':True,
               'debug': False,
               'spec': False, 
               'phot':True,
-              'datname':os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/table1.fits',
-              'photname':os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/table3.fits',
-              'extinctname':os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/table4.fits',
-              'herschname':os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/kingfish.brownapertures.flux.fits',
+              'datname':os.getenv('APPS')+'/prospector_alpha/data/brownseds_data/photometry/table1.fits',
+              'photname':os.getenv('APPS')+'/prospector_alpha/data/brownseds_data/photometry/table3.fits',
+              'extinctname':os.getenv('APPS')+'/prospector_alpha/data/brownseds_data/photometry/table4.fits',
+              'herschname':os.getenv('APPS')+'/prospector_alpha/data/brownseds_data/photometry/kingfish.brownapertures.flux.fits',
               'objname':'UGCA 166',
               }
 

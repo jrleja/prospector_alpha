@@ -18,9 +18,9 @@
 ### mail
 #SBATCH --mail-type=END
 #SBATCH --mail-user=joel.leja@gmail.com
-IDFILE=$APPS"/threedhst_bsfh/data/shivaei_ids.txt"
+IDFILE=$APPS"/prospector_alpha/data/shivaei_ids.txt"
 OBJID=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$IDFILE")
 
-python $APPS/threedhst_bsfh/code/extra_output.py \
-$APPS/threedhst_bsfh/parameter_files/shivaei_params.py \
---outname="$APPS"/threedhst_bsfh/results/shivaei/"$OBJID"
+python $APPS/prospector_alpha/code/extra_output.py \
+$APPS/prospector_alpha/parameter_files/shivaei_params.py \
+--outname="$APPS"/prospector_alpha/results/shivaei/"$OBJID"

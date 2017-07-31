@@ -29,15 +29,15 @@ alpha = 0.8
 lw = 3
 
 #### define model
-param_file='/Users/joel/code/python/threedhst_bsfh/parameter_files/brownseds_np/brownseds_np_params.py'
+param_file='/Users/joel/code/python/prospector_alpha/parameter_files/brownseds_np/brownseds_np_params.py'
 run_params = model_setup.get_run_params(param_file=param_file)
 sps = model_setup.load_sps(**run_params)
 model = model_setup.load_model(**run_params)
 obs = model_setup.load_obs(**run_params)
 
 #### output locations
-out1 = '/Users/joel/code/python/threedhst_bsfh/plots/brownseds_np/pcomp/model_diagram1.png'
-out2 = '/Users/joel/code/python/threedhst_bsfh/plots/brownseds_np/pcomp/model_diagram2.png'
+out1 = '/Users/joel/code/python/prospector_alpha/plots/brownseds_np/pcomp/model_diagram1.png'
+out2 = '/Users/joel/code/python/prospector_alpha/plots/brownseds_np/pcomp/model_diagram2.png'
 
 #### set initial theta
 # 'logmass','sfr_fraction_1', sfr_fraction_2,

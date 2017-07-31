@@ -18,7 +18,7 @@ jansky_mks = 1e-26
 APPS = os.getenv('APPS')
 run_params = {'verbose':True,
               'debug': False,
-              'outfile': APPS+'/threedhst_bsfh/results/guillermo/guillermo',
+              'outfile': APPS+'/prospector_alpha/results/guillermo/guillermo',
               'nofork': True,
               # Optimizer params
               'ftol':0.5e-5, 
@@ -41,8 +41,8 @@ run_params = {'verbose':True,
               'interp_type': 'logarithmic',
               'agelims': [0.0,8.0,8.5,9.0,9.5,9.8],
               # Data info (phot = .cat, dat = .dat, fast = .fout)
-              'cat':APPS+'/threedhst_bsfh/data/gds14876_allphotometry.cat',
-              'objinfo': APPS+'/threedhst_bsfh/data/allfilters.dat'
+              'cat':APPS+'/prospector_alpha/data/gds14876_allphotometry.cat',
+              'objinfo': APPS+'/prospector_alpha/data/allfilters.dat'
               }
 
 ############

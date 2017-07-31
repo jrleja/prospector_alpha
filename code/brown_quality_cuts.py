@@ -48,7 +48,7 @@ def load_atlas3d(e_pinfo):
 	#### load up atlas3d info
 	dtype={'names': ('name', 'hbeta_ang','hbeta_ang_err', 'fe5015_ang','fe5015_ang_err','mgb_ang','mgb_ang_err','fe5270_ang','fe5270_ang_err','age_ssp','age_ssp_err','z_h_ssp','z_h_ssp_err','a_fe_ssp','a_fe_ssp_err','quality'), \
 	       'formats': ('S16', 'f8', 'f8', 'f8', 'f8', 'f8', 'f8', 'f8', 'f8', 'f8', 'f8', 'f8', 'f8', 'f8', 'f8', 'f8', 'f8', 'i4')}
-	a3d = np.loadtxt('/Users/joel/code/python/threedhst_bsfh/data/brownseds_data/atlas_3d_abundances.dat',dtype=dtype,comments='#')
+	a3d = np.loadtxt('/Users/joel/code/python/prospector_alpha/data/brownseds_data/atlas_3d_abundances.dat',dtype=dtype,comments='#')
 
 	#### matching
 	objnames = e_pinfo['objnames']
