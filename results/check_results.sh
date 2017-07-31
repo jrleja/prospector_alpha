@@ -3,7 +3,7 @@
 # for multiple galaxy IDs
 # set location of ID file, base parameter file
 runname=$1
-IDFILE=$APPS"/threedhst_bsfh/data/brownseds_data/photometry/namelist.txt"
+IDFILE=$APPS"/threedhst_prospector/data/brownseds_data/photometry/namelist.txt"
 
 # get number of IDs
 NIDS=$(wc -l < "$IDFILE")

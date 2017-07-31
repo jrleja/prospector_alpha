@@ -19,4 +19,4 @@
 #SBATCH --mail-type=END
 #SBATCH --mail-user=joel.leja@gmail.com
 ### source activate pympi
-mpirun -n 32 python $APPS/bsfh/scripts/prospector.py --param_file=$APPS/prospector_alpha/parameter_files/brownseds_np_nohersch/brownseds_np_nohersch_params_$SLURM_ARRAY_TASK_ID.py 
+mpirun -n 32 python $APPS/prospector/scripts/prospector.py --param_file=$APPS/prospector_alpha/parameter_files/brownseds_np_nohersch/brownseds_np_nohersch_params_$SLURM_ARRAY_TASK_ID.py 

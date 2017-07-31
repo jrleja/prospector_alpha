@@ -1,0 +1,4 @@
+IC 4051: z=0.02931, lumdist=122.0 Mpc
+NGC 3198: z=0.00219666666667, lumdist=13.7 Mpc
+
+flux units are in maggies. multiply by 3631 to get to Jy.
