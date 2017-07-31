@@ -18,6 +18,7 @@ from astropy.cosmology import WMAP9
 import pickle
 from prosp_dutils import asym_errors
 from scipy.optimize import brentq
+from matplotlib.ticker import MaxNLocator
 
 plt.ioff()
 
@@ -149,7 +150,7 @@ def plot_all(agn_evidence,runname='brownseds_agn',runname_noagn='brownseds_np',a
     #### load data
     with open(outfile, "rb") as f:
         outdict=pickle.load(f)
-    idx = 1 # 1 kpc. change to 1 ---> 2 kpc.
+    idx = 1 # 0 = 1 kpc, 1 = 2 kpc.
     plot_summary(pdata,outfolder,outdict,idx,agn_idx=agn_idx,**popts)
 
     agn_evidence['wise_gradient_flag'] = data_cuts(outdict)
@@ -180,7 +181,7 @@ def plot_summary(pdata, outfolder, outdict,idx, agn_idx=Ellipsis, **popts):
             'ecolor':'0.2',
         } 
 
-    fig, ax = plt.subplots(1,1, figsize=(7.5, 7))
+    fig, ax = plt.subplots(1,1, figsize=(6.5, 6))
     arcsec_lim = wise_psf # one PSF FWHM
 
     #### pick out good measurements, and figure out AGN indexes
@@ -191,30 +192,32 @@ def plot_summary(pdata, outfolder, outdict,idx, agn_idx=Ellipsis, **popts):
     cidx = cidx[resolved]
 
     #### plot
-    xp = np.log10(pdata['pars']['fagn']['q50'][resolved])
-    xerr = asym_errors(pdata['pars']['fagn']['q50'][resolved],
+    yp = np.log10(pdata['pars']['fagn']['q50'][resolved])
+    yerr = asym_errors(pdata['pars']['fagn']['q50'][resolved],
                        pdata['pars']['fagn']['q84'][resolved],
                        pdata['pars']['fagn']['q16'][resolved],log=True) 
-    yp = outdict['gradient'][resolved,idx].squeeze()
-    yerr = outdict['gradient_error'][resolved,idx].squeeze()
+    xp = outdict['gradient'][resolved,idx].squeeze()
+    xerr = outdict['gradient_error'][resolved,idx].squeeze()
 
     ax.errorbar(xp[cidx],yp[cidx], 
-                xerr=[xerr[0][cidx],xerr[1][cidx]],
-                yerr=yerr[cidx],
+                yerr=[yerr[0][cidx],yerr[1][cidx]],
+                xerr=xerr[cidx],
                 zorder=-3, fmt=popts['nofmir_shape'],
                 alpha=popts['nofmir_alpha'],ms=6,color=popts['nofmir_color'],**opts)
     ax.errorbar(xp[~cidx],yp[~cidx], 
-                xerr=[xerr[0][~cidx],xerr[1][~cidx]],
-                yerr=yerr[~cidx],
+                yerr=[yerr[0][~cidx],yerr[1][~cidx]],
+                xerr=xerr[~cidx],
                 zorder=-3, fmt=popts['fmir_shape'],
                 alpha=popts['fmir_alpha'],ms=12,color=popts['fmir_color'],**opts)
 
-    ax.set_xlabel(r'log(f$_{\mathrm{AGN,MIR}}$)')
-    ax.set_ylabel(r'$\nabla$(W1-W2) at r=2 kpc [mag/kpc]')
+    ax.set_ylabel(r'log(f$_{\mathrm{AGN,MIR}}$)')
+    ax.set_xlabel(r'$\nabla$(W1-W2) at r=2 kpc [mag/kpc]')
 
-    ax.axhline(0, linestyle='--', color='0.2',lw=2,zorder=-1,alpha=0.4)
+    ax.axvline(-0.15, linestyle='--', color='k',lw=1,zorder=-1)
     #ax.set_ylim(-.2,.2)
-    ax.set_xlim(-4,1)
+    ax.set_ylim(-4,0)
+    ax.set_xlim(-0.3,0.1)
+    ax.xaxis.set_major_locator(MaxNLocator(5))
 
     plt.tight_layout()
     plt.savefig(outfolder+'wise_gradient.png',dpi=150)
@@ -238,10 +241,8 @@ def plot_composites(pdata,outfolder,contours,contour_colors=True,
     for idx in xrange(len(pdata['objname'])):
 
         '''
-        if 'CGCG 436' not in pdata['objname'][idx]:
+        if 'NGC 1068' not in pdata['objname'][idx]:
             continue
-        else:
-            print pdata['objname'][idx]
         '''
         ### load object information
         objname = pdata['objname'][idx]
@@ -463,7 +464,7 @@ def measure_gradient(flux1, flux2, noise1, noise2, background, ax, center, peakf
                       CircularAperture(center,r_out_calc[2]),
                       CircularAnnulus(center,r_in_calc[3],r_out=r_out_calc[3])]
     calcdict = {'r_in':r_in_calc,'r_out':r_out_calc,'apertures':apertures_calc}
-    mask = np.logical_or(np.isinf(noise1),np.isnan(noise1))
+    mask = (np.isinf(noise1)) | (np.isnan(noise1)) | (np.isinf(noise2)) | (np.isnan(noise2))
 
     for dic in [pdict, calcdict]:
 

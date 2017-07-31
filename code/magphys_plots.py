@@ -860,6 +860,7 @@ def plt_all(runname=None,startup=True,**extras):
     else:
         alldata = brown_io.load_alldata(runname=runname)
 
+    '''
     ssfr, ssfr_up, ssfr_down, uvir_ssfr, uvir_ssfr_up, uvir_ssfr_down = [[] for i in range(6)]
     for dat in alldata:
         idx = dat['pextras']['parnames'] == 'ssfr_100'
@@ -875,7 +876,6 @@ def plt_all(runname=None,startup=True,**extras):
         uvir_ssfr_up.append(out[1])
         uvir_ssfr_down.append(out[2])
 
-    '''
     popts = {'fmt':'o', 'capthick':1.5,'elinewidth':1.5,'ms':9,'alpha':0.8,'color':'0.2'}
 
     ssfr = np.squeeze(ssfr)

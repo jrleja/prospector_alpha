@@ -17,7 +17,7 @@ plot 10 largest f_agn spectral comparisons, with two SFHs and two best-fit photo
 
 Maybe separate panels with SFHs, spec residuals, photos residuals? fagn labeled?
 '''
-mask_si_abs = (8.5,12)
+mask_si_abs = (8.5,12.5)
 
 minorFormatter = magphys_plot_pref.jLogFormatter(base=10, labelOnlyBase=False)
 majorFormatter = magphys_plot_pref.jLogFormatter(base=10, labelOnlyBase=True)
@@ -125,13 +125,17 @@ def plot_comparison(idx_plot=None,outfolder=None,
         idx_plot = pdata['agn']['model_pars']['fagn']['q50'].argsort()[-10:]
     
     ### take collate data from composite images
-    fig, sedax, resax = plot_residuals(pdata,idx_plot,outfolder,**popts)
-    
-    pdata_stolen = {}
-    pdata_stolen = stolen_collate_spectra(alldata,alldata_noagn,idx_plot,pdata_stolen,runname,['WISE W1','WISE W2'])
-    sedfig(sedax,resax,pdata_stolen,**popts)
+    fig = plot_residuals(pdata,idx_plot,outfolder,**popts)
+    fig.tight_layout()
     fig.savefig(outfolder+'residuals.png',dpi=150)
     plt.close()
+
+    pdata_stolen = {}
+    pdata_stolen = stolen_collate_spectra(alldata,alldata_noagn,idx_plot,pdata_stolen,runname,['WISE W1','WISE W2'])
+    fig = sedfig(pdata_stolen,**popts)
+    fig.savefig(outfolder+'sed_residuals.png',dpi=150)
+    plt.close()
+
     plot_sfh(pdata,idx_plot,outfolder,**popts)
 
 def add_txt(ax,pdata,fs=12,x=0.05,y=0.88,dy=0.075,ha='left',color=None,**extras):
@@ -211,29 +215,7 @@ def plot_sfh(pdata,idx_plot,outfolder,**popts):
 def plot_residuals(pdata,idx_plot,outfolder,avg=True,**popts):
 
     #### plot geometry
-    fig, ax = plt.subplots(2,2, figsize=(17, 8))
-    left, right, bottom, top = 0.06,0.98,0.1,0.95 # margins
-    #plt.subplots_adjust(right=right,top=top,left=0.54,hspace=0.23,wspace=0.37,bottom=bottom)
-    plt.subplots_adjust(right=0.48,top=top,left=left,hspace=0.24,wspace=0.38,bottom=bottom)
-
-    sedax, resax = [], []
-    axwid, axheight, delx, dely = 0.18, 0.4, 0.05, 0.07
-    left += 0.5
-    left = [left, left+axwid+delx, left, left+axwid+delx]
-    right = [left[0]+axwid, left[1]+axwid, left[0]+axwid, left[1]+axwid]
-    top = [top, top, top-axheight-dely, top-axheight-dely]
-    bot = [top[0]-axheight, top[1]-axheight, top[2]-axheight, top[3]-axheight]
-    for i in xrange(4):
-        gs = gridspec.GridSpec(2,1, height_ratios=[2,1])
-        gs.update(left=left[i],right=right[i],bottom=bot[i],top=top[i],hspace=0)
-        ax_sed, ax_res = plt.Subplot(fig, gs[0]), plt.Subplot(fig, gs[1])
-        fig.add_subplot(ax_sed)
-        fig.add_subplot(ax_res)
-
-        sedax.append(ax_sed)
-        resax.append(ax_res)
-
-    sedax, resax = np.array(sedax), np.array(resax)
+    fig, ax = plt.subplots(2,2, figsize=(11, 10))
     ax = ax.ravel()
     fs = 18
 
@@ -346,9 +328,32 @@ def plot_residuals(pdata,idx_plot,outfolder,avg=True,**popts):
         ax[i+1].xaxis.set_major_formatter(majorFormatter)
         ax[i+1].axhline(0, linestyle='--', color='k',lw=2,zorder=-1)
 
-    return fig, sedax, resax
+    return fig
 
-def sedfig(sedax,resax,pdata,**popts):
+def sedfig(pdata,**popts):
+
+    fig = plt.figure(figsize=(10, 10))
+
+    left, top = 0.116,0.97 # margins
+
+    sedax, resax = [], []
+    axwid, axheight, delx, dely = 0.4, 0.42, 0.075, 0.06
+
+    left = [left, left+axwid+delx, left, left+axwid+delx]
+    right = [left[0]+axwid, left[1]+axwid, left[0]+axwid, left[1]+axwid]
+    top = [top, top, top-axheight-dely, top-axheight-dely]
+    bot = [top[0]-axheight, top[1]-axheight, top[2]-axheight, top[3]-axheight]
+    for i in xrange(4):
+        gs = gridspec.GridSpec(2,1, height_ratios=[2,1])
+        gs.update(left=left[i],right=right[i],bottom=bot[i],top=top[i],hspace=0)
+        ax_sed, ax_res = plt.Subplot(fig, gs[0]), plt.Subplot(fig, gs[1])
+        fig.add_subplot(ax_sed)
+        fig.add_subplot(ax_res)
+
+        sedax.append(ax_sed)
+        resax.append(ax_res)
+
+    sedax, resax = np.array(sedax), np.array(resax)
 
     #### choose galaxies
     to_plot = ['IRAS 08572+3915','NGC 0695','NGC 3690','NGC 7674']
@@ -372,7 +377,6 @@ def sedfig(sedax,resax,pdata,**popts):
         yon, yoff = pdata['observables']['agn_on_spec'][idx][wav_idx], pdata['observables']['agn_off_spec'][idx][wav_idx]
         sedax[ii].plot(mod_wave[wav_idx],yon, lw=lw, alpha=alpha, color=popts['agn_color'],zorder=1)
         sedax[ii].plot(mod_wave[wav_idx],yoff, lw=lw, alpha=alpha, color=popts['noagn_color'])
-
 
         wav_idx = (mod_wave > wavlims[0]) & \
                   (mod_wave < wavlims[1]) & \
@@ -424,6 +428,9 @@ def sedfig(sedax,resax,pdata,**popts):
             min, max = np.min([min,pdata['observables']['ak_flux'][idx][wav_idx].min()]), np.max([max,pdata['observables']['ak_flux'][idx][wav_idx].max()])
 
         ### labels and name
+        sedax[ii].set_xlim(wavlims)
+        resax[ii].set_xlim(wavlims)
+        sedax[ii].set_ylim(min*0.5,max*2)
         fs = 14
         xs, ys, dely = 0.07, 0.61, 0.085
         sedax[ii].text(xs,ys,'AGN on',transform=sedax[ii].transAxes,color=popts['agn_color'],ha='left',fontsize=fs)
@@ -442,7 +449,6 @@ def sedfig(sedax,resax,pdata,**popts):
         resax[ii].axhline(0, linestyle='--', color='0.2',lw=1.5,zorder=-1)
 
         ### axis labels
-        sedax[ii].xaxis.get_major_ticks()[0].label1On = False
         if ii >= 2:
             resax[ii].set_xlabel(r'wavelength $\mu$m')
         if (ii == 0) or (ii == 2):
@@ -452,11 +458,12 @@ def sedfig(sedax,resax,pdata,**popts):
         resax[ii].set_ylim(-reslim,reslim)
         resax[ii].yaxis.set_major_locator(MaxNLocator(3))
 
-        sedax[ii].set_xlim(wavlims)
-        resax[ii].set_xlim(wavlims)
-        sedax[ii].set_ylim(min*0.5,max*2)
+        ### remove x-tick labels
+        labels = [item.get_text() for item in sedax[ii].get_xticklabels()]
+        empty_string_labels = ['']*len(labels)
+        sedax[ii].set_xticklabels(empty_string_labels)
 
-
+    return fig
 
 
 

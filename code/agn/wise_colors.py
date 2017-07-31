@@ -128,10 +128,11 @@ def plot_mir_colors(runname='brownseds_agn',alldata=None,outfolder=None, vega=Tr
                                      idx=idx,**opts)
     plot_nenkova_templates(ax, xfilt=xfilt,yfilt=yfilt,vega=vega)
 
-    #plot_prospector_templates(ax, xfilt=xfilt,yfilt=yfilt,outfolder=outfolder,vega=vega)
+    plot_prospector_templates(ax, xfilt=xfilt,yfilt=yfilt,outfolder=outfolder,vega=vega)
     outstring = 'wise_hotcolors'
     if vega:
         outstring += '_vega'
+    plot_stern_cuts(ax)
     plt.savefig(outfolder+outstring+'.png',dpi=dpi)
     plt.close()
 
@@ -177,7 +178,13 @@ def plot_nenkova_templates(ax, xfilt=None,yfilt=None,vega=False):
     ax.plot(xp,yp,'o',alpha=0.8,ms=11,color=modcolor,mew=2.2)
     ax.plot(xp,yp,' ',alpha=0.6,color=modcolor, linestyle='-',lw=3)
 
-    ax.text(0.05,0.86,'Nenkova+08 \n AGN Templates',transform=ax.transAxes,fontsize=16,color=modcolor,weight='bold')
+    ax.text(0.05,0.89,'Nenkova+08 \nAGN Templates',transform=ax.transAxes,fontsize=13,color=modcolor, weight='semibold')
+
+def plot_stern_cuts(ax):
+    xlim = ax.get_xlim()
+    print xlim
+    ax.axhline(0.8, linestyle='--', color='k',lw=2,zorder=-1)
+    ax.text(xlim[0]+0.2, 0.84, 'Stern+12 AGN cut', fontsize=13, weight='semibold', color='k')
 
 def plot_prospector_templates(ax, xfilt=None, yfilt=None, outfolder=None, vega=False,multiple=True):
 
@@ -186,11 +193,11 @@ def plot_prospector_templates(ax, xfilt=None, yfilt=None, outfolder=None, vega=F
     _sfrX is all SFR in bin X
     '''
 
-    prospcolor = ['#c264ff','#ff4c4c','#1C86EE']
+    prospcolor = ['#c264ff','#1C86EE','#ff4c4c']
 
     xp, yp = [], []
-    strings = ['_sfr1','_sfr6', '_sfr2']
-    label = [' young stars',' old stars', 'intermediate stars']
+    strings = ['_sfr1','_sfr2','_sfr6']
+    label = ['young stars','~0.5 Gyr stars', 'old stars']
     for string in strings:
         prosp = load_dl07_models(outfolder=outfolder,string=string)
         if multiple:
@@ -223,11 +230,11 @@ def plot_prospector_templates(ax, xfilt=None, yfilt=None, outfolder=None, vega=F
         pts.insert(len(pts), pts[0])
 
         poly = Polygon((np.array(pts)- cent) + cent,
-                       facecolor=prospcolor[i], alpha=0.6,zorder=-35)
+                       facecolor=prospcolor[i], alpha=0.45,zorder=-35)
         poly.set_capstyle('round')
         plt.gca().add_patch(poly)
 
-        ax.text(0.05,0.76-0.11*i,'Prospector-$\\alpha$ \n'+label[i],transform=ax.transAxes,fontsize=16,color=prospcolor[i],weight='bold')
+        ax.text(0.05,0.805-0.09*i,'Prospector-$\\alpha$ \n'+label[i],transform=ax.transAxes,fontsize=13,color=prospcolor[i],weight='semibold')
         i += 1
 
 def plot_color_vs_fmir(pdata,xfilt=None,xlabel=None,
@@ -373,9 +380,9 @@ def generate_dl07_models(outfolder='/Users/joel/code/python/threedhst_bsfh/plots
     theta[indices] = 0.0
     sfr_idx = [idx for idx in indices if string[-1] in pnames[idx]]
     theta[sfr_idx] = 1.0
-    theta[pnames.index('dust2')] = 1.5
-    theta[pnames.index('dust1')] = 1.5
-    print theta
+    theta[pnames.index('dust2')] = 0.3
+    theta[pnames.index('dust1')] = 0.3
+
     for logzsol in grid[3]:
         for gamma in grid[0]:
             for qpah in grid[1]:
@@ -384,21 +391,24 @@ def generate_dl07_models(outfolder='/Users/joel/code/python/threedhst_bsfh/plots
                     theta[pnames.index('duste_qpah')] = qpah
                     theta[pnames.index('duste_umin')] = umin
                     theta[pnames.index('logzsol')] = logzsol
-                    sps.ssp.params.dirtiness = 1
+                    #sps.ssp.params.dirtiness = 1
                     spec,mags,sm = model.mean_model(theta, obs, sps=sps)
                     for c in colors: outdict[" ".join(c)].append(-2.5*np.log10(mags[fnames.index(c[0])])+2.5*np.log10(mags[fnames.index(c[1])]))
         
     # now do it again with no dust
-    '''
-    theta[pnames.index('dust2')] = 0.0
-    theta[pnames.index('dust1')] = 0.0
-    for logzsol in grid[3]:
-        theta[pnames.index('logzsol')] = logzsol
-        sps.ssp.params.dirtiness = 1
-        spec,mags,sm = model.mean_model(theta, obs, sps=sps)
-        for c in colors: outdict[" ".join(c)].append(-2.5*np.log10(mags[fnames.index(c[0])])+2.5*np.log10(mags[fnames.index(c[1])]))
-    '''
-
+    try: 
+        test = sfr_idx[0]
+    except IndexError:
+        test = 6
+    if test != 1:
+        theta[pnames.index('dust2')] = 0.0
+        theta[pnames.index('dust1')] = 0.0
+        for logzsol in grid[3]:
+            theta[pnames.index('logzsol')] = logzsol
+            #sps.ssp.params.dirtiness = 1
+            spec,mags,sm = model.mean_model(theta, obs, sps=sps)
+            for c in colors: outdict[" ".join(c)].append(-2.5*np.log10(mags[fnames.index(c[0])])+2.5*np.log10(mags[fnames.index(c[1])]))
+        
     pickle.dump(outdict,open(outfolder+'prospector_template_colors_sfr'+string[-1]+'.pickle', "wb"))
     return outdict
 

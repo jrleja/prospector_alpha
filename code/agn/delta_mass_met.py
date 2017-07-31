@@ -85,8 +85,8 @@ def drawArrow(A, B, ax):
 
 def plot_massmet(pdata,plt_idx,**popts):
 
-    fig, ax = plt.subplots(1,2,figsize=(12,6))
-    ylim = (-2.3,0.4)
+    fig, ax = plt.subplots(1,1,figsize=(6.5,6))
+    ylim = (-2.4,0.5)
     xlabel = r'log(M$_*$/M$_{\odot}$)'
     ylabel = r'log(Z/Z$_{\odot}$)'
 
@@ -104,16 +104,16 @@ def plot_massmet(pdata,plt_idx,**popts):
 
     ### plots
     alpha = 0.7
-    pts = ax[0].scatter(mass_noagn[plt_idx],pdata['no_agn']['logzsol']['q50'][plt_idx], marker='o', color=popts['noagn_color'],s=50,zorder=10,alpha=alpha,edgecolors='k')
-    pts = ax[0].scatter(mass_agn[plt_idx],pdata['agn']['logzsol']['q50'][plt_idx], marker='o', color=popts['agn_color'],s=50,zorder=10,alpha=alpha,edgecolors='k')
-    ax[0].scatter(mass_agn[nonagn_idx],pdata['agn']['logzsol']['q50'][nonagn_idx], marker='o', color='0.4',s=10,zorder=-10,alpha=0.4)
+    pts = ax.scatter(mass_noagn[plt_idx],pdata['no_agn']['logzsol']['q50'][plt_idx], marker='o', color=popts['noagn_color'],s=50,zorder=10,alpha=alpha,edgecolors='k')
+    pts = ax.scatter(mass_agn[plt_idx],pdata['agn']['logzsol']['q50'][plt_idx], marker='o', color=popts['agn_color'],s=50,zorder=10,alpha=alpha,edgecolors='k')
+    ax.scatter(mass_agn[nonagn_idx],pdata['agn']['logzsol']['q50'][nonagn_idx], marker='o', color='0.4',s=10,zorder=-10,alpha=0.4)
     '''
-    ax[0].errorbar(mass_noagn[plt_idx],pdata['no_agn']['logzsol']['q50'][plt_idx], 
+    ax.errorbar(mass_noagn[plt_idx],pdata['no_agn']['logzsol']['q50'][plt_idx], 
                      yerr=err_met_noagn, xerr=err_mass_noagn,
                      fmt='o', ecolor='0.5', capthick=0.5,elinewidth=0.5,
                      ms=0,alpha=0.4,zorder=-5)
 
-    ax[0].errorbar(mass_agn[plt_idx],pdata['agn']['logzsol']['q50'][plt_idx], 
+    ax.errorbar(mass_agn[plt_idx],pdata['agn']['logzsol']['q50'][plt_idx], 
                      yerr=err_met_agn, xerr=err_mass_agn,
                      fmt='o', ecolor='0.5', capthick=0.5,elinewidth=0.5,
                      ms=0,alpha=0.4,zorder=-5)
@@ -121,29 +121,29 @@ def plot_massmet(pdata,plt_idx,**popts):
     for ii in xrange(len(plt_idx)):
         old = (mass_noagn[plt_idx][ii],pdata['no_agn']['logzsol']['q50'][plt_idx[ii]])
         new = (mass_agn[plt_idx][ii],pdata['agn']['logzsol']['q50'][plt_idx[ii]])
-        drawArrow(old,new,ax[0])
+        drawArrow(old,new,ax)
 
     massmet = np.loadtxt(os.getenv('APPS')+'/threedhst_bsfh/data/gallazzi_05_massmet.txt')
     lw = 2.5
     color = 'green'
-    ax[0].plot(massmet[:,0], massmet[:,1],
+    ax.plot(massmet[:,0], massmet[:,1],
            color=color,
            lw=lw,
            linestyle='--',
            zorder=-1)
-    ax[0].plot(massmet[:,0],massmet[:,2],
+    ax.plot(massmet[:,0],massmet[:,2],
            color=color,
            lw=lw,
            zorder=-1)
-    ax[0].plot(massmet[:,0],massmet[:,3],
+    ax.plot(massmet[:,0],massmet[:,3],
            color=color,
            lw=lw,
            zorder=-1)
-    ax[0].set_xlabel(xlabel)
-    ax[0].set_ylabel(ylabel)
-    ax[0].set_ylim(ylim)
-    ax[0].set_xlim(9,11.5)
-    ax[0].text(0.98,0.065,'\nGallazzi et al. 2005',transform=ax[0].transAxes,fontsize=16,color=color,ha='right')
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    ax.set_ylim(ylim)
+    ax.set_xlim(9,11.5)
+    ax.text(0.05,0.93,'\nGallazzi et al. 2005',transform=ax.transAxes,fontsize=16,color=color,ha='left')
 
     ### new plot
     median_z_noagn = np.interp(mass_noagn[plt_idx], massmet[:,0], massmet[:,1])
@@ -163,17 +163,20 @@ def plot_massmet(pdata,plt_idx,**popts):
     deviation_agn[up] /= (upper_z_agn[up]-median_z_agn[up])
     deviation_agn[~up] /= (median_z_agn[~up]-lower_z_agn[~up])
 
+    '''
     ax[1].scatter(mass_noagn[plt_idx],deviation_noagn, marker='o', color=popts['noagn_color'],s=50,zorder=10,alpha=alpha,edgecolors='k')
     ax[1].scatter(mass_agn[plt_idx],deviation_agn, marker='o', color=popts['agn_color'],s=50,zorder=10,alpha=alpha,edgecolors='k')
 
     max = np.max(np.abs(ax[1].get_ylim()))
     ax[1].set_ylim(-max,max)
     ax[1].axhline(0, linestyle='--', color='0.2',lw=2,zorder=-1)
+    '''
+    ax.text(0.04,0.11,'mean offset (AGN off): '+"{:.2f}".format(deviation_noagn.mean())+r"$\sigma_{\mathrm{SDSS}}$",transform=ax.transAxes,fontsize=17,color=popts['noagn_color'])
+    ax.text(0.04,0.05,'mean offset (AGN on): '+"{:.2f}".format(deviation_agn.mean())+r"$\sigma_{\mathrm{SDSS}}$",transform=ax.transAxes,fontsize=17,color=popts['agn_color'])
 
-    ax[1].text(0.05,0.90,'AGN-off mean offset: '+"{:.2f}".format(deviation_noagn.mean())+r"$\sigma$",transform=ax[1].transAxes,fontsize=20,color=popts['noagn_color'])
-    ax[1].text(0.05,0.83,'AGN-on mean offset: '+"{:.2f}".format(deviation_agn.mean())+r"$\sigma$",transform=ax[1].transAxes,fontsize=20,color=popts['agn_color'])
-
+    '''
     ax[1].set_xlabel(xlabel)
     ax[1].set_ylabel(r'log(Z$_{\mathrm{prosp}}$/Z$_{\mathrm{SDSS}}$)/$\sigma_{\mathrm{Z,SDSS}}$')
+    '''
 
     return fig,ax

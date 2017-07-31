@@ -243,7 +243,8 @@ def make_plot(agn_evidence,runname='brownseds_agn',alldata=None,outfolder=None,m
     ### PLOT VERSUS OBSERVED X-RAY FLUX
     outname = 'xray_lum_fagn_model.png'
     fig,ax = plot(pdata,
-                  ypar='fagn',ylabel = r'f$_{\mathrm{AGN,MIR}}$',xrb_color_flag=True, idx=idx, **popts)
+                  ypar='fagn',ylabel = r'log(f$_{\mathrm{AGN,MIR}}$)',xrb_color_flag=False, idx=idx, **popts)
+    plt.tight_layout()
     plt.savefig(outfolder+outname,dpi=dpi)
     plt.close()
 
@@ -381,7 +382,7 @@ def plot(pdata,
     '''
 
     xplot = pdata[xpar]
-    yplot = pdata[ypar]
+    yplot = np.log10(pdata[ypar])
 
     if xpar == 'xray_luminosity':
         xmin, xmax = 5e35,2e44
@@ -394,7 +395,7 @@ def plot(pdata,
     fig, ax = plt.subplots(1,1, figsize=(8, 8))
 
     ### figure out errors
-    yerr =  prosp_dutils.asym_errors(pdata[ypar], pdata[ypar+'_up'], pdata[ypar+'_down'])
+    yerr =  prosp_dutils.asym_errors(pdata[ypar], pdata[ypar+'_up'], pdata[ypar+'_down'],log=True)
     if xpar == 'xray_luminosity':
         xerr = xerr_1d
     else:
@@ -421,25 +422,26 @@ def plot(pdata,
                         **plotopts)
             ax.scatter(xplot[ind][~significant], yplot[ind][~significant], marker=shape, color=blue,s=s,zorder=10,alpha=alph,edgecolors='k')
 
-            ax.text(0.98,0.18,r'L$_{\mathrm{X}}$ consistent',transform=ax.transAxes,color=blue,ha='right')
-            ax.text(0.98,0.14,'with XRBs',transform=ax.transAxes,color=blue,ha='right')
-            ax.text(0.98,0.10,r'L$_{\mathrm{X}}$ inconsistent',transform=ax.transAxes,color=red,ha='right')
-            ax.text(0.98,0.06,'with XRBs',transform=ax.transAxes,color=red,ha='right')
+            #ax.text(0.98,0.18,r'L$_{\mathrm{X}}$ consistent',transform=ax.transAxes,color=blue,ha='right')
+            #ax.text(0.98,0.14,'with XRBs',transform=ax.transAxes,color=blue,ha='right')
+            #ax.text(0.98,0.10,r'L$_{\mathrm{X}}$ inconsistent',transform=ax.transAxes,color=red,ha='right')
+            #ax.text(0.98,0.06,'with XRBs',transform=ax.transAxes,color=red,ha='right')
     else:
         ax.errorbar(xplot, yplot, yerr=yerr, xerr=xerr,ms=0.0,zorder=-2,
                     **plotopts)
-        ax.scatter(xplot[cidx], yplot[cidx], marker=popts['nofmir_shape'], alpha=popts['nofmir_alpha'], color=blue,s=s,zorder=10,edgecolors='k')
-        ax.scatter(xplot[~cidx], yplot[~cidx], marker=popts['fmir_shape'], alpha=popts['fmir_alpha'], color=blue,s=s,zorder=10,edgecolors='k')
+        ax.scatter(xplot[cidx], yplot[cidx], marker=popts['nofmir_shape'], alpha=popts['nofmir_alpha'], color=popts['nofmir_color'],s=s*0.7,zorder=10,edgecolors='k')
+        ax.scatter(xplot[~cidx], yplot[~cidx], marker=popts['fmir_shape'], alpha=popts['fmir_alpha'], color=popts['fmir_color'],s=s,zorder=10,edgecolors='k')
 
     ax.set_ylabel(ylabel)
     ax.set_xlabel(xlabel)
     ax.set_xlim(xmin,xmax)
-    ax.set_ylim(1e-3,2e0)
+    ax.set_ylim(-4,0)
+    ax.axvline(1e42, linestyle='--', color='k',lw=1,zorder=-1)
 
     ax.set_xscale('log',nonposx='clip',subsx=([1]))
-    ax.set_yscale('log',nonposy='clip',subsy=([1]))
+    #ax.set_yscale('log',nonposy='clip',subsy=([1]))
 
-    ax.text(0.05,0.05, r'N$_{\mathrm{match}}$='+str((pdata['xray_luminosity'] > xmin).sum()), transform=ax.transAxes)
+    #ax.text(0.05,0.05, r'N$_{\mathrm{match}}$='+str((pdata['xray_luminosity'] > xmin).sum()), transform=ax.transAxes)
 
     return fig, ax
 

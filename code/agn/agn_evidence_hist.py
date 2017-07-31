@@ -56,21 +56,22 @@ def plot(agn_evidence, alldata, outfolder,agn_idx=None,**popts):
     bins_mid = np.array([[bins_mid[0]-delta_bin]+bins_mid.tolist()+[bins_mid[-1]+delta_bin]]).squeeze()
 
     ### split into groups
-    agn_flag = compflag
+    agn_flag = flag
     noagn_flag = ((measure_flag) & (~flag))# & (~compflag_agn))
     #comp_flag = ((measure_flag) & (~flag) & (compflag_agn))
     flags = [agn_flag, noagn_flag]#, comp_flag]
     colors = [popts['agn_color'], popts['noagn_color']]#, 'orange']
-    labels = ['AGN', 'no AGN']#, 'BPT composite']
+    labels = ['evidence for AGN', 'no evidence for AGN']#, 'BPT composite']
+    linestyles = ['-',':']
 
     ### make histogram
     fig, ax = plt.subplots(1,1, figsize=(7, 7))
     alpha = 0.7
     lw = 3.5
-    for label, color, flag in zip(labels,colors,flags):
+    for label, color, flag, ls in zip(labels,colors,flags,linestyles):
         hist_flag, _ = np.histogram(fmir[flag],bins=bins,density=False)
         hist = np.array([0]+hist_flag.tolist()+[0])
-        ax.plot(bins_mid,hist,color=color,drawstyle='steps-mid',alpha=alpha,lw=lw, label=label)
+        ax.plot(bins_mid,hist,color=color,drawstyle='steps-mid',alpha=alpha,lw=lw, label=label,linestyle=ls)
 
     ax.set_ylabel('N')
     ax.set_xlabel(r'log(f$_{\mathrm{AGN,MIR}}$)')

@@ -20,17 +20,17 @@ def collate_data(alldata,alldata_noagn):
 	### normal parameter labels
 	parnames = alldata_noagn[0]['pquantiles']['parnames'].tolist()
 	parlabels = [r'log(M$_{\mathrm{form}}$/M$_{\odot}$)', 'SFH 0-100 Myr', 'SFH 100-300 Myr', 'SFH 300 Myr-1 Gyr', 
-	         'SFH 1-3 Gyr', 'SFH 3-6 Gyr', 'diffuse dust', r'log(Z/Z$_{\odot}$)', 'diffuse dust index',
+	         'SFH 1-3 Gyr', 'SFH 3-6 Gyr', 'diffuse dust optical depth', r'log(Z/Z$_{\odot}$)', 'diffuse dust index',
 	         'birth-cloud dust', r'dust emission Q$_{\mathrm{PAH}}$',r'dust emission $\gamma$',r'dust emission U$_{\mathrm{min}}$']
 
 	### extra parameters
 	eparnames_all = alldata[0]['pextras']['parnames']
 	eparnames = ['stellar_mass','sfr_100', 'ssfr_100', 'half_time']
-	eparlabels = [r'log(M$_{\mathrm{*}}$/M$_{\odot}$)','log(SFR) [100 Myr]','log(sSFR) [100 Myr]', r"log(t$_{\mathrm{half-mass}})$ [Gyr]"]
+	eparlabels = [r'log(M$_{\mathrm{*}}$/M$_{\odot}$)','log(SFR) [100 Myr]','log(sSFR) [100 Myr]', r"log(t$_{\mathrm{half-mass}}$/Gyr)"]
 
 	### let's do something special here
 	fparnames = ['halpha','m23_frac']
-	fparlabels = [r'log(H$_{\alpha}$ flux)',r'M$_{\mathrm{form}}$(0.1-1 Gyr)/M$_{\mathrm{form}}$(all)']
+	fparlabels = [r'log(H$_{\alpha}$ flux)',r'M$_{\mathrm{0.1-1 Gyr}}$/M$_{\mathrm{total}}$']
 	objname = []
 
 	### setup dictionary
@@ -178,13 +178,10 @@ def plot_dpars(pdata,xpar=None,xparlabel=None,log_xpar=False, agn_idx=None, **po
 	        #'ms': 10
 	       }
 
-	toplot = ['stellar_mass','logzsol','dust2','ssfr_100','half_time','m23_frac']
+	toplot = np.array(['half_time','dust2', 'm23_frac','stellar_mass','logzsol','ssfr_100'])
 
 	idx = 0
-	for ii, par in enumerate(pdata['ordered_labels']):
-
-		if par not in toplot:
-			continue
+	for par in toplot:
 
 		# find the complement
 		cidx = np.ones_like(xpar_plot,dtype=bool)
@@ -196,9 +193,8 @@ def plot_dpars(pdata,xpar=None,xparlabel=None,log_xpar=False, agn_idx=None, **po
 		ax[idx].errorbar(xpar_plot[agn_idx],pdata['median'][par][agn_idx], yerr=[errs[0][agn_idx],errs[1][agn_idx]], zorder=-3, 
 			             fmt=popts['fmir_shape'],alpha=popts['fmir_alpha'],ms=10,color=popts['fmir_color'],**opts)
 
-		ax[idx].set_ylabel('AGN(on)-AGN(off)')
+		ax[idx].set_ylabel(r'$\Delta_{\mathrm{on-off}}$ '+pdata['labels'][par])
 		ax[idx].set_xlabel(xparlabel)
-		ax[idx].set_title(pdata['labels'][par])
 
 		ax[idx].plot([ax[idx].get_xlim()[0],ax[idx].get_xlim()[1]],[0.0,0.0], linestyle='--',color='0.5',lw=1.5,zorder=-5)
 		ax[idx].xaxis.set_major_locator(MaxNLocator(5))

@@ -83,8 +83,7 @@ def make_plot():
     ### define wavelength regime + conversions
     to_plot = np.array([1,100])
     plt_idx = (sps.wavelengths > to_plot[0]*1e4) & (sps.wavelengths < to_plot[1]*1e4)
-    c = 3e18   # angstroms per second
-    conversion = c/sps.wavelengths[plt_idx]
+    onemicron = np.abs((sps.wavelengths[plt_idx]/1e4 - 1)).argmin()
 
     #### generate spectra
     fmir = []
@@ -108,17 +107,21 @@ def make_plot():
                 text = (lmir_agn-modelout['lmir'])/lmir_agn
             else:
                 text = samp_pars[k][i]
-            ax[k].plot(sps.wavelengths[plt_idx]/1e4,np.log(spec[plt_idx]*conversion),
+
+            yplot = np.log(spec[plt_idx])
+            yplot *= -13.5 / yplot[onemicron]
+
+            ax[k].plot(sps.wavelengths[plt_idx]/1e4,yplot,
                        color=cmap(i),lw=2,label="{:.1f}".format(text),
                        path_effects=[pe.Stroke(linewidth=4, foreground='k',alpha=0.7), pe.Normal()],
                        zorder=k)
         itheta[idx[k]] = model.initial_theta[idx[k]]
 
     #### legend + labels
-    ax[0].legend(loc=4,prop={'size':12},title='f$_{\mathrm{AGN,MIR}}$',ncol=2)
-    ax[1].legend(loc=4,prop={'size':12},title=to_samp[1],ncol=2)
-    ax[0].text(0.05,0.075,r'$\tau_{\mathrm{AGN}}$=20',transform=ax[0].transAxes,fontsize=12)
-    ax[1].text(0.05,0.075,r'f$_{\mathrm{AGN,MIR}}$=0.8',transform=ax[1].transAxes,fontsize=12)
+    ax[0].legend(loc=2,prop={'size':12},title='f$_{\mathrm{AGN,MIR}}$',ncol=2,frameon=False)
+    ax[1].legend(loc=2,prop={'size':12},title=to_samp[1],ncol=2,frameon=False)
+    ax[0].text(0.971,0.08,r'$\tau_{\mathrm{AGN}}$=20',transform=ax[0].transAxes,fontsize=12,ha='right')
+    ax[1].text(0.971,0.08,r'f$_{\mathrm{AGN,MIR}}$=0.8',transform=ax[1].transAxes,fontsize=12,ha='right')
 
     for a in ax:
         a.get_legend().get_title().set_fontsize('16')
@@ -126,10 +129,10 @@ def make_plot():
         a.xaxis.set_minor_formatter(minorFormatter)
         a.xaxis.set_major_formatter(majorFormatter)
         a.set_xlim(to_plot)
-        a.set_ylim(15.7,21)
+        a.set_ylim(-14.15,-7.9)
 
         a.set_xlabel(r'wavelength [$\mu$m]')
-        a.set_ylabel(r'log($\nu$f$_{\nu}$)')
+        a.set_ylabel(r'log(f$_{\nu}$)')
 
     plt.tight_layout()
     fig.savefig(outname,dpi=150)

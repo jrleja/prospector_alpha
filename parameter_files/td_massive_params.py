@@ -133,10 +133,50 @@ def tie_gas_logz(logzsol=None, **extras):
 def to_dust1(dust1_fraction=None, dust1=None, dust2=None, **extras):
     return dust1_fraction*dust2
 
-def transform_zfraction_to_sfrfraction(sfr_fraction=None, z_fraction=None, **extras):
-    sfr_fraction[0] = 1-z_fraction[0]
-    for i in xrange(1,sfr_fraction.shape[0]): sfr_fraction[i] =  np.prod(z_fraction[:i])*(1-z_fraction[i])
+def zfrac_to_sfrac(z_fraction=None, **extras):
+    """This transforms from latent, independent `z` variables to sfr
+    fractions. The transformation is such that sfr fractions are drawn from a
+    Dirichlet prior.  See Betancourt et al. 2010
+    """
+    sfr_fraction = np.zeros(len(z_fraction) + 1)
+    sfr_fraction[0] = 1.0 - z_fraction[0]
+    for i in range(1, len(z_fraction)):
+        sfr_fraction[i] = np.prod(z_fraction[:i]) * (1.0 - z_fraction[i])
+    sfr_fraction[-1] = 1 - np.sum(sfr_fraction[:-1])
+
     return sfr_fraction
+
+def zfrac_to_masses(logmass=None, z_fraction=None, agebins=None, **extras):
+    """This transforms from latent, independent `z` variables to sfr fractions
+    and then to bin mass fractions. The transformation is such that sfr
+    fractions are drawn from a Dirichlet prior.  See Betancourt et al. 2010
+    :returns masses:
+        The stellar mass formed in each age bin.
+    """
+    # sfr fractions (e.g. Leja 2016)
+    sfr_fraction = zfrac_to_sfrac(z_fraction)
+    # convert to mass fractions
+    time_per_bin = np.diff(10**agebins, axis=-1)[:,0]
+    sfr_fraction *= np.array(time_per_bin)
+    sfr_fraction /= sfr_fraction.sum()
+    masses = 10**logmass * sfr_fraction
+
+    return masses
+
+def masses_to_zfrac(mass=None, agebins=None, **extras):
+    """The inverse of zfrac_to_masses, for setting mock parameters based on
+    real bin masses.
+    """
+    total_mass = mass.sum()
+    time_per_bin = np.diff(10**agebins, axis=-1)[:,0]
+    sfr_fraction = mass / time_per_bin
+    sfr_fraction /= sfr_fraction.sum()
+    z_fraction = np.zeros(len(sfr_fraction) - 1)
+    z_fraction[0] = 1 - sfr_fraction[0]
+    for i in range(1, len(z_fraction)):
+        z_fraction[i] = 1.0 - sfr_fraction[i] / np.prod(z_fraction[:i])
+
+    return total_mass, z_fraction
 
 #############
 # MODEL_PARAMS
@@ -193,24 +233,17 @@ model_params.append({'name': 'logmass', 'N': 1,
                         'prior': priors.TopHat(mini=5.0, maxi=13.0)})
 
 model_params.append({'name': 'mass', 'N': 1,
-                        'isfree': False,
-                        'init': 1e10,
-                        'depends_on': transform_logmass_to_mass,
-                        'units': 'Msun',
-                        'prior': priors.TopHat(mini=1e5, maxi=1e13)})
+                     'isfree': False,
+                     'depends_on': zfrac_to_masses,
+                     'init': 1.,
+                     'prior': priors.LogUniform(mini=1e9, maxi=1e12),
+                     'units': r'M$_\odot$',})
 
 model_params.append({'name': 'agebins', 'N': 1,
                         'isfree': False,
                         'init': [],
                         'units': 'log(yr)',
                         'prior': None})
-
-model_params.append({'name': 'sfr_fraction', 'N': 1,
-                        'isfree': False,
-                        'init': [],
-                        'depends_on': transform_zfraction_to_sfrfraction,
-                        'units': '',
-                        'prior': priors.TopHat(mini=0.0, maxi=1.0)})
 
 model_params.append({'name': 'z_fraction', 'N': 1,
                         'isfree': True,
@@ -418,27 +451,6 @@ class FracSFH(FastStepBasis):
                 flux[i] = 0.0
         return flux
 
-    def get_galaxy_spectrum(self, **params):
-        self.update(**params)
-
-        #### here's the custom fractional stuff
-        fractions = np.array(self.params['sfr_fraction'])
-        bin_fractions = np.append(fractions,(1-np.sum(fractions)))
-        time_per_bin = []
-        for (t1, t2) in self.params['agebins']: time_per_bin.append(10**t2-10**t1)
-        bin_fractions *= np.array(time_per_bin)
-        bin_fractions /= bin_fractions.sum()
-        
-        mass = bin_fractions*self.params['mass']
-        mtot = self.params['mass'].sum()
-
-        time, sfr, tmax = self.convert_sfh(self.params['agebins'], mass)
-        self.ssp.params["sfh"] = 3 #Hack to avoid rewriting the superclass
-        self.ssp.set_tabular_sfh(time, sfr)
-        wave, spec = self.ssp.get_spectrum(tage=tmax, peraa=False)
-
-        return wave, spec / mtot, self.ssp.stellar_mass / mtot
-
     def get_spectrum(self, outwave=None, filters=None, peraa=False, **params):
         """Get a spectrum and SED for the given params.
         ripped from SSPBasis
@@ -568,18 +580,15 @@ def load_model(objname=None, datdir=None, runname=None, agelims=[], **extras):
     model_params[n.index('agebins')]['N'] = ncomp
     model_params[n.index('agebins')]['init'] = agebins.T
 
-    #### FRACTIONAL MASS INITIALIZATION
-    # N-1 bins, last is set by x = 1 - np.sum(sfr_fraction)
+    ### computational z-fraction setup
+    # N-1 bins
+    # set initial by drawing randomly from the prior
+    model_params[n.index('mass')]['N'] = ncomp
     model_params[n.index('z_fraction')]['N'] = ncomp-1
     tilde_alpha = np.array([ncomp-i for i in xrange(1,ncomp)])
     model_params[n.index('z_fraction')]['prior'] = priors.Beta(alpha=tilde_alpha, beta=np.ones_like(tilde_alpha),mini=0.0,maxi=1.0)
     model_params[n.index('z_fraction')]['init'] =  model_params[n.index('z_fraction')]['prior'].sample()
     model_params[n.index('z_fraction')]['init_disp'] = 0.02
-
-    model_params[n.index('sfr_fraction')]['N'] = ncomp-1
-    model_params[n.index('sfr_fraction')]['prior'] = priors.TopHat(maxi=np.full(ncomp-1,1.0), mini=np.full(ncomp-1,0.0))
-    model_params[n.index('sfr_fraction')]['init'] =  np.zeros(ncomp-1)+1./ncomp
-    model_params[n.index('sfr_fraction')]['init_disp'] = 0.02
 
     #### INSERT REDSHIFT INTO MODEL PARAMETER DICTIONARY ####
     zind = n.index('zred')
