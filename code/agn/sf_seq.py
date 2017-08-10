@@ -14,13 +14,12 @@ from astropy.stats import sigma_clipped_stats
 import matplotlib as mpl
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-np.random.seed(seed=11)
-
 dpi = 150
 red = '#FF3D0D'
 blue = '#1C86EE' 
 
-banned_list = ['NGC 5055', 'NGC 5953', 'UGC 08696', 'NGC 5258', 'IC 0691','NGC 4676 A', 'UGC 09618 N','NGC 1144']
+banned_list = ['NGC 5055', 'NGC 5953', 'UGC 08696', 'NGC 5258', 'NGC 4676 A', 'UGC 09618 N', 'NGC 1144']
+banned_list = []
 
 def collate_data(alldata):
 
@@ -63,49 +62,75 @@ def plot(runname='brownseds_agn',alldata=None,outfolder=None,**popts):
 def plot_sfseq(pdata,outfolder=None,sigclip=True,name_label=False):
 
     #### set up figure geometry
-    xlim = [9, 11.5]
-    ylim = [-2,2]
-    delta_im = 0.07
+    xlim = [9., 11.5]
+    ylim = [-2.,2.]
+    delta_im = 0.045
     delx, dely = (xlim[1]-xlim[0])*delta_im, (ylim[1]-ylim[0])*delta_im
 
     #### randomly sample subject to constraints
     logM_min, logM_max = xlim[0]+delx/2., xlim[1]-delx/2.
     logSFR_min, logSFR_max = ylim[0]+dely/2., ylim[1]-dely/2.
-    ntot = 40
-    overlap = 0.5
+    overlap = 0.7
     m, sfr, fmir, name = [[] for i in range(4)]
-    while (len(m) < ntot):
+    
+    good = np.where(
+                    (pdata['stellar_mass'] > logM_min) & \
+                    (pdata['stellar_mass'] < logM_max) & \
+                    (pdata['sfr_100'] > logSFR_min) & \
+                    (pdata['sfr_100'] < logSFR_max) & \
+                    np.array([obj not in banned_list for obj in pdata['objname']],dtype=bool)
+                  )[0]
+    print 'total number of objects in window: ' + str(len(good))
 
-        if len(m) == 0:
-            good = np.where(
-                            (pdata['stellar_mass'] > logM_min) & \
-                            (pdata['stellar_mass'] < logM_max) & \
-                            (pdata['sfr_100'] > logSFR_min) & \
-                            (pdata['sfr_100'] < logSFR_max) & \
-                            np.array([obj not in banned_list for obj in pdata['objname']],dtype=bool)
-                          )
-            print 1/0
-        else:
-            good = np.where(
-                            (pdata['stellar_mass'] > logM_min) & \
-                            (pdata['stellar_mass'] < logM_max) & \
-                            (pdata['sfr_100'] > logSFR_min) & \
-                            (pdata['sfr_100'] < logSFR_max) & \
-                            np.array([obj not in banned_list for obj in pdata['objname']],dtype=bool) & \
-                            (np.array([(np.abs(stellar_mass-np.array(m)) > delx*overlap).all() for stellar_mass in pdata['stellar_mass']],dtype=bool) | \
-                            np.array([(np.abs(sfr_100-np.array(sfr)) > dely*overlap).all() for sfr_100 in pdata['sfr_100']]))
-                           )
-        try:
-            idx = np.random.choice(good[0], 1, replace=False)
-        except:
-            print 'ran out of galaxies! proceeding with ' + str(len(m))
-            break
+    ### allowed shifts
+    scale = 4
+    nshift = 60 # must be even
+    shiftx = np.concatenate((np.linspace(0,delx*scale,nshift/2+1),np.linspace(-delx*scale/10.,-delx*scale,nshift/2)))
+    shifty = np.concatenate((np.linspace(0,dely*scale,nshift/2+1),np.linspace(-dely*scale/10.,-dely*scale,nshift/2)))
 
-        m = m + pdata['stellar_mass'][idx].tolist()
-        sfr = sfr + pdata['sfr_100'][idx].tolist()
-        fmir = fmir + pdata['fmir'][idx].tolist()
-        name = name + pdata['objname'][idx].tolist()
+    for i, newseed in enumerate(np.linspace(1,25,25)):
 
+        ### use galaxies with N highest FMIR
+        ### otherwise sample randomly
+        np.random.seed(seed=int(newseed))
+        ntop = 4
+        arg = good[pdata['fmir'][good].argsort()][::-1]
+        np.random.shuffle(arg[ntop:])
+
+        ### newlist
+        m.append([])
+        sfr.append([])
+        fmir.append([])
+        name.append([])
+
+        for idx in arg:
+
+            ### shift until we're in the clear
+            win = False
+            for sx in shiftx:
+                for sy in shifty:
+                    stellar_mass = pdata['stellar_mass'][idx] + sx
+                    sfr_100 = pdata['sfr_100'][idx] + sy
+                    if (np.abs(stellar_mass-np.array(m[i])) > delx/2.*overlap).all() & (np.abs(sfr_100-np.array(sfr[i])) > dely/2.*overlap).all():
+                        win = True
+                        break
+                if win:
+                    break
+
+            ### if we can't fit it, try the next one
+            if not win:
+                continue
+
+            ### add it in
+            m[i] = m[i] + [stellar_mass]
+            sfr[i] = sfr[i] + [sfr_100]
+            fmir[i] = fmir[i] + [pdata['fmir'][idx]]
+            name[i] = name[i] + [pdata['objname'][idx]]
+
+    nsize = [len(n) for n in m]
+    amax = np.array(nsize).argmax()
+    print str(nsize[amax]) + ' objects fit in'
+    m, sfr, fmir, name = m[amax], sfr[amax], fmir[amax], name[amax]
 
     #### colormap scaling
     fmir = np.array(fmir)
