@@ -7,8 +7,9 @@ import os
 import observe_agn_templates
 from scipy.spatial import ConvexHull
 from prosp_dutils import asym_errors
-import pickle
+import hickle
 from matplotlib.patches import Polygon
+from sedpy import observate
 
 np.random.seed(2)
 blue = '#1C86EE' 
@@ -127,6 +128,7 @@ def plot_mir_colors(runname='brownseds_agn',alldata=None,outfolder=None, vega=Tr
                                      log_cpar=True, cpar_range=cpar_range,vega=vega,
                                      idx=idx,**opts)
     plot_nenkova_templates(ax, xfilt=xfilt,yfilt=yfilt,vega=vega)
+    #plot_palpha_templates(ax, xfilt=xfilt,yfilt=yfilt,outfolder=outfolder,vega=vega)
 
     plot_prospector_templates(ax, xfilt=xfilt,yfilt=yfilt,outfolder=outfolder,vega=vega)
     outstring = 'wise_hotcolors'
@@ -335,13 +337,111 @@ def plot_color_scatterplot(pdata,xfilt=None,yfilt=None,xlabel=None,ylabel=None,
 def load_dl07_models(outfolder=None,string=''):
 
     try:
-        with open(outfolder+'prospector_template_colors'+string+'.pickle', "rb") as f:
-            outdict=pickle.load(f)
+        with open(outfolder+'prospector_template_colors'+string+'.hickle', "r") as f:
+            outdict=hickle.load(f)
     except IOError as e:
         print e
         print 'generating DL07 models'
         outdict = generate_dl07_models(outfolder=outfolder,string=string)
 
+    return outdict
+
+def plot_palpha_templates(ax, xfilt=None, yfilt=None, outfolder=None, vega=True,multiple=True):
+
+    outname = outfolder+'prospector_prior_colors.hickle'
+    try:
+        with open(outname, "r") as f:
+            prosp = hickle.load(f)
+    except IOError as e:
+        print 'drawing from p-alpha priors'
+        prosp = generate_palpha_models(outname)
+
+    xdat = np.array(prosp[" ".join(xfilt)])
+    ydat = np.array(prosp[" ".join(yfilt)])
+
+    if vega:
+        xdat += vega_conversions(xfilt[0]) - vega_conversions(xfilt[1])
+        ydat += vega_conversions(yfilt[0]) - vega_conversions(yfilt[1])
+
+    points = np.array([xdat.tolist(),ydat.tolist()]).transpose()
+    hull = ConvexHull(points)
+
+    cent = np.mean(points, 0)
+    pts = []
+    for pt in points[hull.simplices]:
+        pts.append(pt[0].tolist())
+        pts.append(pt[1].tolist())
+
+    pts.sort(key=lambda p: np.arctan2(p[1] - cent[1],
+                                    p[0] - cent[0]))
+    pts = pts[0::2]  # Deleting duplicates
+    pts.insert(len(pts), pts[0])
+
+    poly = Polygon((np.array(pts)- cent) + cent,
+                   facecolor='green', alpha=0.45,zorder=-35)
+    poly.set_capstyle('round')
+    plt.gca().add_patch(poly)
+
+    he, xedges, yedges = np.histogram2d(xdat, ydat, bins=10, range=None, normed=True, weights=None)
+    xmid = (xedges[1:] + xedges[:-1])/2.
+    ymid = (yedges[1:] + yedges[:-1])/2.
+
+    cs = ax.contourf(xmid,ymid, np.log10(he.T), linewidths=2,zorder=2, alpha=0.4, cmap='Greys')
+    ax.clabel(cs, inline=1, fontsize=12)
+
+    #X, Y = np.meshgrid(xedges, yedges)
+    #ax.pcolormesh(X, Y, he.T, cmap='Greys',zorder=-5)
+
+    return prosp
+
+def generate_palpha_models(outname, ndraw=500000):
+
+    import brownseds_np_params as nonparam
+
+    #### load test model, build sps, build important variables ####
+    sps = nonparam.load_sps(**nonparam.run_params)
+    model = nonparam.load_model(**nonparam.run_params)
+    sps.update(**model.params)
+
+    ### change priors slightly
+    model._config_dict['dust2']['prior'].update(max=0.5)
+    model._config_dict['dust_index']['prior'].update() 
+    model.params['zred'] = 0.0
+
+    outdict = {}
+    colors = [['spitzer_irac_ch3','spitzer_irac_ch4'], 
+              ['spitzer_irac_ch1','spitzer_irac_ch2'],
+              ['wise_w3','wise_w4'], 
+              ['wise_w2','wise_w3'], 
+              ['wise_w1','wise_w2']]
+    
+    fake_obs = {'maggies': None, 
+                'phot_mask': np.ones_like(np.unique(colors)),
+                'wavelength': None, 
+                'filters': observate.load_filters(np.unique(colors))}
+
+    for c in colors: outdict[" ".join(c)] = []
+
+    theta = copy.deepcopy(model.initial_theta)
+    pnames = model.theta_labels()
+    fnames = [f.name for f in fake_obs['filters']]
+
+    ### draw within the priors
+    for n in xrange(ndraw):
+        for k, inds in list(model.theta_index.items()): theta[inds] = model._config_dict[k]['prior'].sample()
+        spec,mags,sm = model.mean_model(theta, fake_obs, sps=sps)
+        for c in colors: outdict[" ".join(c)].append(float(-2.5*np.log10(mags[fnames.index(c[0])])+2.5*np.log10(mags[fnames.index(c[1])])))
+        if (n % int(ndraw/10)  == 0) & (n != 0):
+            print str(int(n / float(ndraw)*100))+'% done'
+    '''
+    # calculate colors for UGC 5101
+    theta = np.array([11.16,0.00,0.00,0.96,0.01,0.02,1.99,-0.30,0.37,2.12,3.25,0.94,19.16])
+
+    spec,mags,sm = model.mean_model(theta, fake_obs, sps=sps)
+    for c in colors: outdict[" ".join(c)].append(float(-2.5*np.log10(mags[fnames.index(c[0])])+2.5*np.log10(mags[fnames.index(c[1])])))
+    print 1/0
+    '''
+    hickle.dump(outdict,open(outname, "w"))
     return outdict
 
 def generate_dl07_models(outfolder='/Users/joel/code/python/prospector_alpha/plots/brownseds_agn/agn_plots/',string=None):
@@ -355,7 +455,7 @@ def generate_dl07_models(outfolder='/Users/joel/code/python/prospector_alpha/plo
     sps.update(**model.params)
 
     #### pull out boundaries
-    ngrid = 10
+    ngrid = 12
     to_vary = ['duste_gamma','duste_qpah','duste_umin','logzsol']
     grid = []
     for l in to_vary:
@@ -391,25 +491,23 @@ def generate_dl07_models(outfolder='/Users/joel/code/python/prospector_alpha/plo
                     theta[pnames.index('duste_qpah')] = qpah
                     theta[pnames.index('duste_umin')] = umin
                     theta[pnames.index('logzsol')] = logzsol
-                    #sps.ssp.params.dirtiness = 1
                     spec,mags,sm = model.mean_model(theta, obs, sps=sps)
                     for c in colors: outdict[" ".join(c)].append(-2.5*np.log10(mags[fnames.index(c[0])])+2.5*np.log10(mags[fnames.index(c[1])]))
-        
+
     # now do it again with no dust
     try: 
         test = sfr_idx[0]
     except IndexError:
         test = 6
-    if test != 1:
+    if (test != 1):
         theta[pnames.index('dust2')] = 0.0
         theta[pnames.index('dust1')] = 0.0
         for logzsol in grid[3]:
             theta[pnames.index('logzsol')] = logzsol
-            #sps.ssp.params.dirtiness = 1
             spec,mags,sm = model.mean_model(theta, obs, sps=sps)
             for c in colors: outdict[" ".join(c)].append(-2.5*np.log10(mags[fnames.index(c[0])])+2.5*np.log10(mags[fnames.index(c[1])]))
         
-    pickle.dump(outdict,open(outfolder+'prospector_template_colors_sfr'+string[-1]+'.pickle', "wb"))
+    hickle.dump(outdict,open(outfolder+'prospector_template_colors_sfr'+string[-1]+'.hickle', "w"))
     return outdict
 
 

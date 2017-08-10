@@ -152,8 +152,7 @@ def load_obs(photname='', extinctname='', herschname='', objname='', **extras):
     with open(photname, 'r') as f:
         hdr = f.readline().split()
     dtype = np.dtype([(hdr[1],'S20')] + [(n, np.float) for n in hdr[2:]])
-    dat = np.loadtxt(photname, comments = '#', delimiter='\t',
-                     dtype = dtype)
+    dat = np.loadtxt(photname, comments = '#', delimiter='\t', dtype = dtype)
     obj_ind = np.where(dat['id'] == objname)[0][0]
 
     # extract fluxes+uncertainties for all objects and all filters
@@ -268,7 +267,6 @@ def tie_gas_logz(logzsol=None, **extras):
 def transform_zfraction_to_sfrfraction(sfr_fraction=None, z_fraction=None, **extras):
     sfr_fraction[0] = 1-z_fraction[0]
     for i in xrange(1,sfr_fraction.shape[0]): sfr_fraction[i] =  np.prod(z_fraction[:i])*(1-z_fraction[i])
-    #sfr_fraction[-1] = np.prod(z)  #### THIS IS SET IMPLICITLY
     return sfr_fraction
     
 #############

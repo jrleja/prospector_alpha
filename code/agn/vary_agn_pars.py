@@ -11,6 +11,7 @@ import matplotlib as mpl
 import math
 import brownseds_agn_params_1 as nparams
 import matplotlib.patheffects as pe
+import observe_agn_templates
 
 #### LOAD ALL OF THE THINGS
 sps = nparams.load_sps(**nparams.run_params)
@@ -63,7 +64,7 @@ def make_plot():
 
     #### open figure
     itheta = copy.deepcopy(model.initial_theta)
-    fig, ax = plt.subplots(1,2,figsize=(10,5))
+    fig, ax = plt.subplots(1,3,figsize=(15,5))
     outname = '/Users/joel/code/python/prospector_alpha/plots/brownseds_agn/agn_plots/AGN_parameters.png'
 
     #### find indexes
@@ -74,7 +75,7 @@ def make_plot():
     #### set up parameters
     nsamp = 5
     to_samp = [r'f$_{\mathrm{AGN,MIR}}$',r'$\tau_{\mathrm{AGN}}$']
-    samp_pars = [[0.0, 0.05, 0.1, 0.2, 0.5],[5,10,20,50,150]] 
+    samp_pars = [[0.0, 0.05, 0.1, 0.2, 0.5],[5,10,20,40,150]] 
 
     idx = [didx,tidx]
     model.initial_theta[didx] = 0.5
@@ -83,7 +84,10 @@ def make_plot():
     ### define wavelength regime + conversions
     to_plot = np.array([1,100])
     plt_idx = (sps.wavelengths > to_plot[0]*1e4) & (sps.wavelengths < to_plot[1]*1e4)
-    onemicron = np.abs((sps.wavelengths[plt_idx]/1e4 - 1)).argmin()
+    onemicron = np.abs((sps.wavelengths[plt_idx]/1e4 - 100)).argmin()
+
+    ### add AGN-only templates
+    observe_agn_templates.plot(ax[0])
 
     #### generate spectra
     fmir = []
@@ -91,7 +95,6 @@ def make_plot():
         nsamp = len(samp_pars[k])
         cmap = get_cmap(nsamp)
         for i in xrange(nsamp):
-            #sps.ssp.params.dirtiness = 1
             itheta[idx[k]] = samp_pars[k][i]
             spec,mags,sm = model.mean_model(itheta, obs, sps=sps)
 
@@ -109,27 +112,30 @@ def make_plot():
                 text = samp_pars[k][i]
 
             yplot = np.log(spec[plt_idx])
-            yplot *= -13.5 / yplot[onemicron]
+            yplot -= yplot[onemicron]
 
-            ax[k].plot(sps.wavelengths[plt_idx]/1e4,yplot,
+            ax[k+1].plot(sps.wavelengths[plt_idx]/1e4,yplot,
                        color=cmap(i),lw=2,label="{:.1f}".format(text),
                        path_effects=[pe.Stroke(linewidth=4, foreground='k',alpha=0.7), pe.Normal()],
                        zorder=k)
         itheta[idx[k]] = model.initial_theta[idx[k]]
 
     #### legend + labels
-    ax[0].legend(loc=2,prop={'size':12},title='f$_{\mathrm{AGN,MIR}}$',ncol=2,frameon=False)
-    ax[1].legend(loc=2,prop={'size':12},title=to_samp[1],ncol=2,frameon=False)
-    ax[0].text(0.971,0.08,r'$\tau_{\mathrm{AGN}}$=20',transform=ax[0].transAxes,fontsize=12,ha='right')
-    ax[1].text(0.971,0.08,r'f$_{\mathrm{AGN,MIR}}$=0.8',transform=ax[1].transAxes,fontsize=12,ha='right')
+    ax[1].legend(loc=2,prop={'size':12},title='f$_{\mathrm{AGN,MIR}}$',frameon=False)
+    ax[2].legend(loc=2,prop={'size':12},title=to_samp[1],frameon=False)
+    ax[1].text(0.971,0.08,r'$\tau_{\mathrm{AGN}}$=20',transform=ax[1].transAxes,fontsize=12,ha='right')
+    ax[2].text(0.971,0.08,r'f$_{\mathrm{AGN,MIR}}$=0.8',transform=ax[2].transAxes,fontsize=12,ha='right')
 
-    for a in ax:
+    ax[1].text(0.95,0.91,'AGN+galaxy',weight='semibold',transform=ax[1].transAxes,ha='right',fontsize=16)
+    ax[2].text(0.95,0.91,'AGN+galaxy',weight='semibold',transform=ax[2].transAxes,ha='right',fontsize=16)
+
+    for a in ax[1:]:
         a.get_legend().get_title().set_fontsize('16')
         a.set_xscale('log',nonposx='clip',subsx=(1,3))
         a.xaxis.set_minor_formatter(minorFormatter)
         a.xaxis.set_major_formatter(majorFormatter)
         a.set_xlim(to_plot)
-        a.set_ylim(-14.15,-7.9)
+        a.set_ylim(-6,0.3)
 
         a.set_xlabel(r'wavelength [$\mu$m]')
         a.set_ylabel(r'log(f$_{\nu}$)')
