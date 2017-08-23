@@ -73,14 +73,14 @@ def plot(runname='brownseds_agn',runname_noagn='brownseds_np',
                     alldata=alldata_sub,alldata_noagn=alldata_noagn,outfolder=outfolder,**popts)
     '''
     agn_evidence = {}
-    print 'PLOTTING XRAY LUMINOSITY'
-    agn_evidence = xray_luminosity.make_plot(agn_evidence,runname=runname,alldata=alldata_sub,outfolder=outfolder,idx=agn_idx,**popts)
-    print 1/0
-    print 'PLOTTING MASS-METALLICITY DIAGRAM'
-    delta_mass_met.plot_comparison(runname=runname,alldata=alldata_sub,alldata_noagn=alldata_noagn,outfolder=outfolder,plt_idx=agn_idx,**popts) 
     print 'PLOTTING AGN RESIDUALS'
     agn_residuals.plot_comparison(idx_plot=agn_idx,runname=runname,runname_noagn=runname_noagn,
                                         alldata=alldata_sub,alldata_noagn=alldata_noagn,outfolder=outfolder,**popts)
+    print 1/0
+    print 'PLOTTING MASS-METALLICITY DIAGRAM'
+    delta_mass_met.plot_comparison(runname=runname,alldata=alldata_sub,alldata_noagn=alldata_noagn,outfolder=outfolder,plt_idx=agn_idx,**popts) 
+    print 'PLOTTING XRAY LUMINOSITY'
+    agn_evidence = xray_luminosity.make_plot(agn_evidence,runname=runname,alldata=alldata_sub,outfolder=outfolder,idx=agn_idx,**popts)
     print 'PLOTTING SF SEQ'
     sf_seq.plot(runname=runname,alldata=alldata_sub,outfolder=outfolder,**popts) 
     print 'PLOTTING DELTA PARS'
