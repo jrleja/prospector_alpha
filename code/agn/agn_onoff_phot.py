@@ -10,12 +10,6 @@ from prosp_dutils import asym_errors, smooth_spectrum
 
 plt.ioff() # don't pop up a window for each plot
 
-obs_color = '#545454'
-
-tiny_number = 1e-3
-big_number = 1e90
-dpi = 150
-
 minorFormatter = jLogFormatter(base=10, labelOnlyBase=False)
 majorFormatter = jLogFormatter(base=10, labelOnlyBase=True)
 
@@ -54,12 +48,23 @@ def plot_all(outfolder='/Users/joel/code/python/prospector_alpha/plots/brownseds
                    ax = ax_both[i], labels=['Model with AGN','Model without AGN'],labx=labx, laby=laby, 
                    legend=legend, objname=name, txtupperright=txtupperright)   
 
+    ### draw some sweet dividing lines
+    x1, y1 = 0.35, 0.52 # corner point
+    x2, y2 = 0.97, 0.04 # draw lines to?
+    lw = 1.0
+    line = mpl.lines.Line2D((x1,x2),(y1,y1),transform=fig_agn.transFigure,color='black',lw=lw)
+    line2 = mpl.lines.Line2D((x1,x1),(y1,y2),transform=fig_agn.transFigure,color='black',lw=lw)
+    fig_agn.lines = line,line2,
+
+    line = mpl.lines.Line2D((x1,x2),(y1,y1),transform=fig_both.transFigure,color='black',lw=lw)
+    line2 = mpl.lines.Line2D((x1,x1),(y1,y2),transform=fig_both.transFigure,color='black',lw=lw)
+    fig_both.lines = line,line2,
+
     ### I/O, cleanup
     fig_agn.tight_layout()
     fig_both.tight_layout()
 
     #fig.subplots_adjust(right=0.85,wspace=0.3,hspace=0.3,left=0.12)
-
     fig_agn.savefig(outfolder+'phot_agn_only.png',dpi=150)
     fig_both.savefig(outfolder+'phot_both.png',dpi=150)
     plt.close()
@@ -82,6 +87,12 @@ def sed_figure(colors = ['#9400D3','#FF420E'], sresults = None, extra_output = N
     textx = 0.05
     texty = 0.95
     deltay = 0.06
+
+    ### scale
+    ax.set_yscale('log',nonposx='clip')
+    ax.set_xscale('log',nonposx='clip',subsx=(1,3))
+    ax.xaxis.set_minor_formatter(minorFormatter)
+    ax.xaxis.set_major_formatter(majorFormatter)
 
     ### if we have multiple parts, color ancillary data appropriately
     if len(colors) > 1:
@@ -132,7 +143,7 @@ def sed_figure(colors = ['#9400D3','#FF420E'], sresults = None, extra_output = N
 
             # PLOT OBSERVATIONS + ERRORS 
             ax.errorbar(xplot[positive_flux], yplot[positive_flux], yerr=yerr[positive_flux],
-                          color=obs_color, marker='o', label='observed', alpha=alpha, linestyle=' ',ms=ms,zorder=0)
+                          color='#545454', marker='o', label='observed', alpha=alpha, linestyle=' ',ms=ms,zorder=0)
 
         #### calculate and show reduced chi-squared
         chisq = np.sum(chi**2)
@@ -140,7 +151,7 @@ def sed_figure(colors = ['#9400D3','#FF420E'], sresults = None, extra_output = N
         reduced_chisq = chisq/(ndof)
 
         ax.text(textx, texty-deltay*(i+1), r'$\chi^2$/N$_{\mathrm{phot}}$='+"{:.2f}".format(reduced_chisq),
-              fontsize=10, ha='left',transform = ax.transAxes,color=main_color[i])
+              fontsize=9, ha='left',transform = ax.transAxes,color=main_color[i])
     
     # label fmir
     fmir_idx = extra_output[0]['extras']['parnames'] == 'fmir'
@@ -173,7 +184,7 @@ def sed_figure(colors = ['#9400D3','#FF420E'], sresults = None, extra_output = N
         handles, labels = ax.get_legend_handles_labels()
         by_label = OrderedDict(zip(labels, handles))
         ax.legend(by_label.values(), by_label.keys(), 
-                    loc=1, prop={'size':8},
+                    loc=1, prop={'size':7},
                     scatterpoints=1,fancybox=True)
     if laby:
         if ergs_s_cm:
@@ -182,14 +193,8 @@ def sed_figure(colors = ['#9400D3','#FF420E'], sresults = None, extra_output = N
             ax.set_ylabel(r'$\nu f_{\nu}$ [maggie Hz]')
     if labx:
         ax.set_xlabel(r'$\lambda_{\mathrm{obs}}$ [$\mu$m]')
-    else:
-        for tl in ax.get_xticklabels():tl.set_visible(False)
+    for tl in ax.get_xticklabels():tl.set_visible(False)
 
-    ax.set_yscale('log',nonposx='clip')
-    ax.set_xscale('log',nonposx='clip',subsx=(1,3))
-    ax.xaxis.set_minor_formatter(minorFormatter)
-    ax.xaxis.set_major_formatter(majorFormatter)
-   
 def return_sedplot_vars(sample_results, extra_output, nufnu=True, ergs_s_cm=False):
 
     '''

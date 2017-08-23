@@ -20,7 +20,7 @@ def collate_data(alldata,alldata_noagn):
 	### normal parameter labels
 	parnames = alldata_noagn[0]['pquantiles']['parnames'].tolist()
 	parlabels = [r'log(M$_{\mathrm{form}}$/M$_{\odot}$)', 'SFH 0-100 Myr', 'SFH 100-300 Myr', 'SFH 300 Myr-1 Gyr', 
-	         'SFH 1-3 Gyr', 'SFH 3-6 Gyr', 'diffuse dust optical depth', r'log(Z/Z$_{\odot}$)', 'diffuse dust index',
+	         'SFH 1-3 Gyr', 'SFH 3-6 Gyr', r'$\tau_{\mathrm{V,diffuse}}$', r'log(Z/Z$_{\odot}$)', 'diffuse dust index',
 	         'birth-cloud dust', r'dust emission Q$_{\mathrm{PAH}}$',r'dust emission $\gamma$',r'dust emission U$_{\mathrm{min}}$']
 
 	### extra parameters
@@ -169,7 +169,7 @@ def plot_dpars(pdata,xpar=None,xparlabel=None,log_xpar=False, agn_idx=None, **po
 
 	#### plot photometry
 	#fig, ax = plt.subplots(4,5, figsize=(21,16))
-	fig, ax = plt.subplots(2,3, figsize=(15,10))
+	fig, ax = plt.subplots(2,3, figsize=(15,9.5))
 	ax = np.ravel(ax)
 
 	opts = {
@@ -193,7 +193,7 @@ def plot_dpars(pdata,xpar=None,xparlabel=None,log_xpar=False, agn_idx=None, **po
 		ax[idx].errorbar(xpar_plot[agn_idx],pdata['median'][par][agn_idx], yerr=[errs[0][agn_idx],errs[1][agn_idx]], zorder=-3, 
 			             fmt=popts['fmir_shape'],alpha=popts['fmir_alpha'],ms=10,color=popts['fmir_color'],**opts)
 
-		ax[idx].set_ylabel(r'$\Delta_{\mathrm{on-off}}$ '+pdata['labels'][par])
+		ax[idx].set_ylabel(r'$\Delta(\mathrm{on-off}) $ '+pdata['labels'][par])
 		ax[idx].set_xlabel(xparlabel)
 
 		ax[idx].plot([ax[idx].get_xlim()[0],ax[idx].get_xlim()[1]],[0.0,0.0], linestyle='--',color='0.5',lw=1.5,zorder=-5)

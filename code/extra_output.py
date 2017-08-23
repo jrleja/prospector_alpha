@@ -5,6 +5,7 @@ import numpy as np
 from copy import copy
 from astropy import constants
 import argparse
+from brown_io import load_prospector_data, create_prosp_filename
 
 try:
     import prosp_diagnostic_plots
@@ -102,9 +103,6 @@ def calc_extra_quantities(sample_results, ncalc=3000, **kwargs):
 
     parnames = np.array(sample_results['model'].theta_labels())
 
-    ##### describe number of components in Prospector model [legacy]
-    sample_results['ncomp'] = np.sum(['mass' in x for x in sample_results['model'].theta_labels()])
-
     ##### array indexes over which to sample the flatchain
     sample_idx = sample_flatchain(sample_results['flatchain'], sample_results['flatprob'], 
                                   parnames, ir_priors=opts['ir_priors'], include_maxlnprob=True, nsamp=ncalc)
@@ -125,7 +123,6 @@ def calc_extra_quantities(sample_results, ncalc=3000, **kwargs):
     intsfr = np.zeros(shape=(t.shape[0],ncalc))
 
     ##### initialize sps, calculate maxprob
-    # also confirm probability calculations are consistent with fit
     sps = model_setup.load_sps(**sample_results['run_params'])
     maxthetas, maxprob = maxprob_model(sample_results,sps)
 
@@ -390,8 +387,7 @@ def post_processing(param_name, outname=None, **kwargs):
     Driver. Loads output, runs post-processing routine.
     '''
 
-    from brown_io import load_prospector_data, create_prosp_filename
-
+    '''
     # I/O
     if outname is None:
         parmfile = model_setup.import_module_from_file(param_name)
@@ -414,11 +410,21 @@ def post_processing(param_name, outname=None, **kwargs):
     ### create flatchain, run post-processing
     sample_results['flatchain'] = prosp_dutils.chop_chain(sample_results['chain'],**sample_results['run_params'])
     sample_results['flatprob'] = prosp_dutils.chop_chain(sample_results['lnprobability'],**sample_results['run_params'])
+
     extra_output = calc_extra_quantities(sample_results,**kwargs)
     
     ### create post-processing name, dump info
     mcmc_filename, model_filename, extra_filename = create_prosp_filename(outname)
     hickle.dump(extra_output,open(extra_filename, "w"))
+    '''
+
+    ### load sampling
+    import pickle
+    with open(param_name, "rb") as f:
+        sample_results = pickle.load(f)
+    objname = " ".join(param_name.split('_')[2:-2])
+
+    ### load model
 
     ### MAKE PLOTS HERE
     try:

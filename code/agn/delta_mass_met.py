@@ -9,9 +9,6 @@ import prosp_dutils
 
 blue = '#1C86EE' 
 
-minorFormatter = magphys_plot_pref.jLogFormatter(base=10, labelOnlyBase=False)
-majorFormatter = magphys_plot_pref.jLogFormatter(base=10, labelOnlyBase=True)
-
 def collate_data(alldata, alldata_noagn):
 
     ### package up information
@@ -130,7 +127,8 @@ def plot_massmet(pdata,plt_idx,**popts):
            color=color,
            lw=lw,
            linestyle='--',
-           zorder=-1)
+           zorder=-1,
+           label='Gallazzi et al. 2005')
     ax.plot(massmet[:,0],massmet[:,2],
            color=color,
            lw=lw,
@@ -143,8 +141,8 @@ def plot_massmet(pdata,plt_idx,**popts):
     ax.set_ylabel(ylabel)
     ax.set_ylim(ylim)
     ax.set_xlim(9,11.5)
-    ax.text(0.05,0.93,'\nGallazzi et al. 2005',transform=ax.transAxes,fontsize=16,color=color,ha='left')
-
+    ax.legend(loc=2,prop={'size':14},frameon=False)
+    
     ### new plot
     median_z_noagn = np.interp(mass_noagn[plt_idx], massmet[:,0], massmet[:,1])
     lower_z_noagn = np.interp(mass_noagn[plt_idx], massmet[:,0], massmet[:,2])

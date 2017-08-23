@@ -606,28 +606,6 @@ def chop_chain(chain,convergence_check_interval=None, convergence_chunks=325,
 
     return flatchain
 
-
-def return_mwave_custom(filters):
-
-    """
-    returns effective wavelength based on filter names
-    """
-
-    loc = os.getenv('APPS')+'/prospector_alpha/filters/'
-    key_str = 'filter_keys_threedhst.txt'
-    lameff_str = 'lameff_threedhst.txt'
-    
-    lameff = np.loadtxt(loc+lameff_str)
-    keys = np.loadtxt(loc+key_str, dtype='S20',usecols=[1])
-    keys = keys.tolist()
-    keys = np.array([keys.lower() for keys in keys], dtype='S20')
-    
-    lameff_return = [[lameff[keys == filters[i]]][0] for i in range(len(filters))]
-    lameff_return = [item for sublist in lameff_return for item in sublist]
-    assert len(filters) == len(lameff_return), "Filter name is incorrect"
-
-    return lameff_return
-
 def gaussian(x, mu, sig):
     '''
     can't believe there's not a package for this

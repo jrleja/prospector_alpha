@@ -338,9 +338,9 @@ def load_csc(bcoords,objname):
     # names = ('', 'name', 'ra', 'dec', 'significance', 'fb_flux_ap', 'fb_flux_ap_upper', 'fb_flux_ap_lower', 'mb_flux_ap', 
     #          'mb_flux_ap_upper', 'mb_flux_ap_lower', 'hb_flux_ap', 'sb_flux_ap', 'extent_flag', 'hb_flux_ap_upper', 
     #          'sb_flux_ap_upper', 'hb_flux_ap_lower', 'sb_flux_ap_lower', '_Search_Offset')
-
-    dat = np.loadtxt(location, comments = '#', delimiter='|',skiprows=5, dtype = {'names':([str(n) for n in hdr]), \
-                     'formats':(['S40','S40','S40','S40','f16','f16','f16','f16','f16','f16','f16','f16','f16','S40','f16','f16','f16','f16','S40'])})
+    dat = np.genfromtxt(location, comments = '#', delimiter='|',skip_header=5, 
+                        dtype = {'names':([str(n) for n in hdr]), \
+                                 'formats':(['S40','S40','S40','S40','f16','f16','f16','f16','f16','f16','f16','f16','f16','S40','f16','f16','f16','f16','S40'])})
     offset = gather_offset(dat['_Search_Offset'])
     dat = np.lib.recfunctions.append_fields(dat, 'offset', data=offset) 
     dat = agn_str_match(dat,bcoords,objname)
@@ -363,7 +363,7 @@ def load_cxo(bcoords,objname):
 
     #### load
     # names = ('', 'name', 'ra', 'dec', 'count_rate', 'count_rate_error', 'flux', 'database_table', 'observatory','error_radius', 'exposure', 'class', 'hardness_ratio', 'hardness_ratio_err', '_Search_Offset')
-    dat = np.loadtxt(location, comments = '#', delimiter='|',skiprows=5,
+    dat = np.genfromtxt(location, comments = '#', delimiter='|',skip_header=5,
                      dtype = {'names':([str(n) for n in hdr]),\
                               'formats':(['S40','S40','S40','S40','S40','f16','f16','f16','f16','S40','f16','f16','S40'])})
     
@@ -389,7 +389,7 @@ def load_chng(bcoords,objname):
 
     #### load
     # names = ('', 'name', 'ra', 'dec', 'count_rate', 'count_rate_error', 'flux', 'database_table', 'observatory','error_radius', 'exposure', 'class', '_Search_Offset')
-    dat = np.loadtxt(location, comments = '#', delimiter='|',skiprows=5,
+    dat = np.genfromtxt(location, comments = '#', delimiter='|',skip_header=5,
                      dtype = {'names':([str(n) for n in hdr]),\
                               'formats':(['S40','S40','S40','S40','S40','f16','f16','f16','f16','f16','S40','S40'])})
     

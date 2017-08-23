@@ -254,6 +254,7 @@ def make_plot(agn_evidence,runname='brownseds_agn',alldata=None,outfolder=None,m
                   ypar='fagn',ylabel = r'f$_{\mathrm{AGN,MIR}}$',
                   xpar='lsfr',xlabel = r'L$_{\mathrm{X}}$(observed)/L$_{\mathrm{XRB}}$(model)',
                   idx = idx, **popts)
+    plt.tight_layout()
     plt.savefig(outfolder+outname,dpi=dpi)
     plt.close()
 
@@ -330,6 +331,8 @@ def plot_pdf_scatter(pdata, alldata, idx=Ellipsis, outname=None,
         ax[ii].set_yscale('log',nonposx='clip',subsy=(1,2,4))
         ax[ii].yaxis.set_minor_formatter(minorFormatter)
         ax[ii].yaxis.set_major_formatter(majorFormatter)
+        for tl in ax[ii].get_yticklabels():tl.set_visible(False)
+
 
             #ylim = (10**(agn_chain.min()-0.2),10**(agn_chain.max()+0.2)) # have to put in log if-statement
 
@@ -392,7 +395,7 @@ def plot(pdata,
         xmin, xmax = 2.5e-3,2e3
 
     #### plot photometry
-    fig, ax = plt.subplots(1,1, figsize=(8, 8))
+    fig, ax = plt.subplots(1,1, figsize=(6, 6))
 
     ### figure out errors
     yerr =  prosp_dutils.asym_errors(pdata[ypar], pdata[ypar+'_up'], pdata[ypar+'_down'],log=True)
@@ -439,6 +442,8 @@ def plot(pdata,
     ax.axvline(1e42, linestyle='--', color='k',lw=1,zorder=-1)
 
     ax.set_xscale('log',nonposx='clip',subsx=([1]))
+    for tl in ax.get_xticklabels():tl.set_visible(False)
+
     #ax.set_yscale('log',nonposy='clip',subsy=([1]))
 
     #ax.text(0.05,0.05, r'N$_{\mathrm{match}}$='+str((pdata['xray_luminosity'] > xmin).sum()), transform=ax.transAxes)
@@ -447,7 +452,7 @@ def plot(pdata,
 
 def plot_model_corrs(pdata,color_by=None,idx=None,**popts):
 
-    fig, ax = plt.subplots(2,2, figsize=(11, 10))
+    fig, ax = plt.subplots(2,2, figsize=(10, 10))
     cb_ax = fig.add_axes([0.88, 0.15, 0.05, 0.7])
     fig.subplots_adjust(right=0.85,wspace=0.3,hspace=0.3,left=0.12)
     ax = np.ravel(ax)
@@ -480,16 +485,16 @@ def plot_model_corrs(pdata,color_by=None,idx=None,**popts):
 
         vmin, vmax = cb.min(), cb.max()
         ax[ii].scatter(y[cidx],x[cidx], marker=popts['nofmir_shape'],c=cb[cidx], cmap=popts['cmap'], \
-                       s=90,zorder=10, vmin=vmin, vmax=vmax)
+                       s=90,zorder=10, vmin=vmin, vmax=vmax,edgecolors='k')
         pts = ax[ii].scatter(y[idx],x[idx], marker=popts['fmir_shape'],c=cb[idx], cmap=popts['cmap'], \
-                             s=90,zorder=10, vmin=vmin, vmax=vmax)
+                             s=90,zorder=10, vmin=vmin, vmax=vmax,edgecolors='k')
 
         ax[ii].set_xlabel(ylabels[ii])
         ax[ii].set_ylabel(xlabel)
         ax[ii].xaxis.set_major_locator(MaxNLocator(5))
 
     cb = fig.colorbar(pts, cax=cb_ax)
-    cb.ax.set_title(r'$\tau_{v}$', fontdict={'fontweight':'bold','verticalalignment':'bottom'})
+    cb.ax.set_title(r'$\tau_{V}$', fontdict={'fontweight':'bold','verticalalignment':'bottom'})
     cb.solids.set_rasterized(True)
     cb.solids.set_edgecolor("face")
 

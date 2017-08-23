@@ -20,6 +20,7 @@ blue = '#1C86EE'
 
 banned_list = ['NGC 5055', 'NGC 5953', 'UGC 08696', 'NGC 5258', 'NGC 4676 A', 'UGC 09618 N', 'NGC 1144']
 banned_list = []
+noise_list = ['UGC 09618','NGC 4676 A', 'UGC 08696', 'NGC 4914', 'II Zw 096', 'UGC 08335 NW']
 
 def collate_data(alldata):
 
@@ -64,13 +65,13 @@ def plot_sfseq(pdata,outfolder=None,sigclip=True,name_label=False):
     #### set up figure geometry
     xlim = [9., 11.5]
     ylim = [-2.,2.]
-    delta_im = 0.045
+    delta_im = 0.05
     delx, dely = (xlim[1]-xlim[0])*delta_im, (ylim[1]-ylim[0])*delta_im
 
     #### randomly sample subject to constraints
     logM_min, logM_max = xlim[0]+delx/2., xlim[1]-delx/2.
     logSFR_min, logSFR_max = ylim[0]+dely/2., ylim[1]-dely/2.
-    overlap = 0.7
+    overlap = 1.0
     m, sfr, fmir, name = [[] for i in range(4)]
     
     good = np.where(
@@ -83,17 +84,17 @@ def plot_sfseq(pdata,outfolder=None,sigclip=True,name_label=False):
     print 'total number of objects in window: ' + str(len(good))
 
     ### allowed shifts
-    scale = 4
-    nshift = 60 # must be even
-    shiftx = np.concatenate((np.linspace(0,delx*scale,nshift/2+1),np.linspace(-delx*scale/10.,-delx*scale,nshift/2)))
-    shifty = np.concatenate((np.linspace(0,dely*scale,nshift/2+1),np.linspace(-dely*scale/10.,-dely*scale,nshift/2)))
+    scale = 1.2
+    nshift = 30 # must be even
+    shiftx = np.concatenate((np.linspace(0,delx*scale,nshift/2+1),np.linspace(-delx*scale/nshift/2,-delx*scale,nshift/2)))
+    shifty = np.concatenate((np.linspace(0,dely*scale,nshift/2+1),np.linspace(-dely*scale/nshift/2,-dely*scale,nshift/2)))
 
     for i, newseed in enumerate(np.linspace(1,25,25)):
 
         ### use galaxies with N highest FMIR
         ### otherwise sample randomly
         np.random.seed(seed=int(newseed))
-        ntop = 4
+        ntop = 10
         arg = good[pdata['fmir'][good].argsort()][::-1]
         np.random.shuffle(arg[ntop:])
 
@@ -111,7 +112,8 @@ def plot_sfseq(pdata,outfolder=None,sigclip=True,name_label=False):
                 for sy in shifty:
                     stellar_mass = pdata['stellar_mass'][idx] + sx
                     sfr_100 = pdata['sfr_100'][idx] + sy
-                    if (np.abs(stellar_mass-np.array(m[i])) > delx/2.*overlap).all() & (np.abs(sfr_100-np.array(sfr[i])) > dely/2.*overlap).all():
+                    if ((np.abs(stellar_mass-np.array(m[i])) > delx*overlap) | \
+                       (np.abs(sfr_100-np.array(sfr[i])) > dely*overlap)).all():
                         win = True
                         break
                 if win:
@@ -165,16 +167,21 @@ def plot_sfseq(pdata,outfolder=None,sigclip=True,name_label=False):
         # get rid of background
         # sigclip is beautiful but slow!
         if sigclip:
-            mean, median, std = sigma_clipped_stats(data, sigma=3.0,iters=12)
-            if name[i] == 'UGC 09618':
-                data[data < (median+2.5*std)] = median+2.5*std
+            mean, median, std = sigma_clipped_stats(data, sigma=3.0,iters=20)
+            if name[i] in noise_list:
+                if vmax > (median+2.5*std):
+                    data[data < (median+2.5*std)] = median+2.5*std
+                elif vmax > (median+2*std):
+                    data[data < (median+2*std)] = median+2*std
+                else:
+                    data[data < (median+1.5*std)] = median+1.5*std
             else:
                 data[data < (median+std)] = median+std
         else:
             data[data < 0.01*vmax] = 0.01*vmax
 
-        # natural log
-        data, vmax = np.log10(data), np.log10(vmax)
+        # log to emphasize outskirts
+        data, vmax = np.log(data), np.log(vmax)
 
         ### create colormap
         # clip is so that things are at least a little red or blue
@@ -193,7 +200,7 @@ def plot_sfseq(pdata,outfolder=None,sigclip=True,name_label=False):
         cm = LinearSegmentedColormap.from_list('my_list', colors, N=50)
         ax.imshow(data, extent=[m[i]-delx/2., m[i]+delx/2., sfr[i]-dely/2., sfr[i]+dely/2.],cmap=cm,vmax=vmax)
         if name_label:
-            ax.text(m[i],sfr[i]+dely/1.8, name[i],ha='center',fontsize=7)
+            ax.text(m[i],sfr[i]+dely/1.9, name[i],ha='center',fontsize=6)
 
     #### ADD SALIM+07
     salim_mass = np.linspace(7,12,40)
@@ -235,7 +242,7 @@ def plot_sfseq(pdata,outfolder=None,sigclip=True,name_label=False):
 
     ### save and eject
     plt.tight_layout()
-    fig.savefig(outfolder+'sf_seq.png',dpi=200)
+    fig.savefig(outfolder+'sf_seq.png',dpi=220)
     os.system('open '+outfolder+'sf_seq.png')
     plt.close()
 

@@ -31,12 +31,16 @@ def median_by_band(x,y,avg=False,log=False):
     wave_effective.sort()
 
     ### remove overlapping filters
+    ### and ones outside the plot
     delta_lam = 0.06
     for i in range(wave_effective.shape[0]):
         if i >= wave_effective.shape[0]:
             continue
         if ((np.abs(1-wave_effective/wave_effective[i]) < delta_lam).sum() > 1):
             wave_effective = np.delete(wave_effective,i)
+
+    wave_effective = wave_effective[wave_effective < 25]
+
 
     avglam, outval, outval_up, outval_down, outval_upup, outval_downdown = [np.array([]) for i in range(6)]
     for lam in wave_effective:
@@ -169,7 +173,10 @@ def plot_comparison(idx_plot=None,outfolder=None,
         idx_plot = pdata['agn']['model_pars']['fagn']['q50'].argsort()[-10:]
     
     ### take collate data from composite images
-    fig = plot_residuals(pdata,np.arange(len(pdata['agn']['model_pars']['fagn']['q50'])),outfolder,**popts)
+    fig, ax = plt.subplots(2,3, figsize=(15, 10))
+    ax = ax.ravel()
+    fig = plot_residuals(pdata,idx_plot,outfolder,r'High f$_{\mathrm{AGN,MIR}}$',ax=ax[:3],fig=fig,**popts)
+    fig = plot_residuals(pdata,np.arange(len(pdata['agn']['model_pars']['fagn']['q50'])),outfolder,'Full sample',ax=ax[3:],fig=fig,**popts)
     fig.tight_layout()
     fig.savefig(outfolder+'residuals.png',dpi=150)
     plt.close()
@@ -266,12 +273,13 @@ def plot_sfh(pdata,idx_plot,outfolder,**popts):
     plt.savefig(outfolder+'sfh_comparison.png',dpi=150)
     plt.close()
 
-def plot_residuals(pdata,idx_plot,outfolder,avg=True,log=False,**popts):
+def plot_residuals(pdata,idx_plot,outfolder,instring,avg=True,log=False,ax=None,fig=None,**popts):
 
     #### plot geometry
-    fig, ax = plt.subplots(2,2, figsize=(11, 10))
-    ax = ax.ravel()
-    fs = 16
+    if ax is None:
+        fig, ax = plt.subplots(2,2, figsize=(11, 10))
+        ax = ax.ravel()
+    fs = 14
 
     #### plot options
     median_opts = {'alpha':0.8,'lw':3}
@@ -283,15 +291,12 @@ def plot_residuals(pdata,idx_plot,outfolder,avg=True,log=False,**popts):
     xlim_phot = [0.2,30]
     #ylim_phot = [-0.4,0.4]
     ylim_phot = [-2.7,2.7]
-    ylim_phot = [-0.2,6]
+    ylim_phot = [-0.2,25]
     if log:
         ylim_phot = [-0.15,0.15]
-    ylim_spec = [[-.35,.35],
-                 [-.35,.35],
-                 [-.35,.35]]
-    xlim_spec = [[0.35,0.7],
-                 [5,34],
-                 [2.4,4.84]]             
+    ylim_spec = [[-.38,.38], #[[-.35,.35],
+                 [-.38,.38]]
+    xlim_spec = [[2.4,4.84],[5,34]]#[[0.35,0.7],
 
     ### begin loop over galaxies
     for idx in idx_plot:
@@ -302,7 +307,7 @@ def plot_residuals(pdata,idx_plot,outfolder,avg=True,log=False,**popts):
         photy_agn += (pdata['agn']['phot_residuals']['resid'][idx]**2).tolist()
 
         #### include galaxy spectroscopy
-        for i,key in enumerate(pdata['agn']['residuals'].keys()):
+        for i,key in enumerate(['Akari','Spitzer IRS']):
             if pdata['agn']['residuals'][key]['resid'][idx] is not None:
                 specx[i] += pdata['agn']['residuals'][key]['lam'][idx].tolist()
                 specy_noagn[i] += pdata['no_agn']['residuals'][key]['resid'][idx].tolist()
@@ -320,7 +325,7 @@ def plot_residuals(pdata,idx_plot,outfolder,avg=True,log=False,**popts):
     #ax[0].fill_between(x, y_agn_downdown, y_agn_upup, color=popts['agn_color'], alpha=0.2)
     #ax[0].fill_between(x, y_noagn_downdown, y_noagn_upup, color=popts['noagn_color'], alpha=0.2)
 
-    for i, key in enumerate(pdata['agn']['residuals'].keys()):
+    for i, key in enumerate(['Akari','Spitzer IRS']):
         # horrible hack to pick out wavelengths. this preserves ~native spacing, downsampled by 3
         bins = pdata['agn']['residuals'][key]['lam'][idx][::4]
         bins[0] *= 0.96
@@ -377,19 +382,21 @@ def plot_residuals(pdata,idx_plot,outfolder,avg=True,log=False,**popts):
     if log:
         ax[0].set_ylabel(r'log(f$_{\mathrm{obs}}$/f$_{\mathrm{model}}$)')
 
-    ax[0].text(0.05,0.92,'photometry',fontsize=fs,transform=ax[0].transAxes)
+    ax[0].text(0.05,0.86,'photometry',fontsize=fs,transform=ax[0].transAxes)
+    ax[0].text(0.05,0.92,instring,fontsize=fs,transform=ax[0].transAxes,weight='semibold')
     ax[0].text(0.97,0.92,'Model without AGN',transform=ax[0].transAxes,color=popts['noagn_color'],fontsize=fs, ha='right')
     ax[0].text(0.97,0.86,'Model with AGN',transform=ax[0].transAxes,color=popts['agn_color'],fontsize=fs, ha='right')
 
     ax[0].set_xscale('log',nonposx='clip',subsx=(1,2,5))
     ax[0].xaxis.set_minor_formatter(minorFormatter)
     ax[0].xaxis.set_major_formatter(majorFormatter)
+    for tl in ax[0].get_xticklabels():tl.set_visible(False)
     ax[0].set_xlim(xlim_phot)
     ax[0].set_ylim(ylim_phot)
     #ax[0].axhline(0, linestyle='--', color='k',lw=2,zorder=-1)
     #ax[0].yaxis.set_major_locator(MaxNLocator(5))
 
-    for i, key in enumerate(pdata['agn']['residuals'].keys()):
+    for i, key in enumerate(['Akari','Spitzer IRS']):
         sub = (1,2,3,4,5)
         if i+1 == 1:
             sub = (1,2,3,4,5,6)
@@ -397,12 +404,14 @@ def plot_residuals(pdata,idx_plot,outfolder,avg=True,log=False,**popts):
         ax[i+1].set_xlabel(r'rest-frame wavelength [$\mu$m]',labelpad=labelpad)
         ax[i+1].set_ylim(ylim_spec[i])
         ax[i+1].set_xlim(xlim_spec[i])
-        ax[i+1].text(0.05,0.92,key,fontsize=fs,transform=ax[i+1].transAxes)
+        ax[i+1].text(0.05,0.86,key,fontsize=fs,transform=ax[i+1].transAxes)
 
         ax[i+1].set_xscale('log',nonposx='clip',subsx=sub)
         ax[i+1].xaxis.set_minor_formatter(minorFormatter)
         ax[i+1].xaxis.set_major_formatter(majorFormatter)
+        for tl in ax[i+1].get_xticklabels():tl.set_visible(False)
         ax[i+1].axhline(0, linestyle='--', color='k',lw=2,zorder=-1)
+        ax[i+1].text(0.05,0.92,instring,fontsize=fs,transform=ax[i+1].transAxes,weight='semibold')
 
     return fig
 
