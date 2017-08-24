@@ -19,8 +19,8 @@ majorFormatter = magphys_plot_pref.jLogFormatter(base=10, labelOnlyBase=True)
 ebaropts = {
          'fmt':'o',
          'ecolor':'k',
-         'capthick':0.4,
-         'elinewidth':0.4,
+         'capthick':0.7,
+         'elinewidth':0.7,
          'alpha':0.55
         } 
 
@@ -147,7 +147,7 @@ def plot_rms(pdata,outfolder,agn_idx=None,**popts):
              'bdec':r'log(F/F$_0$)$_{\mathrm{H}\alpha}$ - log(F/F$_0$)$_{\mathrm{H}\beta}$'
             }
     lims = [(-2,2), (-2,2), (-0.3,0.3), (-0.15,0.15)]
-    lims2 = [(6,9.3),(5,8.5),(-0.1,0.65),(1.0,1.45)]
+    lims2 = [(6,9.3),(5,8.5),(-0.1,0.7),(1.0,1.45)]
     sn_cut = [0.1, 0.1, 0.1, 0.1]
     minarrow = [0.03, 0.03, 0.01, 0.01]
 

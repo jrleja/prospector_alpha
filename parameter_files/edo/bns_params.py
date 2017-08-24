@@ -72,8 +72,8 @@ def load_obs(**extras):
     dat = {
            'GALEX FUV': (18.86, np.nan), # limit
            'GALEX NUV': (17.82, 0.09),
-           'Cousins B': (12.99, 0.09),
-           'Cousins R': (11.66, 0.09),
+           'Cousins B': (13.08, 0.09),
+           'Cousins R': (11.45, 0.09),
            '2MASS J': (10.98, 0.02),
            '2MASS H': (10.82, 0.02),
            '2MASS K': (11.02, 0.02),

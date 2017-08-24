@@ -172,9 +172,9 @@ def plot_scatterplot(pdata,colorpar=None,colorparlabel=None,log_cpar=False,cpar_
     ax.errorbar(xplot, yplot, yerr=yerr, xerr=xerr,
                 fmt='o', ecolor='0.2', capthick=0.6,elinewidth=0.6,ms=0.0,alpha=0.5,zorder=-5)
     pts = ax.scatter(xplot[cidx], yplot[cidx], marker=popts['nofmir_shape'], c=cpar_plot[cidx], vmin=cpar_plot.min(), vmax=cpar_plot.max(),
-                     cmap=plt.cm.plasma,s=75,zorder=10)
+                     cmap=plt.cm.plasma,s=75,zorder=10,edgecolors='k')
     pts = ax.scatter(xplot[~cidx], yplot[~cidx], marker=popts['fmir_shape'], c=cpar_plot[~cidx], vmin=cpar_plot.min(), vmax=cpar_plot.max(),
-                     cmap=plt.cm.plasma,s=75,zorder=10)
+                     cmap=plt.cm.plasma,s=75,zorder=10,edgecolors='k')
 
     ax.set_xlabel(r'log([NII 6583]/H$_{\alpha}$)')
     ax.set_ylabel(r'log([OIII 5007]/H$_{\beta}$)')

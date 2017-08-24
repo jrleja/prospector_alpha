@@ -26,7 +26,7 @@ def collate_data(alldata,alldata_noagn):
 	### extra parameters
 	eparnames_all = alldata[0]['pextras']['parnames']
 	eparnames = ['stellar_mass','sfr_100', 'ssfr_100', 'half_time']
-	eparlabels = [r'log(M$_{\mathrm{*}}$/M$_{\odot}$)','log(SFR) [100 Myr]','log(sSFR) [100 Myr]', r"log(t$_{\mathrm{half-mass}}$/Gyr)"]
+	eparlabels = [r'log(M$_*$) [M$_{\odot}$]',r'log(SFR) [M$_{\odot}$ yr$^{-1}$]',r'log(sSFR) [yr$^{-1}$]', r"log(t$_{\mathrm{half-mass}}$) [Gyr]"]
 
 	### let's do something special here
 	fparnames = ['halpha','m23_frac']
@@ -204,7 +204,7 @@ def plot_dpars(pdata,xpar=None,xparlabel=None,log_xpar=False, agn_idx=None, **po
 
 		ylim = np.abs(ax[idx].get_ylim()).max()
 		ax[idx].set_ylim(-ylim,ylim)
-		ax[idx].set_xlim(-4,0.2)
+		#ax[idx].set_xlim(-4,0.2)
 
 		idx +=1
 

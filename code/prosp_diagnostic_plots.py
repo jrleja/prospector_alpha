@@ -21,7 +21,7 @@ majorFormatter = jLogFormatter(base=10, labelOnlyBase=True)
 
 def subcorner(sample_results,  sps, model, extra_output, flatchain,
               outname=None, showpars=None,
-              truths=None, powell_results=None,
+              powell_results=None,
               **kwargs):
     """
     Make a corner plot of the (thinned, latter) samples of the posterior
@@ -42,7 +42,7 @@ def subcorner(sample_results,  sps, model, extra_output, flatchain,
                         **kwargs)
 
     fig = add_to_corner(fig, sample_results, extra_output, sps, model, outname=outname,
-                        truths=truths, maxprob=True, title_kwargs=title_kwargs,powell_results=powell_results)
+                        maxprob=True, title_kwargs=title_kwargs,powell_results=powell_results)
 
     if outname is not None:
         fig.savefig('{0}.corner.png'.format(outname))
@@ -70,7 +70,7 @@ def transform_chain(flatchain, model):
 
     return flatchain.squeeze(), parnames
 
-def add_to_corner(fig, sample_results, extra_output, sps, model,truths=None,outname=None,
+def add_to_corner(fig, sample_results, extra_output, sps, model,outname=None,
                   maxprob=True,powell_results=None,title_kwargs=None,twofigure=False):
 
     """
@@ -92,35 +92,6 @@ def add_to_corner(fig, sample_results, extra_output, sps, model,truths=None,outn
     ttop     = 0.95-0.02*(12-scale)
     fs       = 24-(12-scale)
     
-    if truths is not None:
-        parnames = np.append(truths['parnames'],'lnprob')
-        tvals    = np.append(truths['plot_truths'],truths['truthprob'])
-
-        plt.figtext(0.73, ttop, 'truths',weight='bold',
-                       horizontalalignment='right',fontsize=fs)
-        for kk in xrange(len(tvals)):
-            plt.figtext(0.73, ttop-0.02*(kk+1), parnames[kk]+'='+"{:.2f}".format(tvals[kk]),
-                       horizontalalignment='right',fontsize=fs)
-
-        # add in extras
-        etruths = truths['extra_truths']
-        eparnames = truths['extra_parnames']
-        txtcounter = 1
-        for nn in xrange(len(eparnames)):
-            if eparnames[nn] in to_show:
-                fmt = "{:.2f}"
-                if 'sfr' in eparnames[nn]:
-                    etruths[nn] = 10**etruths[nn]
-                if 'ssfr' in eparnames[nn] or 'totmass' in eparnames[nn]:
-                    fmt = '{0:.1e}'
-
-                plt.figtext(0.73, ttop-0.02*(kk+txtcounter+1), eparnames[nn]+'='+fmt.format(etruths[nn]),
-                           horizontalalignment='right',fontsize=fs)
-                txtcounter+=1
-
-        tvals    = np.append(tvals, etruths)
-        parnames = np.append(parnames, eparnames)
-
     # show maximum probability
     if maxprob:
         mprob,_ = transform_chain(extra_output['bfit']['maxprob_params'],model)
@@ -136,12 +107,8 @@ def add_to_corner(fig, sample_results, extra_output, sps, model,truths=None,outn
                 yplot = mprob[kk]
 
             # add parameter names if not covered by truths
-            if truths is None:
-                plt.figtext(0.84, ttop-0.02*(kk+1), maxprob_parnames[kk]+'='+"{:.2f}".format(yplot),
-                       horizontalalignment='right',fontsize=fs)
-            else:
-                plt.figtext(0.75, ttop-0.02*(kk+1), "{:.2f}".format(yplot),
-                       horizontalalignment='left',fontsize=fs)
+            plt.figtext(0.84, ttop-0.02*(kk+1), maxprob_parnames[kk]+'='+"{:.2f}".format(yplot),
+                   horizontalalignment='right',fontsize=fs)
 
     # show powell results
     if powell_results:
@@ -260,12 +227,6 @@ def add_to_corner(fig, sample_results, extra_output, sps, model,truths=None,outn
             ax.xaxis.set_major_locator(MaxNLocator(5))
             [l.set_rotation(45) for l in ax.get_xticklabels()]
 
-            # truths
-            if truths is not None:
-                if plotname[jj] in parnames:
-                    plottruth = tvals[parnames == plotname[jj]]
-                    ax.axvline(x=plottruth,color='r')
-
     return fig
 
 def add_sfh_plot(exout,fig,ax_loc=None,
@@ -324,10 +285,12 @@ def add_sfh_plot(exout,fig,ax_loc=None,
     ax_inset.set_xscale('log',nonposx='clip',subsx=([1]))
     ax_inset.xaxis.set_major_formatter(majorFormatter)
     ax_inset.xaxis.set_tick_params(labelsize=axfontsize*3)
+    for tl in ax_inset.get_xticklabels():tl.set_visible(False)
 
     ax_inset.set_yscale('log',nonposy='clip',subsy=(1,2,5))
     ax_inset.yaxis.set_major_formatter(majorFormatter)
     ax_inset.yaxis.set_tick_params(labelsize=axfontsize*3)
+    for tl in ax_inset.get_yticklabels():tl.set_visible(False)
 
     ax_inset.tick_params('both', length=lw*3, width=lw*.6, which='major')
     for axis in ['top','bottom','left','right']: ax_inset.spines[axis].set_linewidth(lw*.6)
@@ -506,7 +469,7 @@ def return_sedplot_vars(sample_results, extra_output, nufnu=True, ergs_s_cm=Fals
     (obs_maggies-mu)/obs_maggies_unc, spec/(sample_results['model'].params['zred'][0]+1), \
     (1+sample_results['model'].params['zred'][0])*extra_output['observables']['lam_obs']/1e4
 
-def sed_figure(outname = None, truths = None,
+def sed_figure(outname = None,
                colors = ['#1974D2'], sresults = None, extra_output = None,
                labels = ['spectrum (50th percentile)'],
                model_photometry = True, main_color=['black'],
@@ -630,19 +593,6 @@ def sed_figure(outname = None, truths = None,
         print 'no RGB image'
     '''
     ### plot truths
-    if truths is not None:
-        
-        # if truths are made with a different model than they are fit with,
-        # then this will be passing parameters to the wrong model. pass.
-        # in future, attach a model to the truths file!
-        try:
-            wave_eff_truth, _, _, _, chi_truth, _, _ = return_sedplot_vars(truths['truths'], sresults[0], sps)
-
-            res.plot(np.log10(wave_eff_truth), chi_truth, 
-                     color='blue', marker='o', linestyle=' ', label='truths', 
-                     ms=ms,alpha=0.3,markeredgewidth=0.7,**kwargs)
-        except AssertionError:
-            pass
 
     #### TEXT, FORMATTING, LABELS
     z_txt = sresults[0]['model'].params['zred'][0]
@@ -674,6 +624,7 @@ def sed_figure(outname = None, truths = None,
     res.set_xscale('log',nonposx='clip',subsx=(2,5))
     res.xaxis.set_minor_formatter(minorFormatter)
     res.xaxis.set_major_formatter(majorFormatter)
+    for tl in res.get_xticklabels():tl.set_visible(False)
 
     # clean up and output
     fig.add_subplot(phot)
@@ -690,6 +641,7 @@ def sed_figure(outname = None, truths = None,
     ax2.set_xscale('log',nonposx='clip',subsx=(2,5))
     ax2.xaxis.set_minor_formatter(minorFormatter)
     ax2.xaxis.set_major_formatter(majorFormatter)
+    for tl in ax2.get_xticklabels():tl.set_visible(False)
 
     # remove ticks
     phot.set_xticklabels([])
@@ -797,14 +749,7 @@ def make_all_plots(filebase=None,
 
     # BEGIN PLOT ROUTINE
     print 'MAKING PLOTS FOR ' + filebase.split('/')[-1] + ' in ' + outfolder
-    
-    # do we know the truths?
     objname = sample_results['run_params'].get('objname','galaxy')
-    try:
-        truths = prosp_dutils.load_truths(os.getenv('APPS')+'/threed'+sample_results['run_params']['param_file'].split('/threed')[1],
-                                           model=sample_results['model'],obs=sample_results['obs'], sps=sps)
-    except KeyError:
-        truths = None
 
     # chain plot
     flatchain = prosp_dutils.chop_chain(sample_results['chain'],**sample_results['run_params'])
@@ -818,7 +763,7 @@ def make_all_plots(filebase=None,
         print 'MAKING CORNER PLOT'
         subcorner(sample_results, sps, copy.deepcopy(sample_results['model']),
                   extra_output,flatchain,outname=outfolder+objname,
-                  truths=truths, powell_results=powell_results)
+                  powell_results=powell_results)
 
     # sed plot
     if plt_sed:
@@ -833,7 +778,7 @@ def make_all_plots(filebase=None,
 
         # plot
         pfig = sed_figure(sresults = [sample_results], extra_output=[extra_output],
-                          truths=truths, outname=outfolder+objname+'.sed.png')
+                          outname=outfolder+objname+'.sed.png')
         
 def plot_all_driver(runname=None,**extras):
 

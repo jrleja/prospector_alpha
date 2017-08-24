@@ -387,7 +387,6 @@ def post_processing(param_name, outname=None, **kwargs):
     Driver. Loads output, runs post-processing routine.
     '''
 
-    '''
     # I/O
     if outname is None:
         parmfile = model_setup.import_module_from_file(param_name)
@@ -416,15 +415,6 @@ def post_processing(param_name, outname=None, **kwargs):
     ### create post-processing name, dump info
     mcmc_filename, model_filename, extra_filename = create_prosp_filename(outname)
     hickle.dump(extra_output,open(extra_filename, "w"))
-    '''
-
-    ### load sampling
-    import pickle
-    with open(param_name, "rb") as f:
-        sample_results = pickle.load(f)
-    objname = " ".join(param_name.split('_')[2:-2])
-
-    ### load model
 
     ### MAKE PLOTS HERE
     try:

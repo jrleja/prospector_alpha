@@ -440,6 +440,9 @@ def plot(pdata,
     ax.set_xlim(xmin,xmax)
     ax.set_ylim(-4,0)
     ax.axvline(1e42, linestyle='--', color='k',lw=1,zorder=-1)
+    ax.axhline(-1.0, linestyle='--', color=popts['fmir_color'],lw=1,zorder=-1)
+    ax.text(1.4e36,-0.95,'photometric AGN', color=popts['fmir_color'],weight='semibold',fontsize=12)
+    ax.text(1.3e42,-2.0,'X-ray\nAGN', color='k',weight='semibold',fontsize=12)
 
     ax.set_xscale('log',nonposx='clip',subsx=([1]))
     for tl in ax.get_xticklabels():tl.set_visible(False)
@@ -452,9 +455,9 @@ def plot(pdata,
 
 def plot_model_corrs(pdata,color_by=None,idx=None,**popts):
 
-    fig, ax = plt.subplots(2,2, figsize=(10, 10))
-    cb_ax = fig.add_axes([0.88, 0.15, 0.05, 0.7])
-    fig.subplots_adjust(right=0.85,wspace=0.3,hspace=0.3,left=0.12)
+    fig, ax = plt.subplots(2,2, figsize=(11, 10))
+    cb_ax = fig.add_axes([0.83, 0.15, 0.05, 0.7])
+    fig.subplots_adjust(right=0.8,wspace=0.3,hspace=0.3,left=0.12)
     ax = np.ravel(ax)
 
     #### fagn labeling
@@ -466,7 +469,7 @@ def plot_model_corrs(pdata,color_by=None,idx=None,**popts):
 
     #### y-axis
     ypar = ['mass','sfr','ssfr','lir_luv']
-    ylabels = [r'log(M$_{*}$) [M$_{\odot}$/yr]', r'log(SFR) [M$_{\odot}$/yr]',
+    ylabels = [r'log(M$_{*}$) [M$_{\odot}$]', r'log(SFR) [M$_{\odot}$/yr]',
                r'log(sSFR) [yr$^{-1}$]',r'log(L$_{\mathrm{IR}}$/L$_{\mathrm{UV}}$)']
     cb = pdata['d2']
     for ii, yp in enumerate(ypar):
@@ -491,10 +494,11 @@ def plot_model_corrs(pdata,color_by=None,idx=None,**popts):
 
         ax[ii].set_xlabel(ylabels[ii])
         ax[ii].set_ylabel(xlabel)
-        ax[ii].xaxis.set_major_locator(MaxNLocator(5))
+        ax[ii].xaxis.set_major_locator(MaxNLocator(4))
 
     cb = fig.colorbar(pts, cax=cb_ax)
-    cb.ax.set_title(r'$\tau_{V}$', fontdict={'fontweight':'bold','verticalalignment':'bottom'})
+    #cb.ax.set_title(r'$\tau_{V}$', fontdict={'fontweight':'bold','verticalalignment':'bottom'})
+    cb.set_label(r'$\tau_{V}$', fontdict={'fontweight':'bold','fontsize':26})
     cb.solids.set_rasterized(True)
     cb.solids.set_edgecolor("face")
 

@@ -221,10 +221,10 @@ def add_identifier(ax,idx,pdata,fs=12,x=0.94,y=0.88,dy=0.08,weight='bold'):
 def plot_sfh(pdata,idx_plot,outfolder,**popts):
 
     ### open figure
-    fig, ax = plt.subplots(3,4, figsize=(13.5, 9.5))
+    fig, ax = plt.subplots(3,4, figsize=(14, 10))
 
     ax = np.ravel(ax)
-    fs = 10
+    fs = 11.5
     idx_plot = idx_plot[::-1]
 
     ### begin loop
@@ -255,13 +255,15 @@ def plot_sfh(pdata,idx_plot,outfolder,**popts):
             ax[ii].set_xscale('log',nonposx='clip',subsx=([1]))
             ax[ii].xaxis.set_minor_formatter(minorFormatter)
             ax[ii].xaxis.set_major_formatter(majorFormatter)
+            for tl in ax[ii].get_xticklabels():tl.set_visible(False)
 
             ax[ii].set_yscale('log',nonposy='clip',subsy=([1]))
             ax[ii].yaxis.set_minor_formatter(minorFormatter)
             ax[ii].yaxis.set_major_formatter(majorFormatter)
+            for tl in ax[ii].get_yticklabels():tl.set_visible(False)
 
-        add_identifier(ax[ii],idx,pdata, fs=fs,weight='bold')
-        add_txt(ax[ii],pdata,fs=fs,color=[popts['agn_color'],popts['noagn_color']],weight='bold')
+        add_identifier(ax[ii],idx,pdata, fs=fs,weight='bold',y=0.92,x=0.975)
+        add_txt(ax[ii],pdata,fs=fs,color=[popts['agn_color'],popts['noagn_color']],weight='bold',y=0.92,x=0.025)
 
         ax[ii].set_ylim(pmin*0.2,pmax*8)
         ax[ii].set_xlim(t.min()*30,t.max())
@@ -269,7 +271,7 @@ def plot_sfh(pdata,idx_plot,outfolder,**popts):
     # turn off unused plots
     for i in xrange(ii+1,ax.shape[0]): ax[i].axis('off')
 
-    plt.tight_layout()
+    plt.tight_layout(h_pad=0.1,w_pad=0.06)
     plt.savefig(outfolder+'sfh_comparison.png',dpi=150)
     plt.close()
 
@@ -419,10 +421,10 @@ def sedfig(pdata,**popts):
 
     fig = plt.figure(figsize=(15, 10))
 
-    left, top = 0.07,0.97 # margins
+    left, top = 0.1,0.97 # margins
 
     sedax, resax = [], []
-    axwid, axheight, delx, dely = 0.275, 0.42, 0.05, 0.06
+    axwid, axheight, delx, dely = 0.251, 0.42, 0.067, 0.06
 
     left = [left, left+axwid+delx, left+2*(axwid+delx), left, left+axwid+delx, left+2*(axwid+delx)]
     right = [left[0]+axwid, left[1]+axwid, left[2]+axwid, left[0]+axwid, left[1]+axwid, left[2]+axwid]
@@ -444,6 +446,8 @@ def sedfig(pdata,**popts):
     alpha = 0.75
     lw = 1.5
     lw_obs = 3
+    factor = 3e14*3631*1e-23 # conversion factor, divide by wave in microns
+
     for ii in range(len(sedax)):
 
         idx = pdata['observables']['objname'].index(to_plot[ii])
@@ -453,7 +457,7 @@ def sedfig(pdata,**popts):
         wav_idx = (mod_wave > wavlims[0]) & \
                   (mod_wave < wavlims[1]) & \
                   (mod_wave < mask_si_abs[0])
-        yon, yoff = pdata['observables']['agn_on_spec'][idx][wav_idx], pdata['observables']['agn_off_spec'][idx][wav_idx]
+        yon, yoff = pdata['observables']['agn_on_spec'][idx][wav_idx]*factor/mod_wave[wav_idx], pdata['observables']['agn_off_spec'][idx][wav_idx]*factor/mod_wave[wav_idx]
         sedax[ii].plot(mod_wave[wav_idx],yon, lw=lw, alpha=alpha, color=popts['agn_color'],zorder=1)
         sedax[ii].plot(mod_wave[wav_idx],yoff, lw=lw, alpha=alpha, color=popts['noagn_color'])
         min, max = np.min([yon.min(),yoff.min()]), np.max([yoff.max(),yon.max()])
@@ -461,17 +465,17 @@ def sedfig(pdata,**popts):
         wav_idx = (mod_wave > wavlims[0]) & \
                   (mod_wave < wavlims[1]) & \
                   (mod_wave > mask_si_abs[1])
-        yon, yoff = pdata['observables']['agn_on_spec'][idx][wav_idx], pdata['observables']['agn_off_spec'][idx][wav_idx]
+        yon, yoff = pdata['observables']['agn_on_spec'][idx][wav_idx]*factor/mod_wave[wav_idx], pdata['observables']['agn_off_spec'][idx][wav_idx]*factor/mod_wave[wav_idx]
         sedax[ii].plot(mod_wave[wav_idx],yon, lw=lw, alpha=alpha, color=popts['agn_color'],zorder=1, label='Model with AGN')
         sedax[ii].plot(mod_wave[wav_idx],yoff, lw=lw, alpha=alpha, color=popts['noagn_color'], label='Model without AGN')
         min, max = np.min([min,yon.min(),yoff.min()]), np.max([max,yon.max(),yoff.max()])
 
-        on_interp = interp1d(mod_wave, pdata['observables']['agn_on_spec'][idx], bounds_error = False, fill_value = 0)
-        off_interp = interp1d(mod_wave, pdata['observables']['agn_off_spec'][idx], bounds_error = False, fill_value = 0)
+        on_interp = interp1d(mod_wave, pdata['observables']['agn_on_spec'][idx]*factor/mod_wave, bounds_error = False, fill_value = 0)
+        off_interp = interp1d(mod_wave, pdata['observables']['agn_off_spec'][idx]*factor/mod_wave, bounds_error = False, fill_value = 0)
 
         if type(pdata['observables']['spit_lam'][idx]) is np.ndarray:
             wave = pdata['observables']['spit_lam'][idx]/1e4
-            flux = smooth_spectrum(wave*1e4, pdata['observables']['spit_flux'][idx], 2000)
+            flux = smooth_spectrum(wave*1e4, pdata['observables']['spit_flux'][idx]*factor/wave, 2000)
 
             wav_idx = (wave > wavlims[0]) & \
                       (wave < wavlims[1]) & \
@@ -493,10 +497,10 @@ def sedfig(pdata,**popts):
             resax[ii].plot(wave[wav_idx], np.log10(flux[wav_idx]/off_interp(wave[wav_idx])),
                            lw=lw, alpha=alpha, color=popts['noagn_color'])
 
-            min, max = np.min([min,pdata['observables']['spit_flux'][idx][wav_idx].min()]), np.max([max,pdata['observables']['spit_flux'][idx][wav_idx].max()])
+            min, max = np.min([min,(pdata['observables']['spit_flux'][idx][wav_idx]*factor/wave[wav_idx]).min()]), np.max([max,(pdata['observables']['spit_flux'][idx][wav_idx]*factor/wave[wav_idx]).max()])
         if type(pdata['observables']['ak_lam'][idx]) is np.ndarray:
             wave = pdata['observables']['ak_lam'][idx]/1e4
-            flux = smooth_spectrum(wave*1e4, pdata['observables']['ak_flux'][idx], 1000.)
+            flux = smooth_spectrum(wave*1e4, pdata['observables']['ak_flux'][idx]*factor/wave, 1000.)
 
             wav_idx = (wave > wavlims[0]) & (wave < wavlims[1])
             sedax[ii].plot(wave[wav_idx],flux[wav_idx], 
@@ -507,14 +511,14 @@ def sedfig(pdata,**popts):
             resax[ii].plot(wave[wav_idx], np.log10(flux[wav_idx]/off_interp(wave[wav_idx])),
                            lw=lw, alpha=alpha, color=popts['noagn_color'])
 
-            min, max = np.min([min,pdata['observables']['ak_flux'][idx][wav_idx].min()]), np.max([max,pdata['observables']['ak_flux'][idx][wav_idx].max()])
+            min, max = np.min([min,(pdata['observables']['ak_flux'][idx][wav_idx]*factor/wave[wav_idx]).min()]), np.max([max,(pdata['observables']['ak_flux'][idx][wav_idx]*factor/wave[wav_idx]).max()])
 
         ### labels and name
         sedax[ii].set_xlim(wavlims)
         resax[ii].set_xlim(wavlims)
-        sedax[ii].set_ylim(np.clip(min*0.5,1.1e-6,np.inf),max*2)
+        sedax[ii].set_ylim(min,max*2.5)
         fs = 14
-        xs, ys, dely, ha = 0.04, 0.89, 0.085, 'left'
+        xs, ys, dely, ha = 0.025, 0.89, 0.095, 'left'
         if ii == 5:
             xs, ha = 0.97, 'right'
         sedax[ii].text(xs,ys,pdata['observables']['objname'][idx],transform=sedax[ii].transAxes,color='black',ha=ha,fontsize=fs+2)
@@ -526,7 +530,7 @@ def sedfig(pdata,**popts):
         sedax[ii].text(xs,ys-dely,text,transform=sedax[ii].transAxes,color='black',ha=ha,fontsize=fs+2)
 
         if ii == 0:
-            sedax[ii].legend(loc=4, prop={'size':11},
+            sedax[ii].legend(loc=4, prop={'size':9.5},
                              scatterpoints=1,fancybox=True)
 
         ### axis scaling
@@ -534,16 +538,19 @@ def sedfig(pdata,**popts):
         sedax[ii].set_xscale('log',nonposx='clip',subsx=(1,2,4))
         sedax[ii].xaxis.set_minor_formatter(minorFormatter)
         sedax[ii].xaxis.set_major_formatter(majorFormatter)
+        for tl in sedax[ii].get_xticklabels():tl.set_visible(False)
+
         resax[ii].set_xscale('log',nonposx='clip',subsx=(1,2,4))
         resax[ii].xaxis.set_minor_formatter(minorFormatter)
         resax[ii].xaxis.set_major_formatter(majorFormatter)
         resax[ii].axhline(0, linestyle='--', color='0.2',lw=1.5,zorder=-1)
+        for tl in resax[ii].get_xticklabels():tl.set_visible(False)
 
         ### axis labels
         if ii >= 3:
             resax[ii].set_xlabel(r'wavelength $\mu$m')
         if (ii == 0) or (ii == 3):
-            sedax[ii].set_ylabel(r'f$_{\nu}$')
+            sedax[ii].set_ylabel(r'$\nu$f$_{\nu}$ [ergs/s/cm$^{-2}$]')
             resax[ii].set_ylabel(r'log(f$_{\mathrm{obs}}$/f$_{\mathrm{mod}}$)')
         reslim = np.max(resax[ii].get_ylim())
         resax[ii].set_ylim(-reslim,reslim)

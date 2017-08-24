@@ -231,7 +231,7 @@ def plot_prospector_templates(ax, xfilt=None, yfilt=None, outfolder=None, vega=F
         pts = pts[0::2]  # Deleting duplicates
         pts.insert(len(pts), pts[0])
 
-        poly = Polygon((np.array(pts)- cent) + cent,
+        poly = Polygon((np.array(pts)- cent) + cent,edgecolor='k',
                        facecolor=prospcolor[i], alpha=0.45,zorder=-35)
         poly.set_capstyle('round')
         plt.gca().add_patch(poly)
@@ -270,6 +270,7 @@ def plot_color_vs_fmir(pdata,xfilt=None,xlabel=None,
     ax.set_xlabel(xlabel)
     ax.set_ylabel(r'log(f$_{\mathrm{AGN,MIR}}$)')
 
+    plt.tight_layout()
     plt.savefig(outname, dpi=150)
     plt.close()
 
@@ -310,10 +311,10 @@ def plot_color_scatterplot(pdata,xfilt=None,yfilt=None,xlabel=None,ylabel=None,
     #### plot photometry
     fig, ax = plt.subplots(1,1, figsize=(8, 6))
     ax.scatter(xplot[cidx], yplot[cidx], marker=popts['nofmir_shape'], c=cpar_plot[cidx],
-               vmin=cpar_plot.min(), vmax=cpar_plot.max(), cmap=plt.cm.plasma,s=70,alpha=0.9)
+               vmin=cpar_plot.min(), vmax=cpar_plot.max(), cmap=plt.cm.plasma,s=70,alpha=0.9, edgecolors='k')
     ax.scatter(xplot[~cidx], yplot[~cidx], marker=popts['fmir_shape'], c=cpar_plot[~cidx], 
-               vmin=cpar_plot.min(), vmax=cpar_plot.max(), cmap=plt.cm.plasma,s=70,alpha=0.9)
-    pts = ax.scatter(xplot, yplot, marker='o', c=cpar_plot, cmap=plt.cm.plasma,s=0.0,alpha=0.9)
+               vmin=cpar_plot.min(), vmax=cpar_plot.max(), cmap=plt.cm.plasma,s=70,alpha=0.9, edgecolors='k')
+    pts = ax.scatter(xplot, yplot, marker='o', c=cpar_plot, cmap=plt.cm.plasma,s=0.0,alpha=0.9, edgecolors='k')
 
     #pts = ax.scatter(xplot, yplot, marker='o', color='0.4',s=50,alpha=0.4, linewidths=1.4,edgecolors='black')
     #idx = (np.array(pdata['objname'])[good] == 'UGC 05101') | (np.array(pdata['objname'])[good] == 'IC 5298')

@@ -84,7 +84,7 @@ def plot_massmet(pdata,plt_idx,**popts):
 
     fig, ax = plt.subplots(1,1,figsize=(6.5,6))
     ylim = (-2.4,0.5)
-    xlabel = r'log(M$_*$/M$_{\odot}$)'
+    xlabel = r'log(M$_*$) [M$_{\odot}$]'
     ylabel = r'log(Z/Z$_{\odot}$)'
 
     ### pull out fagn

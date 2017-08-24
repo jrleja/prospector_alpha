@@ -84,7 +84,7 @@ def make_plot():
     ### define wavelength regime + conversions
     to_plot = np.array([1,100])
     plt_idx = (sps.wavelengths > to_plot[0]*1e4) & (sps.wavelengths < to_plot[1]*1e4)
-    onemicron = np.abs((sps.wavelengths[plt_idx]/1e4 - 100)).argmin()
+    onemicron = np.abs((sps.wavelengths[plt_idx]/1e4 - 1)).argmin()
 
     ### add AGN-only templates
     observe_agn_templates.plot(ax[0])
@@ -111,8 +111,8 @@ def make_plot():
             else:
                 text = samp_pars[k][i]
 
-            yplot = np.log(spec[plt_idx])
-            yplot -= yplot[onemicron]
+            yplot = spec[plt_idx] * 3e18*3631*1e-23/sps.wavelengths[plt_idx]
+            yplot /= yplot[onemicron]
 
             ax[k+1].plot(sps.wavelengths[plt_idx]/1e4,yplot,
                        color=cmap(i),lw=2,label="{:.1f}".format(text),
@@ -121,7 +121,7 @@ def make_plot():
         itheta[idx[k]] = model.initial_theta[idx[k]]
 
     #### legend + labels
-    ax[1].legend(loc=2,prop={'size':12},title='f$_{\mathrm{AGN,MIR}}$',frameon=False)
+    ax[1].legend(loc=2,prop={'size':12},title='f$_{\mathrm{AGN,MIR}}$',frameon=False,ncol=2)
     ax[2].legend(loc=2,prop={'size':12},title=to_samp[1],frameon=False)
     ax[1].text(0.971,0.08,r'$\tau_{\mathrm{AGN}}$=20',transform=ax[1].transAxes,fontsize=12,ha='right')
     ax[2].text(0.971,0.08,r'f$_{\mathrm{AGN,MIR}}$=0.8',transform=ax[2].transAxes,fontsize=12,ha='right')
@@ -134,11 +134,17 @@ def make_plot():
         a.set_xscale('log',nonposx='clip',subsx=(1,3))
         a.xaxis.set_minor_formatter(minorFormatter)
         a.xaxis.set_major_formatter(majorFormatter)
+        for tl in a.get_xticklabels():tl.set_visible(False)
+
         a.set_xlim(to_plot)
-        a.set_ylim(-6,0.3)
 
         a.set_xlabel(r'wavelength [$\mu$m]')
-        a.set_ylabel(r'log(f$_{\nu}$)')
+        a.set_ylabel(r'$\nu$f$_{\nu}$ [normalized]')
+        a.set_yscale('log',nonposy='clip',subsy=(1,2,4))
+        a.xaxis.set_minor_formatter(minorFormatter)
+        a.xaxis.set_major_formatter(majorFormatter)
+        for tl in a.get_yticklabels():tl.set_visible(False)
+        a.set_ylim(a.get_ylim()[0],a.get_ylim()[1]*3)
 
     plt.tight_layout()
     fig.savefig(outname,dpi=150)

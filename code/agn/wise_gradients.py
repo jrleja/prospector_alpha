@@ -214,6 +214,10 @@ def plot_summary(pdata, outfolder, outdict,idx, agn_idx=Ellipsis, **popts):
     ax.set_xlabel(r'$\nabla$(W1-W2) at r=2 kpc [mag/kpc]')
 
     ax.axvline(-0.15, linestyle='--', color='k',lw=1,zorder=-1)
+    ax.axhline(-1.0, linestyle='--', color=popts['fmir_color'],lw=1,zorder=-1)
+    ax.text(-0.04,-0.95,'photometric AGN', color=popts['fmir_color'],weight='semibold',fontsize=12)
+    ax.text(-0.155,-1.5,'WISE\ngradient\nAGN', color='k',weight='semibold',fontsize=12,ha='right')
+
     #ax.set_ylim(-.2,.2)
     ax.set_ylim(-4,0)
     ax.set_xlim(-0.3,0.1)

@@ -51,29 +51,34 @@ def plot(ax):
         
         ### define plotting stuff
         good = dat[name] > 0
-        xplot = dat['lambda'][good]/1e4
-        yplot = np.log10(dat[name][good])
+        xplot = dat['lambda'][good]/1e4 
+        yplot = dat[name][good] * 3e18*3631*1e-23/dat['lambda'][good]
 
         ### normalize
-        onemicron = yplot.argmax()
-        yplot -= yplot[onemicron]
+        onemicron = np.abs(xplot-1.).argmin()
+        yplot /= yplot[onemicron]
 
         ax.plot(xplot,yplot,
                 label=name,lw=2,color=cmap(i),
                 path_effects=[pe.Stroke(linewidth=4, foreground='k',alpha=0.7), pe.Normal()],zorder=-i)
 
-    ax.legend(title=r'$\tau_{\mathrm{AGN}}$',loc=2,prop={'size':10},frameon=False)
-    ax.set_ylabel(r'f$_{\nu}$')
+    ax.legend(title=r'$\tau_{\mathrm{AGN}}$',loc=2,prop={'size':10},frameon=False,ncol=2)
+    ax.set_ylabel(r'$\nu$f$_{\nu}$ [normalized]')
     ax.set_xlabel(r'wavelength [$\mu$m]')
     ax.text(0.95,0.93,'AGN only',weight='semibold',transform=ax.transAxes,ha='right',fontsize=16)
 
     ax.set_xscale('log',nonposx='clip',subsx=(1,3))
     ax.xaxis.set_minor_formatter(minorFormatter)
     ax.xaxis.set_major_formatter(majorFormatter)
+    for tl in ax.get_xticklabels():tl.set_visible(False)
 
-
+    ax.set_yscale('log',nonposy='clip',subsy=(1,2,4))
+    ax.xaxis.set_minor_formatter(minorFormatter)
+    ax.xaxis.set_major_formatter(majorFormatter)
+    for tl in ax.get_yticklabels():tl.set_visible(False)
     ax.set_xlim(1,200)
-    ax.set_ylim(-2,0.8)
+    in_bounds = (xplot > 1) & (xplot < 200)
+    ax.set_ylim(yplot[in_bounds].min()*0.9, yplot[in_bounds].max()*20)
 
     '''
     outname = '/Users/joel/code/python/prospector_alpha/plots/brownseds_agn/agn_plots/agn_templates.png'

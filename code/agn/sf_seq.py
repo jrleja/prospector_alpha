@@ -58,7 +58,7 @@ def plot(runname='brownseds_agn',alldata=None,outfolder=None,**popts):
     pdata = collate_data(alldata)
 
     ### star-forming sequence plot
-    plot_sfseq(pdata,outfolder=outfolder)
+    plot_sfseq(pdata,outfolder=outfolder,**popts)
     
 def plot_sfseq(pdata,outfolder=None,sigclip=True,name_label=False):
 
@@ -162,7 +162,8 @@ def plot_sfseq(pdata,outfolder=None,sigclip=True,name_label=False):
 
         ### do a little data transformation
         # take maximum to be within ~6 pixels of center
-        vmax = data[(data.shape[0]/2.-3):(data.shape[0]/2.+3),(data.shape[1]/2.-3):(data.shape[1]/2.+3)].max()
+        d1, d2 = np.int(np.round(data.shape[0]/2.)), np.int(np.round(data.shape[1]/2.))
+        vmax = data[(d1-3):(d1+3),(d2-3):(d2+3)].max()
 
         # get rid of background
         # sigclip is beautiful but slow!
@@ -224,7 +225,7 @@ def plot_sfseq(pdata,outfolder=None,sigclip=True,name_label=False):
             zorder=1)
 
     ### labels and saving
-    ax.set_xlabel(r'log(M$_*$/M$_{\odot}$)')
+    ax.set_xlabel(r'log(M$_*$) [M$_{\odot}$]')
     ax.set_ylabel(r'log(SFR) [M$_{\odot}$/yr]')
     ax.set_xlim(xlim)
     ax.set_ylim(ylim)
@@ -254,7 +255,7 @@ def img_extent(pix_center, px_scale, phot_size, im_shape):
             np.clip(pix_center[0][1] + phot_size/px_scale,0,im_shape[0]-1)
            ]
 
-    return np.round(size)
+    return np.round(size).astype(int)
 
 def load_structure(objname,long_axis=False):
 
