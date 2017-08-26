@@ -22,7 +22,7 @@ def collate_data(alldata, alldata_noagn):
         model_pars = {}
         pnames = ['fagn', 'logzsol', 'stellar_mass']
         for p in pnames: 
-            model_pars[p] = {'q50':[],'q84':[],'q16':[]}
+            model_pars[p] = {'q50':[],'q84':[],'q16':[],'chain':[]}
 
         #### load model information
         for dat in the_data[ii]:
@@ -35,6 +35,7 @@ def collate_data(alldata, alldata_noagn):
                     model_pars[key]['q50'].append(dat['pquantiles']['q50'][parnames==key][0])
                     model_pars[key]['q84'].append(dat['pquantiles']['q84'][parnames==key][0])
                     model_pars[key]['q16'].append(dat['pquantiles']['q16'][parnames==key][0])
+                    model_pars[key]['chain'].append(dat['pquantiles']['sample_chain'][:,parnames==key].flatten())
                 elif key in eparnames:
                     model_pars[key]['q50'].append(dat['pextras']['q50'][eparnames==key][0])
                     model_pars[key]['q84'].append(dat['pextras']['q84'][eparnames==key][0])
@@ -151,30 +152,48 @@ def plot_massmet(pdata,plt_idx,**popts):
     lower_z_agn = np.interp(mass_agn[plt_idx], massmet[:,0], massmet[:,2])
     upper_z_agn = np.interp(mass_agn[plt_idx], massmet[:,0], massmet[:,3])
     
-    deviation_noagn = pdata['no_agn']['logzsol']['q50'][plt_idx] - median_z_noagn 
-    up = deviation_noagn > 0
-    deviation_noagn[up] /= (upper_z_noagn[up]-median_z_noagn[up])
-    deviation_noagn[~up] /= (median_z_noagn[~up]-lower_z_noagn[~up])
+    nboot, nidx = 10000, len(plt_idx)
+    deviation_noagn_mean, deviation_agn_mean = [], []
+    for i in xrange(nboot):
+
+        # choose from galaxies, with replacement (bootstrap!)
+        new_plt_idx = np.random.choice(plt_idx,nidx,replace=True)
+
+        # choose randomly from galaxy PDFs (also choose plt_idx randomly with replacement before this?)
+        logzsol_agn, logzsol_noagn = [], []
+        for idx in new_plt_idx: 
+            logzsol_noagn.append(np.random.choice(pdata['no_agn']['logzsol']['chain'][idx],1)[0])
+            logzsol_agn.append(np.random.choice(pdata['agn']['logzsol']['chain'][idx],1)[0])
+
+        deviation_noagn = np.array(logzsol_noagn) - median_z_noagn 
+        up = deviation_noagn > 0
+        deviation_noagn[up] /= (upper_z_noagn[up]-median_z_noagn[up])
+        deviation_noagn[~up] /= (median_z_noagn[~up]-lower_z_noagn[~up])
+
+        deviation_agn = np.array(logzsol_agn) - median_z_agn 
+        up = deviation_agn > 0
+        deviation_agn[up] /= (upper_z_agn[up]-median_z_agn[up])
+        deviation_agn[~up] /= (median_z_agn[~up]-lower_z_agn[~up])
+
+        deviation_noagn_mean.append(deviation_noagn.mean())
+        deviation_agn_mean.append(deviation_agn.mean())
+
+    ondo, on, onup = np.percentile(deviation_agn_mean,[16,50,84])
+    offdo, off, offup = np.percentile(deviation_noagn_mean,[16,50,84])
+
+    # format display
+    fmt = "{{0:{0}}}".format(".1f").format
+    textoff = r"${{{0}}}_{{-{1}}}^{{+{2}}}$"
+    textoff = textoff.format(fmt(off), fmt(off-offdo), fmt(offup-off))
+    texton = r"${{{0}}}_{{-{1}}}^{{+{2}}}$"
+    texton = texton.format(fmt(on), fmt(on-ondo), fmt(onup-on))
     
-    deviation_agn = pdata['agn']['logzsol']['q50'][plt_idx] - median_z_agn 
-    up = deviation_agn > 0
-    deviation_agn[up] /= (upper_z_agn[up]-median_z_agn[up])
-    deviation_agn[~up] /= (median_z_agn[~up]-lower_z_agn[~up])
+    textoff = "mean offset (AGN off): {0} {1}".format(textoff,r"$\sigma_{\mathrm{SDSS}}$")
+    texton = "mean offset (AGN on): {0} {1}".format(texton,r"$\sigma_{\mathrm{SDSS}}$")
 
-    '''
-    ax[1].scatter(mass_noagn[plt_idx],deviation_noagn, marker='o', color=popts['noagn_color'],s=50,zorder=10,alpha=alpha,edgecolors='k')
-    ax[1].scatter(mass_agn[plt_idx],deviation_agn, marker='o', color=popts['agn_color'],s=50,zorder=10,alpha=alpha,edgecolors='k')
-
-    max = np.max(np.abs(ax[1].get_ylim()))
-    ax[1].set_ylim(-max,max)
-    ax[1].axhline(0, linestyle='--', color='0.2',lw=2,zorder=-1)
-    '''
-    ax.text(0.04,0.11,'mean offset (AGN off): '+"{:.2f}".format(deviation_noagn.mean())+r"$\sigma_{\mathrm{SDSS}}$",transform=ax.transAxes,fontsize=17,color=popts['noagn_color'])
-    ax.text(0.04,0.05,'mean offset (AGN on): '+"{:.2f}".format(deviation_agn.mean())+r"$\sigma_{\mathrm{SDSS}}$",transform=ax.transAxes,fontsize=17,color=popts['agn_color'])
-
-    '''
-    ax[1].set_xlabel(xlabel)
-    ax[1].set_ylabel(r'log(Z$_{\mathrm{prosp}}$/Z$_{\mathrm{SDSS}}$)/$\sigma_{\mathrm{Z,SDSS}}$')
-    '''
+    ax.text(0.04,0.11, textoff,
+            transform=ax.transAxes,fontsize=15,color=popts['noagn_color'])
+    ax.text(0.04,0.05, texton,
+            transform=ax.transAxes,fontsize=15,color=popts['agn_color'])
 
     return fig,ax

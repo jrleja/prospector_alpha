@@ -59,8 +59,8 @@ def plot(ax):
         yplot /= yplot[onemicron]
 
         ax.plot(xplot,yplot,
-                label=name,lw=2,color=cmap(i),
-                path_effects=[pe.Stroke(linewidth=4, foreground='k',alpha=0.7), pe.Normal()],zorder=-i)
+                label=name,lw=2.5,color=cmap(i),
+                path_effects=[pe.Stroke(linewidth=4.5, foreground='k',alpha=0.7), pe.Normal()],zorder=-i)
 
     ax.legend(title=r'$\tau_{\mathrm{AGN}}$',loc=2,prop={'size':10},frameon=False,ncol=2)
     ax.set_ylabel(r'$\nu$f$_{\nu}$ [normalized]')
@@ -76,7 +76,7 @@ def plot(ax):
     ax.xaxis.set_minor_formatter(minorFormatter)
     ax.xaxis.set_major_formatter(majorFormatter)
     for tl in ax.get_yticklabels():tl.set_visible(False)
-    ax.set_xlim(1,200)
+    ax.set_xlim(0.5,200)
     in_bounds = (xplot > 1) & (xplot < 200)
     ax.set_ylim(yplot[in_bounds].min()*0.9, yplot[in_bounds].max()*20)
 

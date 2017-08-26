@@ -18,17 +18,16 @@ jansky_mks = 1e-26
 #############
 run_params = {'verbose':True,
               'debug': False,
-              'outfile': os.getenv('APPS')+'/prospector_alpha/results/brownseds_agn_dynest/brownseds_agn_dynest_Arp 256 N',
+              'outfile': os.getenv('APPS')+'/prospector_alpha/results/brownseds_agn_dynesty/brownseds_agn_dynesty_Arp 256 N',
               'nofork': True,
               # dynesty params
               'nested_bound': 'multi', # bounding method
-              'nested_sample': 'rwalk', # sampling method
-              'nested_walks': 50, # emcee walks
+              'nested_sample': 'unif', # sampling method
+              #'nested_walks': 50, # MC walks
               'nested_nlive_batch': 200, # size of live point "batches"
               'nested_nlive_init': 200, # number of initial live points
               'nested_weight_kwargs': {'pfrac': 1.0}, # weight posterior over evidence by 100%
               'nested_dlogz_init': 0.01,
-              'nested_update_interval': 60.,
               # Model info
               'zcontinuous': 2,
               'compute_vega_mags': False,

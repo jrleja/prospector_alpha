@@ -22,9 +22,9 @@ blue = '#1C86EE'
 plotopts = {
          'fmt':'o',
          'ecolor':'k',
-         'capthick':0.4,
-         'elinewidth':0.4,
-         'alpha':0.55
+         'capthick':0.35,
+         'elinewidth':0.35,
+         'alpha':0.4
         } 
 
 def get_cmap(N):

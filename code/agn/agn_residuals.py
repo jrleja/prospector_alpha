@@ -517,6 +517,8 @@ def sedfig(pdata,**popts):
         sedax[ii].set_xlim(wavlims)
         resax[ii].set_xlim(wavlims)
         sedax[ii].set_ylim(min,max*2.5)
+        if ii == 2:
+            sedax[ii].set_ylim(min,1e-9)
         fs = 14
         xs, ys, dely, ha = 0.025, 0.89, 0.095, 'left'
         if ii == 5:

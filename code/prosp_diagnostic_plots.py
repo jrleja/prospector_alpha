@@ -12,16 +12,11 @@ plt.ioff() # don't pop up a window for each plot
 
 obs_color = '#545454'
 
-tiny_number = 1e-3
-big_number = 1e90
-dpi = 150
-
 minorFormatter = jLogFormatter(base=10, labelOnlyBase=False)
 majorFormatter = jLogFormatter(base=10, labelOnlyBase=True)
 
 def subcorner(sample_results,  sps, model, extra_output, flatchain,
               outname=None, showpars=None,
-              powell_results=None,
               **kwargs):
     """
     Make a corner plot of the (thinned, latter) samples of the posterior
@@ -42,7 +37,7 @@ def subcorner(sample_results,  sps, model, extra_output, flatchain,
                         **kwargs)
 
     fig = add_to_corner(fig, sample_results, extra_output, sps, model, outname=outname,
-                        maxprob=True, title_kwargs=title_kwargs,powell_results=powell_results)
+                        maxprob=True, title_kwargs=title_kwargs)
 
     if outname is not None:
         fig.savefig('{0}.corner.png'.format(outname))
@@ -71,7 +66,7 @@ def transform_chain(flatchain, model):
     return flatchain.squeeze(), parnames
 
 def add_to_corner(fig, sample_results, extra_output, sps, model,outname=None,
-                  maxprob=True,powell_results=None,title_kwargs=None,twofigure=False):
+                  maxprob=True,title_kwargs=None,twofigure=False):
 
     """
     adds in posterior distributions for specific parameters
@@ -109,25 +104,6 @@ def add_to_corner(fig, sample_results, extra_output, sps, model,outname=None,
             # add parameter names if not covered by truths
             plt.figtext(0.84, ttop-0.02*(kk+1), maxprob_parnames[kk]+'='+"{:.2f}".format(yplot),
                    horizontalalignment='right',fontsize=fs)
-
-    # show powell results
-    if powell_results:
-        best = np.argmin([p.fun for p in powell_results])
-        pbest,_ = transform_chain(powell_results[best].x,model)
-        powell_params = np.append(pbest,-1*powell_results[best]['fun'])
-        powell_names = np.append(extra_output['quantiles']['parnames'],'lnprob')
-
-        plt.figtext(0.89, ttop, 'after powell',weight='bold',
-                       horizontalalignment='left',fontsize=fs)
-
-        for kk in xrange(len(powell_names)):
-            if powell_names[kk] == 'mass':
-               yplot = np.log10(powell_params[kk])
-            else:
-                yplot = powell_params[kk]
-
-            plt.figtext(0.89, ttop-0.02*(kk+1), "{:.2f}".format(yplot),
-                       horizontalalignment='left',fontsize=fs)
 
     #### two options: add new figure, or combine with old
     if (scale < 6) or twofigure:
@@ -190,6 +166,7 @@ def add_to_corner(fig, sample_results, extra_output, sps, model,outname=None,
                 plot = plotquant[:,jj]
             else:
                 plot = np.log10(plotquant[:,jj])
+            plot = plot[np.isfinite(plot)]
 
             # Plot the histograms.
             n, b, p = ax.hist(plot, bins=50,
@@ -661,7 +638,7 @@ def sed_figure(outname = None,
                       [r'log(M/M$_{\odot}$)',r'log(Z/Z$_{\odot}$)'],text_size=0.5)
 
     if outname is not None:
-        fig.savefig(outname, bbox_inches='tight', dpi=dpi)
+        fig.savefig(outname, bbox_inches='tight', dpi=150)
         plt.close()
 
     #os.system('open '+outname)
@@ -762,8 +739,7 @@ def make_all_plots(filebase=None,
     if plt_corner: 
         print 'MAKING CORNER PLOT'
         subcorner(sample_results, sps, copy.deepcopy(sample_results['model']),
-                  extra_output,flatchain,outname=outfolder+objname,
-                  powell_results=powell_results)
+                  extra_output,flatchain,outname=outfolder+objname)
 
     # sed plot
     if plt_sed:

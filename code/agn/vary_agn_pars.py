@@ -82,7 +82,7 @@ def make_plot():
     model.initial_theta[tidx] = 20
 
     ### define wavelength regime + conversions
-    to_plot = np.array([1,100])
+    to_plot = np.array([0.5,200])
     plt_idx = (sps.wavelengths > to_plot[0]*1e4) & (sps.wavelengths < to_plot[1]*1e4)
     onemicron = np.abs((sps.wavelengths[plt_idx]/1e4 - 1)).argmin()
 
@@ -115,8 +115,8 @@ def make_plot():
             yplot /= yplot[onemicron]
 
             ax[k+1].plot(sps.wavelengths[plt_idx]/1e4,yplot,
-                       color=cmap(i),lw=2,label="{:.1f}".format(text),
-                       path_effects=[pe.Stroke(linewidth=4, foreground='k',alpha=0.7), pe.Normal()],
+                       color=cmap(i),lw=2.5,label="{:.1f}".format(text),
+                       path_effects=[pe.Stroke(linewidth=4.5, foreground='k',alpha=0.7), pe.Normal()],
                        zorder=k)
         itheta[idx[k]] = model.initial_theta[idx[k]]
 
