@@ -22,8 +22,9 @@ run_params = {'verbose':True,
               'nofork': True,
               # dynesty params
               'nested_bound': 'multi', # bounding method
-              'nested_sample': 'unif', # sampling method
-              #'nested_walks': 50, # MC walks
+              'nested_sample': 'rwalk', # sampling method
+              'nested_walks': 50, # MC walks
+              'nested_bootstrap': 10, # ease down on bootstrapping for now
               'nested_nlive_batch': 200, # size of live point "batches"
               'nested_nlive_init': 200, # number of initial live points
               'nested_weight_kwargs': {'pfrac': 1.0}, # weight posterior over evidence by 100%
