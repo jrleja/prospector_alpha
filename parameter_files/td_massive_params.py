@@ -5,6 +5,7 @@ from prospect.sources import FastStepBasis
 from sedpy import observate
 from astropy.cosmology import WMAP9
 from td_io import load_zp_offsets
+from scipy.stats import truncnorm
 
 lsun = 3.846e33
 pc = 3.085677581467192e18  # in cm
@@ -218,7 +219,7 @@ model_params.append({'name': 'logzsol', 'N': 1,
                         'init_disp': 0.25,
                         'disp_floor': 0.2,
                         'units': r'$\log (Z/Z_\odot)$',
-                        'prior': priors.TopHat(mini=-1.98, maxi=0.19)})
+                        'prior': None})
                         
 ###### SFH   ########
 model_params.append({'name': 'sfh', 'N':1,
@@ -380,7 +381,7 @@ model_params.append({'name': 'add_agn_dust', 'N': 1,
                         'prior': None})
 
 model_params.append({'name': 'fagn', 'N': 1,
-                        'isfree': False,
+                        'isfree': True,
                         'init': 0.00,
                         'init_disp': 0.03,
                         'disp_floor': 0.02,
@@ -388,8 +389,8 @@ model_params.append({'name': 'fagn', 'N': 1,
                         'prior': priors.LogUniform(mini=1e-5, maxi=3.0)})
 
 model_params.append({'name': 'agn_tau', 'N': 1,
-                        'isfree': False,
-                        'init': 4.0,
+                        'isfree': True,
+                        'init': 20.0,
                         'init_disp': 5,
                         'disp_floor': 2,
                         'units': '',
@@ -421,6 +422,95 @@ for param in model_params:
     if param['name'] not in fit_order:
         tparams.append(param)
 model_params = tparams
+
+#### Redefine model, to update prior_products
+class SedMet(sedmodel.SedModel):
+
+    def prior_product(self, theta, verbose=False, **extras):
+        """Return a scalar which is the ln of the product of the prior
+        probabilities for each element of theta.  Requires that the prior
+        functions are defined in the theta descriptor.
+
+        :param theta:
+            Iterable containing the free model parameter values.
+
+        :returns lnp_prior:
+            The log of the product of the prior probabilities for these
+            parameter values.
+        """
+        lnp_prior = 0
+        for k, inds in list(self.theta_index.items()):
+            
+            func = self._config_dict[k]['prior']
+            kwargs = self._config_dict[k].get('prior_args', {})
+            if k == 'logzsol':
+                this_prior = np.sum(func(theta[inds],theta[self.theta_index['logmass']], **kwargs))
+                print 'logzsol prior: {0}'.format(this_prior)
+            else:
+                this_prior = np.sum(func(theta[inds], **kwargs))
+
+            lnp_prior += this_prior
+        return lnp_prior
+
+##### Mass-metallicity prior ######
+class MassMet(priors.Prior):
+    """A Gaussian prior designed to approximate the Gallazzi et al. 2005 
+    stellar mass--stellar metallicity relationship.
+
+    Must be updated to have relevant functions of `distribution` in `priors.py`
+    in order to be run with a nested sampler.
+    """
+
+    prior_params = ['mini', 'maxi']
+    distribution = truncnorm
+    massmet = np.loadtxt(os.getenv('APPS')+'/prospector_alpha/data/gallazzi_05_massmet.txt')
+
+    def scale(self,mass):
+        upper_84 = np.interp(mass, self.massmet[:,0], self.massmet[:,3]) 
+        lower_16 = np.interp(mass, self.massmet[:,0], self.massmet[:,2])
+        print (upper_84-lower_16)
+        return (upper_84-lower_16)
+
+    def loc(self,mass):
+        print np.interp(mass, self.massmet[:,0], self.massmet[:,1])
+        return np.interp(mass, self.massmet[:,0], self.massmet[:,1])
+
+    def args(self,mass):
+        a = (self.params['mini'] - self.loc(mass)) / self.scale(mass)
+        b = (self.params['maxi'] - self.loc(mass)) / self.scale(mass)
+        return [a, b]
+
+    @property
+    def range(self):
+        return (self.params['mini'], self.params['maxi'])
+
+    def bounds(self, **kwargs):
+        if len(kwargs) > 0:
+            self.update(**kwargs)
+        return self.range
+
+    def __call__(self, logzsol, mass, **kwargs):
+        """Compute the value of the probability desnity function at x and
+        return the ln of that.
+
+        :params logzsol, mass:
+            Used to calculate the prior
+
+        :param kwargs: optional
+            All extra keyword arguments are used to update the `prior_params`.
+
+        :returns lnp:
+            The natural log of the prior probability at x, scalar or ndarray of
+            same length as the prior object.
+        """
+        if len(kwargs) > 0:
+            self.update(**kwargs)
+        p = self.distribution.pdf(logzsol, *self.args(mass),
+                                  loc=self.loc(mass), scale=self.scale(mass))
+        with np.errstate(invalid='ignore'):
+            lnp = np.log(p)
+        return lnp
+
 
 ###### Redefine SPS ######
 class FracSFH(FastStepBasis):
@@ -590,14 +680,15 @@ def load_model(objname=None, datdir=None, runname=None, agelims=[], **extras):
     model_params[n.index('z_fraction')]['init'] =  model_params[n.index('z_fraction')]['prior'].sample()
     model_params[n.index('z_fraction')]['init_disp'] = 0.02
 
+    ### apply SDSS mass-metallicity prior
+    model_params[n.index('logzsol')]['prior'] = MassMet(mini=-1.98, maxi=0.19)
+
     #### INSERT REDSHIFT INTO MODEL PARAMETER DICTIONARY ####
     zind = n.index('zred')
     model_params[zind]['init'] = zred
 
     #### CREATE MODEL
-    model = sedmodel.SedModel(model_params)
+    model = SedMet(model_params)
 
     return model
-
-model_type = sedmodel.SedModel
 
