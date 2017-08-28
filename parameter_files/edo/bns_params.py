@@ -77,10 +77,10 @@ def load_obs(**extras):
            '2MASS J': (10.98, 0.02),
            '2MASS H': (10.82, 0.02),
            '2MASS K': (11.02, 0.02),
-           'WISE W1': (12.62, 0.02),
-           'WISE W2': (13.32, 0.02),
-           'WISE W3': (14.09, 0.03),
-           'WISE W4': (14.08, 0.12)
+           'WISE W1': (11.92, 0.01),
+           'WISE W2': (12.59, 0.01),
+           'WISE W3': (13.70, 0.04),
+           'WISE W4': (13.86, 0.19)
           }
 
     ### load fluxes, convert from AB magnitudes to maggies
