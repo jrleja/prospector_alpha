@@ -382,7 +382,7 @@ model_params.append({'name': 'add_agn_dust', 'N': 1,
 
 model_params.append({'name': 'fagn', 'N': 1,
                         'isfree': True,
-                        'init': 0.00,
+                        'init': 0.01,
                         'init_disp': 0.03,
                         'disp_floor': 0.02,
                         'units': '',
@@ -445,7 +445,6 @@ class SedMet(sedmodel.SedModel):
             kwargs = self._config_dict[k].get('prior_args', {})
             if k == 'logzsol':
                 this_prior = np.sum(func(theta[inds],theta[self.theta_index['logmass']], **kwargs))
-                print 'logzsol prior: {0}'.format(this_prior)
             else:
                 this_prior = np.sum(func(theta[inds], **kwargs))
 
@@ -468,17 +467,16 @@ class MassMet(priors.Prior):
     def scale(self,mass):
         upper_84 = np.interp(mass, self.massmet[:,0], self.massmet[:,3]) 
         lower_16 = np.interp(mass, self.massmet[:,0], self.massmet[:,2])
-        print (upper_84-lower_16)
         return (upper_84-lower_16)
 
     def loc(self,mass):
-        print np.interp(mass, self.massmet[:,0], self.massmet[:,1])
         return np.interp(mass, self.massmet[:,0], self.massmet[:,1])
 
-    def args(self,mass):
+    def get_args(self,mass):
         a = (self.params['mini'] - self.loc(mass)) / self.scale(mass)
         b = (self.params['maxi'] - self.loc(mass)) / self.scale(mass)
         return [a, b]
+    args = property(get_args)
 
     @property
     def range(self):
@@ -490,7 +488,7 @@ class MassMet(priors.Prior):
         return self.range
 
     def __call__(self, logzsol, mass, **kwargs):
-        """Compute the value of the probability desnity function at x and
+        """Compute the value of the probability density function at x and
         return the ln of that.
 
         :params logzsol, mass:
@@ -505,11 +503,25 @@ class MassMet(priors.Prior):
         """
         if len(kwargs) > 0:
             self.update(**kwargs)
-        p = self.distribution.pdf(logzsol, *self.args(mass),
+        a, b = self.get_args(mass)
+        p = self.distribution.pdf(logzsol, a, b,
                                   loc=self.loc(mass), scale=self.scale(mass))
         with np.errstate(invalid='ignore'):
             lnp = np.log(p)
         return lnp
+
+    def sample(self, mass=10, nsample=None, **kwargs):
+        """Draw a sample from the prior distribution.
+            # hacked, only used to initial powell anyway
+
+        :param nsample: (optional)
+            Unused
+        """
+        if len(kwargs) > 0:
+            self.update(**kwargs)
+        a, b = self.get_args(mass)
+        return self.distribution.rvs(a,b, size=len(self),
+                                     loc=self.loc(mass), scale=self.scale(mass))
 
 
 ###### Redefine SPS ######
