@@ -344,7 +344,7 @@ def show_chain(sample_results,legend=True, outname=None):
 
     ### create plots
     fig, axarr = plt.subplots(ny, nx, figsize = (dim[0]*1.2, dim[1]))
-    fig.subplots_adjust(wspace=0.4,hspace=0.3)
+    fig.subplots_adjust(wspace=0.5,hspace=0.2)
     axarr = np.ravel(axarr)
     
     ### remove some plots to make room for KL divergence
@@ -389,7 +389,7 @@ def show_chain(sample_results,legend=True, outname=None):
         ax.set_xlabel('iteration')
 
     ### add KL divergence
-    kl_ax = fig.add_axes([0.65, 0.1, 0.27, 0.38])
+    kl_ax = fig.add_axes([0.68, 0.1, 0.24, 0.35])
     cmap = get_cmap(npars)
     for i in xrange(npars): 
         kl_ax.plot(sample_results['kl_iteration'],np.log10(sample_results['kl_divergence'][:,i]),

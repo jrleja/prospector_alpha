@@ -1,4 +1,4 @@
-from astropy.io import ascii
+from astropy.io import ascii, fits
 import numpy as np
 from astropy.table import Table, vstack
 import os
@@ -53,12 +53,45 @@ def load_zp_offsets(field):
 
 	return dat
 
+def load_grism_dat(field,process=False):
+	"""if process, turn into a manageable size and interpret some things
+	note that we return REST-FRAME equivalent width!
+	else return the whole shebang
+	"""
+	loc = '/Users/joel/data/3d_hst/v4.1_spectral/'+field.lower()+'_3dhst_v4.1.5_catalogs/'+field.lower()+'_3dhst.v4.1.5.linefit.linematched.fits'
+	hdu = fits.open(loc)
+	dat = hdu[1].data
+
+	if not process:
+		return dat
+	
+	# grab specific lines
+	hdr, hdr_type = [], []
+	lines_to_save = ['Ha']
+	line_list = ['_FLUX', '_FLUX_ERR', '_EQW', '_EQW_ERR']
+	for line in lines_to_save:
+		for ltype in line_list:
+			hdr.append(line+ltype)
+			hdr_type = hdr_type + [float]
+
+	# grab specific fields
+	dat_to_save = ['number', 'grism_id', 'z_max_grism']
+	for idx in dat_to_save:
+		hdr.append(idx)
+		hdr_type.append(dat.dtype[idx])
+	
+	# buil output array
+	out = np.recarray(dat.shape, dtype=[(x,y) for x,y in zip(hdr,hdr_type)]) 
+	for idx in hdr: out[idx][:] = dat[idx][:]
+	return out
+
 def load_linelist(field='COSMOS'):
 	
 	'''
 	uses pieter's zbest catalog to determine objects with spectra
 	returns all line information, zgris, and use flag
 	note that equivalent widths are in observed frame, convert by dividing by (1+z)
+	THIS IS DEPRECATED
 	'''
 	filename='/Users/joel/data/3d_hst/master.zbest.dat'
 	with open(filename, 'r') as f:

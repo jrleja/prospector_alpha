@@ -1,17 +1,140 @@
-import td_io, read_data, random, os, prosp_dutils
+import td_io, read_data, os, prosp_dutils
 import numpy as np
 from astropy.table import Table, vstack
 from astropy.io import ascii
 from astropy.coordinates import ICRS
 from astropy import units as u
-random.seed(25001)
 
 apps = os.getenv('APPS')
 
-# calculate a UVJ flag
-# 0 = quiescent, 1 = starforming
-def calc_uvj_flag(rf):
+def remove_zp_offsets(field,phot,bands_exempt=None):
 
+	zp_offsets = td_io.load_zp_offsets(field)
+	nbands     = len(zp_offsets)
+
+	for kk in xrange(nbands):
+		filter = zp_offsets[kk]['Band'].lower()+'_'+field.lower()
+		if filter not in bands_exempt:
+			phot['f_'+filter] = phot['f_'+filter]/zp_offsets[kk]['Flux-Correction']
+			phot['e_'+filter] = phot['e_'+filter]/zp_offsets[kk]['Flux-Correction']
+
+	return phot
+
+def select_massive(phot=None,fast=None,zbest=None,**extras):
+	# consider removing zbest['use_zgrism'] cut in the future!! no need for good grism data really
+	return (phot['use_phot'] == 1) & (fast['lmass'] > 11) & (zbest['use_zgrism'] == 1)
+def select_ha(phot=None,fast=None,zbest=None,gris=None,**extras):
+	np.random.seed(2)
+	idx = np.where((phot['use_phot'] == 1) & (zbest['use_zgrism'] == 1)  & (gris['Ha_FLUX']/gris['Ha_FLUX_ERR'] > 10) & (gris['Ha_EQW'] > 10))[0]
+	return np.random.choice(idx,40)
+
+
+massive_sample = {
+	       		  'selection_function': select_massive,
+	       		  'runname': 'td_massive',
+	       		  'rm_zp_offsets': True
+		  		  }
+
+ha_sample = {
+	         'selection_function': select_ha,
+	         'runname': 'td_ha',
+	         'rm_zp_offsets': True
+		  	}
+
+def build_sample(sample=None):
+	"""general function to select a sample of galaxies from the 3D-HST catalogs
+	each sample is defined by a series of keywords in a dictionary
+	"""
+	### output
+	fields = ['AEGIS','COSMOS','GOODSN','GOODSS','UDS']
+	id_str_out = '/Users/joel/code/python/prospector_alpha/data/3dhst/'+sample['runname']+'.ids'
+	ids = []
+
+	for field in fields:
+		outbase = '/Users/joel/code/python/prospector_alpha/data/3dhst/'+field+'_'+sample['runname']
+
+		# load data
+		phot = td_io.load_phot_v41(field)
+		fast = td_io.load_fast_v41(field)
+		zbest = td_io.load_zbest(field)
+		mips = td_io.load_mips_data(field)
+		gris = td_io.load_grism_dat(field,process=True)
+	
+		# make catalog cuts
+		good = sample['selection_function'](fast=fast,phot=phot,zbest=zbest,gris=gris)
+
+		phot = phot[good]
+		fast = fast[good]
+		zbest = zbest[good]
+		mips = mips[good]
+		gris = gris[good]
+
+		# add in mips
+		phot['f_MIPS_24um'] = mips['f24tot']
+		phot['e_MIPS_24um'] = mips['ef24tot']
+
+		# save UV+IR SFRs + emission line info in .dat file
+		for name in mips.dtype.names:
+			if name != 'z' and name != 'id':
+				zbest[name] = mips[name]
+			elif name == 'z':
+				zbest['z_sfr'] = mips[name]
+		for name in gris.dtype.names: zbest[name] = gris[name]
+
+		# rename bands in photometric catalogs
+		for column in phot.colnames:
+			if column[:2] == 'f_' or column[:2] == 'e_':
+				phot.rename_column(column, column.lower()+'_'+field.lower())	
+
+		# are we removing the zeropoint offsets? (don't do space photometry!)
+		if sample['rm_zp_offsets']:
+			bands_exempt = ['irac1_cosmos','irac2_cosmos','irac3_cosmos','irac4_cosmos',\
+	                        'f606w_cosmos','f814w_cosmos','f125w_cosmos','f140w_cosmos',\
+	                        'f160w_cosmos','mips_24um_cosmos']
+			phot = remove_zp_offsets(field,phot,bands_exempt=bands_exempt)
+
+		# write out
+		ascii.write(phot, output=outbase+'.cat', 
+		            delimiter=' ', format='commented_header',overwrite=True)
+		ascii.write(fast, output=outbase+'.fout', 
+		            delimiter=' ', format='commented_header',
+		            include_names=fast.keys()[:11],overwrite=True)
+		ascii.write(zbest, output=outbase+'.dat', 
+		            delimiter=' ', format='commented_header',overwrite=True)
+		### save IDs
+		ids = ids + [field+'_'+str(id) for id in phot['id']]
+
+	ascii.write([ids], output=id_str_out, Writer=ascii.NoHeader,overwrite=True)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def calc_uvj_flag(rf):
+	"""calculate a UVJ flag
+	0 = quiescent, 1 = starforming"""
 	import numpy as np
 
 	umag = 25 - 2.5*np.log10(rf['L153'])
@@ -41,74 +164,6 @@ def calc_uvj_flag(rf):
 	
 	return uvj_flag
 
-def build_massive_sample(rm_zp_offsets=True):
-
-	'''
-	selects a sample of massive galaxies
-	currently only in cosmos
-	'''
-
-	### output
-	fields = ['AEGIS','COSMOS','GOODSN','GOODSS','UDS']
-	basename = 'td_massive'
-	id_str_out = '/Users/joel/code/python/prospector_alpha/data/3dhst/'+basename+'.ids'
-	ids = []
-
-	for field in fields:
-		outbase = '/Users/joel/code/python/prospector_alpha/data/3dhst/'+field+'_'+basename
-		fast_str_out = outbase+'.fout'
-		ancil_str_out = outbase+'.dat'
-		phot_str_out = outbase+'.cat'
-
-		### load data
-		phot = td_io.load_phot_v41(field)
-		fast = td_io.load_fast_v41(field)
-		zbest = td_io.load_zbest(field)
-		mips = td_io.load_mips_data(field)
-	
-		### make catalog cuts
-		# consider removing zbest['use_zgrism'] cut in the future!! no need for good grism data really
-		good = (phot['use_phot'] == 1) & (fast['lmass'] > 11) & (zbest['use_zgrism'] == 1)
-
-		phot = phot[good]
-		fast = fast[good]
-		zbest = zbest[good]
-		mips = mips[good]
-
-		### add in mips
-		phot['f_MIPS_24um'] = mips['f24tot']
-		phot['e_MIPS_24um'] = mips['ef24tot']
-
-		### save old SFRs in ancillary file
-		for name in mips.dtype.names:
-			if name != 'z' and name != 'id':
-				zbest[name] = mips[name]
-			elif name == 'z':
-				zbest['z_sfr'] = mips[name]
-		
-		### rename bands in photometric catalogs
-		for column in phot.colnames:
-			if column[:2] == 'f_' or column[:2] == 'e_':
-				phot.rename_column(column, column.lower()+'_'+field.lower())	
-
-		if rm_zp_offsets:
-			bands_exempt = ['irac1_cosmos','irac2_cosmos','irac3_cosmos','irac4_cosmos',\
-	                        'f606w_cosmos','f814w_cosmos','f125w_cosmos','f140w_cosmos',\
-	                        'f160w_cosmos','mips_24um_cosmos']
-			phot = remove_zp_offsets(field,phot,bands_exempt=bands_exempt)
-
-		ascii.write(phot, output=phot_str_out, 
-		            delimiter=' ', format='commented_header',overwrite=True)
-		ascii.write(fast, output=fast_str_out, 
-		            delimiter=' ', format='commented_header',
-		            include_names=fast.keys()[:11],overwrite=True)
-		ascii.write(zbest, output=ancil_str_out, 
-		            delimiter=' ', format='commented_header',overwrite=True)
-	
-		### save IDs
-		ids = ids + [field+'_'+str(id) for id in phot['id']]
-
-	ascii.write([ids], output=id_str_out, Writer=ascii.NoHeader,overwrite=True)
 
 def build_sample_onekrun(rm_zp_offsets=True):
 
@@ -284,19 +339,6 @@ def build_sample_general():
 	            delimiter=' ', format='commented_header')
 	ascii.write([np.array(phot['id'],dtype='int')], output=id_str_out, Writer=ascii.NoHeader)
 	print 1/0
-
-def remove_zp_offsets(field,phot,bands_exempt=None):
-
-	zp_offsets = td_io.load_zp_offsets(field)
-	nbands     = len(zp_offsets)
-
-	for kk in xrange(nbands):
-		filter = zp_offsets[kk]['Band'].lower()+'_'+field.lower()
-		if filter not in bands_exempt:
-			phot['f_'+filter] = phot['f_'+filter]/zp_offsets[kk]['Flux-Correction']
-			phot['e_'+filter] = phot['e_'+filter]/zp_offsets[kk]['Flux-Correction']
-
-	return phot
 
 def build_sample_halpha(rm_zp_offsets=True):
 
