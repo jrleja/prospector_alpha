@@ -27,7 +27,7 @@ run_params = {'verbose':True,
               # MCMC params
               'nwalkers':620,
               'nburn':[150,200,200], 
-              'niter': 7500,
+              'niter': 10000,
               'interval': 0.2,
               # Convergence parameters
               'convergence_check_interval': 50,
@@ -40,7 +40,7 @@ run_params = {'verbose':True,
               'compute_vega_mags': False,
               'initial_disp':0.1,
               'interp_type': 'logarithmic',
-              'agelims': [0.0,8.0,8.5,9.0,9.5,9.8,10.0,10.0],
+              'agelims': [0.0,8.0,8.5,9.0,9.5,9.75,9.95,10.0],
               # Data info
               'objname':'galaxy',
               }

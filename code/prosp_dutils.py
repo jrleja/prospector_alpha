@@ -166,23 +166,20 @@ def offset_and_scatter(x,y,biweight=False,mad=False):
 
 def find_sfh_params(model,theta,obs,sps,sm=None):
 
-    str_sfh_parms = ['sfh','mass','tau','sf_start','tage','sf_trunc','sf_slope','agebins','sfr_fraction','logsfr']
-    parnames = model.theta_labels()
-    sfh_out = []
-
     # pass theta to model
     model.set_parameters(theta)
 
-    for string in str_sfh_parms:
-        
-        # find SFH parameters
+    # find all variables in `str_sfh_parms`
+    str_sfh_params = ['sfh','mass','tau','sf_start','tage','sf_trunc','sf_slope','agebins','sfr_fraction','logsfr']
+    sfh_out = []
+    for string in str_sfh_params:
         if string in model.params:
             sfh_out.append(np.atleast_1d(model.params[string]))
-        # if not defined, give it an empty numpy array
         else:
             sfh_out.append(np.array([]))
 
-    iterable = [(str_sfh_parms[ii],sfh_out[ii]) for ii in xrange(len(sfh_out))]
+    # turn into a dictionary
+    iterable = [(str_sfh_params[ii],sfh_out[ii]) for ii in range(len(sfh_out))]
     out = {key: value for (key, value) in iterable}
 
     # if we pass stellar mass from a prior model call,
@@ -195,7 +192,8 @@ def find_sfh_params(model,theta,obs,sps,sm=None):
             sm = sm_new
 
     ### create mass fractions for nonparametric SFHs
-    if out['sfr_fraction'].shape[0] != 0:
+    # first old-style
+    if (out['sfr_fraction'].shape[0] != 0):
         out['sfr_fraction_full'] = np.concatenate((out['sfr_fraction'],np.atleast_1d(1-out['sfr_fraction'].sum())))
         time_per_bin = []
         for (t1, t2) in sps.params['agebins']: time_per_bin.append(10**t2-10**t1)
@@ -203,11 +201,15 @@ def find_sfh_params(model,theta,obs,sps,sm=None):
         out['mass_fraction'] /= out['mass_fraction'].sum()
         out['mformed'] = copy.copy(out['mass'])
         out['mass'] *= sm
+    # now new-style nonparametric
+    elif out['mass'].shape[0] > 1:
+        out['mass_fraction'] = out['mass']/out['mass'].sum()
+        out['mformed'] = out['mass'].sum()
+        out['mass'] = out['mass'].sum()*sm
     else:
         # Need this because mass is 
         # current mass, not total mass formed!
         out['mformed'] = out['mass'] / sm
-
     return out
 
 def test_likelihood(sps,model,obs,thetas,param_file):

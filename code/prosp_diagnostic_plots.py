@@ -259,15 +259,11 @@ def add_sfh_plot(exout,fig,ax_loc=None,
     ax_inset.set_ylabel(r'SFR [M$_{\odot}$/yr]',fontsize=axfontsize*3,labelpad=2*text_size)
     ax_inset.set_xlabel(r't$_{\mathrm{lookback}}$ [Gyr]',fontsize=axfontsize*3,labelpad=2*text_size)
     
-    ax_inset.set_xscale('log',nonposx='clip',subsx=([1]))
-    ax_inset.xaxis.set_major_formatter(majorFormatter)
+    ax_inset.set_xscale('log')
     ax_inset.xaxis.set_tick_params(labelsize=axfontsize*3)
-    for tl in ax_inset.get_xticklabels():tl.set_visible(False)
 
-    ax_inset.set_yscale('log',nonposy='clip',subsy=(1,2,5))
-    ax_inset.yaxis.set_major_formatter(majorFormatter)
+    ax_inset.set_yscale('log')
     ax_inset.yaxis.set_tick_params(labelsize=axfontsize*3)
-    for tl in ax_inset.get_yticklabels():tl.set_visible(False)
 
     ax_inset.tick_params('both', length=lw*3, width=lw*.6, which='major')
     for axis in ['top','bottom','left','right']: ax_inset.spines[axis].set_linewidth(lw*.6)
@@ -489,7 +485,7 @@ def sed_figure(outname = None,
         if model_photometry:
             phot.plot(wave_eff, modmags, color=colors[i], 
                       marker='o', ms=ms, linestyle=' ', label = 'photometry, best-fit', alpha=alpha, 
-                      markeredgewidth=0.7,**kwargs)
+                      markeredgecolor='k',**kwargs)
         
         res.plot(wave_eff, chi, color=colors[i],
                  marker='o', linestyle=' ', label=labels[i], 
@@ -528,7 +524,8 @@ def sed_figure(outname = None,
 
             # PLOT OBSERVATIONS + ERRORS 
             phot.errorbar(xplot[positive_flux], yplot[positive_flux], yerr=yerr[positive_flux],
-                          color=obs_color, marker='o', label='observed', alpha=alpha, linestyle=' ',ms=ms,zorder=0)
+                          color=obs_color, marker='o', label='observed', alpha=alpha, linestyle=' ',ms=ms,
+                          zorder=0,markeredgecolor='k')
 
         #### calculate and show reduced chi-squared
         chisq = np.sum(chi**2)
