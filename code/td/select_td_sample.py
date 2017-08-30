@@ -26,7 +26,7 @@ def select_massive(phot=None,fast=None,zbest=None,**extras):
 def select_ha(phot=None,fast=None,zbest=None,gris=None,**extras):
 	np.random.seed(2)
 	idx = np.where((phot['use_phot'] == 1) & (zbest['use_zgrism'] == 1)  & (gris['Ha_FLUX']/gris['Ha_FLUX_ERR'] > 10) & (gris['Ha_EQW'] > 10))[0]
-	return np.random.choice(idx,40)
+	return np.random.choice(idx,40,replace=False)
 
 
 massive_sample = {
