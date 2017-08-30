@@ -52,8 +52,11 @@ run_params['outfile'] = run_params['outfile']+'_'+run_params['objname']
 ftrans = {
           'GALEX FUV': 'galex_FUV', 
           'GALEX NUV': 'galex_NUV', 
-          'Cousins B': 'bessell_B', 
-          'Cousins R': 'bessell_R', 
+          'PS1 g': 'PS1.g', 
+          'PS1 r': 'PS1.r', 
+          'PS1 i': 'PS1.i', 
+          'PS1 z': 'PS1.z', 
+          'PS1 y': 'PS1.y', 
           '2MASS J': 'twomass_J', 
           '2MASS H': 'twomass_H', 
           '2MASS K': 'twomass_Ks', 
@@ -72,8 +75,11 @@ def load_obs(**extras):
     dat = {
            'GALEX FUV': (18.86, np.nan), # limit
            'GALEX NUV': (17.82, 0.09),
-           'Cousins B': (13.08, 0.09),
-           'Cousins R': (11.45, 0.09),
+           'PS1 g': (12.80, 0.02),
+           'PS1 r': (12.16, 0.01),
+           'PS1 i': (11.81, 0.01),
+           'PS1 z': (11.57, 0.01),
+           'PS1 y': (11.36, 0.02),
            '2MASS J': (10.98, 0.02),
            '2MASS H': (10.82, 0.02),
            '2MASS K': (11.02, 0.02),
