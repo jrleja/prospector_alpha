@@ -595,7 +595,7 @@ def chop_chain(chain,convergence_check_interval=None, convergence_chunks=325,
     if convergence_check_interval is None:
         nchop= int(chain.shape[1]/nchop)
     else:
-        nchop = convergence_stable_points_criteria+(convergence_check_interval)*(convergence_stable_points_criteria-1)
+        nchop = -convergence_check_interval*convergence_stable_points_criteria
 
     if len(chain.shape) == 3:
         flatchain = chain[:,nchop:,:]

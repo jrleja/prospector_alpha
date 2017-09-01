@@ -32,7 +32,7 @@ def subcorner(sample_results,  sps, model, extra_output, flatchain,
     extents = return_extent(flatchain)
 
     fig = corner.corner(flatchain, labels = parnames, levels=[0.68,0.95,0.997], fill_contours=True, color='#0038A8',
-                        quantiles=[0.16, 0.5, 0.84], verbose = False, range = extents, hist_kwargs=dict(color='k'),
+                        quantiles=[0.16, 0.5, 0.84], verbose = False, hist_kwargs=dict(color='k'),
                         show_titles = True, plot_datapoints=False, title_kwargs=title_kwargs,
                         **kwargs)
 
