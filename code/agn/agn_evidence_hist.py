@@ -65,7 +65,7 @@ def plot(agn_evidence, alldata, outfolder,agn_idx=None,**popts):
     linestyles = ['-',':']
 
     ### make histogram
-    fig, ax = plt.subplots(1,1, figsize=(7, 7))
+    fig, ax = plt.subplots(1,1, figsize=(6.5, 6.5))
     alpha = 0.7
     lw = 3.5
     for label, color, flag, ls in zip(labels,colors,flags,linestyles):
@@ -77,8 +77,9 @@ def plot(agn_evidence, alldata, outfolder,agn_idx=None,**popts):
     ax.set_xlabel(r'log(f$_{\mathrm{AGN,MIR}}$)')
     ax.set_ylim(0,ax.get_ylim()[1]+3)
 
-    ax.legend(loc=0,prop={'size':12})
+    ax.legend(loc=0,prop={'size':15},frameon=False)
 
+    plt.tight_layout()
     plt.savefig(outfolder+'agn_evidence_histogram.png',dpi=150)
     plt.close()
 

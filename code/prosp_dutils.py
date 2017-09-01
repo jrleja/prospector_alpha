@@ -553,9 +553,9 @@ def generate_basenames(runname,ancilname=None):
         else:
             parm = parbase+'.py'
 
-    elif 'td_massive' in runname or runname == 'fast_mimic':
+    elif 'td_' in runname or runname == 'fast_mimic':
 
-        id_list = os.getenv('APPS')+"/prospector_alpha/data/3dhst/td_massive.ids"
+        id_list = os.getenv('APPS')+"/prospector_alpha/data/3dhst/"+runname+".ids"
         ids = np.loadtxt(id_list, dtype='|S60',delimiter=',')
         ngals = len(ids)
 
@@ -565,7 +565,6 @@ def generate_basenames(runname,ancilname=None):
         for jj in xrange(ngals):
             filebase.append(os.getenv('APPS')+'/prospector_alpha/results/'+runname+'/'+ids[jj])
             parm.append(os.getenv('APPS')+"/prospector_alpha/parameter_files/"+parm_basename+'.py') 
-
 
     else:
 
@@ -1197,9 +1196,9 @@ def measure_Dn4000(lam,flux,ax=None):
     return dn4000
 
 def measure_emlines(smooth_spec,sps):
-    ''' emission line fluxes are part of SPS output now. this is
+    """ emission line fluxes are part of SPS output now. this is
     largely present to measure the continuum for EQW calculations
-    '''
+    """
 
     ### load fsps emission line list
     loc = os.getenv('SPS_HOME')+'/data/emlines_info.dat'
@@ -1219,8 +1218,8 @@ def measure_emlines(smooth_spec,sps):
 
         ### calculate luminosity (in Lsun)
         idx = fsps_name[jj] == dat['name']
-        eflux = sps.get_nebline_luminosity[idx]*sps.params['mass']  
-        elam = sps.emline_wavelengths[idx]
+        eflux = float(sps.get_nebline_luminosity[idx]*sps.params['mass'].sum())
+        elam = float(sps.emline_wavelengths[idx])
 
         #### measure average flux in specific bands as "continuum"
         low_cont = (sps.wavelengths > down[jj][0]) & (sps.wavelengths < down[jj][1])
@@ -1238,7 +1237,7 @@ def measure_emlines(smooth_spec,sps):
         continuum_flux = m*elam+br
         eqw = eflux / continuum_flux
 
-        out[lines[jj]] = {'flux':eflux[0],'eqw':eqw[0]}
+        out[lines[jj]] = {'flux':eflux,'eqw':eqw}
 
     return out
 

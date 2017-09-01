@@ -52,7 +52,7 @@ def collate_data(alldata, **extras):
     #### for each object
     fagn, fagn_up, fagn_down, agn_tau, agn_tau_up, agn_tau_down, mass, mass_up, mass_down, lir_luv, lir_luv_up, lir_luv_down, xray_lum, xray_lum_err, database, observatory = [[] for i in range(16)]
     fagn_obs, fagn_obs_up, fagn_obs_down, lmir_lbol, lmir_lbol_up, lmir_lbol_down, xray_hardness, xray_hardness_err = [[] for i in range(8)]
-    lagn, lagn_up, lagn_down, lsfr, lsfr_up, lsfr_down = [], [], [], [], [], []
+    lagn, lagn_up, lagn_down, lsfr, lsfr_up, lsfr_down, lir, lir_up, lir_down = [], [], [], [], [], [], [], [], []
     sfr, sfr_up, sfr_down, ssfr, ssfr_up, ssfr_down, d2, d2_up, d2_down = [[] for i in range(9)]
     fmir, fmir_up, fmir_down, objname = [], [], [], []
     fmir_chain, agn_tau_chain = [], []
@@ -95,6 +95,12 @@ def collate_data(alldata, **extras):
         lir_luv.append(cent)
         lir_luv_up.append(eup)
         lir_luv_down.append(edo)
+
+        cent, eup, edo = quantile(np.random.choice(dat['lir'],nsamp), [0.5, 0.84, 0.16])
+
+        lir.append(cent)
+        lir_up.append(eup)
+        lir_down.append(edo)
 
         cent, eup, edo = quantile(np.random.choice(dat['lmir'],nsamp) / np.random.choice(dat['pextras']['flatchain'][:,dat['pextras']['parnames'] == 'lbol'].squeeze(),nsamp), [0.5, 0.84, 0.16])
 
@@ -180,6 +186,9 @@ def collate_data(alldata, **extras):
     out['lir_luv'] = lir_luv
     out['lir_luv_up'] = lir_luv_up
     out['lir_luv_down'] = lir_luv_down
+    out['lir'] = lir
+    out['lir_up'] = lir_up
+    out['lir_down'] = lir_down
     out['lmir_lbol'] = lmir_lbol
     out['lmir_lbol_up'] = lmir_lbol_up
     out['lmir_lbol_down'] = lmir_lbol_down
@@ -468,9 +477,9 @@ def plot_model_corrs(pdata,color_by=None,idx=None,**popts):
                                      pdata['fagn_down'],log=True)
 
     #### y-axis
-    ypar = ['mass','sfr','ssfr','lir_luv']
+    ypar = ['mass','sfr','ssfr','lir']
     ylabels = [r'log(M$_{*}$) [M$_{\odot}$]', r'log(SFR) [M$_{\odot}$/yr]',
-               r'log(sSFR) [yr$^{-1}$]',r'log(L$_{\mathrm{IR}}$/L$_{\mathrm{UV}}$)']
+               r'log(sSFR) [yr$^{-1}$]',r'log(L$_{\mathrm{IR}}$)']
     cb = pdata['d2']
     for ii, yp in enumerate(ypar):
 
