@@ -11,16 +11,16 @@
 ### memory per cpu, in MB
 #SBATCH --mem-per-cpu=3000
 ### Job name
-#SBATCH -J 'td_dynamics'
+#SBATCH -J 'td_dynamic'
 ### output and error logs
-#SBATCH -o td_dynamics_%a.out
-#SBATCH -e td_dynamics_%a.err
+#SBATCH -o td_dynamic_%a.out
+#SBATCH -e td_dynamic_%a.err
 ### mail
 #SBATCH --mail-type=END
 #SBATCH --mail-user=joel.leja@gmail.com
-IDFILE=$APPS"/prospector_alpha/data/3dhst/td_dynamics.ids"
+IDFILE=$APPS"/prospector_alpha/data/3dhst/td_dynamic.ids"
 OBJID=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$IDFILE")
 srun -n $SLURM_NTASKS --mpi=pmi2 python $APPS/prospector/scripts/prospector.py \
---param_file="$APPS"/prospector_alpha/parameter_files/td_dynamics_params.py \
+--param_file="$APPS"/prospector_alpha/parameter_files/td_dynamic_params.py \
 --objname="$OBJID" \
---outfile="$APPS"/prospector_alpha/results/td_dynamics/"$OBJID"
+--outfile="$APPS"/prospector_alpha/results/td_dynamic/"$OBJID"

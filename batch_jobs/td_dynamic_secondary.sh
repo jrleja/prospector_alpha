@@ -13,14 +13,14 @@
 ### Job name
 #SBATCH -J '3d_ha_sec'
 ### output and error logs
-#SBATCH -o td_dynamics_sec_%a.out
-#SBATCH -e td_dynamics_sec_%a.err
+#SBATCH -o td_dynamic_sec_%a.out
+#SBATCH -e td_dynamic_sec_%a.err
 ### mail
 #SBATCH --mail-type=END
 #SBATCH --mail-user=joel.leja@gmail.com
-IDFILE=$APPS"/prospector_alpha/data/3dhst/td_dynamics.ids"
+IDFILE=$APPS"/prospector_alpha/data/3dhst/td_dynamic.ids"
 OBJID=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$IDFILE")
 
 python $APPS/prospector_alpha/code/extra_output.py \
-$APPS/prospector_alpha/parameter_files/td_dynamics_params.py \
---outname="$APPS"/prospector_alpha/results/td_dynamics/"$OBJID"
+$APPS/prospector_alpha/parameter_files/td_dynamic_params.py \
+--outname="$APPS"/prospector_alpha/results/td_dynamic/"$OBJID"
