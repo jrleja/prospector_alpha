@@ -689,7 +689,7 @@ def load_model(objname=None, datdir=None, runname=None, agelims=[], **extras):
     model_params[n.index('z_fraction')]['N'] = ncomp-1
     tilde_alpha = np.array([ncomp-i for i in xrange(1,ncomp)])
     model_params[n.index('z_fraction')]['prior'] = priors.Beta(alpha=tilde_alpha, beta=np.ones_like(tilde_alpha),mini=0.0,maxi=1.0)
-    model_params[n.index('z_fraction')]['init'] =  model_params[n.index('z_fraction')]['prior'].sample()
+    model_params[n.index('z_fraction')]['init'] = np.array([(i-1)/float(i) for i in range(ncomp,1,-1)])
     model_params[n.index('z_fraction')]['init_disp'] = 0.02
 
     ### apply SDSS mass-metallicity prior

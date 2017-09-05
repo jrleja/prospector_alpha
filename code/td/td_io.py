@@ -17,6 +17,12 @@ def load_zbest(field):
 
     return x
 
+def load_morphology(field,band):
+    # bands: F125W, F140W, F160W. version 4.0.
+    loc = '/Users/joel/data/3d_hst/morphology/'+field+'/'+band+'_galfit_v4.0.cat'
+    x = ascii.read(loc)
+    return x
+
 def load_rf_v41(field):
 
     loc = '/Users/joel/data/3d_hst/v4.1_cats/'+field.lower()+'_3dhst.v4.1.cats/RF_colors/'+field.lower()+'_3dhst.v4.1.master.RF'
@@ -55,7 +61,7 @@ def load_zp_offsets(field):
 
 def load_grism_dat(field,process=False):
     """if process, turn into a manageable size and interpret some things
-    note that we return REST-FRAME equivalent width!
+    note that we return OBSERVED-FRAME equivalent width!
     else return the whole shebang
     """
     loc = '/Users/joel/data/3d_hst/v4.1_spectral/'+field.lower()+'_3dhst_v4.1.5_catalogs/'+field.lower()+'_3dhst.v4.1.5.linefit.linematched.fits'
@@ -84,90 +90,6 @@ def load_grism_dat(field,process=False):
     out = np.recarray(dat.shape, dtype=[(x,y) for x,y in zip(hdr,hdr_type)]) 
     for idx in hdr: out[idx][:] = dat[idx][:]
     return out
-
-def load_linelist(field='COSMOS'):
-    
-    '''
-    uses pieter's zbest catalog to determine objects with spectra
-    returns all line information, zgris, and use flag
-    note that equivalent widths are in observed frame, convert by dividing by (1+z)
-    THIS IS DEPRECATED
-    '''
-    filename='/Users/joel/data/3d_hst/master.zbest.dat'
-    with open(filename, 'r') as f:
-        for jj in range(1): hdr = f.readline().split()
-
-    dat = np.loadtxt(filename, comments = '#',
-                     dtype = {'names':([n for n in hdr[1:]]),
-                              'formats':('S40','f16','f16','S40','f16','f16','f16','f16','f16','f16')})
-    
-    # cut down master catalog to only in-field objects
-    in_field = dat['field'] == field
-    dat      = dat[in_field]
-    
-    # build output
-    t = Table([dat['id'],
-              [-99.0]*len(dat),
-              dat['z_best'],
-              dat['use_grism1'],
-              [-99.0]*len(dat),
-              [-99.0]*len(dat)],
-              names=('id','zgris','zbest','use_grism1','s0','s1'))
-
-    # include only these lines
-    good_lines = ['Ha', 'OIII', 'OIIIx', 'OII']
-    for jj in xrange(len(dat)):
-        
-        # no spectrum
-        if dat['spec_id'][jj] == '00000':
-            pass
-        else: # let's get to work
-            fieldno = dat['spec_id'][jj].split('-')[1]
-            filename='/Users/joel/data/3d_hst/spectra/'+field.lower()+'-wfc3-spectra_v4.1.4/'+field.lower()+'-'+ fieldno+'/LINE/DAT/'+dat['spec_id'][jj]+'.linefit.dat'
-            
-            # if the line file doesn't exist, abandon all hope (WHY DO SOME NOT EXIST?!?!?!)
-            # some don't exist, others are empty
-            # empty ones just don't enter the value assigning loop
-            # may be difference in version between pieter's master catalog and current line catalog
-            try:
-                with open(filename, 'r') as f:
-                    hdr = f.readline().split()
-                    t['zgris'][jj] = float(f.readline().split('=')[1].strip())
-            except:
-                print filename+" doesn't exist"
-                continue
-            
-            linedat = np.loadtxt(filename, comments='#',
-                                 dtype = {'names':([n for n in hdr[1:]]),
-                                          'formats':('S40', 'f16','f16','f16','f16','f16')})
-            
-            # tilt correction
-            with open(filename) as search:
-                for line in search:
-                    if 'tilt correction' in line:
-                        splitline = line.split(' ')
-                        t[jj]['s0'] = float(splitline[splitline.index('s0')+2])
-                        t[jj]['s1'] = float(splitline[splitline.index('s1')+2])
-
-            # if there's only one line, loadtxt returns a different thing
-            if linedat.size == 1:
-                linedat=np.array(linedat.reshape(1),dtype=linedat.dtype)
-            
-            for kk in xrange(linedat.size): #for each line
-                if linedat['line'][kk] in good_lines: # only include lines we're interested in
-                    if linedat['line'][kk]+'_flux' not in t.keys(): #check for existing column names
-                            for line in good_lines: # only add lines we're intersetd in!
-                                for name in linedat.dtype.names[1:]: t[line+'_'+name] = [-99.0]*len(t)
-                    for name in linedat.dtype.names[1:]: t[jj][linedat['line'][kk]+'_'+name] = linedat[name][kk]
-
-    # convert to rest-frame eqw
-    for key in t.keys():
-        if 'EQW' in key:
-            detection = t[key] != -99
-            t[key][detection] = t[key][detection]/(1+t['zgris'][detection])
-
-    return t
-        
 
 def load_mips_data(field,objnum=None):
     

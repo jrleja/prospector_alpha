@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import corner, os, copy, prosp_dutils
 from prospect.io import read_results
 import matplotlib as mpl
-from matplotlib.ticker import MaxNLocator
+from matplotlib.ticker import MaxNLocator, FormatStrFormatter
 from prospect.models import model_setup
 from magphys_plot_pref import jLogFormatter
 from brown_io import load_prospector_data
@@ -254,7 +254,7 @@ def add_sfh_plot(exout,fig,ax_loc=None,
     if tmin:
         xmin = tmin
 
-    axlim_sfh=[xmax, xmin, ymin*.7, ymax*1.4]
+    axlim_sfh=[xmax, xmin*3, ymin*.7, ymax*1.4]
     ax_inset.axis(axlim_sfh)
     ax_inset.set_ylabel(r'SFR [M$_{\odot}$/yr]',fontsize=axfontsize*3,labelpad=2*text_size)
     ax_inset.set_xlabel(r't$_{\mathrm{lookback}}$ [Gyr]',fontsize=axfontsize*3,labelpad=2*text_size)
@@ -267,6 +267,9 @@ def add_sfh_plot(exout,fig,ax_loc=None,
 
     ax_inset.tick_params('both', length=lw*3, width=lw*.6, which='major')
     for axis in ['top','bottom','left','right']: ax_inset.spines[axis].set_linewidth(lw*.6)
+
+    ax_inset.xaxis.set_major_formatter(FormatStrFormatter('%2.2g'))
+    ax_inset.yaxis.set_major_formatter(FormatStrFormatter('%2.2g'))
 
 def plot_sfh_fast(tau,tage,mass,tuniv=None):
 
@@ -540,7 +543,7 @@ def sed_figure(outname = None,
     ### apply plot limits
     phot.set_xlim(xlim)
     res.set_xlim(xlim)
-    ymin, ymax = yplot[positive_flux].min()*0.5, yplot[positive_flux].max()*10
+    ymin, ymax = yplot[positive_flux].min()*0.5, yplot[positive_flux].max()*8
 
     #### add transmission curves
     if transcurves:
@@ -622,11 +625,11 @@ def sed_figure(outname = None,
     
     #### add SFH 
     if add_sfh:
-        sfh_ax = fig.add_axes([0.42,0.63,0.18,0.24],zorder=32)
+        sfh_ax = fig.add_axes([0.381,0.39,0.18,0.24],zorder=32)
         add_sfh_plot(extra_output, fig,
                      main_color = ['black'],
                      ax_inset=sfh_ax,
-                     text_size=0.9,lw=1.8)
+                     text_size=0.7,lw=1.5)
 
     #### add insets
     if False:
@@ -635,7 +638,7 @@ def sed_figure(outname = None,
                       [r'log(M/M$_{\odot}$)',r'log(Z/Z$_{\odot}$)'],text_size=0.5)
 
     if outname is not None:
-        fig.savefig(outname, bbox_inches='tight', dpi=150)
+        fig.savefig(outname, bbox_inches='tight', dpi=160)
         plt.close()
 
     #os.system('open '+outname)

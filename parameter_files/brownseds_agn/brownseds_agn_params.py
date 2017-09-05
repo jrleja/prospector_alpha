@@ -390,7 +390,7 @@ model_params.append({'name': 'dust1_fraction', 'N': 1,
 
 model_params.append({'name': 'dust2', 'N': 1,
                         'isfree': True,
-                        'init': 1.0,
+                        'init': 0.3,
                         'init_disp': 0.25,
                         'disp_floor': 0.15,
                         'units': '',
@@ -697,7 +697,7 @@ def load_model(objname='',datname='', agelims=[], **extras):
     model_params[n.index('z_fraction')]['N'] = ncomp-1
     tilde_alpha = np.array([ncomp-i for i in xrange(1,ncomp)])
     model_params[n.index('z_fraction')]['prior'] = priors.Beta(alpha=tilde_alpha, beta=np.ones_like(tilde_alpha),mini=0.0,maxi=1.0)
-    model_params[n.index('z_fraction')]['init'] =  model_params[n.index('z_fraction')]['prior'].sample()
+    model_params[n.index('z_fraction')]['init'] = np.array([(i-1)/float(i) for i in range(ncomp,1,-1)])
     model_params[n.index('z_fraction')]['init_disp'] = 0.02
 
     model_params[n.index('sfr_fraction')]['N'] = ncomp-1

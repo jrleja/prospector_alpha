@@ -1,6 +1,5 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from magphys import read_magphys_output
 import os, copy, prosp_dutils
 from scipy.interpolate import interp1d
 from matplotlib.ticker import MaxNLocator
@@ -55,6 +54,161 @@ class jLogFormatter(mpl.ticker.LogFormatter):
 #### format those log plots! 
 minorFormatter = jLogFormatter(base=10, labelOnlyBase=False)
 majorFormatter = jLogFormatter(base=10, labelOnlyBase=True)
+
+def read_magphys_output(objname=None):
+
+  '''
+  two output files
+
+  GALAXY_ID.fit has observed fluxes+uncertainties,
+  index of best-fit IR + optical models, chi^2, values of
+  best-fit parameters, fluxes in each filter, and likelihood
+  distribution of all parameters
+
+  GALAXY_ID.sed has main parameters of the best-fit model,
+  and the SED of the best-fit model.
+  '''
+
+  if objname is None:
+    objname = np.loadtxt(project_info['idfile'],delimiter='#',dtype = str)[0]
+
+  #### first file ####
+  file1 = slice_name(objname.replace(' ',''))[:8]+'.fit'
+  with open(project_info['output']+'/'+file1[:10], 'r') as f:
+
+    # skip first line
+    f.readline()
+
+    ##### observations #####
+    # flux in Lsun/Hz
+    obs = {}
+    obs['filters'] = np.array(f.readline().split()[1:],dtype=str)
+    obs['flux'] = np.array(f.readline().split(),dtype=float)
+    obs['flux_unc'] = np.array(f.readline().split(),dtype=float)
+    obs['phot_mask'] = (obs['flux'] != 0) | (obs['flux_unc'] != 0)
+
+    # skip four lines
+    for kk in xrange(4): f.readline()
+
+    ##### metadata #####
+    metadata = {}
+    line = np.array(f.readline().split(),dtype=float)
+    metadata['bestfit_opt_ind'] = line[0]
+    metadata['bestfit_ir_ind'] = line[1]
+    metadata['chisq'] = line[2]
+    metadata['redshift'] = line[3]
+
+    ##### best-fit model #####
+    # in Lsun/Hz
+    model = {}
+    model['parnames'] = np.array(f.readline().replace('.',' ').split()[1:],dtype=str)
+    model['parameters'] = np.array(f.readline().split(),dtype=float)
+    f.readline()
+    model['flux'] = np.array(f.readline().split(),dtype=float)
+
+    # skip three lines
+    for kk in xrange(3): f.readline()
+
+    ##### parameter PDFs #####
+    pdfs = {'x_interp_perc': np.array([0.025,0.16,0.5,0.84,0.975]),
+            'percentiles': {},
+            'likelihood_distr': {},
+            'likelihood_x': {}
+            }
+    for par in model['parnames']:
+
+      for line in f:
+        # ignore comments
+        # if it's the last comment, switch to new parname
+        if line.find('#') != -1 and line.find('....') != -1:
+          continue
+        elif line.find('#') != -1:
+          break
+
+        _ = np.array(line.split(),dtype=float)
+
+        if _.shape[0] == 2:
+          pdfs['likelihood_x'][par] = np.append(pdfs['likelihood_x'].get(par,[]),_[0])
+          pdfs['likelihood_distr'][par] = np.append(pdfs['likelihood_distr'].get(par,[]),_[1])
+        else:
+          pdfs['percentiles'][par] = _
+      
+  ##### second file #####
+  file2 = slice_name(objname.replace(' ',''))[:8]+'.sed'
+  with open(project_info['output']+'/'+file2[:10], 'r') as f:
+
+    # skip two lines
+    for i in xrange(2): f.readline()
+
+    ##### read model parameters
+    model['full_parnames'] = np.array(f.readline().replace('.',' ').split(),dtype=str)[1:]
+    model['full_parameters'] = np.array(f.readline().split(),dtype=float)
+    f.readline()
+    model['full_parnames'] = np.append(model['full_parnames'],np.array(f.readline().replace('.',' ').split(),dtype=str)[1:])
+    model['full_parameters'] = np.append(model['full_parameters'],np.array(f.readline().split(),dtype=float))
+
+    # skip three lines
+    for i in xrange(3): f.readline()
+
+    ##### read spectrum ##### 
+    # starts in obslam
+    for line in f:
+      _ = np.array(line.split(),dtype=float)
+      model['lam'] = np.append(model.get('lam',[]),10**_[0])#*(1+metadata['redshift']))
+      model['spec'] = np.append(model.get('spec',[]),_[1])
+      model['spec_nodust'] = np.append(model.get('spec_nodust',[]),_[2])
+
+  ##### units of [log(Lsun/angstrom)], change to maggies
+  # first save output as speclum
+  model['speclum'] = 10**model['spec']
+  model['speclum_nodust'] = 10**model['spec_nodust']
+
+  # now convert to Lsun/Hz
+  c = 3e18 # Angstroms / s
+  model['spec'] = (10**model['spec']) * model['lam']**2 / c
+  model['spec_nodust'] = (10**model['spec_nodust']) * model['lam']**2 / c
+
+  # from Lsun/Hz to maggies
+  lsun = 3.846e33  # ergs/s
+  jansky_cgs = 1e-23
+  to_maggies = lsun / (3631*jansky_cgs)
+
+  # cm^2
+  pc = 3.085677581467192e18  # cm
+  dfactor = 4*np.pi*(pc*cosmo.luminosity_distance(metadata['redshift']).value *
+                    1e6)**2 / (1+metadata['redshift'])
+
+  model['spec'] *= to_maggies / dfactor
+  model['spec_nodust'] *= to_maggies / dfactor
+  obs['flux'] *= to_maggies / dfactor
+  obs['flux_unc'] *= to_maggies / dfactor
+  model['flux']  *= to_maggies / dfactor
+
+  ##### load SFH
+  metind = model['full_parnames'] == 'Z/Zo'
+  age,sfr = read_magphys_sfh(int(metadata['bestfit_opt_ind']),
+                           float(model['full_parameters'][metind]))
+  sfh = {'age':age,'sfr':sfr}
+
+  ##### add SFR_10 from best-fitting SFH
+  # in Msun/yr
+  magmass = model['full_parameters'][[model['full_parnames'] == 'M*/Msun']]
+  magsfr = sfh['sfr']*magmass
+  magtime = np.abs(np.max(sfh['age']) - sfh['age'])
+
+  sfr_10 = integral_average(magtime,magsfr,0,1e7)
+  if np.isfinite(sfr_10) == False:
+    print 1/0
+  model['full_parameters'] = np.append(model['full_parameters'],sfr_10)
+  model['full_parnames'] = np.append(model['full_parnames'],'SFR_10')
+
+  magphys = {'model': model,
+             'obs': obs, 
+             'metadata': metadata,
+             'pdfs': pdfs,
+             'sfh': sfh}
+
+  return magphys
 
 def median_by_band(x,y,avg=False):
 
