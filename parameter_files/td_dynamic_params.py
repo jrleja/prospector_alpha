@@ -643,10 +643,12 @@ def load_model(objname=None, datdir=None, runname=None, agelims=[], **extras):
 
     ###### REDSHIFT ######
     ### open file, load data
-    # this is zgris
-    datname = datdir + objname.split('_')[0] + '_' + runname + '.dat'
-    dat = ascii.read(datname)
-    zred = dat['z_max_grism'][np.array(dat['phot_id']) == int(objname.split('_')[-1])][0]
+    fastname = datdir + objname.split('_')[0] + '_' + runname + '.fout'
+    with open(fastname, 'r') as f:
+        hdr = f.readline().split()
+    dtype = np.dtype([(hdr[1],'S20')] + [(n, np.float) for n in hdr[2:]])
+    fast = np.loadtxt(fastname, comments = '#', delimiter=' ', dtype = dtype)
+    zred = fast['z'][fast['id'] == objname.split('_')[-1]][0]
 
     #### CALCULATE TUNIV #####
     tuniv = WMAP9.age(zred).value
