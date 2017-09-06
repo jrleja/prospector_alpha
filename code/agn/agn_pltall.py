@@ -73,6 +73,8 @@ def plot(runname='brownseds_agn',runname_noagn='brownseds_np',
                     alldata=alldata_sub,alldata_noagn=alldata_noagn,outfolder=outfolder,**popts)
     '''
     agn_evidence = {}
+    print 'PLOTTING DELTA PARS'
+    plot_delta_pars.plot(runname=runname,runname_noagn=runname_noagn,alldata=alldata_sub,alldata_noagn=alldata_noagn,outfolder=outfolder,idx=agn_idx,**popts)
     print 'PLOTTING WISE GRADIENTS'
     agn_evidence = wise_gradients.plot_all(agn_evidence,runname=runname,runname_noagn=runname_noagn,alldata=alldata_sub,
                                            alldata_noagn=alldata_noagn,agn_idx=agn_idx,regenerate=False,outfolder=outfolder, **popts)
@@ -93,7 +95,4 @@ def plot(runname='brownseds_agn',runname_noagn='brownseds_np',
     print 'PLOTTING SF SEQ'
     sf_seq.plot(runname=runname,alldata=alldata_sub,outfolder=outfolder,**popts) 
     print 'PLOTTING MASS-METALLICITY DIAGRAM'
-    delta_mass_met.plot_comparison(runname=runname,alldata=alldata_sub,alldata_noagn=alldata_noagn,outfolder=outfolder,plt_idx=agn_idx,**popts) 
-
-    print 'PLOTTING DELTA PARS'
-    plot_delta_pars.plot(runname=runname,runname_noagn=runname_noagn,alldata=alldata_sub,alldata_noagn=alldata_noagn,outfolder=outfolder,idx=agn_idx,**popts) 
+    delta_mass_met.plot_comparison(runname=runname,alldata=alldata_sub,alldata_noagn=alldata_noagn,outfolder=outfolder,plt_idx=agn_idx,**popts)  

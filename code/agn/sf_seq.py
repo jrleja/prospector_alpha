@@ -60,7 +60,7 @@ def plot(runname='brownseds_agn',alldata=None,outfolder=None,**popts):
     ### star-forming sequence plot
     plot_sfseq(pdata,outfolder=outfolder,**popts)
     
-def plot_sfseq(pdata,outfolder=None,sigclip=True,name_label=False):
+def plot_sfseq(pdata,outfolder=None,sigclip=True,name_label=False,**popts):
 
     #### set up figure geometry
     xlim = [9., 11.5]

@@ -40,9 +40,9 @@ def collate_data(alldata, alldata_noagn):
         ### build containers
         rms = {}
         labels = ['halpha','hbeta','bdec','dn4000']
-        obs_eline_names = alldata[0]['residuals']['emlines']['em_name']
-        mod_eline_names = alldata[0]['model_emline']['emnames']
-        mod_extra_names = alldata[0]['pextras']['parnames']
+        obs_eline_names = the_data[ii][0]['residuals']['emlines']['em_name']
+        mod_eline_names = the_data[ii][0]['model_emline']['emnames']
+        mod_extra_names = the_data[ii][0]['pextras']['parnames']
         for d in ['obs','mod']:
             rms[d] = {}
             for l in labels: rms[d][l] = []
@@ -53,7 +53,7 @@ def collate_data(alldata, alldata_noagn):
         pnames = ['fagn', 'agn_tau']
         for p in pnames: 
             model_pars[p] = {'q50':[],'q84':[],'q16':[]}
-        parnames = alldata[0]['pquantiles']['parnames']
+        parnames = the_data[ii][0]['pquantiles']['parnames']
 
         #### load model information
         for dat in the_data[ii]:

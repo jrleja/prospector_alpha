@@ -19,6 +19,7 @@ def collate_data(alldata,alldata_noagn):
 
 	### normal parameter labels
 	parnames = alldata_noagn[0]['pquantiles']['parnames'].tolist()
+	parnames2 = alldata[0]['pquantiles']['parnames'].tolist()
 	parlabels = [r'log(M$_{\mathrm{form}}$/M$_{\odot}$)', 'SFH 0-100 Myr', 'SFH 100-300 Myr', 'SFH 300 Myr-1 Gyr', 
 	         'SFH 1-3 Gyr', 'SFH 3-6 Gyr', r'$\tau_{\mathrm{V,diffuse}}$', r'log(Z/Z$_{\odot}$)', 'diffuse dust index',
 	         'birth-cloud dust', r'dust emission Q$_{\mathrm{PAH}}$',r'dust emission $\gamma$',r'dust emission U$_{\mathrm{min}}$']
@@ -55,8 +56,9 @@ def collate_data(alldata,alldata_noagn):
 			outvals[par].append(outq[par]['q50'][-1])
 		for par in eparnames:
 			match = eparnames_all == par
+			match2 = datnoagn['pextras']['parnames'] == par
 			p1 = np.random.choice(np.log10(dat['pextras']['flatchain'][:,match]).squeeze(),size=size)
-			p2 = np.random.choice(np.log10(datnoagn['pextras']['flatchain'][:,match]).squeeze(),size=size)
+			p2 = np.random.choice(np.log10(datnoagn['pextras']['flatchain'][:,match2]).squeeze(),size=size)
 			ratio = p1 - p2
 			for q in outq[par].keys(): 
 				quant = float(q[1:])/100
@@ -77,6 +79,8 @@ def collate_data(alldata,alldata_noagn):
 		# calculate tuniv, create agelim array
 		par = 'm23_frac'
 		zfrac_idx = np.array(['z_fraction' in p for p in parnames],dtype=bool)
+		zfrac_idx2 = np.array(['z_fraction' in p for p in parnames2],dtype=bool)
+
 		tuniv = WMAP9.age(dat['residuals']['phot']['z']).value
 		agelims = [0.0,8.0,8.5,9.0,9.5,9.8,10.0]
 		agelims[-1] = np.log10(tuniv*1e9)
@@ -84,7 +88,7 @@ def collate_data(alldata,alldata_noagn):
 		for i in xrange(len(agelims)-1): time_per_bin.append(10**agelims[i+1]-10**agelims[i])
 
 		# now calculate fractions for each of them
-		sfrfrac = transform_zfraction_to_sfrfraction(dat['pquantiles']['sample_chain'][:,zfrac_idx])
+		sfrfrac = transform_zfraction_to_sfrfraction(dat['pquantiles']['sample_chain'][:,zfrac_idx2])
 		full = np.concatenate((sfrfrac,(1-sfrfrac.sum(axis=1))[:,None]),axis=1)
 		mass_fraction = full*np.array(time_per_bin)
 		mass_fraction /= mass_fraction.sum(axis=1)[:,None]

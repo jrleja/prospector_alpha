@@ -52,6 +52,12 @@ run_params['outfile'] = run_params['outfile']+'_'+run_params['objname']
 ftrans = {
           'GALEX FUV': 'galex_FUV', 
           'GALEX NUV': 'galex_NUV', 
+          'UVOT uvw2': 'Swift-UVOT.UVW2',
+          'UVOT uvm2': 'Swift-UVOT.UVM2',
+          'UVOT uvw1': 'Swift-UVOT.UVW1',
+          'UVOT u': 'Swift-UVOT.U',
+          'UVOT b': 'Swift-UVOT.B',
+          'UVOT v': 'Swift-UVOT.V',
           'PS1 g': 'PS1.g', 
           'PS1 r': 'PS1.r', 
           'PS1 i': 'PS1.i', 
@@ -66,6 +72,8 @@ ftrans = {
           'WISE W4': 'wise_w4'
          }
 
+
+
 def load_obs(**extras):
     """
     let's do this
@@ -75,6 +83,12 @@ def load_obs(**extras):
     dat = {
            'GALEX FUV': (18.86, np.nan), # limit
            'GALEX NUV': (17.82, 0.09),
+           'UVOT uvw2': (17.52, 0.04),
+           'UVOT uvm2': (17.97, 0.05),
+           'UVOT uvw1': (16.47, 0.04),
+           'UVOT u': (14.94, 0.03),
+           'UVOT b': (13.37, 0.03),
+           'UVOT v': (12.57, 0.02),
            'PS1 g': (12.80, 0.02),
            'PS1 r': (12.16, 0.01),
            'PS1 i': (11.81, 0.01),
@@ -116,6 +130,18 @@ def load_obs(**extras):
     obs['wavelength'] = None
     obs['spectrum'] = None
 
+    '''
+    import matplotlib.pyplot as plt
+    uvot = np.array(['UVOT' in f for f in fnames],dtype=bool)
+    plt.errorbar(obs['wave_effective'][~uvot],obs['maggies'][~uvot],yerr=obs['maggies_unc'][~uvot],fmt='o',ms=5,linestyle=' ',color='black')
+    plt.errorbar(obs['wave_effective'][uvot],obs['maggies'][uvot],yerr=obs['maggies_unc'][uvot],fmt='o',ms=5,linestyle=' ',color='red')
+    plt.xscale('log')
+    plt.yscale('log')
+    plt.xlabel('log(wavelength)')
+    plt.ylabel(r'f$_{\nu}$')
+    plt.show()
+    print 1/0
+    '''
     return obs
 
 ######################
