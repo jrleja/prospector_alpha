@@ -141,30 +141,15 @@ def return_fast_sed(fastname,objname, sps=None, obs=None, dustem = False):
     return spec,mags,w,fast,fields
 
 
-def load_fast_3dhst(filename, objnum):
+def load_fast(runname,field):
+    """ returns ancillary data from select_td_sample
     """
-    Load FAST output for a particular object
-    Returns a dictionary of inputs for BSFH
-    """
+    loc = os.getenv('APPS')+'/prospector_alpha/data/3dhst/'+field.upper()+'_'+runname+'.fout'
+    dat = ascii.read(loc)
+    out = np.recarray((len(dat)), dtype=dat.dtype)
+    for idx in dat.colnames: out[idx][:] = dat[idx][:]
 
-    # filter through header junk, load data
-    with open(filename, 'r') as f:
-        for jj in range(1): hdr = f.readline().split()
-    dat = np.loadtxt(filename, comments = '#',dtype = np.dtype([(n, np.float) for n in hdr[1:]]))
-
-    # extract field names, search for ID, pull out object info
-    fields = [f for f in dat.dtype.names]
-    
-    
-    if objnum is None:
-        values = dat[fields].view(float).reshape(len(dat),-1)
-    else:
-        values = dat[fields].view(float).reshape(len(dat),-1)
-        id_ind = fields.index('id')
-        obj_ind = [int(x[id_ind]) for x in dat].index(int(objnum))
-        values = values[obj_ind]
-
-    return values, fields
+    return out
 
 def load_ancil_data(runname,field):
     """ returns ancillary data from select_td_sample

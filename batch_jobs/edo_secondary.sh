@@ -18,4 +18,4 @@
 ### mail
 #SBATCH --mail-type=END
 #SBATCH --mail-user=joel.leja@gmail.com
-python $APPS/prospector_alpha/code/extra_output.py $APPS/prospector_alpha/parameter_files/edo/edo_params.py 
+python $APPS/prospector_alpha/code/extra_output.py $APPS/prospector_alpha/parameter_files/edo/bns_params.py 
