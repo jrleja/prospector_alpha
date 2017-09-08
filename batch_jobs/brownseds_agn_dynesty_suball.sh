@@ -1,7 +1,7 @@
 #!/bin/bash
 ### Name of the job
 ### Requested number of cores
-#SBATCH -n 32
+#SBATCH -n 1
 ### Requested number of nodes
 #SBATCH -N 1
 ### Requested computing time in minutes

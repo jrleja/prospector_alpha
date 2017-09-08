@@ -116,9 +116,10 @@ def output_table(edict, agn_flag, noagn_flag,agn_idx):
     litdat['name'] = np.char.strip(litdat['name'])
 
     ### what goes in the table?
+    # anything with (A POSITIVE AGN INDICATOR) | (THREE NEGATIVE AGN INDICATORS) | (PROSPECTOR AGN FLAG)
     idx = np.where(agn_flag | noagn_flag)[0]
-    idx = np.unique(np.concatenate((idx,agn_idx))) # add in AGN
-    idx = idx[edict['fmir'][idx].argsort()][::-1]
+    idx = np.unique(np.concatenate((idx,agn_idx))) # add in Prospector-AGN
+    idx = idx[edict['fmir'][idx].argsort()][::-1] # sort by decreasing F_MIR
     ngal = idx.shape[0]
 
     ### generate data
