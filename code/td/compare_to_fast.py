@@ -11,7 +11,7 @@ plt.ioff()
 
 minorFormatter = magphys_plot_pref.jLogFormatter(base=10, labelOnlyBase=False)
 majorFormatter = magphys_plot_pref.jLogFormatter(base=10, labelOnlyBase=True)
-popts = {'fmt':'o', 'capthick':1.5,'elinewidth':1.5,'ms':9,'alpha':0.8,'color':'0.3'}
+popts = {'fmt':'o', 'capthick':1.5,'elinewidth':1.5,'ms':9,'alpha':0.8,'color':'0.3','markeredgecolor':'k'}
 red = '#FF3D0D'
 dpi = 120
 
@@ -208,9 +208,9 @@ def fast_comparison(fast,prosp,parlabels,pnames,outname):
 
 		## log axes & range
 		if par[:3] == 'sfr' or par == 'half_time':
-			sub = (1,2,4)
+			sub = (2,4)
 			if par[:3] == 'sfr':
-				sub = ([1])
+				sub = None
 				
 			axes[i].set_yscale('log',nonposy='clip',subsy=sub)
 			axes[i].yaxis.set_major_formatter(majorFormatter)
@@ -327,7 +327,7 @@ def uvir_comparison(data, outname):
 	if qpah.sum() != 0:
 		fig, ax = plt.subplots(2, 2, figsize = (12,12))
 	else:
-		fig, ax = plt.subplots(1,2,figsize=(14,6))
+		fig, ax = plt.subplots(1,2,figsize=(12.5,6))
 	ax = np.ravel(ax)
 
 	### UV_IR SFR plot
@@ -336,12 +336,9 @@ def uvir_comparison(data, outname):
 	sub = ([1])
 	ax[0].set_xlabel('sSFR$_{\mathrm{UVIR}}$')
 	ax[0].set_ylabel('sSFR$_{\mathrm{Prosp}}$')
-	ax[0].set_yscale('log',nonposy='clip',subsy=sub)
-	ax[0].yaxis.set_major_formatter(majorFormatter)
-	ax[0].yaxis.set_minor_formatter(minorFormatter)
-	ax[0].set_xscale('log',nonposy='clip',subsx=sub)
-	ax[0].xaxis.set_major_formatter(majorFormatter)
-	ax[0].xaxis.set_minor_formatter(minorFormatter)
+
+	ax[0].set_yscale('log')
+	ax[0].set_xscale('log')
 
 	off,scat = offset_and_scatter(np.log10(ssfr_uvir[good]),np.log10(ssfr_prosp[good]),biweight=True)
 	scatunits = ' dex'
@@ -354,7 +351,7 @@ def uvir_comparison(data, outname):
 
 	ax[1].errorbar(ssfr_prosp[good], np.log10(ssfr_prosp[good]/ssfr_uvir[good]), **popts)
 	pts = ax[1].scatter(ssfr_prosp[good], np.log10(ssfr_prosp[good]/ssfr_uvir[good]), marker='o', c=halftime[good],
-				  cmap=plt.cm.plasma,s=75,zorder=10)
+				  cmap=plt.cm.plasma,s=75,zorder=10, edgecolors='k')
 	cbar = fig.colorbar(pts, ax=ax[1])
 	cbar.set_label(r'half-mass time [Gyr]')
 	ax[1].set_ylim(-1.0,0.5)
@@ -364,9 +361,7 @@ def uvir_comparison(data, outname):
 	ax[1].set_ylabel('log(sSFR$_{\mathrm{Prosp}}$/sSFR$_{\mathrm{UVIR}}$)')
 	ax[1].axhline(0, linestyle='--', color='red',lw=2,zorder=-1)
 
-	ax[1].set_xscale('log',nonposy='clip',subsx=([1]))
-	ax[1].xaxis.set_major_formatter(majorFormatter)
-	ax[1].xaxis.set_minor_formatter(minorFormatter)
+	ax[1].set_xscale('log')
 
 	if ax.shape[0] > 2:
 		ax[2].errorbar(qpah[good], sfr_ratio[good], xerr=qpah_err, yerr=sfr_ratio_err, **popts)

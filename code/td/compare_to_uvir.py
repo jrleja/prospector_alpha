@@ -12,6 +12,7 @@ import prosp_dutils
 import copy
 import matplotlib.cm as cmx
 import matplotlib.colors as colors
+from matplotlib.ticker import MaxNLocator, FormatStrFormatter
 
 plt.ioff()
 
@@ -20,9 +21,9 @@ majorFormatter = magphys_plot_pref.jLogFormatter(base=10, labelOnlyBase=True)
 popts = {'fmt':'o', 'capthick':1.5,'elinewidth':1.5,'ms':9,'alpha':0.8,'color':'0.3'}
 red = '#FF3D0D'
 dpi = 120
-cmap = 'gist_rainbow'
+cmap = 'cool'
 
-def collate_data(runname, filename=None, regenerate=False, nsamp=100):
+def collate_data(runname, filename=None, regenerate=False, nsamp=100, add_fagn=True):
     
     ### if it's already made, load it and give it back
     # else, start with the making!
@@ -32,7 +33,7 @@ def collate_data(runname, filename=None, regenerate=False, nsamp=100):
             return outdict
 
     ### define output containers
-    sfr_uvir_obs, objname = [], []
+    sfr_uvir_obs, fagn, objname = [], [], []
     sfr_uvir_prosp, sfr_uvir_prosp_up, sfr_uvir_prosp_do, sfr_uvir_prosp_chain = [], [], [], []
     sfr_prosp, sfr_prosp_up, sfr_prosp_do, sfr_prosp_chain = [], [], [], []
     ssfr_prosp, ssfr_prosp_up, ssfr_prosp_do, ssfr_prosp_chain = [], [], [], []
@@ -55,6 +56,7 @@ def collate_data(runname, filename=None, regenerate=False, nsamp=100):
     allfields = np.unique(field).tolist()
     for f in allfields:
         uvirlist.append(td_io.load_mips_data(f))
+
     for i, name in enumerate(basenames):
 
         #### load input
@@ -66,6 +68,10 @@ def collate_data(runname, filename=None, regenerate=False, nsamp=100):
             continue
         objname.append(name.split('/')[-1])
         print 'loading '+objname[-1]
+
+        ### add fagn
+        fagn_idx = prosp['quantiles']['parnames'] == 'fagn'
+        fagn.append(prosp['quantiles']['q50'][fagn_idx][0])
 
         ### calculuate UV+IR SFRs from model, as fraction of each stellar population
         run_params = pfile.run_params
@@ -169,6 +175,7 @@ def collate_data(runname, filename=None, regenerate=False, nsamp=100):
            'ssfr_prosp_up': np.array(ssfr_prosp_up),
            'ssfr_prosp_do': np.array(ssfr_prosp_do),
            'ssfr_prosp_chain': ssfr_prosp_chain,
+           'fagn': np.array(fagn),
            'objname': np.array(objname)
           }
 
@@ -188,7 +195,7 @@ def do_all(runname='td_massive', outfolder=None,**opts):
 
     uvir_comparison(data,outfolder)
 
-def uvir_comparison(data, outfolder):
+def uvir_comparison(data, outfolder,color_by_fagn=True):
     '''
     x-axis is log time (bins)
     y-axis is SFR_BIN / SFR_UVIR_PROSP ?
@@ -213,7 +220,7 @@ def uvir_comparison(data, outfolder):
         to_add = np.array(tmp) / data['sfr_uvir_prosp'][i]
         pltbins.append(to_add)
 
-        ax.plot(time/1e9, pltbins[-1], 'o', color=scalar_map.to_rgba(ssfr_prosp[i]), alpha=0.4, ms=4)
+        ax.plot(time/1e9, pltbins[-1], 'o', color=scalar_map.to_rgba(ssfr_prosp[i]), alpha=0.4, ms=4, markeredgecolor='k')
 
     ### plot running averages
     bins = np.linspace(ssfr_prosp.min(),ssfr_prosp.max(),5)
@@ -229,10 +236,12 @@ def uvir_comparison(data, outfolder):
         ax.plot(timeavg, sfravg, '-', color=scalar_map.to_rgba((bins[i]+bins[i+1])/2.), lw=4, zorder=1)
 
     ### FAKE SCATTER PLOT for the color map (sure there's a better way to do this but this is a one-liner)
-    pts = ax.scatter(ssfr_prosp, ssfr_prosp, s=0.0, cmap=cmap, c=ssfr_prosp, vmin=ssfr_prosp.min(), vmax=ssfr_prosp.max())
-    ax.set_xscale('log',nonposx='clip',subsx=(1,3))
-    ax.xaxis.set_minor_formatter(minorFormatter)
-    ax.xaxis.set_major_formatter(majorFormatter)
+    pts = ax.scatter(ssfr_prosp, ssfr_prosp, s=0.0, cmap=cmap, edgecolors='k',
+                     c=ssfr_prosp, vmin=ssfr_prosp.min(), vmax=ssfr_prosp.max())
+    ax.set_xscale('log',subsx=[3])
+    ax.xaxis.set_minor_formatter(FormatStrFormatter('%2.2g'))
+    ax.xaxis.set_major_formatter(FormatStrFormatter('%2.2g'))
+    ax.tick_params('both', pad=3.5, size=8.0, width=1.0, which='minor')
 
     ax.set_ylabel('SFR$_{\mathrm{UV+IR,bin}}$/SFR$_{\mathrm{UV+IR,total}}$')
     ax.set_xlabel('time [Gyr]')
@@ -249,21 +258,22 @@ def uvir_comparison(data, outfolder):
     #### Plot Prospector UV+IR SFR versus the observed UV+IR SFR
     good = data['sfr_uvir_obs'] > 0
 
-    ax2.plot(data['sfr_uvir_obs'][good], data['sfr_uvir_prosp'][good], 'o', color='0.4')
+    ax2.plot(data['sfr_uvir_obs'][good], data['sfr_uvir_prosp'][good], 'o', color='0.4',markeredgecolor='k')
     min, max = data['sfr_uvir_obs'][good].min()*0.8, data['sfr_uvir_obs'][good].max()*1.2
-    ax2.plot([min, max], [min, max], '--', color='0.4')
+    ax2.plot([min, max], [min, max], '--', color='0.4',zorder=-1)
     ax2.axis([min,max,min,max])
 
     ax2.set_ylabel('SFR$_{\mathrm{UV+IR,PROSP}}$')
     ax2.set_xlabel('SFR$_{\mathrm{UV+IR,KATE}}$')
 
-    ax2.set_xscale('log',nonposx='clip',subsx=(1,3))
-    ax2.xaxis.set_minor_formatter(minorFormatter)
-    ax2.xaxis.set_major_formatter(majorFormatter)
+    ax2.set_xscale('log',subsx=[3])
+    ax2.xaxis.set_minor_formatter(FormatStrFormatter('%2.4g'))
+    ax2.xaxis.set_major_formatter(FormatStrFormatter('%2.4g'))
+    ax2.tick_params('both', pad=3.5, size=8.0, width=1.0, which='minor')
 
-    ax2.set_yscale('log',nonposx='clip',subsy=(1,3))
-    ax2.yaxis.set_minor_formatter(minorFormatter)
-    ax2.yaxis.set_major_formatter(majorFormatter)
+    ax2.set_yscale('log',subsy=[3])
+    ax2.yaxis.set_minor_formatter(FormatStrFormatter('%2.4g'))
+    ax2.yaxis.set_major_formatter(FormatStrFormatter('%2.4g'))
 
     ##### Plot (UV+IR SFR / Prosp SFR)
     uvir_frac, uvir_frac_up, uvir_frac_do = [], [], []
@@ -289,10 +299,17 @@ def uvir_comparison(data, outfolder):
     ax3.axis([0,1,0,1.2])
 
     #### add colored points and colorbar
-    ssfr_prosp = np.log10(data['ssfr_prosp'])
-    pts = ax3.scatter(x,y, s=50, cmap=cmap, c=ssfr_prosp, vmin=ssfr_prosp.min(), vmax=ssfr_prosp.max())
+    if color_by_fagn:
+        colorvar = np.log10(data['fagn'])
+        colorlabel = r'log(f$_{\mathrm{AGN}}$)'
+        ax3_outstring = '_fagn'
+    else:
+        colorvar = np.log10(data['ssfr_prosp'])
+        colorlabel = r'log(sSFR$_{\mathrm{SED}}$)'
+        ax3_outstring = '_ssfr'
+    pts = ax3.scatter(x,y, s=50, cmap=cmap, c=ssfr_prosp, vmin=ssfr_prosp.min(), vmax=ssfr_prosp.max(),edgecolors='k')
     cb = fig3.colorbar(pts, ax=ax3, aspect=10)
-    cb.set_label(r'log(sSFR$_{\mathrm{SED}}$)')
+    cb.set_label(colorlabel)
     cb.solids.set_rasterized(True)
     cb.solids.set_edgecolor("face")
 
@@ -307,7 +324,7 @@ def uvir_comparison(data, outfolder):
 
     fig.savefig(outfolder+'uvir_bin_comparison.png',dpi=dpi)
     fig2.savefig(outfolder+'prosp_uvir_to_obs_uvir.png',dpi=dpi)
-    fig3.savefig(outfolder+'uvir_frac.png',dpi=dpi)
+    fig3.savefig(outfolder+'uvir_frac'+ax3_outstring+'.png',dpi=dpi)
 
     plt.close()
     print 1/0
