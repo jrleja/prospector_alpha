@@ -19,7 +19,7 @@ jansky_mks = 1e-26
 
 run_params = {'verbose':True,
               'debug': False,
-              'outfile': os.getenv('APPS')+'/prospector_alpha/results/edo/bns',
+              'outfile': os.getenv('APPS')+'/prospector_alpha/results/edo/bns_fixedz',
               'nofork': True,
               # Optimizer params
               'ftol':0.5e-5, 
