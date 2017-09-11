@@ -40,7 +40,7 @@ run_params = {'verbose':True,
               'compute_vega_mags': False,
               'initial_disp':0.1,
               'interp_type': 'logarithmic',
-              'agelims': [0.0,8.0,8.5,9.0,9.5,9.75,9.95,10.0],
+              'agelims': [0.0,8.0,8.5,9.0,9.5,9.75,9.95,10.04,10.1],
               # Data info
               'objname':'galaxy',
               }
@@ -52,12 +52,6 @@ run_params['outfile'] = run_params['outfile']+'_'+run_params['objname']
 ftrans = {
           'GALEX FUV': 'galex_FUV', 
           'GALEX NUV': 'galex_NUV', 
-          'UVOT uvw2': 'Swift-UVOT.UVW2',
-          'UVOT uvm2': 'Swift-UVOT.UVM2',
-          'UVOT uvw1': 'Swift-UVOT.UVW1',
-          'UVOT u': 'Swift-UVOT.U',
-          'UVOT b': 'Swift-UVOT.B',
-          'UVOT v': 'Swift-UVOT.V',
           'PS1 g': 'PS1.g', 
           'PS1 r': 'PS1.r', 
           'PS1 i': 'PS1.i', 
@@ -83,12 +77,6 @@ def load_obs(**extras):
     dat = {
            'GALEX FUV': (18.86, np.nan), # limit
            'GALEX NUV': (17.82, 0.09),
-           'UVOT uvw2': (17.52, 0.04),
-           'UVOT uvm2': (17.97, 0.05),
-           'UVOT uvw1': (16.47, 0.04),
-           'UVOT u': (14.94, 0.03),
-           'UVOT b': (13.37, 0.03),
-           'UVOT v': (12.57, 0.02),
            'PS1 g': (12.80, 0.02),
            'PS1 r': (12.16, 0.01),
            'PS1 i': (11.81, 0.01),
