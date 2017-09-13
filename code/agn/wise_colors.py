@@ -91,8 +91,8 @@ def plot_mir_colors(runname='brownseds_agn',alldata=None,outfolder=None, vega=Tr
 
     #### load alldata
     if alldata is None:
-        import brown_io
-        alldata = brown_io.load_alldata(runname=runname)
+        import prospector_io
+        alldata = prospector_io.load_alldata(runname=runname)
 
     #### make output folder if necessary
     if outfolder is None:

@@ -6,7 +6,7 @@ import magphys_plot_pref
 import pickle
 from corner import quantile
 from astropy import constants
-import brown_io
+import prospector_io
 from matplotlib.ticker import MaxNLocator
 from extra_output import post_processing
 import matplotlib as mpl
@@ -365,7 +365,7 @@ def collate_data(runname_nh=None, runname_h=None, runname_nh_weighted=None,outpi
 	
 	#### if we're doing mocks...
 	try:
-		alldata = brown_io.load_alldata(runname=runname_h) # for observed Halpha
+		alldata = prospector_io.load_alldata(runname=runname_h) # for observed Halpha
 		mock_flag = False
 	except:
 		mock_flag = True
@@ -391,12 +391,12 @@ def collate_data(runname_nh=None, runname_h=None, runname_nh_weighted=None,outpi
 
 		#### load no herschel runs
 		try:
-			sample_results_nh, powell_results_nh, model_nh = brown_io.load_prospector_data(filebase_nh[jj])
+			sample_results_nh, powell_results_nh, model_nh = prospector_io.load_prospector_data(filebase_nh[jj])
 		except:
 			print 'failed to load number ' + str(int(jj))
 			continue
 		try:
-			sample_results_nh_weighted, powell_results_nh_weighted, model_nh_weighted = brown_io.load_prospector_data(filebase_nh_weighted[jj])
+			sample_results_nh_weighted, powell_results_nh_weighted, model_nh_weighted = prospector_io.load_prospector_data(filebase_nh_weighted[jj])
 		except:
 			print 'failed to load number ' + str(int(jj))
 			continue
@@ -404,7 +404,7 @@ def collate_data(runname_nh=None, runname_h=None, runname_nh_weighted=None,outpi
 		### match to filebase_nh
 		name = filebase_nh[jj].split('_')[-1]
 		match = [s for s in filebase_h if name in s][0]
-		sample_results_h, powell_results_h, model_h = brown_io.load_prospector_data(match)
+		sample_results_h, powell_results_h, model_h = prospector_io.load_prospector_data(match)
 
 		### save CLOUDY-marginalized Halpha
 		try: 
@@ -412,7 +412,7 @@ def collate_data(runname_nh=None, runname_h=None, runname_nh_weighted=None,outpi
 		except KeyError:
 			param_name = os.getenv('APPS')+'/threed'+sample_results_nh['run_params']['param_file'].split('/threed')[1]
 			post_processing(param_name, add_extra=True)
-			sample_results_nh, powell_results_nh, model_nh = brown_io.load_prospector_data(filebase_nh[jj])
+			sample_results_nh, powell_results_nh, model_nh = prospector_io.load_prospector_data(filebase_nh[jj])
 
 		ha_em = linenames == 'Halpha'
 		outdat_nh['ha_q50'] = sample_results_nh['model_emline']['flux']['q50'][ha_em]

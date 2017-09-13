@@ -753,8 +753,6 @@ def integrate_mag(spec_lam,spectra,filter, z=None, alt_file='/Users/joel/code/py
             NOTE: if redshift is specified, INSTEAD RETURN apparent magnitude and flux [erg/s/cm^2]
     '''
 
-    from calc_ml import load_filter_response
-
     if type(filter) == str:
         resp_lam, res = load_filter_response(filter, 
                                              alt_file=alt_file)
@@ -802,6 +800,48 @@ def integrate_mag(spec_lam,spectra,filter, z=None, alt_file='/Users/joel/code/py
 
     #print 'maggies: {0}'.format(10**(-0.4*mag)*1e10)
     return mag, luminosity
+
+def load_filter_response(filter, alt_file=None):
+    '''READS FILTER RESPONSE CURVES FOR FSPS'''
+    
+    if not alt_file:
+        filter_response_curve = os.getenv('SPS_HOME')+'/data/allfilters.dat'
+    else:
+        filter_response_curve = alt_file
+
+    # initialize output arrays
+    lam,res = (np.zeros(0) for i in range(2))
+
+    # upper case?
+    if filter.lower() == filter:
+        lower_case = True
+    else:
+        lower_case = False
+
+    # open file
+    with open(filter_response_curve, 'r') as f:
+        # Skips text until we find the correct filter
+        for line in f:
+            if lower_case:
+                if line.lower().find(filter) != -1:
+                    break
+            else:
+                if line.find(filter) != -1:
+                    break
+        # Reads text until we hit the next filter
+        for line in f:  # This keeps reading the file
+            if line.find('#') != -1:
+                break
+            # read line, extract data
+            data = line.split()
+            lam = np.append(lam,float(data[0]))
+            res = np.append(res,float(data[1]))
+
+    if len(lam) == 0:
+        print "Couldn't find filter " + filter + ': STOPPING'
+        print 1/0
+
+    return lam, res
 
 def return_full_sfh(t, sfh_params,**kwargs):
 

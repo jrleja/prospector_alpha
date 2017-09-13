@@ -32,10 +32,10 @@ def plot_dn(idx_plot=None,outfolder=None,
 
     #### load alldata
     if alldata is None:
-        import brown_io
+        import prospector_io
 
-        alldata = brown_io.load_alldata(runname=runname)
-        alldata_noagn = brown_io.load_alldata(runname=runname_noagn)
+        alldata = prospector_io.load_alldata(runname=runname)
+        alldata_noagn = prospector_io.load_alldata(runname=runname_noagn)
 
     #### make output folder if necessary
     if outfolder is None:

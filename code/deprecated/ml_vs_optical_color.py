@@ -147,7 +147,7 @@ def do_all(runname='brownseds_np',alldata=None,outfolder=None):
 
 	#### load alldata
 	if alldata is None:
-		alldata = brown_io.load_alldata(runname=runname)
+		alldata = prospector_io.load_alldata(runname=runname)
 
 	#### make output folder if necessary
 	if outfolder is None:

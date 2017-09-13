@@ -1,5 +1,5 @@
 import numpy as np
-import brown_io
+import prospector_io
 from scipy.interpolate import interp1d
 import magphys_plot_pref
 import matplotlib.pyplot as plt
@@ -45,7 +45,7 @@ def prep_spectra(alldata,nbins=None,log_qpah=False,equal_n_bins=True):
 	for ii,dat in enumerate(alldata):
 
 		### load spectrum 
-		obs_spec = brown_io.load_spectra(dat['objname'])
+		obs_spec = prospector_io.load_spectra(dat['objname'])
 		irs_idx = obs_spec['source'] == 3
 		if (np.sum(irs_idx) == 0) or (dat['pquantiles']['q50'][0] < 10): # don't stack if we don't have spectra, or low-mass
 			continue
@@ -141,7 +141,7 @@ def plot_stacks(outfolder=None,alldata=None,runname='brownseds_np',log_qpah=Fals
 
 	#### load data if necessary
 	if alldata is None:
-		alldata = brown_io.load_alldata(runname=runname)
+		alldata = prospector_io.load_alldata(runname=runname)
 	if outfolder is None:
 		outfolder = os.getenv('APPS')+'/prospector_alpha/plots/'+runname+'/pcomp/'
 

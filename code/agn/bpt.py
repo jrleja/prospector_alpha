@@ -1,5 +1,5 @@
 import numpy as np
-import brown_io
+import prospector_io
 import matplotlib.pyplot as plt
 import agn_plot_pref
 from corner import quantile
@@ -65,7 +65,7 @@ def plot_bpt(agn_evidence,runname='brownseds_agn',alldata=None,outfolder=None,id
 
     #### load alldata
     if alldata is None:
-        alldata = brown_io.load_alldata(runname=runname)
+        alldata = prospector_io.load_alldata(runname=runname)
 
     #### make output folder if necessary
     if outfolder is None:

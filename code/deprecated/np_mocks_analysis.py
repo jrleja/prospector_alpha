@@ -9,7 +9,7 @@ from corner import quantile
 from prospect.models import model_setup
 import sys
 from extra_output import post_processing
-from brown_io import load_prospector_data
+from prospector_io import load_prospector_data
 
 minsfr = 1e-4
 minssfr = 1e-15

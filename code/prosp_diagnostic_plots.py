@@ -6,7 +6,7 @@ import matplotlib as mpl
 from matplotlib.ticker import MaxNLocator, FormatStrFormatter
 from prospect.models import model_setup
 from magphys_plot_pref import jLogFormatter
-from brown_io import load_prospector_data
+from prospector_io import load_prospector_data
 
 plt.ioff() # don't pop up a window for each plot
 

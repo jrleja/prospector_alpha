@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import os
 import hickle
 import td_io
-from brown_io import load_prospector_extra
+from prospector_io import load_prospector_extra
 import magphys_plot_pref
 from astropy.cosmology import WMAP9
 import td_massive_params as pfile

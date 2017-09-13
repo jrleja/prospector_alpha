@@ -4,7 +4,7 @@ import os
 import hickle
 import td_io
 from prosp_dutils import generate_basenames,av_to_dust2,asym_errors,equalize_axes,offset_and_scatter,exp_decl_sfh_half_time
-from brown_io import load_prospector_extra
+from prospector_io import load_prospector_extra
 import magphys_plot_pref
 from astropy.cosmology import WMAP9
 plt.ioff()

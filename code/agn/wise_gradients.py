@@ -11,7 +11,7 @@ import copy
 from astropy.convolution import convolve, convolve_fft
 from wise_colors import vega_conversions
 from magphys_plot_pref import jLogFormatter
-import brown_io
+import prospector_io
 from corner import quantile
 from photutils import CircularAperture, CircularAnnulus, find_peaks, aperture_photometry
 from astropy.cosmology import WMAP9
@@ -70,7 +70,7 @@ def collate_data(alldata,alldata_noagn):
     # match
     eparnames = alldata[0]['pextras']['parnames']
     xr_idx = eparnames == 'xray_lum'
-    xray = brown_io.load_xray_cat(xmatch = True)
+    xray = prospector_io.load_xray_cat(xmatch = True)
 
     lsfr, lsfr_up, lsfr_down, xray_lum, xray_lum_err = [], [], [], [], []
     for i, dat in enumerate(alldata):
@@ -123,7 +123,7 @@ def collate_data(alldata,alldata_noagn):
     out['lsfr_down'] = np.array(lsfr_down)
     out['xray_luminosity'] = np.array(xray_lum)
     out['xray_luminosity_err'] = np.array(xray_lum_err)
-    out['bpt'] = brown_io.return_agn_str(np.ones_like(alldata,dtype=bool),string=True)
+    out['bpt'] = prospector_io.return_agn_str(np.ones_like(alldata,dtype=bool),string=True)
 
     return out
 
@@ -132,8 +132,8 @@ def plot_all(agn_evidence,runname='brownseds_agn',runname_noagn='brownseds_np',a
 
     #### load alldata
     if alldata is None:
-        alldata = brown_io.load_alldata(runname=runname)
-        alldata_noagn = brown_io.load_alldata(runname=runname_noagn)
+        alldata = prospector_io.load_alldata(runname=runname)
+        alldata_noagn = prospector_io.load_alldata(runname=runname_noagn)
 
     #### make output folder if necessary
     outfolder_overlays = os.getenv('APPS')+'/prospector_alpha/plots/'+runname+'/agn_plots/sdss_overlays'
@@ -646,7 +646,7 @@ def download_wise_data(alldata, idx=Ellipsis):
 
     dir = '/Users/joel/code/python/prospector_alpha/data/brownseds_data/fits/unWISE/'
     url = '"http://unwise.me/cutout_fits?version=neo1&size=60&bands=12&file_img_m=on&file_invvar_m=on&'
-    ra,dec,objnames = brown_io.load_coordinates()
+    ra,dec,objnames = prospector_io.load_coordinates()
     with open(dir+'download.sh', 'w') as f:
 
         for dat in np.array(alldata)[idx]:
@@ -700,7 +700,7 @@ def load_structure(objname,long_axis=False):
 
 def load_coordinates(objname):
 
-    ra,dec,objnames = brown_io.load_coordinates()
+    ra,dec,objnames = prospector_io.load_coordinates()
     match = objname == objnames
     
     return ra[match], dec[match]

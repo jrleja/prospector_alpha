@@ -1,6 +1,6 @@
 import optical_color_color,bpt,plot_delta_pars,agn_residuals,xray_luminosity,plot_spec_rms,wise_colors
 import wise_gradients, plot_dn, agn_evidence_hist, sf_seq
-import delta_mass_met,os,brown_io
+import delta_mass_met,os,prospector_io
 import numpy as np
 import matplotlib.pyplot as plt
 from astropy import constants
@@ -11,9 +11,9 @@ def plot(runname='brownseds_agn',runname_noagn='brownseds_np',
 
     #### load alldata
     if alldata is None:
-        alldata = brown_io.load_alldata(runname=runname)
+        alldata = prospector_io.load_alldata(runname=runname)
     if alldata_noagn is None:
-        alldata_noagn = brown_io.load_alldata(runname=runname_noagn)
+        alldata_noagn = prospector_io.load_alldata(runname=runname_noagn)
 
     #### outfolder
     outfolder = os.getenv('APPS')+'/prospector_alpha/plots/'+runname+'/agn_plots/'

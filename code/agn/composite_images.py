@@ -14,7 +14,7 @@ import copy
 from astropy.convolution import convolve, convolve_fft
 from wise_colors import vega_conversions
 from magphys_plot_pref import jLogFormatter
-import brown_io
+import prospector_io
 from corner import quantile
 from prosp_dutils import smooth_spectrum
 
@@ -58,7 +58,7 @@ def collate_data(alldata):
 	# match
 	eparnames = alldata[0]['pextras']['parnames']
 	xr_idx = eparnames == 'xray_lum'
-	xray = brown_io.load_xray_cat(xmatch = True)
+	xray = prospector_io.load_xray_cat(xmatch = True)
 
 	lsfr, lsfr_up, lsfr_down, xray_lum, xray_lum_err = [], [], [], [], []
 	for dat in alldata:
@@ -104,7 +104,7 @@ def collate_data(alldata):
 	out['lsfr_down'] = np.array(lsfr_down)
 	out['xray_luminosity'] = np.array(xray_lum)
 	out['xray_luminosity_err'] = np.array(xray_lum_err)
-	out['bpt'] = brown_io.return_agn_str(np.ones_like(alldata,dtype=bool),string=True)
+	out['bpt'] = prospector_io.return_agn_str(np.ones_like(alldata,dtype=bool),string=True)
 
 	return out
 
@@ -146,7 +146,7 @@ def collate_spectra(alldata,alldata_noagn,idx_plot,pdata,runname,contours):
 		lam.append(dat['model_spec_lam'])
 
 		### observed spectra
-		obs_spec = brown_io.load_spectra(dat['objname'])
+		obs_spec = prospector_io.load_spectra(dat['objname'])
 		spit_idx = obs_spec['source'] == 3
 		if spit_idx.sum() > 0:
 			spit_lam.append(obs_spec['rest_lam'][spit_idx])
@@ -183,8 +183,8 @@ def plot_all(runname='brownseds_agn',runname_noagn='brownseds_np',alldata=None,a
 
 	#### load alldata
 	if alldata is None:
-		alldata = brown_io.load_alldata(runname=runname)
-		alldata_noagn = brown_io.load_alldata(runname=runname_noagn)
+		alldata = prospector_io.load_alldata(runname=runname)
+		alldata_noagn = prospector_io.load_alldata(runname=runname_noagn)
 
 	#### make output folder if necessary
 	if outfolder is None:
@@ -512,7 +512,7 @@ def load_structure(objname,long_axis=False):
 
 def load_coordinates(objname):
 
-	ra,dec,objnames = brown_io.load_coordinates()
+	ra,dec,objnames = prospector_io.load_coordinates()
 	match = objname == objnames
 	
 	return ra[match], dec[match]

@@ -1,5 +1,5 @@
 import numpy as np
-import prosp_dutils, brown_io, copy
+import prosp_dutils, prospector_io, copy
 import os
 import td_massive_params as pfile
 from astropy import constants

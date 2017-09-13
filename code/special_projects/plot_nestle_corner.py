@@ -3,7 +3,7 @@ import corner
 import numpy as np
 from prospect.io import read_results
 from prospect.models import model_setup
-from brown_io import load_prospector_data
+from prospector_io import load_prospector_data
 from prosp_dutils import generate_basenames, chop_chain, asym_errors
 from prosp_diagnostic_plots import transform_chain
 from matplotlib.ticker import MaxNLocator

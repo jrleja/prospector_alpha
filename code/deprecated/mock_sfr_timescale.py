@@ -6,7 +6,7 @@ import magphys_plot_pref
 import pickle
 from matplotlib.ticker import MaxNLocator
 from corner import quantile
-from brown_io import load_prospector_data
+from prospector_io import load_prospector_data
 
 minsfr = 1e-4
 minssfr = 1e-15

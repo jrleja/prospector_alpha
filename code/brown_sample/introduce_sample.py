@@ -3,7 +3,7 @@ import prosp_dutils
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 import os
-import brown_io
+import prospector_io
 import matplotlib.gridspec as gridspec
 
 plt.ioff()
@@ -11,7 +11,7 @@ plt.ioff()
 def make_plot(runname='brownseds_np'):
 
 	#### load alldata
-	alldata = brown_io.load_alldata(runname=runname)
+	alldata = prospector_io.load_alldata(runname=runname)
 
 	#### create figure, plus metrics
 	dpi = 135

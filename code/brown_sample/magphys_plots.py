@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import os, copy, prosp_dutils
 from scipy.interpolate import interp1d
 from matplotlib.ticker import MaxNLocator
-import math, measure_emline_lum, brown_io
+import math, measure_emline_lum, prospector_io
 import magphys_plot_pref
 import mag_ensemble
 import matplotlib as mpl
@@ -789,7 +789,7 @@ def sed_comp_figure(sample_results, extra_output, sps, model, magphys,
         resplots = [None, None, None]
 
     ##### observed spectra + residuals #####
-    obs_spec = brown_io.load_spectra(sample_results['run_params']['objname'])
+    obs_spec = prospector_io.load_spectra(sample_results['run_params']['objname'])
 
     label = ['Optical','Akari', 'Spitzer IRS']
 
@@ -941,7 +941,7 @@ def collate_data(filebase=None,
 
     # attempt to load data
     try:
-         sample_results, powell_results, model, extra_output = brown_io.load_prospector_data(filebase)
+         sample_results, powell_results, model, extra_output = prospector_io.load_prospector_data(filebase)
     except AttributeError:
         print 'failed to load ' + filebase
         return None
@@ -1010,9 +1010,9 @@ def plt_all(runname=None,startup=True,**extras):
                                            **extras)
 
             alldata.append(dictionary)
-        brown_io.save_alldata(alldata,runname=runname)
+        prospector_io.save_alldata(alldata,runname=runname)
     else:
-        alldata = brown_io.load_alldata(runname=runname)
+        alldata = prospector_io.load_alldata(runname=runname)
 
     '''
     ssfr, ssfr_up, ssfr_down, uvir_ssfr, uvir_ssfr_up, uvir_ssfr_down = [[] for i in range(6)]
@@ -1088,7 +1088,7 @@ def plt_all(runname=None,startup=True,**extras):
     mag_ensemble.plot_comparison(alldata,os.getenv('APPS')+'/prospector_alpha/plots/'+runname+'/magphys/')
 
 
-    brown_io.write_results(alldata,os.getenv('APPS')+'/prospector_alpha/plots/'+runname+'/pcomp/')
+    prospector_io.write_results(alldata,os.getenv('APPS')+'/prospector_alpha/plots/'+runname+'/pcomp/')
     allpar_plot(alldata,hflag,os.getenv('APPS')+'/prospector_alpha/plots/'+runname+'/pcomp/')
     plot_all_residuals(alldata,runname)
     stack_irs_spectra.plot_stacks(alldata=alldata,outfolder=os.getenv('APPS')+'/prospector_alpha/plots/'+runname+'/pcomp/')
@@ -1099,7 +1099,7 @@ def perform_wavelength_cal(spec_dict, objname):
     (2) apply polynomial correction to obs_spec
     '''
 
-    spec_cal = brown_io.load_spec_cal(runname=None)
+    spec_cal = prospector_io.load_spec_cal(runname=None)
 
     #### find matching galaxy by loading basenames for BROWNSEDS
     filebase, parm_basename, ancilname=prosp_dutils.generate_basenames('brownseds')
@@ -1142,7 +1142,7 @@ def compute_specmags(runname=None, outfolder=None):
     #### load up prospector results
     filebase, parm_basename, ancilname=prosp_dutils.generate_basenames(runname)
     outname = os.getenv('APPS')+'/prospector_alpha/plots/'+runname+'/pcomp/sfrcomp.png'
-    alldata = brown_io.load_alldata(runname=runname)
+    alldata = prospector_io.load_alldata(runname=runname)
     sps = prosp_dutils.setup_sps(custom_filter_key=None)
 
     optphot = np.zeros(shape=(3,len(alldata)))
@@ -1157,7 +1157,7 @@ def compute_specmags(runname=None, outfolder=None):
         #### load up observed spec
         # arrives in maggies * Hz
         # change to maggies
-        spec_dict = brown_io.load_spectra(dat['objname'])
+        spec_dict = prospector_io.load_spectra(dat['objname'])
         opt_idx = spec_dict['source'] == 1
         obs_wav = spec_dict['obs_lam'][opt_idx]
         obs_spec = spec_dict['flux'][opt_idx] / (3e18 / obs_wav)
@@ -1254,20 +1254,20 @@ def compute_specmags(runname=None, outfolder=None):
     plt.close()
 
     out = {'obs_phot':obsphot,'spec_phot':optphot}
-    brown_io.save_spec_cal(out,runname=runname)
+    prospector_io.save_spec_cal(out,runname=runname)
 
 def add_prosp_mag_info(runname='brownseds_np'):
 
-    alldata = brown_io.load_alldata(runname=runname)
+    alldata = prospector_io.load_alldata(runname=runname)
 
     filebase, parm_basename, ancilname=prosp_dutils.generate_basenames(runname)
     for ii,dat in enumerate(alldata):
-        sample_results, powell_results, model, extra_output = brown_io.load_prospector_data(filebase[ii], hdf5=True)
+        sample_results, powell_results, model, extra_output = prospector_io.load_prospector_data(filebase[ii], hdf5=True)
         magphys = read_magphys_output(objname=dat['objname'])
         dat = update_model_info(dat, sample_results, extra_output, magphys)
         print str(ii)+' done'
 
-    brown_io.save_alldata(alldata,runname=runname)
+    prospector_io.save_alldata(alldata,runname=runname)
 
 
 

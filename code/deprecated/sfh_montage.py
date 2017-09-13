@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
-import brown_io
+import prospector_io
 import os
 import magphys_plot_pref
 import matplotlib as mpl
@@ -155,7 +155,7 @@ def main_plot(runname='brownseds_np'):
 	outfolder = os.getenv('APPS')+'/prospector_alpha/plots/'+runname+'/pcomp/'
 
 	### load data
-	alldata = brown_io.load_alldata(runname=runname)
+	alldata = prospector_io.load_alldata(runname=runname)
 
 	### define t_half
 	thalf_idx = alldata[0]['pextras']['parnames'] == 'half_time'

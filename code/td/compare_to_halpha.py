@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import os, hickle, td_io, prosp_dutils
-from brown_io import load_prospector_extra
+from prospector_io import load_prospector_extra
 from astropy.cosmology import WMAP9
 from astropy import units as u
 

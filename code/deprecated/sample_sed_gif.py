@@ -159,7 +159,7 @@ def make_gif(runname='brownseds_np',objname='Arp 256 N', sample_results = None, 
 	### LOAD DATA
 	if sample_results is None:
 		#import prosp_dutils
-		from brown_io import load_prospector_data
+		from prospector_io import load_prospector_data
 		sample_results, powell_results, model = load_prospector_data(None, runname=runname, objname=objname)
 
 	### setup plot geometry

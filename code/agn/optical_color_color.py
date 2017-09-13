@@ -1,5 +1,5 @@
 import numpy as np
-import brown_io
+import prospector_io
 import matplotlib.pyplot as plt
 import agn_plot_pref
 from prosp_dutils import asym_errors
@@ -81,7 +81,7 @@ def plot(runname='brownseds_np',alldata=None,outfolder=None):
 
 	#### load alldata
 	if alldata is None:
-		alldata = brown_io.load_alldata(runname=runname)
+		alldata = prospector_io.load_alldata(runname=runname)
 
 	#### make output folder if necessary
 	if outfolder is None:

@@ -5,7 +5,7 @@ import numpy as np
 from copy import copy
 from astropy import constants
 import argparse
-from brown_io import load_prospector_data, create_prosp_filename
+from prospector_io import load_prospector_data, create_prosp_filename
 
 try:
     import prosp_diagnostic_plots

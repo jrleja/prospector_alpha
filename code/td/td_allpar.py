@@ -5,7 +5,7 @@ import magphys_plot_pref
 from matplotlib.ticker import MaxNLocator
 import copy, os, pickle
 import matplotlib as mpl
-from brown_io import load_prospector_extra
+from prospector_io import load_prospector_extra
 
 mpl.rcParams.update({'font.size': 18})
 mpl.rcParams.update({'font.weight': 500})

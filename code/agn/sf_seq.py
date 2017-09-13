@@ -8,7 +8,7 @@ import matplotlib.image as mpimg
 from astropy.io import fits
 from astropy.wcs import WCS
 from astropy.coordinates import SkyCoord  # High-level coordinates
-import brown_io
+import prospector_io
 from matplotlib.colors import LinearSegmentedColormap
 from astropy.stats import sigma_clipped_stats
 import matplotlib as mpl
@@ -46,7 +46,7 @@ def plot(runname='brownseds_agn',alldata=None,outfolder=None,**popts):
 
     #### load alldata
     if alldata is None:
-        alldata = brown_io.load_alldata(runname=runname)
+        alldata = prospector_io.load_alldata(runname=runname)
 
     #### make output folder if necessary
     if outfolder is None:
@@ -280,7 +280,7 @@ def load_structure(objname,long_axis=False):
 
 def load_coordinates(objname):
 
-    ra,dec,objnames = brown_io.load_coordinates()
+    ra,dec,objnames = prospector_io.load_coordinates()
     match = objname == objnames
     
     return ra[match], dec[match]

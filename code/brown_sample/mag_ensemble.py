@@ -9,7 +9,7 @@ from scipy.optimize import minimize
 import pickle
 import corner
 from matplotlib.ticker import MaxNLocator
-import brown_quality_cuts, brown_io
+import brown_quality_cuts, prospector_io
 
 #### set up colors and plot style
 prosp_color = '#e60000'
@@ -1207,7 +1207,7 @@ def ionization_parameter(e_pinfo, hflag, alldata, outfolder=''):
     keep_idx = np.squeeze((sn_oiii > sn_cut) & (sn_oii > sn_cut) & \
                           (np.abs(e_pinfo['obs']['err_oiii']) > 0) & (np.abs(e_pinfo['obs']['err_oii']) > 0))
 
-    sfing, composite, agn = brown_io.return_agn_str(keep_idx)
+    sfing, composite, agn = prospector_io.return_agn_str(keep_idx)
     keys = [sfing, composite, agn]
 
     ### now calculate intrinsic ratio
@@ -1307,7 +1307,7 @@ def gas_phase_metallicity(e_pinfo, hflag, alldata, outfolder='',ssfr_cut=False):
     qpah_errdo = np.array([x['pquantiles']['q16'][qpah_idx][0] for x in alldata])[keep_idx]
 
     #### get BPT status
-    sfing, composite, agn = brown_io.return_agn_str(keep_idx)
+    sfing, composite, agn = prospector_io.return_agn_str(keep_idx)
     keys = [sfing, composite, agn]
 
     #### get gas-phase metallicity
@@ -1393,7 +1393,7 @@ def bpt_diagram(e_pinfo,hflag,outname=None):
     obs_nii_ha_err = e_pinfo['obs']['nii_ha_err'][keep_idx]
 
     ##### AGN identifiers
-    sfing, composite, agn = brown_io.return_agn_str(keep_idx)
+    sfing, composite, agn = prospector_io.return_agn_str(keep_idx)
     keys = [sfing, composite, agn]
 
     ##### herschel identifier
@@ -1531,7 +1531,7 @@ def obs_vs_kennicutt_ha(e_pinfo,hflag,outname_prosp='test.png',outname_mag='test
     fit_and_save(pmet,pl_ha_ratio)
 
     ##### AGN identifiers
-    sfing, composite, agn = brown_io.return_agn_str(keep_idx)
+    sfing, composite, agn = prospector_io.return_agn_str(keep_idx)
     keys = [sfing, composite, agn]
 
     ##### herschel identifier
@@ -1737,7 +1737,7 @@ def paper_summary_plot(e_pinfo, hflag, outname='test.png'):
     keep_idx = brown_quality_cuts.halpha_cuts(e_pinfo)
 
     ##### AGN identifiers
-    sfing, composite, agn = brown_io.return_agn_str(keep_idx)
+    sfing, composite, agn = prospector_io.return_agn_str(keep_idx)
     keys = [sfing, composite, agn]
 
     ##### halpha log tricks
@@ -1777,7 +1777,7 @@ def paper_summary_plot(e_pinfo, hflag, outname='test.png'):
     dn4000_prosp = e_pinfo['prosp']['dn4000'][dn_idx,0]
 
     ##### AGN identifiers
-    sfing, composite, agn = brown_io.return_agn_str(dn_idx)
+    sfing, composite, agn = prospector_io.return_agn_str(dn_idx)
     keys = [sfing, composite, agn]
 
     #### plot dn4000
@@ -1817,7 +1817,7 @@ def balmlines_delta(e_pinfo,outname='test.png',model='obs',
     keep_idx = brown_quality_cuts.halpha_cuts(e_pinfo)
 
     ##### AGN identifiers
-    sfing, composite, agn = brown_io.return_agn_str(keep_idx)
+    sfing, composite, agn = prospector_io.return_agn_str(keep_idx)
     keys = [sfing, composite, agn]
 
     ##### plot!
@@ -1871,7 +1871,7 @@ def obs_vs_prosp_balmlines(e_pinfo,hflag,outname='test.png',outname_resid='test.
     keep_idx = brown_quality_cuts.halpha_cuts(e_pinfo)
 
     ##### AGN identifiers
-    sfing, composite, agn = brown_io.return_agn_str(keep_idx)
+    sfing, composite, agn = prospector_io.return_agn_str(keep_idx)
     keys = [sfing, composite, agn]
 
     ##### herschel identifier
@@ -2057,7 +2057,7 @@ def obs_vs_model_hdelta(e_pinfo,hflag,outname=None,outname2=None,outname_dnplt=N
     dn4000_prosp = e_pinfo['prosp']['dn4000'][good_idx,0]
 
     ##### AGN identifiers
-    sfing, composite, agn = brown_io.return_agn_str(good_idx)
+    sfing, composite, agn = prospector_io.return_agn_str(good_idx)
     keys = [sfing, composite, agn]
 
     ##### herschel identifier
@@ -2164,7 +2164,7 @@ def obs_vs_model_dn(e_pinfo,hflag,outname=None):
     dn_idx = e_pinfo['obs']['dn4000'] > 0.5
 
     ##### AGN identifiers
-    sfing, composite, agn = brown_io.return_agn_str(dn_idx)
+    sfing, composite, agn = prospector_io.return_agn_str(dn_idx)
     keys = [sfing, composite, agn]
 
     ##### plot quantities
@@ -2437,7 +2437,7 @@ def obs_vs_model_bdec(e_pinfo,hflag,outname1='test.png',outname2='test.png'):
     pl_bdec_measured = prosp_dutils.bdec_to_ext(e_pinfo['obs']['bdec'][keep_idx])
 
     ##### BPT classifications, herschel flag
-    sfing, composite, agn = brown_io.return_agn_str(keep_idx)
+    sfing, composite, agn = prospector_io.return_agn_str(keep_idx)
     keys = [sfing, composite, agn]
     hflag = [hflag[keep_idx],~hflag[keep_idx]]
 
@@ -2532,7 +2532,7 @@ def residual_plots(e_pinfo,hflag,outfolder):
     inclination = e_pinfo['obs']['inclination'][keep_idx]
 
     #### AGN+Herschel identifiers ######
-    sfing, composite, agn = brown_io.return_agn_str(keep_idx)
+    sfing, composite, agn = prospector_io.return_agn_str(keep_idx)
     keys = [sfing, composite, agn]
     hflag = [hflag[keep_idx],~hflag[keep_idx]]
 
@@ -2692,7 +2692,7 @@ def residual_plots(e_pinfo,hflag,outfolder):
     tau2 = prosp_dutils.chev_extinction(modtau, lam2_extdiff,ebars=True)
     dtau_dlam_chev = ((tau2-tau1) / (lam2_extdiff-lam1_extdiff)) / modtau
 
-    sfingn, compositen, agnn = brown_io.return_agn_str(np.ones_like(keep_idx))
+    sfingn, compositen, agnn = prospector_io.return_agn_str(np.ones_like(keep_idx))
     nkeys = [sfingn, compositen, agnn]
     for ii in xrange(len(labels)): 
         dtau_dlam_prosp_errors = prosp_dutils.asym_errors(dtau_dlam_prosp[nkeys[ii],0],
@@ -2837,16 +2837,16 @@ def plot_emline_comp(alldata,outfolder,hflag):
         (4) model Halpha (from Kennicutt + dust) versus observed Halpha
     '''
 
-    import brown_io
+    import prospector_io
     ##### Pull relevant information out of alldata
     emline_names = alldata[0]['residuals']['emlines']['em_name']
 
     ##### load moustakas+10 line flux information
     objnames = np.array([f['objname'] for f in alldata])
-    dat = brown_io.load_moustakas_data(objnames = list(objnames))
+    dat = prospector_io.load_moustakas_data(objnames = list(objnames))
 
     ##### load new moustakas line flux information (from email, january 2016)
-    newdat = brown_io.load_moustakas_newdat(objnames = list(objnames))
+    newdat = prospector_io.load_moustakas_newdat(objnames = list(objnames))
 
     ##### format emission line data for plotting
     e_pinfo = fmt_emline_info(alldata)
@@ -3170,7 +3170,7 @@ def prospector_comparison(alldata,outfolder,hflag):
 
 
     #### agn flags
-    sfing, composite, agn = brown_io.return_agn_str(np.ones_like(hflag,dtype=bool))
+    sfing, composite, agn = prospector_io.return_agn_str(np.ones_like(hflag,dtype=bool))
     agn_flags = [sfing,composite,agn]
 
     #### best-fits
