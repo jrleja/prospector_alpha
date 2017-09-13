@@ -529,7 +529,6 @@ class NestedModel(sedmodel.SedModel):
 
         return theta
 
-
     def prior_product(self, theta, **extras):
         """
         this isn't how we do things around these parts

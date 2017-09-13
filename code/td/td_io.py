@@ -4,17 +4,13 @@ from astropy.table import Table, vstack
 import os
 
 def load_phot_v41(field):
-
     loc = '/Users/joel/data/3d_hst/v4.1_cats/'+field.lower()+'_3dhst.v4.1.cats/Catalog/'+field.lower()+'_3dhst.v4.1.cat'
     x = ascii.read(loc)
-
     return x
 
 def load_zbest(field):
-
     loc = '/Users/joel/data/3d_hst/v4.1_spectral/'+field.lower()+'_3dhst_v4.1.5_catalogs/'+field.lower()+'_3dhst.v4.1.5.zbest.dat'
     x = ascii.read(loc)
-
     return x
 
 def load_morphology(field,band):
@@ -23,19 +19,40 @@ def load_morphology(field,band):
     x = ascii.read(loc)
     return x
 
-def load_rf_v41(field):
-
+def load_rf_v41(field,zbest=True):
     loc = '/Users/joel/data/3d_hst/v4.1_cats/'+field.lower()+'_3dhst.v4.1.cats/RF_colors/'+field.lower()+'_3dhst.v4.1.master.RF'
+    if zbest:
+        loc = '/Users/joel/data/3d_hst/v4.1_spectral/'+field.lower()+'_3dhst_v4.1.5_catalogs/'+field.lower()+'_3dhst.v4.1.5.zbest.rf'
     x = ascii.read(loc)
-
     return x
 
-def load_fast_v41(field):
-
+def load_fast_v41(field,zbest=True):
     loc = '/Users/joel/data/3d_hst/v4.1_cats/'+field.lower()+'_3dhst.v4.1.cats/Fast/'+field.lower()+'_3dhst.v4.1.fout'
+    if zbest:
+        loc = '/Users/joel/data/3d_hst/v4.1_spectral/'+field.lower()+'_3dhst_v4.1.5_catalogs/'+field.lower()+'_3dhst.v4.1.5.zbest.fout'
     x = ascii.read(loc, names=['id','z','ltau','metal','lage','Av','lmass','lsfr','lssfr','la2t','chi2'])
-
     return x
+
+def load_mips_data(field,objnum=None,zbest=True,process=True):
+    filename = '/Users/joel/data/3d_hst/v4.1_cats/'+field.lower()+'_3dhst.v4.1.cats/'+field.lower()+'_3dhst.v4.1.sfr'
+    if zbest:
+        filename = '/Users/joel/data/3d_hst/v4.1_spectral/'+field.lower()+'_3dhst_v4.1.5_catalogs/'+field.lower()+'_3dhst.v4.1.5.zbest.sfr'
+    with open(filename, 'r') as f:
+        for jj in range(1): hdr = f.readline().split()
+    dat = np.loadtxt(filename, comments = '#',dtype = np.dtype([(n, np.float) for n in hdr[1:]]))
+    
+    if process:
+        badir = (dat['sfr_IR'] < 0) & (dat['sfr_UV'] > 0) & (dat['sfr'] < -50)
+        dat['sfr'][badir] = dat['sfr_UV'][badir]
+        
+        baduv = (dat['sfr_UV'] < 0) & (dat['sfr_IR'] > 0) & (dat['sfr'] < -50)
+        dat['sfr'][baduv] = dat['sfr_IR'][baduv]
+
+    if objnum is not None:
+        objdat = dat[dat['id'] == float(objnum)]
+        return objdat
+
+    return dat
 
 def load_zp_offsets(field):
 
@@ -91,25 +108,10 @@ def load_grism_dat(field,process=False):
     for idx in hdr: out[idx][:] = dat[idx][:]
     return out
 
-def load_mips_data(field,objnum=None):
-    
-    filename = '/Users/joel/data/3d_hst/v4.1_cats/'+field.lower()+'_3dhst.v4.1.cats/'+field.lower()+'_3dhst.v4.1.sfr'
-    with open(filename, 'r') as f:
-        for jj in range(1): hdr = f.readline().split()
-    dat = np.loadtxt(filename, comments = '#',dtype = np.dtype([(n, np.float) for n in hdr[1:]]))
-    
-    if objnum is not None:
-        objdat = dat[dat['id'] == float(objnum)]
-        return objdat
-
-    return dat
-
 def return_fast_sed(fastname,objname, sps=None, obs=None, dustem = False):
-
-    '''
-    give the fast parameters straight from the FAST out file
+    """give the fast parameters straight from the FAST out file
     return observables with best-fit FAST parameters, main difference hopefully being stellar population models
-    '''
+    """
 
     # load fast parameters
     fast, fields = load_fast_3dhst(fastname, objname)
