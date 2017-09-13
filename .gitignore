@@ -10,3 +10,4 @@ replicate.sh
 filters
 parameter_files/*prior*
 data/
+code/deprecated
