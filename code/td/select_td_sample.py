@@ -185,6 +185,7 @@ def build_sample(sample=None):
         out = sample['master_cut'](out) 
 
     # write out for each field
+    print 1/0
     for i,field in enumerate(fields):
         outbase = '/Users/joel/code/python/prospector_alpha/data/3dhst/'+field+'_'+sample['runname']
         ascii.write(out['phot'][i], output=outbase+'.cat', 

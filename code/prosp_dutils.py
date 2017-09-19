@@ -400,11 +400,6 @@ def halfmass_assembly_time(sfh_params):
                            args=(sfh_params,0.5),
                            rtol=1.48e-08, maxiter=1000)
     except ValueError:
-        
-        # make error only pop up once
-        import warnings
-        warnings.simplefilter('once', UserWarning)
-
         # big problem
         warnings.warn("You've passed SFH parameters that don't allow t_half to be calculated. Check for bugs.", UserWarning)
         half_time = np.nan
@@ -553,7 +548,7 @@ def generate_basenames(runname,ancilname=None):
         else:
             parm = parbase+'.py'
 
-    elif 'td_' in runname or runname == 'fast_mimic':
+    elif 'td' in runname or runname == 'fast_mimic':
 
         id_list = os.getenv('APPS')+"/prospector_alpha/data/3dhst/"+runname+".ids"
         ids = np.loadtxt(id_list, dtype='|S60',delimiter=',')
@@ -581,8 +576,8 @@ def generate_basenames(runname,ancilname=None):
 
     return filebase,parm,ancilname
 
-def chop_chain(chain,convergence_check_interval=None, convergence_chunks=325,
-               convergence_stable_points_criteria=3, nchop=1.15, weights=None,size=3e5,**extras):
+def chop_chain(chain, convergence_check_interval=None, convergence_chunks=325,
+               convergence_stable_points_criteria=3, nchop=1.15, weights=None, size=3e5,**extras):
     '''
     if we used emcee, either (a) use the final 1/4th of the chain, or (b) use KL divergence convergence criteria
     if we used nestle, sample chain nestle_nsample times according to weights
@@ -1113,7 +1108,7 @@ def measure_agn_luminosity(fagn,sps,mass):
     # tabular or "regular" SSPs
     if np.isscalar(sps.ssp.log_lbol):
         weighted_lbol = 10**sps.ssp.log_lbol
-        lagn = weighted_lbol*fagn[0]*float(constants.L_sun.cgs.value)
+        lagn = weighted_lbol*float(fagn)*constants.L_sun.cgs.value
     else:
         ssp_lbol = np.insert(10**sps.ssp.log_lbol, 0, 10**sps.ssp.log_lbol[0])
         weights = sps.all_ssp_weights
@@ -1135,7 +1130,7 @@ def estimate_xray_lum(sfr):
     sfr_chabrier = 10**(np.log10(sfr)+0.24)
     return 4e39*sfr_chabrier
 
-def measure_restframe_properties(sps, model = None, obs = None, thetas = None, emlines = False,
+def measure_restframe_properties(sps, model = None, thetas = None, emlines = False,
                                  measure_ir = False, measure_luv = False, measure_mir = False,
                                  abslines = False, restframe_optical_photometry = False):
     '''
@@ -1157,18 +1152,20 @@ def measure_restframe_properties(sps, model = None, obs = None, thetas = None, e
     ### save redshift, lumdist
     z      = model.params.get('zred', np.array(0.0))
     lumdist = model.params.get('lumdist', np.array(0.0))
+    nebinspec = model.params.get('nebemlineinspec', True)
     model.params['zred'] = np.array(0.0)
     if lumdist:
         model.params['lumdist'] = np.array(1e-5)
+    if nebinspec == False:
+        model.params['nebemlineinspec'] = True
 
     ### if we want restframe optical photometry, generate fake obs file
     ### else generate NO obs file (don't do extra filter convolutions if not necessary)
+    obs = {'filters': [], 'wavelength': None}
     if restframe_optical_photometry:
         from sedpy.observate import load_filters
         filters = ['bessell_U','bessell_V','twomass_J','bessell_B','bessell_R','twomass_Ks']
-        obs = {'filters': load_filters(filters), 'wavelength': None}
-    else:
-        obs = {'filters': [], 'wavelength': None}
+        obs['filters'] += load_filters(filters)
 
     ### calculate SED. comes out as maggies per Hz, @ 10pc
     spec,mags,sm = model.mean_model(thetas, obs, sps=sps)
@@ -1178,6 +1175,8 @@ def measure_restframe_properties(sps, model = None, obs = None, thetas = None, e
     model.params['zred'] = z
     if lumdist:
         model.params['lumdist'] = lumdist
+    if nebinspec == False:
+        model.params['nebemlineinspec'] = False
 
     ### convert to Lsun / hz
     spec *= dfactor_10pc / constants.L_sun.cgs.value * to_ergs
@@ -1187,17 +1186,14 @@ def measure_restframe_properties(sps, model = None, obs = None, thetas = None, e
     spec_flam = spec * to_flam
 
     ##### do we need a smooth spectrum?
-    if (abslines) or (emlines):
-        smooth_spec = smooth_spectrum(w,spec_flam,250.0,minlam=3e3,maxlam=8e3)
-
-    ##### measure absorption lines and dn4000
-    if abslines:
+    if (abslines):
+        smooth_spec = smooth_spectrum(w,spec_flam,250.0,minlam=3e3,maxlam=7e3)
         out['abslines'] = measure_abslines(w,smooth_spec) # comes out in Lsun and rest-frame EQW
-        out['dn4000'] = measure_Dn4000(w,smooth_spec)
 
     ##### measure emission lines
     if emlines:
-        out['emlines'] = measure_emlines(smooth_spec,sps)
+        out['emlines'] = measure_emlines(spec_flam,sps,enames=emlines)
+    out['dn4000'] = measure_Dn4000(w,spec_flam)
 
     if measure_ir:
         out['lir'] = return_lir(w,spec, z=None, alt_file=None)/constants.L_sun.cgs.value # comes out in ergs/s, convert to Lsun
@@ -1235,7 +1231,7 @@ def measure_Dn4000(lam,flux,ax=None):
 
     return dn4000
 
-def measure_emlines(smooth_spec,sps):
+def measure_emlines(smooth_spec,sps,enames=None):
     """ emission line fluxes are part of SPS output now. this is
     largely present to measure the continuum for EQW calculations
     """
@@ -1246,13 +1242,17 @@ def measure_emlines(smooth_spec,sps):
                      dtype = {'names':('lam','name'),'formats':('f16','S40')})
 
     ### define emission lines
-    lines = np.array(['Hdelta','Hbeta','[OIII]1','[OIII]2','Halpha','[NII]'])
-    fsps_name = np.array(['H delta 4102','H beta 4861','[OIII]4960','[OIII]5007','H alpha 6563','[NII]6585'])
-
-    up   = [(4124.25,4151.00),(4894.625,4910.000),(4970.,4979.),(5025.,5035.),(6590.,6610.),(6590.,6610.)]
-    down = [(4041.6,4081.5),(4817.875,4835.875),(4946.,4955.),(4985.,4995.),(6515.,6540.),(6515.,6540.)]
+    # legacy code compatible
+    if enames is None:
+        lines = np.array(['Hdelta','Hbeta','[OIII]1','[OIII]2','Halpha','[NII]'])
+        fsps_name = np.array(['H delta 4102','H beta 4861','[OIII]4960','[OIII]5007','H alpha 6563','[NII]6585'])
+    else:
+        lines = enames
+        fsps_name = enames
 
     ##### measure emission line flux + EQW
+    fig, ax = plt.subplots(2,3, figsize=(12, 8))
+    ax = ax.ravel()
     out = {}
     for jj in xrange(len(lines)):
 
@@ -1261,21 +1261,9 @@ def measure_emlines(smooth_spec,sps):
         eflux = float(sps.get_nebline_luminosity[idx]*sps.params['mass'].sum())
         elam = float(sps.emline_wavelengths[idx])
 
-        #### measure average flux in specific bands as "continuum"
-        low_cont = (sps.wavelengths > down[jj][0]) & (sps.wavelengths < down[jj][1])
-        high_cont = (sps.wavelengths > up[jj][0]) & (sps.wavelengths < up[jj][1])
-
-        low_flux = np.mean(smooth_spec[low_cont])
-        high_flux = np.mean(smooth_spec[high_cont])
-
-        low_lam = np.mean(down[jj])
-        high_lam = np.mean(up[jj])
-
-        ### draw line between two continuua to define continuum(lambda=lambda_emission_line)
-        m = (high_flux-low_flux)/(high_lam-low_lam)
-        br = high_flux - m*high_lam
-        continuum_flux = m*elam+br
-        eqw = eflux / continuum_flux
+        # simple continuum estimation
+        tidx = np.abs(sps.wavelengths-elam) < 100
+        eqw = eflux/np.median(smooth_spec[tidx])
 
         out[lines[jj]] = {'flux':eflux,'eqw':eqw}
 

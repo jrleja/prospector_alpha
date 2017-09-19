@@ -209,7 +209,7 @@ def calc_extra_quantities(sample_results, ncalc=3000, **kwargs):
         ##### and magnitudes (LIR, LUV)
         if opts['measure_spectral_features']:
             modelout = prosp_dutils.measure_restframe_properties(sps, thetas = thetas,
-                                                        model=sample_results['model'], obs = sample_results['obs'],
+                                                        model=sample_results['model'],
                                                         measure_ir=True, measure_luv=True, measure_mir=True, 
                                                         emlines=True, abslines=True, restframe_optical_photometry = False)
             #### initialize arrays
@@ -236,7 +236,7 @@ def calc_extra_quantities(sample_results, ncalc=3000, **kwargs):
                 nagn_thetas = copy(thetas)
                 nagn_thetas[parnames == 'fagn'] = 0.0
                 modelout = prosp_dutils.measure_restframe_properties(sps, thetas=nagn_thetas,
-                                            model=sample_results['model'], obs=sample_results['obs'],
+                                            model=sample_results['model'],
                                             measure_mir=True)
                 fmir[jj] = (lmir[jj]-modelout['lmir'])/lmir[jj]
 
