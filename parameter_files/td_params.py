@@ -239,7 +239,6 @@ model_params.append({'name': 'mass', 'N': 1,
                      'isfree': False,
                      'depends_on': zfrac_to_masses,
                      'init': 1.,
-                     'prior': priors.LogUniform(mini=1e9, maxi=1e12),
                      'units': r'M$_\odot$',})
 
 model_params.append({'name': 'agebins', 'N': 1,
@@ -274,7 +273,7 @@ model_params.append({'name': 'dust1', 'N': 1,
                         'depends_on': to_dust1,
                         'init': 1.0,
                         'units': '',
-                        'prior': priors.TopHat(mini=0.0, maxi=6.0)})
+                        'prior': None})
 
 model_params.append({'name': 'dust1_fraction', 'N': 1,
                         'isfree': True,
@@ -304,7 +303,7 @@ model_params.append({'name': 'dust1_index', 'N': 1,
                         'isfree': False,
                         'init': -1.0,
                         'units': '',
-                        'prior': priors.TopHat(mini=-1.5, maxi=-0.5)})
+                        'prior': None})
 
 model_params.append({'name': 'dust_tesc', 'N': 1,
                         'isfree': False,
@@ -477,12 +476,12 @@ class MassMet(priors.Prior):
         """
         if len(kwargs) > 0:
             self.update(**kwargs)
-        a, b = self.get_args(x[0])
-        p = self.distribution.pdf(x[1], a, b,
-                                  loc=self.loc(x[0]), scale=self.scale(x[0]))
+        p = np.atleast_2d(np.zeros_like(x))
+        a, b = self.get_args(x[...,0])
+        p[...,1] = self.distribution.pdf(x[...,1], a, b, loc=self.loc(x[...,0]), scale=self.scale(x[...,0]))
         with np.errstate(invalid='ignore'):
-            lnp = np.log(p)
-        return lnp
+            p[...,1] = np.log(p[...,1])
+        return p
 
     def sample(self, nsample=None, **kwargs):
         """Draw a sample from the prior distribution.
