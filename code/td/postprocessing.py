@@ -42,9 +42,9 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000,
     print 'Best-fit lnprob currently: {0}'.format(current_maxprob[0])
     print 'Best-fit lnprob during sampling: {0}'.format(res['lnprobability'].argmax())
 
-    # calculate down the chain in dynesty weights
+    # randomly choose from the chain, weighted by dynesty weights
     # make sure the first one is the maximum probability model (so we're cheating a bit!)
-    # don't do replacement, we can use weights to get likelihoods at the end
+    # don't do replacement, we can use weights to rebuild PDFs
     nsample = res['chain'].shape[0]
     sample_idx = np.random.choice(np.arange(nsample), size=ncalc, p=res['weights'], replace=False)
     if amax in sample_idx:
@@ -171,20 +171,24 @@ def post_processing(param_name, objname=None, **kwargs):
     # I/O
     res, powell_results, model, _ = load_prospector_data(obj_outfile,hdf5=True,load_extra_output=False)
 
+    # make filenames local...
     print 'Performing post-processing on ' + objname
-    res['model'] = pfile.load_model(**res['run_params'])
+    for key in res['run_params']:
+        if type(res['run_params'][key]) == unicode:
+            if 'prospector_alpha' in res['run_params'][key]:
+                res['run_params'][key] = os.getenv('APPS')+'/prospector_alpha'+res['run_params'][key].split('prospector_alpha')[-1]
     sps = pfile.load_sps(**res['run_params'])
     obs = pfile.load_obs(**res['run_params'])
 
     # sample from chain
     extra_output = calc_extra_quantities(res,sps,obs,**kwargs)
     
-    ### create post-processing name, dump info
+    # create post-processing name, dump info
     _, _, extra_filename = create_prosp_filename(obj_outfile)
     hickle.dump(extra_output,open(extra_filename, "w"))
 
-    ### MAKE PLOTS HERE
-    td_standard_plots.make_all_plots(filebase=outname,outfolder=outfolder)
+    # make standard plots
+    prosp_dynesty_plots.make_all_plots(filebase=obj_outfile,outfolder=outfolder)
 
 def str2bool(v):
     if v.lower() in ('yes', 'true', 't', 'y', '1'):
