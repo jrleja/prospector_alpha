@@ -34,7 +34,7 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000,
     # calculate maxprob
     # and ensure that maxprob stored is the same as calculated now 
     # don't recalculate lnprobability after we fix MassMet
-    #res['lnprobability'] = res['lnlikelihood'] + res['model'].prior_product(res['chain'])
+    res['lnprobability'] = res['lnlikelihood'] + res['model'].prior_product(res['chain'])
     amax = res['lnprobability'].argmax()
     current_maxprob = prosp_dutils.test_likelihood(sps, res['model'], res['obs'], 
                                                    res['chain'][amax], 
