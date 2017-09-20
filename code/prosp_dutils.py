@@ -1251,8 +1251,6 @@ def measure_emlines(smooth_spec,sps,enames=None):
         fsps_name = enames
 
     ##### measure emission line flux + EQW
-    fig, ax = plt.subplots(2,3, figsize=(12, 8))
-    ax = ax.ravel()
     out = {}
     for jj in xrange(len(lines)):
 
