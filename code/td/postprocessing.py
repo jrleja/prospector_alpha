@@ -201,10 +201,7 @@ if __name__ == "__main__":
     ### don't create keyword if not passed in!
     parser = argparse.ArgumentParser(argument_default=argparse.SUPPRESS)
     parser.add_argument('parfile', type=str)
-    parser.add_argument('--outname')
-    parser.add_argument('--measure_spectral_features',type=str2bool)
-    parser.add_argument('--mags_nodust',type=str2bool)
-    parser.add_argument('--ir_priors',type=str2bool)
+    parser.add_argument('--objname')
     parser.add_argument('--ncalc',type=int)
 
     args = vars(parser.parse_args())

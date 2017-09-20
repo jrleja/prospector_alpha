@@ -21,6 +21,6 @@
 IDFILE=$APPS"/prospector_alpha/data/3dhst/td.ids"
 OBJID=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$IDFILE")
 
-python $APPS/prospector_alpha/code/extra_output.py \
+python $APPS/prospector_alpha/code/td/postprocessing.py \
 $APPS/prospector_alpha/parameter_files/td_params.py \
---outname="$APPS"/prospector_alpha/results/td/"$OBJID"
+--objname="$OBJID"

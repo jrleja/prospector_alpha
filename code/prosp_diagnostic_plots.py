@@ -491,7 +491,7 @@ def sed_figure(outname = None,
                       markeredgecolor='k',**kwargs)
         
         res.plot(wave_eff, chi, color=colors[i],
-                 marker='o', linestyle=' ', label=labels[i], 
+                 marker='o', linestyle=' ', label=labels[i], markeredgecolor='k'
                  ms=ms,alpha=alpha,markeredgewidth=0.7,**kwargs)        
 
         ###### spectra for q50 + 5th, 95th percentile
@@ -499,7 +499,9 @@ def sed_figure(outname = None,
         spec_pdf = np.zeros(shape=(len(w),3))
 
         for jj in xrange(len(w)): spec_pdf[jj,:] = np.percentile(extra_output[i]['observables']['spec'][jj,:],[5.0,50.0,95.0])
-        
+        for pp in range(spec_pdf.shape[1]):
+            spec_pdf[:,pp] = prosp_dutils.smooth_spectrum(modlam*1e4,spec_pdf[:,pp],200,minlam=1e3,maxlam=1e5)
+
         sfactor = 3e18/w
         if ergs_s_cm:
             sfactor *= 3631*1e-23
