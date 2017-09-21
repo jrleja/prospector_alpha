@@ -27,7 +27,6 @@ run_params = {'verbose':True,
               'nested_bound': 'multi', # bounding method
               'nested_sample': 'unif', # sampling method
               'nested_bootstrap': 10, # how much bootstrapping? tone down a bit
-              'nested_update_interval': 500, # how many calls between updating the ellipses
               'nested_nlive_batch': 200, # size of live point "batches"
               'nested_nlive_init': 100, # number of initial live points
               'nested_weight_kwargs': {'pfrac': 1.0}, # weight posterior over evidence by 100%

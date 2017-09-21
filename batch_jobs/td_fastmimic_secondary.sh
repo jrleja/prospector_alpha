@@ -18,7 +18,7 @@
 ### mail
 #SBATCH --mail-type=END
 #SBATCH --mail-user=joel.leja@gmail.com
-IDFILE=$APPS"/prospector_alpha/data/3dhst/td_fastmimic.ids"
+IDFILE=$APPS"/prospector_alpha/data/3dhst/td.ids"
 OBJID=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$IDFILE")
 
 python $APPS/prospector_alpha/code/td_fastmimic/postprocessing.py \
