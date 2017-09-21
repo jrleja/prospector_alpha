@@ -188,8 +188,14 @@ def post_processing(param_name, objname=None, **kwargs):
     hickle.dump(extra_output,open(extra_filename, "w"))
 
     # make standard plots
-    prosp_dynesty_plots.make_all_plots(filebase=obj_outfile,outfolder=outfolder)
+    prosp_dynesty_plots.make_all_plots(filebase=obj_outfile,outfolder=plot_outfolder)
 
+
+def do_all(param_name=None,runname=None,**kwargs):
+    ids = np.genfromtxt('/Users/joel/code/python/prospector_alpha/data/3dhst/'+runname+'.ids',dtype=str)
+    for id in ids:
+        post_processing(param_name, objname=id, **kwargs)
+        
 def str2bool(v):
     if v.lower() in ('yes', 'true', 't', 'y', '1'):
         return True

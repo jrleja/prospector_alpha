@@ -1,23 +1,14 @@
 import numpy as np
 import os, fsps, sys, copy
-try:
-    import matplotlib.pyplot as plt
-except:
-    pass
 from prospect.models import model_setup
 from scipy.interpolate import interp1d
 from scipy.integrate import simps
 from astropy import constants
 
-def return_lir(lam,spec,z=None,alt_file=None):
-
-    # integrates input over wavelength
-    # input must be Lsun / hz
-    # returns erg/s
-
-    # fake LIR filter
-    # 8-1000 microns
-    # note that lam must be in angstroms
+def return_lir(lam,spec,z=None):
+    """ returns IR luminosity (8-1000 microns) in erg/s
+    input spectrum must be Lsun/Hz, wavelength in \AA
+    """
     botlam = np.atleast_1d(8e4-1)
     toplam = np.atleast_1d(1000e4+1)
     edgetrans = np.atleast_1d(0)
@@ -29,15 +20,10 @@ def return_lir(lam,spec,z=None,alt_file=None):
 
     return lir
 
-def return_luv(lam,spec,z=None,alt_file=None):
-
-    # integrates input over wavelength
-    # input must be Lsun / hz
-    # returns erg/s
-
-    # fake LUV filter
-    # over 1216-3000 angstroms
-    # note that lam must be in angstroms
+def return_luv(lam,spec,z=None):
+    """ returns UV luminosity (1216-3000 \AA) in erg/s
+    input spectrum must be Lsun/Hz, wavelength in \AA
+    """
     botlam = np.atleast_1d(1216)
     toplam = np.atleast_1d(3000)
     edgetrans = np.atleast_1d(0)
@@ -45,19 +31,15 @@ def return_luv(lam,spec,z=None,alt_file=None):
                    [np.concatenate((edgetrans,np.ones(100),edgetrans))]]
 
     # calculate integral
-    _,luv     = integrate_mag(lam,spec,luv_filter, z=z, alt_file=alt_file) # comes out in ergs/s
+    _,luv     = integrate_mag(lam,spec,luv_filter, z=z) # comes out in ergs/s
 
     return luv
 
 
-def return_lmir(lam,spec,z=None,alt_file=None):
-
-    # integrates input over wavelength
-    # input must be Lsun / hz
-    # returns erg/s
-
-    # over 4-20um
-    # note that lam must be in angstroms
+def return_lmir(lam,spec,z=None):
+    """ returns MIR luminosity (4-20 microns) in erg/s
+    input spectrum must be Lsun/Hz, wavelength in \AA
+    """
     botlam = np.atleast_1d(4e4-1)
     toplam = np.atleast_1d(20e4+1)
     edgetrans = np.atleast_1d(0)
@@ -65,15 +47,13 @@ def return_lmir(lam,spec,z=None,alt_file=None):
                    [np.concatenate((edgetrans,np.ones(100),edgetrans))]]
 
     # calculate integral
-    _,luv     = integrate_mag(lam,spec,luv_filter, z=z, alt_file=alt_file) # comes out in ergs/s
+    _,luv     = integrate_mag(lam,spec,luv_filter, z=z) # comes out in ergs/s
 
     return luv
 
 def sfr_uvir(lir,luv):
-
-    # inputs in Lsun
-    # from Whitaker+14
-    # output is Msun/yr, in Chabrier IMF
+    """inputs in Lsun. Calculates UV+IR SFR from Whitaker+14
+    output is Msun/yr, in Chabrier IMF"""
     return 1.09e-10*(lir + 2.2*luv)
 
 def smooth_spectrum(lam,spec,sigma,
@@ -411,77 +391,6 @@ def halfmass_assembly_time(sfh_params):
 
     return tgal-half_time
 
-def load_truths(param_file,model=None,sps=None,obs=None, calc_prob = True):
-
-    '''
-    loads truths, generates useful information
-    will load sps, model, obs, etc if not passed!
-    '''
-
-    # load necessary machinery
-    run_params = model_setup.get_run_params(param_file=param_file)
-    if sps is None:
-        sps = model_setup.load_sps(**run_params)
-    if model is None:
-        model = model_setup.load_model(**run_params)
-    if obs is None:
-        obs = model_setup.load_obs(**run_params)
-
-    # load truths
-    with open(run_params['truename'], 'r') as f:
-        hdr = f.readline().split()[1:]
-    truth = np.loadtxt(run_params['truename'], comments = '#',
-                       dtype = np.dtype([(n, np.float) for n in hdr]))
-
-    truths = np.array([x for x in truth[int(run_params['objname'])-1]])
-    parnames = np.array(hdr)
-
-    # SFH parameters
-    sfh_params = find_sfh_params(model,truths,obs,sps)
-    deltat=0.1
-    sfr_10  = np.log10(calculate_sfr(sfh_params,0.01))
-    ssfr_10 = np.log10(10**sfr_10 / sfh_params['mass'].sum())
-    sfr_100  = np.log10(calculate_sfr(sfh_params,deltat))
-    ssfr_100 = np.log10(calculate_sfr(sfh_params,deltat) / sfh_params['mass'].sum())
-    totmass = sfh_params['mass'].sum()
-    halftime = halfmass_assembly_time(sfh_params)
-    if calc_prob == True:
-        lnprob   = test_likelihood(sps,model,obs,truths,param_file)
-
-    modelout = measure_restframe_properties(sps, thetas = truths,
-                                            model=model, obs = obs,
-                                            measure_ir=True)
-    emnames = np.array(modelout['emlines'].keys())
-    emflux = np.array([modelout['emlines'][line]['flux'] for line in emnames])
-    absnames = np.array(modelout['abslines'].keys())
-    abseqw = np.array([modelout['abslines'][line]['eqw'] for line in absnames])
-    dn4000 = modelout['dn4000']
-    lir = modelout['lir']
-    
-    #### parameter conversions for plotting
-    plot_truths = truths+0.0
-    for kk in xrange(len(parnames)):
-        if 'mass' in parnames[kk] and 'log' not in parnames[kk]:
-            plot_truths[kk] = np.log10(plot_truths[kk])
-
-    truths_dict = {'parnames':parnames,
-                   'truths':truths,
-                   'plot_truths':plot_truths,
-                   'extra_parnames':np.array(['sfr_10','ssfr_10','sfr_100','ssfr_100','half_time','totmass']),
-                   'extra_truths':np.array([sfr_10,ssfr_10,sfr_100,ssfr_100,halftime,totmass]),
-                   'sfh_params': sfh_params,
-                   'emnames':emnames,
-                   'emflux':emflux,
-                   'absnames':absnames,
-                   'abseqw':abseqw,
-                   'dn4000':dn4000,
-                   'lir':lir}
-
-    if calc_prob == True:
-        truths_dict['truthprob'] = lnprob
-
-    return truths_dict
-
 def running_median(x,y,nbins=10,avg=False,weights=None,bins=None):
 
     if bins is None:
@@ -629,7 +538,6 @@ def gas_met(nii_ha,oiii_hb):
     #       c0: 0.1549  c1: -1.5031 c2: -0.9790 c3: -0.0297 [OIII 5007 / Hbeta] 
     #       log R = c0 + c1 x + c2 x**2 + c3 x**3 + c4 x**4
 
-
     #### find solutions
     c1 = [-0.7732 - np.log10(nii_ha), 1.2357, -0.2811, -0.7201, -0.3330]
     c2 = [0.1549 - np.log10(oiii_hb), -1.5031, -0.9790, -0.0297]
@@ -655,13 +563,11 @@ def gas_met(nii_ha,oiii_hb):
     #return (closest+closest_niiha)/2.
 
 def equalize_axes(ax, x,y, dynrange=0.1, line_of_equality=True, axlims=None, log_in_linear=False):
-    
-    ''' 
-    sets up an equal x and y range that encompasses all of the data
-    if line_of_equality, add a diagonal line of equality 
-    dynrange represents the percent of the data range above and below which
-    the plot limits are set
-    '''
+    """ defines a plot range that encompasses all of the data
+    line_of_equality: add a dashed diagonal line of equality 
+    dynrange: the percent of the data range above and below which the plot limits are set
+    log_in_linear: we are passed LOG variables but want ranges in LINEAR space
+    """
 
     dynx, dyny = (np.nanmax(x)-np.nanmin(x))*dynrange,\
                  (np.nanmax(y)-np.nanmin(y))*dynrange
@@ -691,11 +597,10 @@ def equalize_axes(ax, x,y, dynrange=0.1, line_of_equality=True, axlims=None, log
     return ax
 
 def integral_average(x,y,x0,x1):
-    '''
-    to do a definite integral over a given x,y array
+    """to do a definite integral over a given x,y array
     you have to redefine the x,y array to only exist over
     the relevant range
-    ''' 
+    """
 
     xarr_new = np.linspace(x0, x1, 40)
     bad = xarr_new == 0.0
@@ -708,7 +613,6 @@ def integral_average(x,y,x0,x1):
     I1 = integrate.simps(yarr_new, xarr_new) / (x1 - x0)
 
     return I1
-
 
 def create_prosp_filename(filebase):
 
@@ -733,7 +637,7 @@ def create_prosp_filename(filebase):
 def av_to_dust2(av):
     return av/1.086
 
-def integrate_mag(spec_lam,spectra,filter, z=None, alt_file='/Users/joel/code/python/prospector_alpha/filters/allfilters_threedhst.dat'):
+def integrate_mag(spec_lam,spectra,filter, z=None):
 
     '''
     borrowed from calc_ml
@@ -748,12 +652,8 @@ def integrate_mag(spec_lam,spectra,filter, z=None, alt_file='/Users/joel/code/py
             NOTE: if redshift is specified, INSTEAD RETURN apparent magnitude and flux [erg/s/cm^2]
     '''
 
-    if type(filter) == str:
-        resp_lam, res = load_filter_response(filter, 
-                                             alt_file=alt_file)
-    else:
-        resp_lam = filter[0][0]
-        res      = filter[1][0]
+    resp_lam = filter[0][0]
+    res      = filter[1][0]
 
     # physical units, in CGS
     pc2cm = 3.08568E18
@@ -1196,11 +1096,11 @@ def measure_restframe_properties(sps, model = None, thetas = None, emlines = Fal
     out['dn4000'] = measure_Dn4000(w,spec_flam)
 
     if measure_ir:
-        out['lir'] = return_lir(w,spec, z=None, alt_file=None)/constants.L_sun.cgs.value # comes out in ergs/s, convert to Lsun
+        out['lir'] = return_lir(w,spec, z=None)/constants.L_sun.cgs.value # comes out in ergs/s, convert to Lsun
     if measure_luv:
-        out['luv'] = return_luv(w,spec, z=None, alt_file=None)/constants.L_sun.cgs.value # comes out in ergs/s, convert to Lsun
+        out['luv'] = return_luv(w,spec, z=None)/constants.L_sun.cgs.value # comes out in ergs/s, convert to Lsun
     if measure_mir:
-        out['lmir'] = return_lmir(w,spec, z=None, alt_file=None)/constants.L_sun.cgs.value # comes out in ergs/s, convert to Lsun
+        out['lmir'] = return_lmir(w,spec, z=None)/constants.L_sun.cgs.value # comes out in ergs/s, convert to Lsun
     if restframe_optical_photometry:
         out['mags'] = mags
         out['photname'] = np.array(filters)
@@ -1208,10 +1108,10 @@ def measure_restframe_properties(sps, model = None, thetas = None, emlines = Fal
     return out
 
 def measure_Dn4000(lam,flux,ax=None):
-    ''' defined as average flux ratio between
+    """ defined as average flux ratio between
     [4050,4250] and [3750,3950] (Bruzual 1983; Hamilton 1985)
     blue: 3850-3950 . . . 4000-4100 (Balogh 1999)
-    '''
+    """
     blue = (lam > 3850) & (lam < 3950)
     red  = (lam > 4000) & (lam < 4100)
     dn4000 = np.mean(flux[red])/np.mean(flux[blue])
@@ -1299,6 +1199,7 @@ def measure_abslines(lam,flux,plot=False, alt_plot=False):
     # if we want to plot but don't have fig + ax set up, set them up
     # else if we have them, unpack them
     if plot == True:
+        import matplotlib.pyplot as plt
         fig, ax = plt.subplots(2,3, figsize = (18.75,12))
         ax = np.ravel(ax)
     elif plot is not False:

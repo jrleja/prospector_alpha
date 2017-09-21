@@ -270,7 +270,6 @@ for param in model_params:
 model_params = tparams
 
 def load_sps(**extras):
-
     sps = CSPBasis(**extras)
     return sps
 
