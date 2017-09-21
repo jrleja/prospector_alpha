@@ -219,7 +219,7 @@ def sed_figure(outname = None,
 
     # set up plot
     ms, alpha, fs, ticksize = 5, 0.8, 16, 12
-    textx, texty, deltay = 0.02, .95, .04
+    textx, texty, deltay = 0.02, .95, .05
     fig = plt.figure()
     gs = gridspec.GridSpec(2,1, height_ratios=[3,1])
     gs.update(hspace=0)
@@ -313,8 +313,8 @@ def sed_figure(outname = None,
     # add in arrows for negative fluxes
     if pflux.sum() != len(obsmags):
         downarrow = [u'\u2193']
-        y0 = 10**((np.log10(ymax) - np.log10(ymin))/20.)*ymin[0]
-        for x0 in xplot[~positive_flux]: phot.plot(x0, y0, linestyle='none',marker=u'$\u2193$',markersize=16,alpha=alpha,mew=0.0,color=obs_color)
+        y0 = 10**((np.log10(ymax) - np.log10(ymin))/20.)*ymin
+        for x0 in phot_wave_eff[~pflux]: phot.plot(x0, y0, linestyle='none',marker=u'$\u2193$',markersize=16,alpha=alpha,mew=0.0,color=obs_color)
     phot.set_ylim(ymin, ymax)
     resid_ymax = np.abs(resid.get_ylim()).max()
     resid.set_ylim(-resid_ymax,resid_ymax)

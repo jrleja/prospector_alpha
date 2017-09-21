@@ -21,10 +21,10 @@ def load_alldata(runname,filename,regenerate=False):
             # prospector first
             try:
                 prosp = load_prospector_extra(name)
-            except TypeError:
+            except (IOError, TypeError):
                 print name.split('/')[-1]+' failed to load. skipping.'
                 continue
-            dat = {'quantiles':prosp['quantiles'],'extras':prosp['extras']}
+            dat = {'thetas':prosp['thetas'],'extras':prosp['extras']}
             alldata.append(dat)
         pickle.dump(alldata,open(filename, "w"))
     else:
@@ -35,17 +35,17 @@ def load_alldata(runname,filename,regenerate=False):
 def arrange_data(alldata):
 
     ### normal parameter labels
-    parnames_all = alldata[0]['quantiles']['parnames']
+    parnames_all = alldata[0]['thetas'].keys()
     parnames = [par for par in parnames_all if 'z_fraction' not in par]
 
     ### extra parameters
-    eparnames_all = alldata[0]['extras']['parnames']
+    eparnames_all = alldata[0]['extras'].keys()
     eparnames = ['sfr_100', 'ssfr_100', 'half_time']
 
     parlabels = {
-                 'logmass':r'log(M/M$_{\odot}$)', 
+                 'massmet_1':r'log(M/M$_{\odot}$)', 
                  'dust2': r'diffuse dust', 
-                 'logzsol': r'log(Z/Z$_{\odot}$)', 
+                 'massmet_2': r'log(Z/Z$_{\odot}$)', 
                  'dust_index': r'diffuse dust index',
                  'dust1_fraction': r'(diffuse/young) dust', 
                  'duste_qpah': r'Q$_{\mathrm{PAH}}$',
@@ -69,18 +69,16 @@ def arrange_data(alldata):
 
     ### fill with data
     for dat in alldata:
-        for ii,par in enumerate(parnames):
-            match = parnames_all == par
+        for par in parnames:
             if par == 'fagn':
-                for q in outq[par].keys(): outq[par][q].append(np.log10(dat['quantiles'][q][match]))
-                outvals[par].append(np.log10(dat['quantiles']['q50'][match]))
+                for q in outq[par].keys(): outq[par][q].append(np.log10(dat['thetas'][par][q]))
+                outvals[par].append(np.log10(dat['thetas'][par]['q50']))
             else:
-                for q in outq[par].keys(): outq[par][q].append(dat['quantiles'][q][match])
-                outvals[par].append(dat['quantiles']['q50'][match])
+                for q in outq[par].keys(): outq[par][q].append(dat['thetas'][par][q])
+                outvals[par].append(dat['thetas'][par]['q50'])
         for par in eparnames:
-            match = eparnames_all == par
-            for q in outq[par].keys(): outq[par][q].append(np.log10(dat['extras'][q][match][0]))
-            outvals[par].append(np.log10(dat['extras']['q50'][match][0]))
+            for q in outq[par].keys(): outq[par][q].append(np.log10(dat['extras'][par][q]))
+            outvals[par].append(np.log10(dat['extras'][par]['q50']))
 
     ### do the errors
     for par in parlabels.keys():
@@ -124,24 +122,14 @@ def allpar_plot(runname='td_massive',outfolder=None,lowmet=True,regenerate=False
            }
     hopts = copy.deepcopy(opts)
     hopts['color'] = '#FF420E'
-    outname = outfolder+'all_parameter.png'
 
     ### color low-metallicity, high-mass galaxies
-    # hijack Herschel flag
-    if lowmet:
-        parnames = alldata[0]['quantiles']['parnames']
-        met_idx = parnames == 'logzsol'
-        mass_idx = parnames == 'logmass'
-        met_q50 = np.array([data['quantiles']['q50'][met_idx][0] for data in alldata])
-        mass_q50 = np.array([data['quantiles']['q50'][mass_idx][0] for data in alldata])
+    met_q50 = np.array([data['thetas']['massmet_2']['q50'] for data in alldata])
+    mass_q50 = np.array([data['thetas']['massmet_1']['q50'] for data in alldata])
+    hflag = (met_q50 < -1.0) & (mass_q50 > 9.5)
+    outname = outfolder+'all_parameter.png'
 
-        hflag = (met_q50 < -1.0) & (mass_q50 > 9.5)
-
-        outname = outfolder+'all_parameter_lowmet.png'
-
-    else:
-        hflag = np.ones_like(alldata[0]['quantiles']['q50'])
-
+    # plot
     for yy, ypar in enumerate(dat['ordered_labels']):
         for xx, xpar in enumerate(dat['ordered_labels']):
 

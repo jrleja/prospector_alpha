@@ -1,10 +1,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import os, hickle, td_io
-from prosp_dutils import generate_basenames,av_to_dust2,asym_errors,equalize_axes,offset_and_scatter,exp_decl_sfh_half_time
+from prosp_dutils import generate_basenames,av_to_dust2,asym_errors,equalize_axes,offset_and_scatter,exp_decl_sfh_half_time,sfr_uvir
 from matplotlib.ticker import FormatStrFormatter
 from prospector_io import load_prospector_extra
 from astropy.cosmology import WMAP9
+from dynesty.plotting import _quantile as weighted_quantile
 plt.ioff()
 
 popts = {'fmt':'o', 'capthick':1.5,'elinewidth':1.5,'ms':9,'alpha':0.8,'color':'0.3','markeredgecolor':'k'}
@@ -29,28 +30,26 @@ def collate_data(runname, runname_fast, filename=None, regenerate=False):
                  r'diffuse dust optical depth', r'log(sSFR) [yr$^-1$]',
                  r"t$_{\mathrm{half-mass}}$ [Gyr]", r'log(Z/Z$_{\odot}$)', r'Q$_{\mathrm{PAH}}$',
                  r'f$_{\mathrm{AGN}}$', 'dust index']
-    pnames = ['stellar_mass','sfr_100','dust2','ssfr_100','half_time','massmet_2', 'duste_qpah', 'fagn', 'dust_index']
-    source = ['FAST', 'FAST', 'FAST', 'FAST', 'FAST']
+    fnames = ['stellar_mass','sfr_100','dust2','ssfr_100','half_time'] # take for fastmimic too
+    pnames = fnames+['massmet_2', 'duste_qpah', 'fagn', 'dust_index'] # already calculated in Prospector
+    enames = ['model_uvir_sfr', 'model_uvir_ssfr', 'sfr_ratio'] # must calculate here
     outprosp, outprosp_fast, outfast, outlabels = {},{},{},{}
-    sfr_100_uvir = []
+    sfr_100_uvir, sfr_100_uv, sfr_100_ir = [], [], []
     outfast['z'] = []
-    for i,par in enumerate(parlabels):
+    for i,par in enumerate(pnames+enames):
         
         ### look for it in FAST
-        try:
-            x = source[i]
-            outfast[pnames[i]] = []
-        except IndexError:
-            pass
+        if par in fnames:
+            outfast[par] = []
 
         ### if it's in FAST, it's in Prospector-FAST
-        if pnames[i] in outfast.keys():
-            outprosp_fast[pnames[i]] = {}
-            outprosp_fast[pnames[i]]['q50'],outprosp_fast[pnames[i]]['q84'],outprosp_fast[pnames[i]]['q16'] = [],[],[]
+        if par in outfast.keys():
+            outprosp_fast[par] = {}
+            outprosp_fast[par]['q50'],outprosp_fast[par]['q84'],outprosp_fast[par]['q16'] = [],[],[]
 
         ### it's always in Prospector
-        outprosp[pnames[i]] = {}
-        outprosp[pnames[i]]['q50'],outprosp[pnames[i]]['q84'],outprosp[pnames[i]]['q16'] = [],[],[]
+        outprosp[par] = {}
+        outprosp[par]['q50'],outprosp[par]['q84'],outprosp[par]['q16'] = [],[],[]
     
     ### fill output containers
     basenames, _, _ = generate_basenames(runname)
@@ -85,11 +84,19 @@ def collate_data(runname, runname_fast, filename=None, regenerate=False):
             
             ### fill it up
             for q in ['q16','q50','q84']:
-
                 x = prosp[loc][par][q]
                 if par == 'stellar_mass' or par == 'ssfr_100':
                     x = np.log10(x)
                 outprosp[par][q].append(x)
+        
+        # a little extra
+        uvir_chain = sfr_uvir(prosp['extras']['lir']['chain'],prosp['extras']['luv']['chain'])
+        for q in ['q16','q50','q84']: 
+            outprosp['model_uvir_sfr'][q] += [weighted_quantile(uvir_chain, np.array([float(q[1:])/100.]),weights=prosp['weights'])[0]]
+            outprosp['model_uvir_ssfr'][q] += [weighted_quantile(uvir_chain/prosp['extras']['stellar_mass']['chain'], 
+                                                               np.array([float(q[1:])/100.]),weights=prosp['weights'])[0]]
+            outprosp['sfr_ratio'][q] += [weighted_quantile(np.log10(uvir_chain/prosp['extras']['sfr_100']['chain']), 
+                                                         np.array([float(q[1:])/100.]),weights=prosp['weights'])[0]]
 
         ### prospector-fast
         if runname_fast is not None:
@@ -109,7 +116,7 @@ def collate_data(runname, runname_fast, filename=None, regenerate=False):
                     if par == 'stellar_mass' or par == 'ssfr_100':
                         x = np.log10(x)
                     outprosp_fast[par][q].append(x)
-
+        
         ### now FAST, UV+IR SFRs
         # find correct field, find ID match
         fidx = allfields.index(field[i])
@@ -125,6 +132,8 @@ def collate_data(runname, runname_fast, filename=None, regenerate=False):
         outfast['half_time'] += [exp_decl_sfh_half_time(10**fast['lage'][f_idx][0],10**fast['ltau'][f_idx][0])/1e9]
         outfast['z'] += [fast['z'][f_idx][0]]
         sfr_100_uvir += [uvir['sfr'][u_idx][0]]
+        sfr_100_ir += [uvir['sfr_IR'][u_idx][0]]
+        sfr_100_uv += [uvir['sfr_UV'][u_idx][0]]
 
     ### turn everything into numpy arrays
     for k1 in outprosp.keys():
@@ -141,7 +150,9 @@ def collate_data(runname, runname_fast, filename=None, regenerate=False):
            'prosp_fast': outprosp_fast,
            'labels':np.array(parlabels),
            'pnames':np.array(pnames),
-           'uv_ir_sfr': np.array(sfr_100_uvir)
+           'uvir_sfr': np.array(sfr_100_uvir),
+           'ir_sfr': np.array(sfr_100_ir),
+           'uv_sfr': np.array(sfr_100_uv)
           }
 
     ### dump files and return
@@ -167,11 +178,12 @@ def do_all(runname='td_massive', runname_fast='fast_mimic',outfolder=None,**opts
         fast_comparison(data['fast'],data['prosp'],data['labels'],data['pnames'],outfolder+'fast_to_palpha_comparison.png')
 
     prospector_versus_z(data,outfolder+'prospector_versus_z.png')
-    uvir_comparison(data,outfolder+'uvir_comparison.png')
+    uvir_comparison(data,outfolder+'uvir_comparison')
+    uvir_comparison(data,outfolder+'uvir_comparison_model', model_uvir = True)
 
 def fast_comparison(fast,prosp,parlabels,pnames,outname):
     
-    fig, axes = plt.subplots(2, 2, figsize = (10,10))
+    fig, axes = plt.subplots(2, 2, figsize = (6,6))
     axes = np.ravel(axes)
 
     for i,par in enumerate(['stellar_mass','sfr_100','dust2','half_time']):
@@ -241,7 +253,7 @@ def fast_comparison(fast,prosp,parlabels,pnames,outname):
 
 def prospector_versus_z(data,outname):
     
-    fig, axes = plt.subplots(2, 3, figsize = (15,10))
+    fig, axes = plt.subplots(2, 3, figsize = (10,6.66))
     axes = np.ravel(axes)
 
     toplot = ['stellar_mass','sfr_100','ssfr_100','half_time','massmet_2','dust2']
@@ -282,17 +294,17 @@ def prospector_versus_z(data,outname):
     plt.savefig(outname,dpi=dpi)
     plt.close()
 
-def uvir_comparison(data, outname):
+def uvir_comparison(data, outname, model_uvir = False):
     """ plot sSFR_prosp versus sSFR_UVIR against a variety of variables
     what drives the differences?
+    model_uvir: instead of using LIR + LUV from observations + templates,
+    calculate directly from Prospector model
     """
 
     # load up data
     sfr_prosp, sfr_prosp_up, sfr_prosp_down = data['prosp']['sfr_100']['q50'], data['prosp']['sfr_100']['q84'], data['prosp']['sfr_100']['q16']
     ssfr_prosp, ssfr_prosp_up, ssfr_prosp_down = 10**data['prosp']['ssfr_100']['q50'], 10**data['prosp']['ssfr_100']['q84'], 10**data['prosp']['ssfr_100']['q16']
-    sfr_uvir = data['uv_ir_sfr']
 
-    mass = 10**data['prosp']['stellar_mass']['q50']
     logzsol = data['prosp']['massmet_2']['q50']
     halftime = data['prosp']['half_time']['q50']
 
@@ -303,14 +315,26 @@ def uvir_comparison(data, outname):
     sfr_prosp = np.clip(sfr_prosp,minssfr,np.inf)
     sfr_prosp_up = np.clip(sfr_prosp_up,minssfr,np.inf)
     sfr_prosp_down = np.clip(sfr_prosp_down,minssfr,np.inf)
-    sfr_uvir = np.clip(sfr_uvir,minssfr,np.inf)
 
     ssfr_prosp = np.clip(ssfr_prosp,minssfr,np.inf)
     ssfr_prosp_up = np.clip(ssfr_prosp_up,minssfr,np.inf)
     ssfr_prosp_down = np.clip(ssfr_prosp_down,minssfr,np.inf)
-    ssfr_uvir = np.clip(sfr_uvir/mass,minssfr,np.inf)
 
-    sfr_ratio, sfr_ratio_up, sfr_ratio_down = np.log10(sfr_prosp/sfr_uvir), np.log10(sfr_prosp_up/sfr_uvir), np.log10(sfr_prosp_down/sfr_uvir)
+    # calculate UV_IR SFRs, and ratios
+    # different if we use model or observed UVIR SFRs
+    if model_uvir == False:
+        ssfr_uvir = np.clip(data['uvir_sfr']/10**data['prosp']['stellar_mass']['q50'],minssfr,np.inf)
+        sfr_uvir = np.clip(data['uvir_sfr'],minsfr,np.inf)
+        ssfr_uvir_err, sfr_uvir_err = None, None
+        sfr_ratio, sfr_ratio_up, sfr_ratio_down = np.log10(sfr_prosp/sfr_uvir), np.log10(sfr_prosp_up/sfr_uvir), np.log10(sfr_prosp_down/sfr_uvir)
+        ssfr_label = 'sSFR$_{\mathrm{UVIR,obs}}$'
+    else:
+        sfr_uvir = data['prosp']['model_uvir_sfr']['q50']
+        sfr_uvir_err = asym_errors(sfr_uvir,data['prosp']['model_uvir_sfr']['q84'], data['prosp']['model_uvir_sfr']['q16'])
+        ssfr_uvir = data['prosp']['model_uvir_ssfr']['q50']
+        ssfr_uvir_err = asym_errors(ssfr_uvir,data['prosp']['model_uvir_ssfr']['q84'], data['prosp']['model_uvir_ssfr']['q16'])
+        sfr_ratio, sfr_ratio_up, sfr_ratio_down = data['prosp']['sfr_ratio']['q50'], data['prosp']['sfr_ratio']['q84'], data['prosp']['sfr_ratio']['q16']
+        ssfr_label = 'sSFR$_{\mathrm{UVIR,mod}}$'
 
     # errors
     # also define flag where minimum was enforced 
@@ -325,15 +349,15 @@ def uvir_comparison(data, outname):
 
     # plot geometry
     if qpah.sum() != 0:
-        fig, ax = plt.subplots(2, 2, figsize = (10,9.2))
+        fig, ax = plt.subplots(2, 2, figsize = (7,6.5))
     else:
         fig, ax = plt.subplots(1,2,figsize=(12.5,6))
     ax = np.ravel(ax)
 
     # sSFR_prosp versus sSFR_uvir
-    ax[0].errorbar(ssfr_uvir, ssfr_prosp, yerr=ssfr_err, **popts)
+    ax[0].errorbar(ssfr_uvir, ssfr_prosp, xerr=ssfr_uvir_err, yerr=ssfr_err, **popts)
 
-    ax[0].set_xlabel('sSFR$_{\mathrm{UVIR}}$')
+    ax[0].set_xlabel(ssfr_label)
     ax[0].set_ylabel('sSFR$_{\mathrm{Prosp}}$')
 
     ax[0].set_yscale('log')
@@ -347,14 +371,15 @@ def uvir_comparison(data, outname):
     ax[0].plot([min,max],[min,max],'--', color='red', zorder=2)
 
     # sSFR_prosp versus (sSFR_prosp / sSFR_uvir)
-    ax[1].errorbar(ssfr_prosp[good], np.log10(ssfr_prosp[good]/ssfr_uvir[good]), **popts)
+    ax[1].errorbar(ssfr_prosp[good], np.log10(ssfr_prosp[good]/ssfr_uvir[good]),
+                   xerr=[ssfr_err[0][good],ssfr_err[1][good]], yerr=sfr_ratio_err, **popts)
     pts = ax[1].scatter(ssfr_prosp[good], np.log10(ssfr_prosp[good]/ssfr_uvir[good]), marker='o', c=halftime[good],
                   cmap=plt.cm.plasma,s=75,zorder=10, edgecolors='k')
     cbar = fig.colorbar(pts, ax=ax[1])
     cbar.set_label(r'half-mass time [Gyr]')
 
     ax[1].set_xlabel('sSFR$_{\mathrm{Prosp}}$')
-    ax[1].set_ylabel('log(sSFR$_{\mathrm{Prosp}}$/sSFR$_{\mathrm{UVIR}}$)',labelpad=2)
+    ax[1].set_ylabel('log(sSFR$_{\mathrm{Prosp}}$/' + ssfr_label + ')',labelpad=2)
     ax[1].axhline(0, linestyle='--', color='red',lw=2,zorder=-1)
 
     ax[1].set_xscale('log')
@@ -371,13 +396,13 @@ def uvir_comparison(data, outname):
             for tl in a.get_xticklabels():tl.set_visible(False)
             a.tick_params('both', pad=3.5, size=3.5, width=1.0, which='both')
 
-            a.set_ylabel(r'log(SFR$_{\mathrm{Prosp}}$/SFR$_{\mathrm{UVIR}}$)')
+            a.set_ylabel(r'log(SFR$_{\mathrm{Prosp}}$/'+ssfr_label)
             a.axhline(0, linestyle='--', color='red',lw=2,zorder=-1)
         ax[2].set_xlabel(data['labels'][data['pnames'] == 'duste_qpah'][0])
         ax[3].set_xlabel(data['labels'][data['pnames'] == 'fagn'][0])
 
     plt.tight_layout()
-    plt.savefig(outname,dpi=dpi)
+    plt.savefig(outname+'.png',dpi=dpi)
     plt.close()
 
 

@@ -25,7 +25,7 @@ run_params = {'verbose':True,
               'nofork': True,
               # dynesty params
               'nested_bound': 'multi', # bounding method
-              'nested_sample': 'unif', # sampling method
+              'nested_sample': 'rwalk', # sampling method
               'nested_bootstrap': 10, # how much bootstrapping? tone down a bit
               'nested_nlive_batch': 200, # size of live point "batches"
               'nested_nlive_init': 100, # number of initial live points

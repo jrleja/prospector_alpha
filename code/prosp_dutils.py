@@ -16,7 +16,7 @@ def return_lir(lam,spec,z=None):
                   [np.concatenate((edgetrans,np.ones(100),edgetrans))]]
 
     # calculate integral
-    _,lir     = integrate_mag(lam,spec,lir_filter, z=z, alt_file=alt_file) # comes out in ergs/s
+    _,lir     = integrate_mag(lam,spec,lir_filter, z=z) # comes out in ergs/s
 
     return lir
 

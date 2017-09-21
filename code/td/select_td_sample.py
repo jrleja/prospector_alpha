@@ -39,7 +39,7 @@ def select_td(phot=None,fast=None,zbest=None,gris=None,**extras):
 def td_cut(out):
     """ select galaxies spaced evenly in z, mass, sSFR
     """
-    n_per_bin = 20
+    n_per_bin = 30
     nfield = len(out['fast'])
     zbins = np.linspace(0.5,3,6)
     ssfrbins = np.array([-np.inf,1e-11,1e-10,1e-9,5e-9,1e-8])
@@ -185,7 +185,6 @@ def build_sample(sample=None):
         out = sample['master_cut'](out) 
 
     # write out for each field
-    print 1/0
     for i,field in enumerate(fields):
         outbase = '/Users/joel/code/python/prospector_alpha/data/3dhst/'+field+'_'+sample['runname']
         ascii.write(out['phot'][i], output=outbase+'.cat', 

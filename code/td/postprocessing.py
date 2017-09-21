@@ -170,6 +170,8 @@ def post_processing(param_name, objname=None, **kwargs):
 
     # I/O
     res, powell_results, model, _ = load_prospector_data(obj_outfile,hdf5=True,load_extra_output=False)
+    if res is None:
+        return
 
     # make filenames local...
     print 'Performing post-processing on ' + objname
