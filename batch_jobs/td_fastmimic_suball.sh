@@ -20,7 +20,12 @@
 #SBATCH --mail-user=joel.leja@gmail.com
 IDFILE=$APPS"/prospector_alpha/data/3dhst/td.ids"
 OBJID=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$IDFILE")
-srun -n $SLURM_NTASKS --mpi=pmi2 python $APPS/prospector/scripts/prospector_dynesty.py \
---param_file="$APPS"/prospector_alpha/parameter_files/td_fastmimic_params.py \
---objname="$OBJID" \
---outfile="$APPS"/prospector_alpha/results/td_fastmimic/"$OBJID"
+if test -n "$(find $APPS'/prospector_alpha/results/td_fastmimic/' -maxdepth 1 -name $OBJID'*.model' -print -quit)"
+then
+    echo "$OBJID output already exists, aborting"
+else
+    srun -n $SLURM_NTASKS --mpi=pmi2 python $APPS/prospector/scripts/prospector_dynesty.py \
+    --param_file="$APPS"/prospector_alpha/parameter_files/td_fastmimic_params.py \
+    --objname="$OBJID" \
+    --outfile=$APPS"/prospector_alpha/results/td_fastmimic/"$OBJID
+fi

@@ -21,6 +21,11 @@
 IDFILE=$APPS"/prospector_alpha/data/3dhst/td.ids"
 OBJID=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$IDFILE")
 
-python $APPS/prospector_alpha/code/td/postprocessing.py \
-$APPS/prospector_alpha/parameter_files/td_params.py \
---objname="$OBJID"
+if test -n "$(find $APPS'/prospector_alpha/results/td/' -maxdepth 1 -name $OBJID'*.post' -print -quit)"
+then
+    echo "$OBJID output already exists, aborting"
+else
+    python $APPS/prospector_alpha/code/td/postprocessing.py \
+    $APPS/prospector_alpha/parameter_files/td_params.py \
+    --objname="$OBJID"
+fi

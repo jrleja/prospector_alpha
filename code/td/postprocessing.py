@@ -152,8 +152,9 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000,
 
     return eout
 
-def post_processing(param_name, objname=None, **kwargs):
+def post_processing(param_name, objname=None, overwrite=False, **kwargs):
     """Driver. Loads output, runs post-processing routine.
+    overwrite=False will return immediately if post-processing file already exists.
     kwargs are passed to calc_extra_quantities
     """
 
@@ -169,8 +170,12 @@ def post_processing(param_name, objname=None, **kwargs):
         os.makedirs(plot_outfolder)
 
     # I/O
-    res, powell_results, model, _ = load_prospector_data(obj_outfile,hdf5=True,load_extra_output=False)
+    res, powell_results, model, eout = load_prospector_data(obj_outfile,hdf5=True,load_extra_output=False)
     if res is None:
+        print 'there are no sampling results! returning.'
+        return
+    if (eout is not None) & (not overwrite):
+        print 'post-processing file already exists! returning.'
         return
 
     # make filenames local...
@@ -211,6 +216,7 @@ if __name__ == "__main__":
     parser.add_argument('parfile', type=str)
     parser.add_argument('--objname')
     parser.add_argument('--ncalc',type=int)
+    parser.add_argument('--overwrite',type=str2bool)
 
     args = vars(parser.parse_args())
     kwargs = {}

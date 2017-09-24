@@ -89,8 +89,12 @@ def load_prospector_extra(filebase,objname=None,runname=None):
         filebase = os.getenv('APPS')+'/prospector_alpha/results/'+runname+'/'+runname+'_'+objname
     mcmc_filename, model_filename, extra_name = create_prosp_filename(filebase)
 
-    with open(extra_name, "r") as f:
-        extra_output=hickle.load(f)
+    try:
+        with open(extra_name, "r") as f:
+            extra_output=hickle.load(f)
+    except:
+        print 'failed to load ' + extra_name
+        return None
 
     return extra_output
 
