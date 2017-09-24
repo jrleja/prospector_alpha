@@ -152,7 +152,7 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000,
 
     return eout
 
-def post_processing(param_name, objname=None, overwrite=False, **kwargs):
+def post_processing(param_name, objname=None, overwrite=True, **kwargs):
     """Driver. Loads output, runs post-processing routine.
     overwrite=False will return immediately if post-processing file already exists.
     kwargs are passed to calc_extra_quantities

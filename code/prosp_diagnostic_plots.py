@@ -491,7 +491,7 @@ def sed_figure(outname = None,
                       markeredgecolor='k',**kwargs)
         
         res.plot(wave_eff, chi, color=colors[i],
-                 marker='o', linestyle=' ', label=labels[i], markeredgecolor='k'
+                 marker='o', linestyle=' ', label=labels[i], markeredgecolor='k',
                  ms=ms,alpha=alpha,markeredgewidth=0.7,**kwargs)        
 
         ###### spectra for q50 + 5th, 95th percentile
