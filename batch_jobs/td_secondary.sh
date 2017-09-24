@@ -9,7 +9,7 @@
 ### Partition or queue name
 #SBATCH -p conroy,serial_requeue,conroy-intel,general
 ### memory per cpu, in MB
-#SBATCH --mem-per-cpu=6500
+#SBATCH --mem-per-cpu=10000
 ### Job name
 #SBATCH -J 'td_sec'
 ### output and error logs
