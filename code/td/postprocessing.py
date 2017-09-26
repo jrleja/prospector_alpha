@@ -153,8 +153,9 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=False,
             for q,qstr in zip([q50,q16,q84],['q50','q16','q84']): eout['obs']['elines'][key1][key2][qstr] = q
 
     if shorten_spec:
-        q50, q16, q84 = weighted_quantile(eout['obs']['spec'], np.array([0.5, 0.16, 0.84]), weights=eout['weights'])
-        eout['obs']['spec'] = {'q50':q50,'q84':q84,'q16':q16}
+        spec_pdf = np.zeros(shape=(len(sps.wavelengths),3))
+        for jj in xrange(spec_pdf.shape[0]): spec_pdf[jj,:] = weighted_quantile(eout['obs']['spec'][:,jj], np.array([0.5, 0.16, 0.84]), weights=eout['weights'])
+        eout['obs']['spec'] = {'q50':spec_pdf[:,0],'q16':spec_pdf[:,1],'q84':spec_pdf[:,2]}
 
     return eout
 
