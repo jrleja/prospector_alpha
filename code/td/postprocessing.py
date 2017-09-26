@@ -22,13 +22,15 @@ def set_sfh_time_vector(res,ncalc):
         t.sort()
         t = t[1:-1] # remove older than oldest bin, younger than youngest bin
         t = np.clip(t,1e-3,np.inf) # nothing younger than 1 Myr!
+        t = np.unique(t)
     else:
         sys.exit('ERROR: not sure how to set up the time array here!')
     return t
 
-def calc_extra_quantities(res, sps, obs, ncalc=3000, 
+def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=False,
                           **kwargs):
     """calculate extra quantities: star formation history, stellar mass, spectra, photometry, etc
+    shorten_spec: if on, return only the 50th / 84th / 16th percentiles. else return all spectra.
     """
 
     # calculate maxprob
@@ -150,6 +152,10 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000,
             q50, q16, q84 = weighted_quantile(eout['obs']['elines'][key1][key2]['chain'], np.array([0.5, 0.16, 0.84]), weights=eout['weights'])
             for q,qstr in zip([q50,q16,q84],['q50','q16','q84']): eout['obs']['elines'][key1][key2][qstr] = q
 
+    if shorten_spec:
+        q50, q16, q84 = weighted_quantile(eout['obs']['spec'], np.array([0.5, 0.16, 0.84]), weights=eout['weights'])
+        eout['obs']['spec'] = {'q50':q50,'q84':q84,'q16':q16}
+
     return eout
 
 def post_processing(param_name, objname=None, overwrite=True, **kwargs):
@@ -170,7 +176,7 @@ def post_processing(param_name, objname=None, overwrite=True, **kwargs):
         os.makedirs(plot_outfolder)
 
     # I/O
-    res, powell_results, model, eout = load_prospector_data(obj_outfile,hdf5=True,load_extra_output=False)
+    res, powell_results, model, eout = load_prospector_data(obj_outfile,hdf5=True,load_extra_output=True)
     if res is None:
         print 'there are no sampling results! returning.'
         return
@@ -217,6 +223,7 @@ if __name__ == "__main__":
     parser.add_argument('--objname')
     parser.add_argument('--ncalc',type=int)
     parser.add_argument('--overwrite',type=str2bool)
+    parser.add_argument('--shorten_spec',type=str2bool)
 
     args = vars(parser.parse_args())
     kwargs = {}

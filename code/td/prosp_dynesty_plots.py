@@ -207,7 +207,7 @@ def sed_figure(outname = None,
                colors = ['#1974D2'], sresults = None, eout = None,
                labels = ['spectrum (50th percentile)'],
                model_photometry = True, main_color=['black'],
-               ml_spec=False,transcurves=False,
+               transcurves=False,
                ergs_s_cm=True, add_sfh=False,
                **kwargs):
     """Plot the photometry for the model and data (with error bars), and
@@ -239,11 +239,14 @@ def sed_figure(outname = None,
         obsmags_unc = res['obs']['maggies_unc'][mask]
 
         # model information
-        modspec_bfit = eout[i]['obs']['spec'][0,:]
         modmags_bfit = eout[i]['obs']['mags'][0,mask]
-        nspec = modspec_bfit.shape[0]
-        spec_pdf = np.zeros(shape=(nspec,3))
-        for jj in range(spec_pdf.shape[0]): spec_pdf[jj,:] = np.percentile(eout[i]['obs']['spec'][:,jj],[16.0,50.0,84.0])
+        modspec_lam = eout[i]['obs']['lam_obs']
+        nspec = modspec_lam.shape[0]
+        try:
+            spec_pdf = np.zeros(shape=(nspec,3))
+            for jj in range(spec_pdf.shape[0]): spec_pdf[jj,:] = np.percentile(eout[i]['obs']['spec'][:,jj],[16.0,50.0,84.0])
+        except:
+            spec_pdf = np.stack((eout[i]['obs']['spec']['q16'],eout[i]['obs']['spec']['q50'],eout[i]['obs']['spec']['q84']),axis=1)
 
         # units
         zred = res['model'].params['zred'][0]
@@ -259,9 +262,8 @@ def sed_figure(outname = None,
         phot_wave_eff /= 1e4
 
         # spectra
-        spec_pdf *= (factor/eout[i]['obs']['lam_obs']/(1+zred)).reshape(nspec,1)
-        modspec_bfit *= factor/eout[i]['obs']['lam_obs']/(1+zred)
-        modspec_lam = eout[i]['obs']['lam_obs']*(1+zred)/1e4
+        spec_pdf *= (factor/modspec_lam/(1+zred)).reshape(nspec,1)
+        modspec_lam = modspec_lam*(1+zred)/1e4
         
         # plot maximum probability model
         if model_photometry:
@@ -276,8 +278,6 @@ def sed_figure(outname = None,
 
         # model spectra
         yplt = spec_pdf[:,1]
-        if ml_spec:
-            yplt = modspec_bfit
         pspec = prosp_dutils.smooth_spectrum(modspec_lam*1e4,yplt,200,minlam=1e3,maxlam=1e5)
         nz = pspec > 0
         phot.plot(modspec_lam[nz], pspec[nz], linestyle='-',
@@ -314,7 +314,7 @@ def sed_figure(outname = None,
     if pflux.sum() != len(obsmags):
         downarrow = [u'\u2193']
         y0 = 10**((np.log10(ymax) - np.log10(ymin))/20.)*ymin
-        for x0 in phot_wave_eff[~pflux]: phot.plot(x0, y0, linestyle='none',marker=u'$\u2193$',markersize=16,alpha=alpha,mew=0.0,color=obs_color)
+        for x0 in phot_wave_eff[~pflux]: phot.plot(x0, y0, linestyle='none',marker=u'$\u2193$',markersize=16,alpha=alpha,mew=0.5,mec='k',color=obs_color)
     phot.set_ylim(ymin, ymax)
     resid_ymax = np.abs(resid.get_ylim()).max()
     resid.set_ylim(-resid_ymax,resid_ymax)
@@ -377,56 +377,6 @@ def sed_figure(outname = None,
     if outname is not None:
         fig.savefig(outname, bbox_inches='tight', dpi=180)
         plt.close()
-
-def add_inset_pdf(eout,ax,pars,pnames,text_size=1,lw=1):
-    
-    axfontsize=4*text_size
-
-    for i, p in enumerate(pars):
-        
-        if p in eout['quantiles']['parnames']:
-            idx = eout['quantiles']['parnames'] == p
-            plot = eout['quantiles']['sample_chain'][:,idx]
-            qvalues = [eout['quantiles']['q16'][idx],
-                       eout['quantiles']['q50'][idx],
-                       eout['quantiles']['q84'][idx]]
-        else:
-            idx = eout['extras']['parnames'] == p
-            plot = np.log10(eout['extras']['flatchain'][:,idx])
-            qvalues = [np.log10(eout['extras']['q16'][idx]),
-                       np.log10(eout['extras']['q50'][idx]),
-                       np.log10(eout['extras']['q84'][idx])]
-
-        ### Plot histogram.
-        n, b, p = ax[i].hist(plot, bins=50,
-                          histtype="step",color='k',
-                          range=[np.min(plot),np.max(plot)])
-
-        for q in qvalues: ax[i].axvline(q, ls=':', color='k')
-
-        # display quantiles
-        q_m = qvalues[1]-qvalues[0]
-        q_p = qvalues[2]-qvalues[1]
-
-        # format quantile display
-        fmt = "{{0:{0}}}".format(".2f").format
-        title = r"${{{0}}}_{{-{1}}}^{{+{2}}}$"
-        title = title.format(fmt(qvalues[1][0]), fmt(q_m[0]), fmt(q_p[0]))
-        ax[i].set_title(title,fontsize=axfontsize*4)
-        ax[i].set_xlabel(pnames[i],fontsize=axfontsize*4,labelpad=2*text_size)
-
-        # axes
-        # set min/max
-        ax[i].set_xlim(np.percentile(plot,0.5),
-                    np.percentile(plot,99.5))
-        ax[i].set_ylim(0, 1.1 * np.max(n))
-        ax[i].set_yticklabels([])
-        ax[i].xaxis.set_major_locator(MaxNLocator(4))
-        #[l.set_rotation(45) for l in ax[i].get_xticklabels()]
-        ax[i].xaxis.set_tick_params(labelsize=axfontsize*3)
-        ax[i].yaxis.set_tick_params(labelsize=axfontsize*3)
-        ax[i].tick_params('both', length=lw*3, width=lw*.6, which='major')
-
 
 def make_all_plots(filebase=None,
                    outfolder=os.getenv('APPS')+'/prospector_alpha/plots/',

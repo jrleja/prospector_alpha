@@ -23,4 +23,5 @@ OBJID=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$IDFILE")
 python $APPS/prospector_alpha/code/td/postprocessing.py \
 $APPS/prospector_alpha/parameter_files/td_params.py \
 --objname="$OBJID" \
---overwrite=False
+--overwrite=True \
+--shorten_spec=True
