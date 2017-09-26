@@ -447,7 +447,7 @@ def return_sedplot_vars(sample_results, extra_output, nufnu=True, ergs_s_cm=Fals
 
 def sed_figure(outname = None,
                colors = ['#1974D2'], sresults = None, extra_output = None,
-               labels = ['spectrum (50th percentile)'],
+               labels = ['model spectrum'],
                model_photometry = True, main_color=['black'],
                fir_extra = False, ml_spec=False,transcurves=False,
                ergs_s_cm=True, add_sfh=False,
@@ -461,18 +461,16 @@ def sed_figure(outname = None,
     ms = 5
     alpha = 0.8
     
-    from matplotlib import gridspec
-
     #### set up plot
     fig = plt.figure()
-    gs = gridspec.GridSpec(2,1, height_ratios=[3,1])
+    gs = mpl.gridspec.GridSpec(2,1, height_ratios=[3,1])
     gs.update(hspace=0)
     phot, res = plt.Subplot(fig, gs[0]), plt.Subplot(fig, gs[1])
 
     ### diagnostic text
     textx = 0.02
     texty = 0.95
-    deltay = 0.04
+    deltay = 0.05
 
     ### if we have multiple parts, color ancillary data appropriately
     if len(colors) > 1:
@@ -484,10 +482,23 @@ def sed_figure(outname = None,
         #### grab data for maximum probability model
         wave_eff, obsmags, obsmags_unc, modmags, chi, modspec, modlam = return_sedplot_vars(sample_results,extra_output[i],ergs_s_cm=ergs_s_cm)
 
+        ### observations!
+        if i == 0:
+            xplot = wave_eff
+            yplot = obsmags
+            yerr = obsmags_unc
+
+            positive_flux = obsmags > 0
+
+            # PLOT OBSERVATIONS + ERRORS 
+            phot.errorbar(xplot[positive_flux], yplot[positive_flux], yerr=yerr[positive_flux],
+                          color=obs_color, marker='o', label='observed', alpha=alpha, linestyle=' ',ms=ms,
+                          zorder=0,markeredgecolor='k')
+
         #### plot maximum probability model
         if model_photometry:
-            phot.plot(wave_eff, modmags, color=colors[i], 
-                      marker='o', ms=ms, linestyle=' ', label = 'photometry, best-fit', alpha=alpha, 
+            phot.plot(wave_eff[positive_flux], modmags[positive_flux], color=colors[i], 
+                      marker='o', ms=ms, linestyle=' ', label = 'model photometry', alpha=alpha, 
                       markeredgecolor='k',**kwargs)
         
         res.plot(wave_eff, chi, color=colors[i],
@@ -508,7 +519,7 @@ def sed_figure(outname = None,
         nz = modspec > 0
         if ml_spec:
             phot.plot(modlam[nz], modspec[nz], linestyle='-',
-                      color=colors[i], alpha=0.9,zorder=-1,label = labels[i],**kwargs)
+                      color=colors[i], alpha=0.9,zorder=-1,label = 'model spectrum',**kwargs)
         else:
             phot.plot(modlam[nz], spec_pdf[nz,1]*sfactor[nz]/(sample_results['model'].params['zred'][0]+1), linestyle='-',
                       color=colors[i], alpha=0.9,zorder=-1,label = labels[i],**kwargs)  
@@ -519,18 +530,6 @@ def sed_figure(outname = None,
                           spec_pdf[:,2]*sfactor/(sample_results['model'].params['zred'][0]+1),
                           color=colors[i],
                           alpha=0.3,zorder=-1)
-        ### observations!
-        if i == 0:
-            xplot = wave_eff
-            yplot = obsmags
-            yerr = obsmags_unc
-
-            positive_flux = obsmags > 0
-
-            # PLOT OBSERVATIONS + ERRORS 
-            phot.errorbar(xplot[positive_flux], yplot[positive_flux], yerr=yerr[positive_flux],
-                          color=obs_color, marker='o', label='observed', alpha=alpha, linestyle=' ',ms=ms,
-                          zorder=0,markeredgecolor='k')
 
         #### calculate and show reduced chi-squared
         chisq = np.sum(chi**2)
@@ -540,7 +539,7 @@ def sed_figure(outname = None,
         phot.text(textx, texty-deltay*(i+1), r'best-fit $\chi^2$/N$_{\mathrm{phot}}$='+"{:.2f}".format(reduced_chisq),
               fontsize=10, ha='left',transform = phot.transAxes,color=main_color[i])
 
-    xlim = (min(xplot)*0.5,max(xplot)*3)
+    xlim = (min(xplot)*0.5,25)
 
     ### apply plot limits
     phot.set_xlim(xlim)
@@ -557,7 +556,7 @@ def sed_figure(outname = None,
     if positive_flux.sum() != len(obsmags):
         downarrow = [u'\u2193']
         y0 = 10**((np.log10(phot.get_ylim()[1]) - np.log10(phot.get_ylim()[0]))/20.)*phot.get_ylim()[0]
-        for x0 in xplot[~positive_flux]: phot.plot(x0, y0, linestyle='none',marker=u'$\u2193$',markersize=16,alpha=alpha,mew=0.0,color=obs_color)
+        for x0 in xplot[~positive_flux]: phot.plot(x0, y0, linestyle='none',marker=u'$\u2193$',markersize=16,alpha=alpha,mew=0.5,mec='k',color=obs_color)
 
     #### add RGB image
     '''
@@ -592,18 +591,21 @@ def sed_figure(outname = None,
                 scatterpoints=1,fancybox=True)
                 
     # set labels
-    res.set_ylabel( r'$\chi$')
+    fs, ls = 14, 12
+    res.set_ylabel( r'$\chi$',fontsize=fs)
     if ergs_s_cm:
-        phot.set_ylabel(r'$\nu f_{\nu}$ [erg/s/cm$^2$]')
+        phot.set_ylabel(r'$\nu f_{\nu}$ [erg/s/cm$^2$]',fontsize=fs)
     else:
-        phot.set_ylabel(r'$\nu f_{\nu}$ [maggie Hz]')
-    res.set_xlabel(r'$\lambda_{\mathrm{obs}}$ [$\mu$m]')
+        phot.set_ylabel(r'$\nu f_{\nu}$ [maggie Hz]',fontsize=fs)
+    res.set_xlabel(r'$\lambda_{\mathrm{obs}}$ [$\mu$m]',fontsize=fs)
     phot.set_yscale('log',nonposx='clip')
     phot.set_xscale('log',nonposx='clip')
     res.set_xscale('log',nonposx='clip',subsx=(2,5))
-    res.xaxis.set_minor_formatter(minorFormatter)
-    res.xaxis.set_major_formatter(majorFormatter)
-    for tl in res.get_xticklabels():tl.set_visible(False)
+    res.xaxis.set_minor_formatter(FormatStrFormatter('%2.2g'))
+    res.xaxis.set_major_formatter(FormatStrFormatter('%2.2g'))
+    res.tick_params('both', pad=3.5, size=3.5, width=1.0, which='both',labelsize=ls)
+    phot.tick_params('y', which='major', labelsize=ls)
+
 
     # clean up and output
     fig.add_subplot(phot)
@@ -615,13 +617,13 @@ def sed_figure(outname = None,
     ax2=phot.twiny()
     ax2.set_xticks(np.arange(0,10,0.2))
     ax2.set_xlim(x1/(1+z_txt), x2/(1+z_txt))
-    ax2.set_xlabel(r'$\lambda_{\mathrm{rest}}$ [$\mu$m]')
+    ax2.set_xlabel(r'$\lambda_{\mathrm{rest}}$ [$\mu$m]',fontsize=fs)
     ax2.set_ylim(y1, y2)
-    ax2.set_xscale('log',nonposx='clip',subsx=(2,5))
-    ax2.xaxis.set_minor_formatter(minorFormatter)
-    ax2.xaxis.set_major_formatter(majorFormatter)
-    for tl in ax2.get_xticklabels():tl.set_visible(False)
-
+    res.set_xscale('log',nonposx='clip',subsx=(2,5))
+    res.xaxis.set_minor_formatter(FormatStrFormatter('%2.2g'))
+    res.xaxis.set_major_formatter(FormatStrFormatter('%2.2g'))
+    res.tick_params('both', pad=3.5, size=3.5, width=1.0, which='both',labelsize=ls)
+    
     # remove ticks
     phot.set_xticklabels([])
     
@@ -640,7 +642,7 @@ def sed_figure(outname = None,
                       [r'log(M/M$_{\odot}$)',r'log(Z/Z$_{\odot}$)'],text_size=0.5)
 
     if outname is not None:
-        fig.savefig(outname, bbox_inches='tight', dpi=160)
+        fig.savefig(outname, bbox_inches='tight', dpi=200)
         plt.close()
 
     #os.system('open '+outname)
