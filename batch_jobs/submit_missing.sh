@@ -3,7 +3,7 @@
 # for multiple galaxy IDs
 # set location of ID file, base parameter file
 runname=$1
-IDFILE=$APPS"/threedhst_prospector/data/brownseds_data/photometry/namelist.txt"
+IDFILE=$APPS"/prospector_alpha/data/3dhst/td.ids"
 
 # get number of IDs
 NIDS=$(wc -l < "$IDFILE")
@@ -14,8 +14,8 @@ do
   # read id
   LINE=$(sed -n "${i}p" "$IDFILE")
   mod=${LINE//[ ]/*}
-  if ! ls $runname/*$mod* 1> /dev/null 2>&1; then
-    echo $i" not done!"
+  if ! ls $APPS/prospector_alpha/results/$runname/*$mod* 1> /dev/null 2>&1; then
+    sbatch --array=$i-$i td_suball.sh
   fi
 
 done
