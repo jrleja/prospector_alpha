@@ -14,7 +14,7 @@ do
   # read id
   LINE=$(sed -n "${i}p" "$IDFILE")
   mod=${LINE//[ ]/*}
-  if ! ls $APPS/prospector_alpha/results/$runname/*$mod* 1> /dev/null 2>&1; then
+  if ! ls $APPS/prospector_alpha/results/$runname/*$mod*model 1> /dev/null 2>&1; then
     sbatch --array=$i-$i td_suball.sh
   fi
 
