@@ -24,6 +24,8 @@ def load_alldata(runname,filename,regenerate=False):
             except (IOError, TypeError):
                 print name.split('/')[-1]+' failed to load. skipping.'
                 continue
+            if prosp is None:
+                continue
             dat = {'thetas':prosp['thetas'],'extras':prosp['extras']}
             alldata.append(dat)
         pickle.dump(alldata,open(filename, "w"))
@@ -115,21 +117,22 @@ def allpar_plot(runname='td_massive',outfolder=None,lowmet=True,regenerate=False
     fig, ax = plt.subplots(ncols=npars, nrows=npars, figsize=(npars*3,npars*3))
     fig.subplots_adjust(wspace=0.0,hspace=0.0,top=0.95,bottom=0.05,left=0.05,right=0.95)
     opts = {
-            'color': '#1C86EE',
+            'color': '0.4',
             'mew': 1.5,
             'alpha': 0.6,
             'fmt': 'o'
            }
-    hopts = copy.deepcopy(opts)
-    hopts['color'] = '#FF420E'
+    if len(dat['median']['sfr_100']) > 200:
+        opts['mew'] = 0.0
+        opts['ms'] = 2
+        opts['capthick'] = 0.05
+        opts['elinewidth'] = 0.02
 
     ### color low-metallicity, high-mass galaxies
-    met_q50 = np.array([data['thetas']['massmet_2']['q50'] for data in alldata])
-    mass_q50 = np.array([data['thetas']['massmet_1']['q50'] for data in alldata])
-    hflag = (met_q50 < -1.0) & (mass_q50 > 9.5)
     outname = outfolder+'all_parameter.png'
 
     # plot
+    dat['ordered_labels'] = ['massmet_1','dust2','massmet_2','dust_index','dust1_fraction','duste_qpah','fagn','agn_tau','sfr_100','ssfr_100','half_time']
     for yy, ypar in enumerate(dat['ordered_labels']):
         for xx, xpar in enumerate(dat['ordered_labels']):
 
@@ -138,15 +141,10 @@ def allpar_plot(runname='td_massive',outfolder=None,lowmet=True,regenerate=False
                 ax[yy,xx].axis('off')
                 continue
 
-            ax[yy,xx].errorbar(dat['median'][xpar][~hflag],dat['median'][ypar][~hflag],
-                               xerr=[dat['errs'][xpar][0][~hflag],dat['errs'][xpar][1][~hflag]], 
-                               yerr=[dat['errs'][ypar][0][~hflag],dat['errs'][ypar][1][~hflag]], 
+            ax[yy,xx].errorbar(dat['median'][xpar],dat['median'][ypar],
+                               xerr=dat['errs'][xpar], 
+                               yerr=dat['errs'][ypar], 
                                **opts)
-
-            ax[yy,xx].errorbar(dat['median'][xpar][hflag],dat['median'][ypar][hflag],
-                               xerr=[dat['errs'][xpar][0][hflag],dat['errs'][xpar][1][hflag]], 
-                               yerr=[dat['errs'][ypar][0][hflag],dat['errs'][ypar][1][hflag]], 
-                               **hopts)
 
             #### RANGE
             minx,maxx = dat['median'][xpar].min(),dat['median'][xpar].max()
@@ -156,6 +154,11 @@ def allpar_plot(runname='td_massive',outfolder=None,lowmet=True,regenerate=False
             miny,maxy = dat['median'][ypar].min(),dat['median'][ypar].max()
             dyny = (maxy-miny)*0.1
             ax[yy,xx].set_ylim(miny-dyny, maxy+dyny)
+
+            #### RUNNING MEDIAN
+            xmed, ymed, bincount = prosp_dutils.running_median(dat['median'][xpar],dat['median'][ypar],avg=False,return_bincount=True)
+            good = bincount > 10
+            ax[yy,xx].plot(xmed[good],ymed[good],color='#FF3D0D',lw=3.5,zorder=30)
 
             #### LABELS
             if xx % npars == 0:

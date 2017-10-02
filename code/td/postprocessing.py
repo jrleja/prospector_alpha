@@ -181,7 +181,7 @@ def post_processing(param_name, objname=None, overwrite=True, **kwargs):
     if res is None:
         print 'there are no sampling results! returning.'
         return
-    if not overwrite:
+    if (not overwrite) & (eout is not None):
         print 'post-processing file already exists! returning.'
         return
 

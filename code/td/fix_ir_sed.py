@@ -13,9 +13,11 @@ pc = 3.085677581467192e18  # in cm
 dfactor_10pc = 4*np.pi*(10*pc)**2
 to_ergs = 3631e-23
 
-dale_helou_txt = '/Users/joel/code/python/prospector_alpha/data/MIPS/dale_helou.txt'
-with open(dale_helou_txt, 'r') as f: hdr = f.readline().split()[1:]
-conversion = np.loadtxt(dale_helou_txt, comments = '#', dtype = np.dtype([(n, np.float) for n in hdr]))
+dale_helou_txt = '/Users/joel/code/python/prospector_alpha/data/Wuyts08_conversion.txt'
+with open(dale_helou_txt, 'r') as f: 
+    for i in range(8): f.readline()
+    hdr = f.readline().split()[1:]
+conversion = np.genfromtxt(dale_helou_txt, comments = '#', dtype = np.dtype([(n, np.float) for n in hdr]))
 
 outdir = '/Users/joel/code/python/prospector_alpha/tests/irsed/'
 
@@ -112,12 +114,12 @@ def mips_to_lir(mips_flux,z):
     # else, scale the nearest conversion factor by the 
     # ratio of luminosity distances, since nonlinear error due to distances will dominate
     if z > 0.1:
-        intfnc = interp1d(conversion['redshift'],conversion['fac_MIPS24um'], bounds_error = True, fill_value = 0)
+        intfnc = interp1d(conversion['Redshift'],conversion['fac_MIPS24um'], bounds_error = True, fill_value = 0)
         fac = intfnc(z)
     else:
-        near_idx = np.abs(conversion['redshift']-z).argmin()
-        lumdist_ratio = (WMAP9.luminosity_distance(z).value / WMAP9.luminosity_distance(conversion['redshift'][near_idx]).value)**2
-        zfac_ratio = (1.+conversion['redshift'][near_idx]) / (1.+z)
+        near_idx = np.abs(conversion['Redshift']-z).argmin()
+        lumdist_ratio = (WMAP9.luminosity_distance(z).value / WMAP9.luminosity_distance(conversion['Redshift'][near_idx]).value)**2
+        zfac_ratio = (1.+conversion['Redshift'][near_idx]) / (1.+z)
         fac = conversion['fac_MIPS24um'][near_idx]*lumdist_ratio*zfac_ratio
 
     return fac*mips_flux

@@ -724,6 +724,7 @@ def make_all_plots(filebase=None,
             _, powell_results, model, extra_output = load_prospector_data(filebase,no_sample_results=True, hdf5=True)
         except TypeError:
             return  
+    print 1/0
 
     run_params = model_setup.get_run_params(param_file=param_name)
     sps = model_setup.load_sps(**run_params)
