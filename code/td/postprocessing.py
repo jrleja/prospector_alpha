@@ -41,8 +41,8 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=False,
     current_maxprob = prosp_dutils.test_likelihood(sps, res['model'], res['obs'], 
                                                    res['chain'][amax], 
                                                    res['run_params']['param_file'])
-    print 'Best-fit lnprob currently: {0}'.format(current_maxprob[0])
-    print 'Best-fit lnprob during sampling: {0}'.format(res['lnprobability'].argmax())
+    print 'Best-fit lnprob currently: {0}'.format(float(current_maxprob))
+    print 'Best-fit lnprob during sampling: {0}'.format(res['lnprobability'][amax])
 
     # randomly choose from the chain, weighted by dynesty weights
     # make sure the first one is the maximum probability model (so we're cheating a bit!)
@@ -181,7 +181,7 @@ def post_processing(param_name, objname=None, overwrite=True, **kwargs):
     if res is None:
         print 'there are no sampling results! returning.'
         return
-    if (eout is not None) & (not overwrite):
+    if not overwrite:
         print 'post-processing file already exists! returning.'
         return
 

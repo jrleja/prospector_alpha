@@ -87,6 +87,63 @@ def smooth_spectrum(lam,spec,sigma,
 
     return spec_out
 
+def asym_errors(center, up, down, log=False):
+
+    if log:
+        errup = np.log10(up)-np.log10(center)
+        errdown = np.log10(center)-np.log10(down)
+        errarray = [errdown,errup]
+    else:
+        errarray = [center-down,up-center]
+
+    return errarray
+
+def running_median(x,y,nbins=10,avg=False,weights=None,bins=None,return_bincount=False):
+
+    if bins is None:
+        bins = np.linspace(x.min(),x.max(), nbins+1)
+    else:
+        nbins = len(bins)-1
+        
+    idx  = np.digitize(x,bins,right=True)
+
+    if avg == False:
+        running_median = np.array([np.median(y[idx-1==k]) for k in range(nbins)])
+    else:
+        running_median= []
+        for k in range(nbins): # for loop because we can't pass an empty array to np.average!
+            if (idx-1==k).sum() == 0:
+                running_median.append(0.0)
+            else:
+                if weights is None:
+                    weight = None
+                else:
+                    weight = weights[idx-1==k]
+                running_median.append(np.average(y[idx-1==k],weights=weight))
+        running_median = np.array(running_median)
+    outbins = (bins[:-1]+bins[1:])/2.
+
+    # remove empty
+    empty = np.isnan(running_median) == 1
+    running_median[empty] = 0
+
+    if return_bincount:
+        return outbins,running_median, np.array([(idx == i).sum() for i in range(nbins)])
+    return outbins,running_median
+
+def get_cmap(N,cmap='nipy_spectral'):
+    '''Returns a function that maps each index in 0, 1, ... N-1 to a distinct 
+    RGB color.'''
+
+    import matplotlib.cm as cmx
+    import matplotlib.colors as colors
+
+    color_norm  = colors.Normalize(vmin=0, vmax=N-1)
+    scalar_map = cmx.ScalarMappable(norm=color_norm, cmap=cmap) 
+    def map_index_to_rgb_color(index):
+        return scalar_map.to_rgba(index)
+    return map_index_to_rgb_color
+
 def normalize_error_asym(obs,mod):
     
     # define output
@@ -106,6 +163,40 @@ def normalize_error_asym(obs,mod):
     out[~undershot] = (obs[~undershot,0] - mod[~undershot,0]) / np.sqrt(edown_mod[~undershot]**2+eup_obs[~undershot]**2)
 
     return out
+
+def equalize_axes(ax, x,y, dynrange=0.1, line_of_equality=True, axlims=None, log_in_linear=False):
+    """ defines a plot range that encompasses all of the data
+    line_of_equality: add a dashed diagonal line of equality 
+    dynrange: the percent of the data range above and below which the plot limits are set
+    log_in_linear: we are passed LOG variables but want ranges in LINEAR space
+    """
+
+    dynx, dyny = (np.nanmax(x)-np.nanmin(x))*dynrange,\
+                 (np.nanmax(y)-np.nanmin(y))*dynrange
+    
+    if axlims is None:
+        if np.nanmin(x)-dynx > np.nanmin(y)-dyny:
+            min = np.nanmin(y)-dyny
+        else:
+            min = np.nanmin(x)-dynx
+        if np.nanmax(x)+dynx > np.nanmax(y)+dyny:
+            max = np.nanmax(x)+dynx
+        else:
+            max = np.nanmax(y)+dyny
+    else:
+        min = axlims[0]
+        max = axlims[1]
+
+    if log_in_linear:
+        min = 10**min
+        max = 10**max
+
+    ax.set_xlim(min,max)
+    ax.set_ylim(min,max)
+
+    if line_of_equality:
+        ax.plot([min,max],[min,max],linestyle='--',color='0.1',alpha=0.8)
+    return ax
 
 def offset_and_scatter(x,y,biweight=False,mad=False):
 
@@ -391,36 +482,6 @@ def halfmass_assembly_time(sfh_params):
 
     return tgal-half_time
 
-def running_median(x,y,nbins=10,avg=False,weights=None,bins=None):
-
-    if bins is None:
-        bins = np.linspace(x.min(),x.max(), nbins+1)
-    else:
-        nbins = len(bins)-1
-        
-    idx  = np.digitize(x,bins,right=True)
-    if avg == False:
-        running_median = np.array([np.median(y[idx-1==k]) for k in range(nbins)])
-    else:
-        running_median= []
-        for k in range(nbins): # for loop because we can't pass an empty array to np.average!
-            if (idx-1==k).sum() == 0:
-                running_median.append(0.0)
-            else:
-                if weights is None:
-                    weight = None
-                else:
-                    weight = weights[idx-1==k]
-                running_median.append(np.average(y[idx-1==k],weights=weight))
-        running_median = np.array(running_median)
-    outbins = (bins[:-1]+bins[1:])/2.
-
-    # remove empty
-    empty = np.isnan(running_median) == 1
-    running_median[empty] = 0
-
-    return outbins,running_median
-
 def generate_basenames(runname,ancilname=None):
 
     filebase, parm = [], []
@@ -518,17 +579,6 @@ def gaussian(x, mu, sig):
     '''
     return np.exp(-np.power(x - mu, 2.) / (2 * np.power(sig, 2.)))
 
-def asym_errors(center, up, down, log=False):
-
-    if log:
-        errup = np.log10(up)-np.log10(center)
-        errdown = np.log10(center)-np.log10(down)
-        errarray = [errdown,errup]
-    else:
-        errarray = [center-down,up-center]
-
-    return errarray
-
 def gas_met(nii_ha,oiii_hb):
     # return gas-phase metallicity based on NII / Halpha ratio
     # 
@@ -561,40 +611,6 @@ def gas_met(nii_ha,oiii_hb):
 
     return closest
     #return (closest+closest_niiha)/2.
-
-def equalize_axes(ax, x,y, dynrange=0.1, line_of_equality=True, axlims=None, log_in_linear=False):
-    """ defines a plot range that encompasses all of the data
-    line_of_equality: add a dashed diagonal line of equality 
-    dynrange: the percent of the data range above and below which the plot limits are set
-    log_in_linear: we are passed LOG variables but want ranges in LINEAR space
-    """
-
-    dynx, dyny = (np.nanmax(x)-np.nanmin(x))*dynrange,\
-                 (np.nanmax(y)-np.nanmin(y))*dynrange
-    
-    if axlims is None:
-        if np.nanmin(x)-dynx > np.nanmin(y)-dyny:
-            min = np.nanmin(y)-dyny
-        else:
-            min = np.nanmin(x)-dynx
-        if np.nanmax(x)+dynx > np.nanmax(y)+dyny:
-            max = np.nanmax(x)+dynx
-        else:
-            max = np.nanmax(y)+dyny
-    else:
-        min = axlims[0]
-        max = axlims[1]
-
-    if log_in_linear:
-        min = 10**min
-        max = 10**max
-
-    ax.set_xlim(min,max)
-    ax.set_ylim(min,max)
-
-    if line_of_equality:
-        ax.plot([min,max],[min,max],linestyle='--',color='0.1',alpha=0.8)
-    return ax
 
 def integral_average(x,y,x0,x1):
     """to do a definite integral over a given x,y array
@@ -1153,6 +1169,11 @@ def measure_emlines(smooth_spec,sps,enames=None):
     ##### measure emission line flux + EQW
     out = {}
     for jj in xrange(len(lines)):
+
+        # if we don't do nebular emission, zero this out
+        if not hasattr(sps, 'get_nebline_luminosity'):
+            out[lines[jj]] = {'flux':0.0,'eqw':0.0}
+            continue
 
         ### calculate luminosity (in Lsun)
         idx = fsps_name[jj] == dat['name']
