@@ -159,18 +159,23 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=False,
 
     return eout
 
-def post_processing(param_name, objname=None, overwrite=True, **kwargs):
+def post_processing(param_name, objname=None, runname = None, overwrite=True, **kwargs):
     """Driver. Loads output, runs post-processing routine.
     overwrite=False will return immediately if post-processing file already exists.
+    if runname is specified, we can pass in parameter file for run A with outputs at location runname
     kwargs are passed to calc_extra_quantities
     """
 
     # bookkeeping: where are we coming from and where are we going?
     pfile = model_setup.import_module_from_file(param_name)
     run_outfile = pfile.run_params['outfile']
-    obj_outfile = "/".join(run_outfile.split('/')[:-1]) + '/' + objname
-    run_name = run_outfile.split('/')[-2]
-    plot_outfolder = os.getenv('APPS')+'/prospector_alpha/plots/'+run_name+'/'
+    if runname is None:
+        runname = run_outfile.split('/')[-2]
+        obj_outfile = "/".join(run_outfile.split('/')[:-1]) + '/' + objname
+    else:
+        obj_outfile = "/".join(run_outfile.split('/')[:-2]) + '/' + runname + '/' + objname
+
+    plot_outfolder = os.getenv('APPS')+'/prospector_alpha/plots/'+runname+'/'
 
     # check for output folder, create if necessary
     if not os.path.isdir(plot_outfolder):
