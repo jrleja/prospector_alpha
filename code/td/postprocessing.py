@@ -174,7 +174,6 @@ def post_processing(param_name, objname=None, runname = None, overwrite=True, **
         obj_outfile = "/".join(run_outfile.split('/')[:-1]) + '/' + objname
     else:
         obj_outfile = "/".join(run_outfile.split('/')[:-2]) + '/' + runname + '/' + objname
-
     plot_outfolder = os.getenv('APPS')+'/prospector_alpha/plots/'+runname+'/'
 
     # check for output folder, create if necessary
@@ -230,6 +229,7 @@ if __name__ == "__main__":
     parser.add_argument('--ncalc',type=int)
     parser.add_argument('--overwrite',type=str2bool)
     parser.add_argument('--shorten_spec',type=str2bool)
+    parser.add_argument('--runname', type=str)
 
     args = vars(parser.parse_args())
     kwargs = {}
