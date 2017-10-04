@@ -16,7 +16,9 @@ minlogssfr = -13
 minssfr = 10**minlogssfr
 minsfr = 0.01
 
-def collate_data(runname, runname_fast, filename=None, regenerate=False, lir_from_mips=True):
+nbin_min = 10
+
+def collate_data(runname, runname_fast, filename=None, regenerate=False, lir_from_mips=False):
     
     ### if it's already made, load it and give it back
     # else, start with the making!
@@ -65,16 +67,19 @@ def collate_data(runname, runname_fast, filename=None, regenerate=False, lir_fro
     for i, name in enumerate(basenames):
 
         print 'loading '+name.split('/')[-1]
+
         ### make sure all files exist
         try:
             res, _, model, prosp = load_prospector_data(name)
             if runname_fast is not None:
-                prosp_fast = load_prospector_extra(basenames_fast[i])
+                fres, _, fmodel, prosp_fast = load_prospector_data(basenames_fast[i])
+            else:
+                prosp_fast = None
         except:
             print name.split('/')[-1]+' failed to load. skipping.'
             continue
 
-        if prosp is None:
+        if (prosp is None) or ((prosp_fast is None) & (runname_fast is not None)):
             continue
 
         ### prospector first
@@ -126,7 +131,10 @@ def collate_data(runname, runname_fast, filename=None, regenerate=False, lir_fro
                     x = prosp_fast[loc][par][q]
                     if par == 'stellar_mass' or par == 'ssfr_100':
                         x = np.log10(x)
-                    outprosp_fast[par][q].append(x)
+                    try:
+                        outprosp_fast[par][q].append(x)
+                    except KeyError:
+                        continue
         
         ### now FAST, UV+IR SFRs
         # find correct field, find ID match
@@ -180,24 +188,29 @@ def do_all(runname='td_massive', runname_fast='fast_mimic',outfolder=None,**opts
 
     data = collate_data(runname,runname_fast,filename=outfolder+'data/fastcomp.h5',**opts)
 
-    popts = {'fmt':'o', 'capthick':1.5,'elinewidth':1.5,'alpha':0.8,'color':'0.3','ms':9,'markeredgecolor':'k'} # for small samples
+    popts = {'fmt':'o', 'capthick':1.5,'elinewidth':1.5,'alpha':0.8,'color':'0.3','ms':5,'markeredgecolor':'k'} # for small samples
     if len(data['uvir_sfr']) > 400:
         popts = {'fmt':'o', 'capthick':.15,'elinewidth':.15,'alpha':0.5,'color':'0.3','ms':0.1,'markeredgecolor':'k'}
 
     # if we have FAST-mimic runs, do a thorough comparison
     # else just do Prospector-FAST
     if runname_fast is not None:
-        fast_comparison(data['fast'],data['prosp_fast'],data['labels'],data['pnames'],outfolder+'fast_to_fastmimic_comparison.png',popts)
-        fast_comparison(data['prosp_fast'],data['prosp'],data['labels'],data['pnames'],outfolder+'fastmimic_to_palpha_comparison.png',popts)
+        fast_comparison(data['fast'],data['prosp_fast'],data['labels'],data['pnames'],
+                        outfolder+'fast_to_fastmimic_comparison.png',popts,plabel='FAST-mimic')
+        fast_comparison(data['prosp_fast'],data['prosp'],data['labels'],data['pnames'],
+                        outfolder+'fastmimic_to_palpha_comparison.png',popts,flabel='FAST-mimic')
+        fast_comparison(data['fast'],data['prosp'],data['labels'],data['pnames'],
+                        outfolder+'fast_to_palpha_comparison.png',popts)
     else:
-        fast_comparison(data['fast'],data['prosp'],data['labels'],data['pnames'],outfolder+'fast_to_palpha_comparison.png',popts)
+        fast_comparison(data['fast'],data['prosp'],data['labels'],data['pnames'],
+                        outfolder+'fast_to_palpha_comparison.png',popts)
 
-    mass_redshift_offset(data['fast'], data['prosp'], outfolder+'deltam_vs_z.png')
+    mass_redshift_offset(data['fast'], data['prosp'], outfolder+'deltam_vs_z.png', filename=outfolder+'data/masscomp.h5')
     prospector_versus_z(data,outfolder+'prospector_versus_z.png',popts)
-    uvir_comparison(data,outfolder+'uvir_comparison',popts)
+    uvir_comparison(data,outfolder+'uvir_comparison',popts, filename=outfolder+'data/ssfrcomp.h5')
     uvir_comparison(data,outfolder+'uvir_comparison_model',  popts, model_uvir = True)
 
-def fast_comparison(fast,prosp,parlabels,pnames,outname,popts):
+def fast_comparison(fast,prosp,parlabels,pnames,outname,popts,flabel='FAST',plabel='Prospector'):
     
     fig, axes = plt.subplots(2, 2, figsize = (6,6))
     axes = np.ravel(axes)
@@ -247,9 +260,9 @@ def fast_comparison(fast,prosp,parlabels,pnames,outname,popts):
             axes[i].tick_params('both', pad=3.5, size=3.5, width=1.0, which='both')
 
         elif 'mass' in par:
-            axes[i] = prosp_dutils.equalize_axes(axes[i], xfast, yprosp, dynrange=0.01, line_of_equality=True)
             axes[i].set_xlim(8.5,12)
             axes[i].set_ylim(8.5,12)
+            axes[i].plot([8.5,12],[8.5,12],linestyle='--',color='0.1',alpha=0.8)
             off,scat = prosp_dutils.offset_and_scatter(xfast[good],yprosp[good],biweight=True)
         else:
             axes[i] = prosp_dutils.equalize_axes(axes[i], xfast, yprosp, dynrange=0.1, line_of_equality=True)
@@ -265,8 +278,8 @@ def fast_comparison(fast,prosp,parlabels,pnames,outname,popts):
                      transform = axes[i].transAxes,horizontalalignment='right')
         axes[i].text(0.985,0.03, 'biweight scatter='+"{:.2f}".format(scat)+scatunits,
                      transform = axes[i].transAxes,horizontalalignment='right')
-        axes[i].set_xlabel('FAST '+ parlabels[pnames==par][0])
-        axes[i].set_ylabel('Prospector '+  parlabels[pnames==par][0])
+        axes[i].set_xlabel(flabel + ' ' + parlabels[pnames==par][0])
+        axes[i].set_ylabel(plabel + ' ' +  parlabels[pnames==par][0])
 
     plt.tight_layout()
     plt.savefig(outname,dpi=dpi)
@@ -315,7 +328,7 @@ def prospector_versus_z(data,outname,popts):
     plt.savefig(outname,dpi=dpi)
     plt.close()
 
-def mass_redshift_offset(fast, prosp, outname):
+def mass_redshift_offset(fast, prosp, outname, filename=None):
 
     # plot
     fig, ax = plt.subplots(1, 1, figsize = (3.5,3.5))
@@ -330,26 +343,36 @@ def mass_redshift_offset(fast, prosp, outname):
     zbins = np.linspace(0.5,3,6)
     nbins = len(zbins)-1
     cmap = prosp_dutils.get_cmap(nbins,cmap='plasma')
+    xmed, ymed, zmed = [], [], []
     for i in range(nbins):
         inbin = (fast['z'] > zbins[i]) & (fast['z'] <= zbins[i+1])
-        x,y = mprosp[inbin], delta_m[inbin]
+        if inbin.sum() == 0:
+            continue
+        x,y = mfast[inbin], delta_m[inbin]
 
-        xmed, ymed, bincount = prosp_dutils.running_median(x,y,avg=False,return_bincount=True)
-        xmed, ymed = xmed[bincount > 10], ymed[bincount>10]
-        ax.plot(xmed, ymed, color=cmap(i),lw=2,alpha=0.95,label="{0:.1f}".format(zbins[i])+'<z<'+"{0:.1f}".format(zbins[i+1]))
+        x, y, bincount = prosp_dutils.running_median(x,y,avg=False,return_bincount=True)
+        x, y = x[bincount > nbin_min], y[bincount > nbin_min]
+        ax.plot(x, y, color=cmap(i),lw=2,alpha=0.95,label="{0:.1f}".format(zbins[i])+'<z<'+"{0:.1f}".format(zbins[i+1]))
+        xmed += x.tolist()
+        ymed += y.tolist()
+        zmed += [(zbins[i]+zbins[i+1])/2.]*len(y)
 
     ax.axhline(0, linestyle='--', color='red', lw=2,zorder=-1)
-    ax.set_xlabel(r'log(M$_{\mathrm{Prosp}}$/M$_{\odot}$)')
+    ax.set_xlabel(r'log(M$_{\mathrm{FAST}}$/M$_{\odot}$)')
     ax.set_ylabel(r'log(M$_{\mathrm{Prosp}}$/M$_{\mathrm{FAST}}$)')
     ax.legend(prop={'size':8}, scatterpoints=1,fancybox=True)
     ax.set_ylim(-0.5,0.5)
+
+    if filename is not None:
+        out = {'fast_mass': xmed, 'log_mprosp_mfast': ymed, 'z': zmed}
+        hickle.dump(out,open(filename, "w"))
 
     plt.tight_layout()
     plt.savefig(outname+'.png',dpi=dpi)
     plt.close()
 
 
-def uvir_comparison(data, outname, popts, model_uvir = False, simulate_nondetections=True):
+def uvir_comparison(data, outname, popts, model_uvir = False, simulate_nondetections=False, filename=None):
     """ plot sSFR_prosp versus sSFR_UVIR against a variety of variables
     what drives the differences?
     model_uvir: instead of using LIR + LUV from observations + templates,
@@ -360,16 +383,13 @@ def uvir_comparison(data, outname, popts, model_uvir = False, simulate_nondetect
     sfr_prosp, sfr_prosp_up, sfr_prosp_down = data['prosp']['sfr_100']['q50'], data['prosp']['sfr_100']['q84'], data['prosp']['sfr_100']['q16']
     ssfr_prosp, ssfr_prosp_up, ssfr_prosp_down = 10**data['prosp']['ssfr_100']['q50'], 10**data['prosp']['ssfr_100']['q84'], 10**data['prosp']['ssfr_100']['q16']
 
-    logzsol = data['prosp']['massmet_2']['q50']
-    halftime = data['prosp']['half_time']['q50']
-
     qpah, qpah_up, qpah_down = data['prosp']['duste_qpah']['q50'], data['prosp']['duste_qpah']['q84'], data['prosp']['duste_qpah']['q16']
     fagn, fagn_up, fagn_down = data['prosp']['fagn']['q50'], data['prosp']['fagn']['q84'], data['prosp']['fagn']['q16']
 
     # clip to minimum
-    sfr_prosp = np.clip(sfr_prosp,minssfr,np.inf)
-    sfr_prosp_up = np.clip(sfr_prosp_up,minssfr,np.inf)
-    sfr_prosp_down = np.clip(sfr_prosp_down,minssfr,np.inf)
+    sfr_prosp = np.clip(sfr_prosp,minsfr,np.inf)
+    sfr_prosp_up = np.clip(sfr_prosp_up,minsfr,np.inf)
+    sfr_prosp_down = np.clip(sfr_prosp_down,minsfr,np.inf)
 
     ssfr_prosp = np.clip(ssfr_prosp,minssfr,np.inf)
     ssfr_prosp_up = np.clip(ssfr_prosp_up,minssfr,np.inf)
@@ -378,13 +398,12 @@ def uvir_comparison(data, outname, popts, model_uvir = False, simulate_nondetect
     # calculate UV_IR SFRs, and ratios
     # different if we use model or observed UVIR SFRs
     if model_uvir == False:
-        ssfr_uvir = np.clip(data['uvir_sfr']/10**data['prosp']['stellar_mass']['q50'],minssfr,np.inf)
+        ssfr_uvir = np.clip(data['uvir_sfr']/10**data['fast']['stellar_mass'],minssfr,np.inf)
         sfr_uvir = np.clip(data['uvir_sfr'],minsfr,np.inf)
         ssfr_uvir_err, sfr_uvir_err = None, None
         sfr_ratio, sfr_ratio_up, sfr_ratio_down = np.log10(sfr_prosp/sfr_uvir), np.log10(sfr_prosp_up/sfr_uvir), np.log10(sfr_prosp_down/sfr_uvir)
         ssfr_label = 'sSFR$_{\mathrm{UVIR,obs}}$'
         sfr_label = 'SFR$_{\mathrm{UVIR,obs}}$'
-
     else:
         sfr_uvir = data['prosp']['model_uvir_sfr']['q50']
         sfr_uvir_err = prosp_dutils.asym_errors(sfr_uvir,data['prosp']['model_uvir_sfr']['q84'], data['prosp']['model_uvir_sfr']['q16'])
@@ -394,20 +413,20 @@ def uvir_comparison(data, outname, popts, model_uvir = False, simulate_nondetect
         ssfr_label = 'sSFR$_{\mathrm{UVIR,mod}}$'
         sfr_label = 'SFR$_{\mathrm{UVIR,mod}}$'
 
-    #  define flag where minimum was enforced 
+    # define flag where minimum was enforced 
     # these aren't used in offset/scatter calculations
     # or plotted in the trends with SFR ratio (redshift, qpah, fagn)
     # if we want to simulate nondetections in model space, we can add in clipping there
-    # in that case we have to redfine the UVIR SFR errors to include nondetections
+    # in that case we have to redefine the UVIR SFR errors to include nondetections
     good = (ssfr_uvir != minssfr) & (ssfr_prosp != minssfr) & (data['uv_sfr'] > -1) & (data['ir_sfr'] > -1)
     if (model_uvir) and (simulate_nondetections):
         good = (data['uvir_sfr']/10**data['prosp']['stellar_mass']['q50'] >= minssfr) & (data['uv_sfr'] > -1) & (data['ir_sfr'] > -1)
-        sfr_uvir_err = prosp_dutils.asym_errors(sfr_uvir[good],data['prosp']['model_uvir_sfr']['q84'][good], data['prosp']['model_uvir_sfr']['q16'][good])
-        ssfr_uvir_err = prosp_dutils.asym_errors(ssfr_uvir[good],data['prosp']['model_uvir_ssfr']['q84'][good], data['prosp']['model_uvir_ssfr']['q16'][good])
 
     # calculate errors for all quantities
     sfr_err = prosp_dutils.asym_errors(sfr_prosp[good], sfr_prosp_up[good], sfr_prosp_down[good], log=False)
     ssfr_err = prosp_dutils.asym_errors(ssfr_prosp[good], ssfr_prosp_up[good], ssfr_prosp_down[good], log=False)
+    sfr_uvir_err = prosp_dutils.asym_errors(sfr_uvir[good],data['prosp']['model_uvir_sfr']['q84'][good], data['prosp']['model_uvir_sfr']['q16'][good])
+    ssfr_uvir_err = prosp_dutils.asym_errors(ssfr_uvir[good],data['prosp']['model_uvir_ssfr']['q84'][good], data['prosp']['model_uvir_ssfr']['q16'][good])
     sfr_ratio_err = prosp_dutils.asym_errors(sfr_ratio[good], sfr_ratio_up[good], sfr_ratio_down[good], log=False)
     qpah_err = prosp_dutils.asym_errors(qpah[good], qpah_up[good], qpah_down[good], log=False)
     fagn_err = prosp_dutils.asym_errors(fagn[good], fagn_up[good], fagn_down[good], log=False)
@@ -420,10 +439,7 @@ def uvir_comparison(data, outname, popts, model_uvir = False, simulate_nondetect
     ax = np.ravel(ax)
 
     # sSFR_prosp versus sSFR_uvir
-    try:
-        ax[0].errorbar(ssfr_uvir[good], ssfr_prosp[good], xerr=ssfr_uvir_err, yerr=ssfr_err, **popts)
-    except:
-        print 1/0
+    ax[0].errorbar(ssfr_uvir[good], ssfr_prosp[good], xerr=ssfr_uvir_err, yerr=ssfr_err, **popts)
 
     ax[0].set_xlabel(ssfr_label)
     ax[0].set_ylabel('sSFR$_{\mathrm{Prosp}}$')
@@ -442,17 +458,22 @@ def uvir_comparison(data, outname, popts, model_uvir = False, simulate_nondetect
     zbins = np.linspace(0.5,3,6)
     nbins = len(zbins)-1
     cmap = prosp_dutils.get_cmap(nbins,cmap='plasma')
+    xmed, ymed, zmed = [], [], []
     for i in range(nbins):
         inbin = (data['fast']['z'][good] > zbins[i]) & (data['fast']['z'][good] <= zbins[i+1])
-        x,y = np.log10(ssfr_prosp[good][inbin]), sfr_ratio[good][inbin]
-        #ax[1].plot(x,y,popts['fmt'],color=cmap(i),alpha=popts['alpha'], ms=popts['ms'])
+        if inbin.sum() == 0:
+            continue
 
-        xmed, ymed, bincount = prosp_dutils.running_median(x,y,avg=False,return_bincount=True)
-        xmed, ymed = xmed[bincount > 10], ymed[bincount>10]
-        ax[1].plot(xmed, ymed, color=cmap(i),lw=2,alpha=0.95,label="{0:.1f}".format(zbins[i])+'<z<'+"{0:.1f}".format(zbins[i+1]))
+        x,y = np.log10(ssfr_uvir[good][inbin]), sfr_ratio[good][inbin]
+        x, y, bincount = prosp_dutils.running_median(x,y,avg=False,return_bincount=True)
+        x, y = x[bincount > nbin_min], y[bincount > nbin_min]
+        ax[1].plot(x, y, color=cmap(i),lw=2,alpha=0.95,label="{0:.1f}".format(zbins[i])+'<z<'+"{0:.1f}".format(zbins[i+1]))
+        xmed += x.tolist()
+        ymed += y.tolist()
+        zmed += [(zbins[i]+zbins[i+1])/2.]*len(y)
 
     ax[1].axhline(0, linestyle='--', color='red', lw=2,zorder=-1)
-    ax[1].set_xlabel('log(sSFR$_{\mathrm{Prosp}}$)')
+    ax[1].set_xlabel('log('+ssfr_label+')')
     ax[1].set_ylabel(r'log(SFR$_{\mathrm{Prosp}}$/'+sfr_label+')')
     ax[1].legend(prop={'size':8}, scatterpoints=1,fancybox=True)
     ax[1].set_ylim(-1,1)
@@ -476,6 +497,10 @@ def uvir_comparison(data, outname, popts, model_uvir = False, simulate_nondetect
 
         ax[2].set_ylim(-3,3)
         ax[3].set_ylim(-3,3)
+
+    if filename is not None:
+        out = {'log_sfruvir_mfast': xmed, 'log_sfrprosp_sfruvir': ymed, 'z': zmed}
+        hickle.dump(out,open(filename, "w"))
 
     plt.tight_layout()
     plt.savefig(outname+'.png',dpi=dpi)

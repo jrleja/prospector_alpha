@@ -518,9 +518,9 @@ def generate_basenames(runname,ancilname=None):
         else:
             parm = parbase+'.py'
 
-    elif 'td' in runname or runname == 'fast_mimic':
+    elif 'td' in runname:
 
-        id_list = os.getenv('APPS')+"/prospector_alpha/data/3dhst/"+runname+".ids"
+        id_list = os.getenv('APPS')+"/prospector_alpha/data/3dhst/td.ids"
         ids = np.loadtxt(id_list, dtype='|S60',delimiter=',')
         ngals = len(ids)
 

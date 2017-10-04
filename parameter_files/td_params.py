@@ -36,7 +36,7 @@ run_params = {'verbose':True,
               'compute_vega_mags': False,
               'initial_disp':0.1,
               'interp_type': 'logarithmic',
-              'agelims': [0.0,8.0,8.5,9.0,9.5,9.8,10.0],
+              'agelims': [0.0,7.478,8.0,8.5,9.0,9.5,9.8,10.0],
               # Data info (phot = .cat, dat = .dat, fast = .fout)
               'datdir':APPS+'/prospector_alpha/data/3dhst/',
               'runname': 'td',
@@ -629,14 +629,15 @@ def load_sps(**extras):
     sps = NebSFH(**extras)
     return sps
 
-def load_model(objname=None, datdir=None, runname=None, agelims=[], **extras):
+def load_model(objname=None, datdir=None, runname=None, agelims=[], zred=None, alpha_sfh=0.2, **extras):
 
     ###### REDSHIFT ######
     ### open file, load data
-    datname = datdir + objname.split('_')[0] + '_' + runname + '.dat'
-    dat = ascii.read(datname)
-    idx = dat['phot_id'] == int(objname.split('_')[-1])
-    zred = float(dat['z_best'][idx])
+    if zred is None:
+        datname = datdir + objname.split('_')[0] + '_' + runname + '.dat'
+        dat = ascii.read(datname)
+        idx = dat['phot_id'] == int(objname.split('_')[-1])
+        zred = float(dat['z_best'][idx])
 
     #### CALCULATE TUNIV #####
     tuniv = WMAP9.age(zred).value
@@ -647,7 +648,7 @@ def load_model(objname=None, datdir=None, runname=None, agelims=[], **extras):
         tbinmax = (tuniv-2)*1e9
     else:
         tbinmax = (tuniv-1)*1e9
-    agelims = [agelims[0]] + np.linspace(agelims[1],np.log10(tbinmax),5).tolist() + [np.log10(tuniv*1e9)]
+    agelims = agelims[:2] + np.linspace(agelims[2],np.log10(tbinmax),len(agelims)-3).tolist() + [np.log10(tuniv*1e9)]
     agebins = np.array([agelims[:-1], agelims[1:]])
     ncomp = len(agelims) - 1
 
@@ -660,11 +661,17 @@ def load_model(objname=None, datdir=None, runname=None, agelims=[], **extras):
 
     ### computational z-fraction setup
     # N-1 bins
-    # set initial by drawing randomly from the prior
+    # set initial with a constant SFH
+    # if alpha_SFH is a vector, use this as the alpha array
+    # else assume all alphas are the same
     model_params[n.index('mass')]['N'] = ncomp
     model_params[n.index('z_fraction')]['N'] = ncomp-1
-    tilde_alpha = np.array([ncomp-i for i in xrange(1,ncomp)])
-    model_params[n.index('z_fraction')]['prior'] = priors.Beta(alpha=tilde_alpha, beta=np.ones_like(tilde_alpha),mini=0.0,maxi=1.0)
+    if type(alpha_sfh) != type(np.array([])):
+        alpha = np.repeat(alpha_sfh,ncomp-1)
+    else:
+        alpha = alpha_sfh
+    tilde_alpha = np.array([alpha[i-1:].sum() for i in xrange(1,ncomp)])
+    model_params[n.index('z_fraction')]['prior'] = priors.Beta(alpha=tilde_alpha, beta=alpha, mini=0.0, maxi=1.0)
     model_params[n.index('z_fraction')]['init'] = np.array([(i-1)/float(i) for i in range(ncomp,1,-1)])
     model_params[n.index('z_fraction')]['init_disp'] = 0.02
 
