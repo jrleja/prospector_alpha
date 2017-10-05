@@ -46,7 +46,7 @@ run_params = {'verbose':True,
 # OBS
 #############
 
-def load_obs(objname=None, datdir=None, runname=None, err_floor=0.05, zperr=True, **extras):
+def load_obs(objname=None, datdir=None, runname=None, err_floor=0.05, zperr=True, no_zp_corrs=False, **extras):
 
     ''' 
     objname: number of object in the 3D-HST COSMOS photometric catalog
@@ -83,18 +83,28 @@ def load_obs(objname=None, datdir=None, runname=None, err_floor=0.05, zperr=True
     maggies = flux/(1e10)
     maggies_unc = unc/(1e10)
 
-    ### implement error floor
-    maggies_unc = np.clip(maggies_unc, maggies*err_floor, np.inf)
-
-    ### inflate errors by zeropoint offsets from Table 11, Skelton+14
+    # deal with the zeropoint errors
     # ~5% to ~20% effect
-    if zperr:
+    # either REMOVE them or INFLATE THE ERRORS by them
+    # in general, we don't inflate errors of space-based bands
+    # if use_zp is set, RE-APPLY these offsets
+    if (zperr) or (use_zp):
+        no_zp_correction = ['irac1','irac2','irac3','irac4','f435w','f606w','f606wcand','f775w','f814w',
+                            'f814wcand','f850lp','f850lpcand','f125w','f140w','f160w']
         zp_offsets = load_zp_offsets(None)
         band_names = np.array([x['Band'].lower()+'_'+x['Field'].lower() for x in zp_offsets])
         for ii,f in enumerate(filters):
             match = band_names == f
             if match.sum():
-                maggies_unc[ii] = ( (maggies_unc[ii]**2) + (maggies[ii]*(1-zp_offsets[match]['Flux-Correction'][0]))**2 ) **0.5
+                in_exempt = len([s for s in no_zp_correction if s in f])
+                if (no_zp_corrs) & (not in_exempt):
+                    maggies[ii] /= zp_offsets[match]['Flux-Correction'][0]
+                    maggies_unc[ii] /= zp_offsets[match]['Flux-Correction'][0]
+                if zperr & (not in_exempt):
+                    maggies_unc[ii] = ( (maggies_unc[ii]**2) + (maggies[ii]*(1-zp_offsets[match]['Flux-Correction'][0]))**2 ) **0.5
+
+    ### implement error floor
+    maggies_unc = np.clip(maggies_unc, maggies*err_floor, np.inf)
 
     ### if we have super negative flux, then mask it !
     ### where super negative is <0 with 95% certainty

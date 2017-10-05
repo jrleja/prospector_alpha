@@ -7,14 +7,16 @@ from astropy.cosmology import WMAP9
 
 apps = os.getenv('APPS')
 
-def remove_zp_offsets(field,phot,bands_exempt=None):
-
+def remove_zp_offsets(field,phot,no_zp_correction=None):
+    # by default, don't correct the space-based photometry
     zp_offsets = td_io.load_zp_offsets(field)
     nbands     = len(zp_offsets)
-
+    if no_zp_correction is None:
+        no_zp_correction = ['irac1','irac2','irac3','irac4','f435w','f606w','f606wcand','f775w','f814w',
+                            'f814wcand','f850lp','f850lpcand','f125w','f140w','f160w']
     for kk in xrange(nbands):
         filter = zp_offsets[kk]['Band'].lower()+'_'+field.lower()
-        if zp_offsets[kk]['Band'].lower() not in bands_exempt:
+        if zp_offsets[kk]['Band'].lower() in no_zp_correction:
             phot['f_'+filter] = phot['f_'+filter]/zp_offsets[kk]['Flux-Correction']
             phot['e_'+filter] = phot['e_'+filter]/zp_offsets[kk]['Flux-Correction']
 
@@ -170,10 +172,7 @@ def build_sample(sample=None):
 
         # are we removing the zeropoint offsets? (don't do space photometry!)
         if sample['rm_zp_offsets']:
-            bands_exempt = ['irac1','irac2','irac3','irac4',\
-                            'f606w','f814w','f125w','f140w',\
-                            'f160w','mips_24um']
-            phot = remove_zp_offsets(field,phot,bands_exempt=bands_exempt)
+            phot = remove_zp_offsets(field,phot)
 
         # save for writing out
         out['phot'].append(phot)
@@ -283,10 +282,7 @@ def build_sample_dynamics(sample=dynamic_sample,print_match=True):
 
         # are we removing the zeropoint offsets? (don't do space photometry!)
         if sample['rm_zp_offsets']:
-            bands_exempt = ['irac1_cosmos','irac2_cosmos','irac3_cosmos','irac4_cosmos',\
-                            'f606w_cosmos','f814w_cosmos','f125w_cosmos','f140w_cosmos',\
-                            'f160w_cosmos','mips_24um_cosmos']
-            phot = remove_zp_offsets(field,phot,bands_exempt=bands_exempt)
+            phot = remove_zp_offsets(field,phot)
 
         # include bezanson catalog info
         not_to_save = ['z', 'ID', 'Filter']
@@ -450,10 +446,7 @@ def build_sample_onekrun(rm_zp_offsets=True):
             phot_out.rename_column(column, column.lower()+'_'+field.lower())    
 
     if rm_zp_offsets:
-        bands_exempt = ['irac1_cosmos','irac2_cosmos','irac3_cosmos','irac4_cosmos',\
-                        'f606w_cosmos','f814w_cosmos','f125w_cosmos','f140w_cosmos',\
-                        'f160w_cosmos','mips_24um_cosmos']
-        phot_out = remove_zp_offsets(field,phot_out,bands_exempt=bands_exempt)
+        phot_out = remove_zp_offsets(field,phot_out)
 
     ascii.write(phot_out, output=phot_str_out, 
                 delimiter=' ', format='commented_header')

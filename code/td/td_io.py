@@ -56,10 +56,6 @@ def load_mips_data(field,objnum=None,zbest=True,process=True):
 
 def load_zp_offsets(field):
 
-    ### add in dash
-    if field == 'GOODSN' or field == 'GOODSS':
-        field = field[:5]+'-'+field[5]
-
     filename = os.getenv('APPS')+'/prospector_alpha/data/3dhst/zp_offsets_tbl11_skel14.txt'
     with open(filename, 'r') as f:
         for jj in range(1): hdr = f.readline().split()
@@ -70,7 +66,7 @@ def load_zp_offsets(field):
         good = dat['Field'] == field
         if np.sum(good) == 0:
             print 'Not an acceptable field name! Returning None'
-            return None
+            print 1/0
         else:
             dat = dat[good]
 
