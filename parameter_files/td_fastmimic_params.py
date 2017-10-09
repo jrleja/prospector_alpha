@@ -43,7 +43,7 @@ run_params = {'verbose':True,
 ############
 # OBS
 #############
-def load_obs(objname=None, datdir=None, runname=None, err_floor=0.05, zperr=False, no_zp_corrs=True, **extras):
+def load_obs(objname=None, datdir=None, runname=None, err_floor=0.05, zperr=True, no_zp_corrs=False, **extras):
     """
     objname: number of object in the 3D-HST COSMOS photometric catalog
     err_floor: the fractional error floor (0.05 = 5% floor)
@@ -77,7 +77,7 @@ def load_obs(objname=None, datdir=None, runname=None, err_floor=0.05, zperr=Fals
     # either REMOVE them or INFLATE THE ERRORS by them
     # in general, we don't inflate errors of space-based bands
     # if use_zp is set, RE-APPLY these offsets
-    if (zperr) or (use_zp):
+    if (zperr) or (no_zp_corrs):
         no_zp_correction = ['irac1','irac2','irac3','irac4','f435w','f606w','f606wcand','f775w','f814w',
                             'f814wcand','f850lp','f850lpcand','f125w','f140w','f160w']
         zp_offsets = load_zp_offsets(None)

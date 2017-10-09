@@ -88,7 +88,7 @@ def load_obs(objname=None, datdir=None, runname=None, err_floor=0.05, zperr=True
     # either REMOVE them or INFLATE THE ERRORS by them
     # in general, we don't inflate errors of space-based bands
     # if use_zp is set, RE-APPLY these offsets
-    if (zperr) or (use_zp):
+    if (zperr) or (no_zp_corrs):
         no_zp_correction = ['irac1','irac2','irac3','irac4','f435w','f606w','f606wcand','f775w','f814w',
                             'f814wcand','f850lp','f850lpcand','f125w','f140w','f160w']
         zp_offsets = load_zp_offsets(None)
@@ -102,7 +102,7 @@ def load_obs(objname=None, datdir=None, runname=None, err_floor=0.05, zperr=True
                     maggies_unc[ii] /= zp_offsets[match]['Flux-Correction'][0]
                 if zperr & (not in_exempt):
                     maggies_unc[ii] = ( (maggies_unc[ii]**2) + (maggies[ii]*(1-zp_offsets[match]['Flux-Correction'][0]))**2 ) **0.5
-
+    print 1/0
     ### implement error floor
     maggies_unc = np.clip(maggies_unc, maggies*err_floor, np.inf)
 
