@@ -102,7 +102,7 @@ def load_obs(objname=None, datdir=None, runname=None, err_floor=0.05, zperr=True
                     maggies_unc[ii] /= zp_offsets[match]['Flux-Correction'][0]
                 if zperr & (not in_exempt):
                     maggies_unc[ii] = ( (maggies_unc[ii]**2) + (maggies[ii]*(1-zp_offsets[match]['Flux-Correction'][0]))**2 ) **0.5
-    print 1/0
+
     ### implement error floor
     maggies_unc = np.clip(maggies_unc, maggies*err_floor, np.inf)
 
