@@ -25,27 +25,14 @@ def collate_data(runname, filename=None, regenerate=False, nsamp=100, add_fagn=T
         with open(filename, "r") as f:
             outdict=hickle.load(f)
 
-        '''
-        ### fill output containers
-        basenames, _, _ = prosp_dutils.generate_basenames(runname)
-        logzsol = []
-        for i, name in enumerate(basenames):
-
-            # load input
-            try:
-                prosp = load_prospector_extra(name)
-            except:
-                print name.split('/')[-1]+' failed to load. skipping.'
-                continue
-            if prosp is None:
-                continue
-
-            logzsol.append(prosp['thetas']['massmet_2']['q50'])
-
-        outdict['logzsol'] = np.array(logzsol)
-        hickle.dump(outdict,open(filename, "w"))
-        '''
         return outdict
+
+    # load obs dict and sps object
+    # we only want these once, they're heavy
+    run_params = pfile.run_params
+    sps = pfile.load_sps(**run_params)
+    obs = pfile.load_obs(**run_params)
+    objnames = np.genfromtxt(run_params['datdir']+run_params['runname']+'.ids',dtype=[('objnames', '|S40')])
 
     ### define output containers
     sfr_uvir_obs, fagn, objname = [], [], []
@@ -71,10 +58,10 @@ def collate_data(runname, filename=None, regenerate=False, nsamp=100, add_fagn=T
     allfields = np.unique(field).tolist()
     for f in allfields:
         uvirlist.append(td_io.load_mips_data(f))
-
+    basenames = basenames[:100]
     for i, name in enumerate(basenames):
 
-        # load input
+        # load output from fit
         try:
             res, _, model, prosp = load_prospector_data(name)
         except:
@@ -86,17 +73,9 @@ def collate_data(runname, filename=None, regenerate=False, nsamp=100, add_fagn=T
         objname.append(name.split('/')[-1])
         print 'loaded '+objname[-1]
 
-        ### calculuate UV+IR SFRs from model, as fraction of each stellar population
-        run_params = pfile.run_params
-
-        ### we only want these once, they're heavy
-        if i == 0:
-            sps = pfile.load_sps(**run_params)
-            obs = pfile.load_obs(**run_params)
-            objnames = np.genfromtxt(run_params['datdir']+run_params['runname']+'.ids',dtype=[('objnames', '|S40')])
-
-        #### clear out mass dependency in model
-        # this is clever... I think?
+        # generate two new models
+        # one has all of the 'depends_on' functions stripped
+        # so we can update masses without having them overridden by the z_fraction variables
         run_params['objname'] = objnames['objnames'][i]
         oldmodel = pfile.load_model(**run_params)
         model_params = copy.deepcopy(oldmodel.config_list)
@@ -105,15 +84,19 @@ def collate_data(runname, filename=None, regenerate=False, nsamp=100, add_fagn=T
                 model_params[j].pop('depends_on', None)
         model = sedmodel.SedModel(model_params)
 
-        ### calculate original UVIR SFR, plus without young stars / AGN
-        # if we only do it once, use best-fit
-        # otherwise, sample from posterior
+        # if we only sample once, use best-fit
+        # otherwise, take `nsamp` samples from posterior
         if nsamp == 1:
             sample_idx = [res['lnprobability'].argmax()]
         else:
             weights = res['weights'][prosp['sample_idx']]
             sample_idx = np.random.choice(prosp['sample_idx'], size=nsamp, p=weights/weights.sum(), replace=False)
 
+        # here we calculate SFR(UV+IR) with LIR + LUV from:
+        # (a) the 'true' L_IR and L_UV,
+        # (b) L_IR estimated from MIPS flux,
+        # (a) true L_IR with no AGN contribution,
+        # (b) true L_IR with only heating from young stars
         true_sfr_uvir_prosp, model_lir_sfr_uvir, sidx_map = [], [], []
         for source in sfr_source_names: sfr_source[source+'_chain'].append([])
         for k, sidx in enumerate(sample_idx):
@@ -121,16 +104,19 @@ def collate_data(runname, filename=None, regenerate=False, nsamp=100, add_fagn=T
             # calculate thetas, bookkeeping
             sidx_map.append(np.where(prosp['sample_idx'] == sidx)[0][0])
             theta = copy.copy(res['chain'][sidx])
+
+            # pass thetas to model with dependencies
+            # then pull out the masses and f_agn
             oldmodel.set_parameters(theta)
             mass = copy.copy(oldmodel.params['mass'])
             fagn_mod = copy.copy(oldmodel.params['fagn'])
 
-            # calculate UVIR SFR
-            # toggle for where to extract LIR from
-            # input flux must be in mJy
+            # calculate UV+IR SFR using new thetas
             out = prosp_dutils.measure_restframe_properties(sps, model = oldmodel, thetas = theta, measure_ir = True, measure_luv = True)
             model_lir_sfr_uvir.append(prosp_dutils.sfr_uvir(out['lir'],out['luv']))
 
+            # also calculate UV+IR SFR a second way, by extrapolating from the MIPS flux
+            # input for this LIR must be in janskies
             midx = np.array(['mips' in u for u in res['obs']['filternames']],dtype=bool)
             mips_flux = prosp['obs']['mags'][sidx_map[-1],midx].squeeze() * 3631 * 1e3
             lir = mips_to_lir(mips_flux, res['model'].params['zred'][0])
@@ -148,8 +134,9 @@ def collate_data(runname, filename=None, regenerate=False, nsamp=100, add_fagn=T
                     theta[model.theta_index['fagn']] = 0.0
                     model.params['mass'] = np.zeros_like(mass)
                     model.params['mass'][0] = mass[0]
-                    out = prosp_dutils.measure_restframe_properties(sps, model = model, thetas = theta,
-                                                                    measure_ir = True, measure_luv = True)
+                    if model.params['agebins'][0][1] != 8:
+                        model.params['mass'][1] = mass[1]
+                    out = prosp_dutils.measure_restframe_properties(sps, model = model, thetas = theta, measure_ir = True, measure_luv = True)
                     model.params['mass'] = mass
                     sfr_source[source+'_chain'][-1] += [prosp_dutils.sfr_uvir(out['lir'],out['luv'])]
 
@@ -349,7 +336,7 @@ def uvir_comparison(data, outfolder,color_by_fagn=False,color_by_logzsol=True):
     cb.solids.set_edgecolor("face")
 
     ### label
-    ax2.set_ylabel('SFR$_{\mathrm{SED}}$/SFR$_{\mathrm{UV+IR}}$')
+    ax2.set_ylabel('SFR$_{\mathrm{Prosp}}$/SFR$_{\mathrm{UV+IR}}$')
     ax2.set_xlabel('fraction of dust heating from young stars')
 
     ### grab quantities for last plot

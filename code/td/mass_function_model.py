@@ -154,7 +154,6 @@ def drho_dt(z, logm_min=9, logm_max=13, dm=0.01, dz=0.001,
     spars, spars_dz = mf_parameters(z), mf_parameters(z+dz)
     phi_dz = 10**mf_phi(spars,logm) - 10**mf_phi(spars_dz,logm)
     if apply_pcorrections:
-        out = load_pcorrections()
         logm += mass_fnc(logm,z)
 
     # now get mass_formed
@@ -202,6 +201,12 @@ def plot_sfrd(logm_min=9,logm_max=13,dm=0.01,use_whit12=False,
     ax.plot(zrange, np.log10(sf_sfrd), color=blue, label='star formation', **popts)
     ax.plot(zrange, np.log10(mf_sfrd), color=red, label='mass function',**popts)
 
+    # plot sfrd
+    phi_madau = 0.015*(1+zrange)**2.7 / (1+((1+zrange)/2.9)**5.6)
+    phi_madau = np.log10(phi_madau) - 0.24 # salpeter correction
+    ax.plot(zrange, phi_madau, color='green', label='Madau et al. 2015', **popts)
+
+    # labels and legends
     ax.set_xlabel('redshift')
     ax.set_ylabel(r'log(SFRD) [M$_{\odot}$/yr]')
 

@@ -12,9 +12,9 @@ plt.ioff()
 red = '#FF3D0D'
 dpi = 160
 
-minlogssfr = -13
+minlogssfr = -15
 minssfr = 10**minlogssfr
-minsfr = 0.01
+minsfr = 0.0001
 
 nbin_min = 10
 
@@ -34,7 +34,7 @@ def collate_data(runname, runname_fast, filename=None, regenerate=False, lir_fro
                  r'f$_{\mathrm{AGN}}$', 'dust index']
     fnames = ['stellar_mass','sfr_100','dust2','ssfr_100','half_time'] # take for fastmimic too
     pnames = fnames+['massmet_2', 'duste_qpah', 'fagn', 'dust_index'] # already calculated in Prospector
-    enames = ['model_uvir_sfr', 'model_uvir_ssfr', 'sfr_ratio'] # must calculate here
+    enames = ['model_uvir_sfr', 'model_uvir_ssfr', 'sfr_ratio','model_uvir_truelir_sfr', 'model_uvir_truelir_ssfr', 'sfr_ratio_truelir'] # must calculate here
     outprosp, outprosp_fast, outfast, outlabels = {},{},{},{}
     sfr_100_uvir, sfr_100_uv, sfr_100_ir = [], [], []
     outfast['z'] = []
@@ -97,17 +97,21 @@ def collate_data(runname, runname_fast, filename=None, regenerate=False, lir_fro
                     x = np.log10(x)
                 outprosp[par][q].append(x)
         
-        # a little extra
-        if lir_from_mips:
-            # input flux must be in mJy
-            midx = np.array(['mips' in u for u in res['obs']['filternames']],dtype=bool)
-            mips_flux = prosp['obs']['mags'][:,midx].squeeze() * 3631 * 1e3
-            lir = mips_to_lir(mips_flux, res['model'].params['zred'][0])
-        else:
-            lir = prosp['extras']['lir']['chain']
-
+        # input flux must be in mJy
+        midx = np.array(['mips' in u for u in res['obs']['filternames']],dtype=bool)
+        mips_flux = prosp['obs']['mags'][:,midx].squeeze() * 3631 * 1e3
+        lir = mips_to_lir(mips_flux, res['model'].params['zred'][0])
         uvir_chain = prosp_dutils.sfr_uvir(lir,prosp['extras']['luv']['chain'])
+
+        truelir = prosp['extras']['lir']['chain']
+        uvir_truelir_chain = prosp_dutils.sfr_uvir(truelir,prosp['extras']['luv']['chain'])
+
         for q in ['q16','q50','q84']: 
+            outprosp['model_uvir_truelir_sfr'][q] += [weighted_quantile(uvir_truelir_chain, np.array([float(q[1:])/100.]),weights=prosp['weights'])[0]]
+            outprosp['model_uvir_truelir_ssfr'][q] += [weighted_quantile(uvir_truelir_chain/prosp['extras']['stellar_mass']['chain'], 
+                                                               np.array([float(q[1:])/100.]),weights=prosp['weights'])[0]]
+            outprosp['sfr_ratio_truelir'][q] += [weighted_quantile(np.log10(prosp['extras']['sfr_100']['chain']/uvir_truelir_chain), 
+                                                         np.array([float(q[1:])/100.]),weights=prosp['weights'])[0]]
             outprosp['model_uvir_sfr'][q] += [weighted_quantile(uvir_chain, np.array([float(q[1:])/100.]),weights=prosp['weights'])[0]]
             outprosp['model_uvir_ssfr'][q] += [weighted_quantile(uvir_chain/prosp['extras']['stellar_mass']['chain'], 
                                                                np.array([float(q[1:])/100.]),weights=prosp['weights'])[0]]
@@ -190,7 +194,7 @@ def do_all(runname='td_massive', runname_fast='fast_mimic',outfolder=None,**opts
 
     popts = {'fmt':'o', 'capthick':1.5,'elinewidth':1.5,'alpha':0.8,'color':'0.3','ms':5,'markeredgecolor':'k'} # for small samples
     if len(data['uvir_sfr']) > 400:
-        popts = {'fmt':'o', 'capthick':.15,'elinewidth':.15,'alpha':0.5,'color':'0.3','ms':0.1,'markeredgecolor':'k'}
+        popts = {'fmt':'o', 'capthick':.15,'elinewidth':.15,'alpha':0.35,'color':'0.3','ms':2, 'errorevery': 5000}
 
     # if we have FAST-mimic runs, do a thorough comparison
     # else just do Prospector-FAST
@@ -205,10 +209,16 @@ def do_all(runname='td_massive', runname_fast='fast_mimic',outfolder=None,**opts
         fast_comparison(data['fast'],data['prosp'],data['labels'],data['pnames'],
                         outfolder+'fast_to_palpha_comparison.png',popts)
 
-    mass_redshift_offset(data['fast'], data['prosp'], outfolder+'deltam_vs_z.png', filename=outfolder+'data/masscomp.h5')
+    mass_metallicity_relationship(data, outfolder+'massmet_vs_z.png', popts)
+    deltam_with_redshift(data['fast'], data['prosp'], outfolder+'deltam_vs_z.png', filename=outfolder+'data/masscomp.h5')
     prospector_versus_z(data,outfolder+'prospector_versus_z.png',popts)
-    uvir_comparison(data,outfolder+'uvir_comparison',popts, filename=outfolder+'data/ssfrcomp.h5')
-    uvir_comparison(data,outfolder+'uvir_comparison_model',  popts, model_uvir = True)
+
+    uvir_comparison(data,outfolder+'sfr_uvir_comparison', popts, ssfr=False)
+    uvir_comparison(data,outfolder+'sfr_uvir_comparison_model',  popts, model_uvir = True, ssfr=False)
+    uvir_comparison(data,outfolder+'sfr_uvir_truelir_comparison_model',  popts, model_uvir = 'true_LIR', ssfr=False)
+    uvir_comparison(data,outfolder+'ssfr_uvir_comparison', popts, filename=outfolder+'data/ssfrcomp.h5', ssfr=True)
+    uvir_comparison(data,outfolder+'ssfr_uvir_comparison_model',  popts, model_uvir = True, ssfr=True)
+    uvir_comparison(data,outfolder+'ssfr_uvir_truelir_comparison_model',  popts, model_uvir = 'true_LIR', ssfr=True)
 
 def fast_comparison(fast,prosp,parlabels,pnames,outname,popts,flabel='FAST',plabel='Prospector'):
     
@@ -328,7 +338,74 @@ def prospector_versus_z(data,outname,popts):
     plt.savefig(outname,dpi=dpi)
     plt.close()
 
-def mass_redshift_offset(fast, prosp, outname, filename=None):
+def mass_metallicity_relationship(data,outname,popts):
+    
+    # plot information
+    fig, axes = plt.subplots(2, 3, figsize = (9,6))
+    fig.subplots_adjust(wspace=0.0,hspace=0.0)
+    axes = np.ravel(axes)
+    xlim = (9,11.5)
+    ylim = (-2,0.5)
+
+    # redshift bins + colors
+    zbins = np.linspace(0.5,3,6)
+    nbins = len(zbins)-1
+    cmap = prosp_dutils.get_cmap(nbins,cmap='plasma')
+
+    # z=0 mass-met
+    massmet = np.loadtxt(os.getenv('APPS')+'/prospector_alpha/data/gallazzi_05_massmet.txt')
+    for i in range(nbins):
+
+        # the main show
+        idx = (data['fast']['z'] > zbins[i]) & (data['fast']['z'] <= zbins[i+1])
+        xm, xm_up, xm_down = [data['prosp']['stellar_mass'][q][idx] for q in ['q50','q84','q16']]
+        yz, yz_up, yz_down = [data['prosp']['massmet_2'][q][idx] for q in ['q50','q84','q16']]
+        xerr = prosp_dutils.asym_errors(xm, xm_up, xm_down)
+        yerr = prosp_dutils.asym_errors(yz, yz_up, yz_down)
+        axes[i+1].errorbar(xm,yz,yerr=yerr,xerr=xerr,**popts)
+
+        # labels
+        if i > 1:
+            axes[i+1].set_xlabel('log(M/M$_{\odot}$)')
+        else:
+            for tl in axes[i+1].get_xticklabels():tl.set_visible(False)
+        if i == 2:
+            axes[i+1].set_ylabel('log(Z/Z$_{\odot}$)')
+            axes[0].set_ylabel('log(Z/Z$_{\odot}$)')
+            for tl in axes[0].get_xticklabels():tl.set_visible(False)
+        else:
+            for tl in axes[i+1].get_yticklabels():tl.set_visible(False)
+
+        # z=0 relationship
+        lw = 1.5
+        color = '0.5'
+        axes[i+1].plot(massmet[:,0], massmet[:,1], color=color, lw=lw, linestyle='--', zorder=-1, label='Gallazzi et al. 2005')
+        axes[i+1].plot(massmet[:,0],massmet[:,2], color=color, lw=lw, zorder=-1)
+        axes[i+1].plot(massmet[:,0],massmet[:,3], color=color, lw=lw, zorder=-1)
+        if i == 0:
+            axes[0].plot(massmet[:,0], massmet[:,1], color=color, lw=lw, linestyle='--', zorder=-1, label='Gallazzi et al. 2005')
+            axes[0].plot(massmet[:,0],massmet[:,2], color=color, lw=lw, zorder=-1)
+            axes[0].plot(massmet[:,0],massmet[:,3], color=color, lw=lw, zorder=-1)
+
+
+        # running median
+        nbin_min = 5
+        x, y, bincount = prosp_dutils.running_median(xm,yz,avg=False,return_bincount=True)
+        x, y = x[bincount > nbin_min], y[bincount > nbin_min]
+        axes[i+1].plot(x, y, color=cmap(i),lw=3,alpha=0.95,label="{0:.1f}".format(zbins[i])+'<z<'+"{0:.1f}".format(zbins[i+1]))
+        axes[0].plot(x, y, color=cmap(i),lw=3,alpha=0.95,label="{0:.1f}".format(zbins[i])+'<z<'+"{0:.1f}".format(zbins[i+1]))
+
+    for a in axes:
+        a.set_xlim(xlim)
+        a.set_ylim(ylim)
+
+    axes[0].legend(loc=4, prop={'size':8},
+                   scatterpoints=1,fancybox=True)
+
+    plt.savefig(outname,dpi=dpi)
+    plt.close()
+
+def deltam_with_redshift(fast, prosp, outname, filename=None):
 
     # plot
     fig, ax = plt.subplots(1, 1, figsize = (3.5,3.5))
@@ -372,85 +449,89 @@ def mass_redshift_offset(fast, prosp, outname, filename=None):
     plt.close()
 
 
-def uvir_comparison(data, outname, popts, model_uvir = False, simulate_nondetections=False, filename=None):
+def uvir_comparison(data, outname, popts, model_uvir = False, ssfr=False, filename=None):
     """ plot sSFR_prosp versus sSFR_UVIR against a variety of variables
     what drives the differences?
     model_uvir: instead of using LIR + LUV from observations + templates,
     calculate directly from Prospector model
     """
 
-    # load up data
-    sfr_prosp, sfr_prosp_up, sfr_prosp_down = data['prosp']['sfr_100']['q50'], data['prosp']['sfr_100']['q84'], data['prosp']['sfr_100']['q16']
-    ssfr_prosp, ssfr_prosp_up, ssfr_prosp_down = 10**data['prosp']['ssfr_100']['q50'], 10**data['prosp']['ssfr_100']['q84'], 10**data['prosp']['ssfr_100']['q16']
+    # define flag where a UV+IR SFR is observed
+    good = (data['uv_sfr'] > -1) & (data['ir_sfr'] > -1)
 
-    qpah, qpah_up, qpah_down = data['prosp']['duste_qpah']['q50'], data['prosp']['duste_qpah']['q84'], data['prosp']['duste_qpah']['q16']
-    fagn, fagn_up, fagn_down = data['prosp']['fagn']['q50'], data['prosp']['fagn']['q84'], data['prosp']['fagn']['q16']
-
-    # clip to minimum
-    sfr_prosp = np.clip(sfr_prosp,minsfr,np.inf)
-    sfr_prosp_up = np.clip(sfr_prosp_up,minsfr,np.inf)
-    sfr_prosp_down = np.clip(sfr_prosp_down,minsfr,np.inf)
-
-    ssfr_prosp = np.clip(ssfr_prosp,minssfr,np.inf)
-    ssfr_prosp_up = np.clip(ssfr_prosp_up,minssfr,np.inf)
-    ssfr_prosp_down = np.clip(ssfr_prosp_down,minssfr,np.inf)
-
-    # calculate UV_IR SFRs, and ratios
-    # different if we use model or observed UVIR SFRs
-    if model_uvir == False:
-        ssfr_uvir = np.clip(data['uvir_sfr']/10**data['fast']['stellar_mass'],minssfr,np.inf)
-        sfr_uvir = np.clip(data['uvir_sfr'],minsfr,np.inf)
-        ssfr_uvir_err, sfr_uvir_err = None, None
-        sfr_ratio, sfr_ratio_up, sfr_ratio_down = np.log10(sfr_prosp/sfr_uvir), np.log10(sfr_prosp_up/sfr_uvir), np.log10(sfr_prosp_down/sfr_uvir)
-        ssfr_label = 'sSFR$_{\mathrm{UVIR,obs}}$'
-        sfr_label = 'SFR$_{\mathrm{UVIR,obs}}$'
+    # load up Prospector data
+    if ssfr:
+        prosp, prosp_up, prosp_down = [10**data['prosp']['ssfr_100'][q][good] for q in ['q50','q84','q16']]
+        prosp_label = 'sSFR$_{\mathrm{Prosp}}$'
     else:
-        sfr_uvir = data['prosp']['model_uvir_sfr']['q50']
-        sfr_uvir_err = prosp_dutils.asym_errors(sfr_uvir,data['prosp']['model_uvir_sfr']['q84'], data['prosp']['model_uvir_sfr']['q16'])
-        ssfr_uvir = data['prosp']['model_uvir_ssfr']['q50']
-        ssfr_uvir_err = prosp_dutils.asym_errors(ssfr_uvir,data['prosp']['model_uvir_ssfr']['q84'], data['prosp']['model_uvir_ssfr']['q16'])
-        sfr_ratio, sfr_ratio_up, sfr_ratio_down = data['prosp']['sfr_ratio']['q50'], data['prosp']['sfr_ratio']['q84'], data['prosp']['sfr_ratio']['q16']
-        ssfr_label = 'sSFR$_{\mathrm{UVIR,mod}}$'
-        sfr_label = 'SFR$_{\mathrm{UVIR,mod}}$'
+        prosp, prosp_up, prosp_down = [data['prosp']['sfr_100'][q][good] for q in ['q50','q84','q16']]
+        prosp_label = 'SFR$_{\mathrm{Prosp}}$'
+    prosp_err = prosp_dutils.asym_errors(prosp, prosp_up, prosp_down, log=False)
 
-    # define flag where minimum was enforced 
-    # these aren't used in offset/scatter calculations
-    # or plotted in the trends with SFR ratio (redshift, qpah, fagn)
-    # if we want to simulate nondetections in model space, we can add in clipping there
-    # in that case we have to redefine the UVIR SFR errors to include nondetections
-    good = (ssfr_uvir != minssfr) & (ssfr_prosp != minssfr) & (data['uv_sfr'] > -1) & (data['ir_sfr'] > -1)
-    if (model_uvir) and (simulate_nondetections):
-        good = (data['uvir_sfr']/10**data['prosp']['stellar_mass']['q50'] >= minssfr) & (data['uv_sfr'] > -1) & (data['ir_sfr'] > -1)
+    qpah, qpah_up, qpah_down = [data['prosp']['duste_qpah'][q][good] for q in ['q50','q84','q16']]
+    fagn, fagn_up, fagn_down = [data['prosp']['fagn'][q][good] for q in ['q50','q84','q16']]
+    qpah_err = prosp_dutils.asym_errors(qpah, qpah_up, qpah_down, log=False)
+    fagn_err = prosp_dutils.asym_errors(fagn, fagn_up, fagn_down, log=False)
 
-    # calculate errors for all quantities
-    sfr_err = prosp_dutils.asym_errors(sfr_prosp[good], sfr_prosp_up[good], sfr_prosp_down[good], log=False)
-    ssfr_err = prosp_dutils.asym_errors(ssfr_prosp[good], ssfr_prosp_up[good], ssfr_prosp_down[good], log=False)
-    sfr_uvir_err = prosp_dutils.asym_errors(sfr_uvir[good],data['prosp']['model_uvir_sfr']['q84'][good], data['prosp']['model_uvir_sfr']['q16'][good])
-    ssfr_uvir_err = prosp_dutils.asym_errors(ssfr_uvir[good],data['prosp']['model_uvir_ssfr']['q84'][good], data['prosp']['model_uvir_ssfr']['q16'][good])
-    sfr_ratio_err = prosp_dutils.asym_errors(sfr_ratio[good], sfr_ratio_up[good], sfr_ratio_down[good], log=False)
-    qpah_err = prosp_dutils.asym_errors(qpah[good], qpah_up[good], qpah_down[good], log=False)
-    fagn_err = prosp_dutils.asym_errors(fagn[good], fagn_up[good], fagn_down[good], log=False)
+    # calculate UV+IR values, and ratios
+    # different if we use model or observed UVIR
+    # and if we use sSFR or SFR
+    if model_uvir:
+
+        if model_uvir == 'true_LIR':
+            lbl = 'model_uvir_truelir'
+            ratio_lbl = 'sfr_ratio_truelir'
+            append_lbl = ' [True L$_{\mathrm{IR}}$]'
+        else:
+            lbl = 'model_uvir'
+            ratio_lbl = 'sfr_ratio'
+            append_lbl = ' [L$_{\mathrm{IR}}$ from MIPS]'
+
+        if ssfr:
+            uvir = data['prosp'][lbl+'_ssfr']['q50'][good]
+            uvir_err = prosp_dutils.asym_errors(uvir,data['prosp'][lbl+'_ssfr']['q84'][good], data['prosp'][lbl+'_ssfr']['q16'][good])
+            ratio, ratio_err = np.log10(prosp/uvir), None
+            uvir_label = 'sSFR$_{\mathrm{UV+IR,mod}}$'+append_lbl
+        else:
+            uvir = data['prosp'][lbl+'_sfr']['q50'][good]
+            uvir_err = prosp_dutils.asym_errors(uvir,data['prosp'][lbl+'_sfr']['q84'][good], data['prosp'][lbl+'_sfr']['q16'][good])
+            ratio, ratio_up, ratio_down = [data['prosp'][ratio_lbl]['q50'][good] for q in ['q50','q84','q16']]
+            ratio_err = prosp_dutils.asym_errors(ratio, ratio_up, ratio_down)
+            uvir_label = 'SFR$_{\mathrm{UV+IR,mod}}$'+append_lbl
+    else:
+        if ssfr:
+            uvir = np.clip(data['uvir_sfr'][good]/10**data['prosp']['stellar_mass']['q50'][good],minssfr,np.inf)
+            uvir_err = None     
+            ratio, ratio_err = np.log10(prosp/uvir), None
+            uvir_label = 'SFR$_{\mathrm{UV+IR,obs}}$/M$_{\mathrm{prosp}}$'
+        else:
+            uvir = np.clip(data['uvir_sfr'][good],minsfr,np.inf)
+            uvir_err = None
+            ratio, ratio_up, ratio_down = np.log10(prosp/uvir), np.log10(prosp_up/uvir), np.log10(prosp_down/uvir)
+            ratio_err = prosp_dutils.asym_errors(ratio, ratio_up, ratio_down)
+            uvir_label = 'SFR$_{\mathrm{UV+IR,obs}}$'
+
+    # remove clips from scatter calculations
+    no_min = (uvir != minssfr) & (prosp != minssfr)
 
     # plot geometry
-    if qpah.sum() != 0:
-        fig, ax = plt.subplots(2, 2, figsize = (7,6.5))
-    else:
-        fig, ax = plt.subplots(1,2,figsize=(12.5,6))
+    fig, ax = plt.subplots(1, 2, figsize = (8,4))
     ax = np.ravel(ax)
 
     # sSFR_prosp versus sSFR_uvir
-    ax[0].errorbar(ssfr_uvir[good], ssfr_prosp[good], xerr=ssfr_uvir_err, yerr=ssfr_err, **popts)
+    ax[0].errorbar(uvir, prosp, xerr=uvir_err, yerr=prosp_err, **popts)
 
-    ax[0].set_xlabel(ssfr_label)
-    ax[0].set_ylabel('sSFR$_{\mathrm{Prosp}}$')
+    ax[0].set_xlabel(uvir_label)
+    ax[0].set_ylabel(prosp_label)
 
     ax[0].set_yscale('log')
     ax[0].set_xscale('log')
 
-    off,scat = prosp_dutils.offset_and_scatter(np.log10(ssfr_uvir[good]),np.log10(ssfr_prosp[good]),biweight=True)
+    off,scat = prosp_dutils.offset_and_scatter(np.log10(uvir[no_min]),np.log10(prosp[no_min]),biweight=True)
     ax[0].text(0.05,0.94, 'offset=' + "{:.2f}".format(off) + ' dex', transform = ax[0].transAxes)
     ax[0].text(0.05,0.89, 'biweight scatter=' + "{:.2f}".format(scat) + ' dex', transform = ax[0].transAxes)
-    min, max = 1e-13,1e-8
+
+    min, max = np.min([prosp.min(),uvir.min()]), np.max([prosp.max(),uvir.max()])
     ax[0].axis([min,max,min,max])
     ax[0].plot([min,max],[min,max],'--', color='red', zorder=2)
 
@@ -464,7 +545,7 @@ def uvir_comparison(data, outname, popts, model_uvir = False, simulate_nondetect
         if inbin.sum() == 0:
             continue
 
-        x,y = np.log10(ssfr_uvir[good][inbin]), sfr_ratio[good][inbin]
+        x,y = np.log10(uvir[inbin]), ratio[inbin]
         x, y, bincount = prosp_dutils.running_median(x,y,avg=False,return_bincount=True)
         x, y = x[bincount > nbin_min], y[bincount > nbin_min]
         ax[1].plot(x, y, color=cmap(i),lw=2,alpha=0.95,label="{0:.1f}".format(zbins[i])+'<z<'+"{0:.1f}".format(zbins[i+1]))
@@ -473,40 +554,42 @@ def uvir_comparison(data, outname, popts, model_uvir = False, simulate_nondetect
         zmed += [(zbins[i]+zbins[i+1])/2.]*len(y)
 
     ax[1].axhline(0, linestyle='--', color='red', lw=2,zorder=-1)
-    ax[1].set_xlabel('log('+ssfr_label+')')
-    ax[1].set_ylabel(r'log(SFR$_{\mathrm{Prosp}}$/'+sfr_label+')')
+    ax[1].set_xlabel('log('+prosp_label+')')
+    ax[1].set_ylabel(r'log('+prosp_label+'/'+uvir_label+')')
     ax[1].legend(prop={'size':8}, scatterpoints=1,fancybox=True)
     ax[1].set_ylim(-1,1)
 
-    # if we are also fitting for (fagn, qpah), throw them in!
-    if ax.shape[0] > 2:
-        ax[2].errorbar(qpah[good], sfr_ratio[good], xerr=qpah_err, yerr=sfr_ratio_err, **popts)
-        ax[3].errorbar(fagn[good], sfr_ratio[good], xerr=fagn_err, yerr=sfr_ratio_err, **popts)
+    plt.tight_layout()
+    plt.savefig(outname+'.png',dpi=dpi)
+    plt.close()
+
+    if filename is not None:
+        out = {'log_sfruvir_mfast': xmed, 'log_sfrprosp_sfruvir': ymed, 'z': zmed}
+        hickle.dump(out,open(filename, "w"))
+
+    if ratio is not None:
+        fig, ax = plt.subplots(1, 2, figsize = (8,4))
+        ax[0].errorbar(qpah, ratio, xerr=qpah_err, yerr=ratio_err, **popts)
+        ax[1].errorbar(fagn, ratio, xerr=fagn_err, yerr=ratio_err, **popts)
         subsx = [(1,3),([1])]
-        for i, a in enumerate(ax[2:]):
+        for i, a in enumerate(ax):
             a.set_xscale('log', subsx=subsx[i])
             a.xaxis.set_minor_formatter(FormatStrFormatter('%2.4g'))
             a.xaxis.set_major_formatter(FormatStrFormatter('%2.4g'))
             for tl in a.get_xticklabels():tl.set_visible(False)
             a.tick_params('both', pad=3.5, size=3.5, width=1.0, which='both')
 
-            a.set_ylabel(r'log(SFR$_{\mathrm{Prosp}}$/'+sfr_label+')')
+            a.set_ylabel(r'log('+prosp_label+'/'+uvir_label+')')
             a.axhline(0, linestyle='--', color='red',lw=2,zorder=-1)
-        ax[2].set_xlabel(data['labels'][data['pnames'] == 'duste_qpah'][0])
-        ax[3].set_xlabel(data['labels'][data['pnames'] == 'fagn'][0])
+        ax[0].set_xlabel(data['labels'][data['pnames'] == 'duste_qpah'][0])
+        ax[1].set_xlabel(data['labels'][data['pnames'] == 'fagn'][0])
 
-        ax[2].set_ylim(-3,3)
-        ax[3].set_ylim(-3,3)
+        ax[0].set_ylim(-3,3)
+        ax[1].set_ylim(-3,3)
 
-    if filename is not None:
-        out = {'log_sfruvir_mfast': xmed, 'log_sfrprosp_sfruvir': ymed, 'z': zmed}
-        hickle.dump(out,open(filename, "w"))
-
-    plt.tight_layout()
-    plt.savefig(outname+'.png',dpi=dpi)
-    plt.close()
-
-
+        plt.tight_layout()
+        plt.savefig(outname+'_par_variation.png',dpi=dpi)
+        plt.close()
 
 
 
