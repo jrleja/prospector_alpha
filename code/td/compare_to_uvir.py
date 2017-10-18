@@ -58,7 +58,7 @@ def collate_data(runname, filename=None, regenerate=False, nsamp=100, add_fagn=T
     allfields = np.unique(field).tolist()
     for f in allfields:
         uvirlist.append(td_io.load_mips_data(f))
-    basenames = basenames[:100]
+
     for i, name in enumerate(basenames):
 
         # load output from fit

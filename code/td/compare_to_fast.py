@@ -6,6 +6,7 @@ from prospector_io import load_prospector_data
 from astropy.cosmology import WMAP9
 from dynesty.plotting import _quantile as weighted_quantile
 from fix_ir_sed import mips_to_lir
+import copy
 
 plt.ioff()
 
@@ -29,15 +30,18 @@ def collate_data(runname, runname_fast, filename=None, regenerate=False, lir_fro
 
     ### define output containers
     parlabels = [r'log(M$_{\mathrm{stellar}}$/M$_{\odot}$)', 'SFR [M$_{\odot}$/yr]',
-                 r'diffuse dust optical depth', r'log(sSFR) [yr$^-1$]',
+                 r'$\tau_{\mathrm{diffuse}}$', r'log(sSFR) [yr$^-1$]',
                  r"t$_{\mathrm{half-mass}}$ [Gyr]", r'log(Z/Z$_{\odot}$)', r'Q$_{\mathrm{PAH}}$',
                  r'f$_{\mathrm{AGN}}$', 'dust index']
     fnames = ['stellar_mass','sfr_100','dust2','ssfr_100','half_time'] # take for fastmimic too
     pnames = fnames+['massmet_2', 'duste_qpah', 'fagn', 'dust_index'] # already calculated in Prospector
     enames = ['model_uvir_sfr', 'model_uvir_ssfr', 'sfr_ratio','model_uvir_truelir_sfr', 'model_uvir_truelir_ssfr', 'sfr_ratio_truelir'] # must calculate here
-    outprosp, outprosp_fast, outfast, outlabels = {},{},{},{}
+
+    outprosp, outprosp_fast, outfast, outlabels = {},{'bfit':{}},{},{}
     sfr_100_uvir, sfr_100_uv, sfr_100_ir = [], [], []
+    phot_chi, phot_percentile, phot_obslam, phot_restlam, phot_fname = [], [], [], [], []
     outfast['z'] = []
+
     for i,par in enumerate(pnames+enames):
         
         ### look for it in FAST
@@ -46,14 +50,14 @@ def collate_data(runname, runname_fast, filename=None, regenerate=False, lir_fro
 
         ### if it's in FAST, it's in Prospector-FAST
         if par in outfast.keys():
-            outprosp_fast[par] = {}
-            outprosp_fast[par]['q50'],outprosp_fast[par]['q84'],outprosp_fast[par]['q16'] = [],[],[]
+            outprosp_fast[par] = {q:[] for q in ['q50','q84','q16']}
+            outprosp_fast['bfit'][par] = []
 
         ### it's always in Prospector
         outprosp[par] = {}
         outprosp[par]['q50'],outprosp[par]['q84'],outprosp[par]['q16'] = [],[],[]
     
-    ### fill output containers
+    # fill output containers
     basenames, _, _ = prosp_dutils.generate_basenames(runname)
     if runname_fast is not None:
         basenames_fast, _, _ = prosp_dutils.generate_basenames(runname_fast)
@@ -64,6 +68,7 @@ def collate_data(runname, runname_fast, filename=None, regenerate=False, lir_fro
     for f in allfields:
         fastlist.append(td_io.load_fast(runname,f))
         uvirlist.append(td_io.load_ancil_data(runname,f))
+
     for i, name in enumerate(basenames):
 
         print 'loading '+name.split('/')[-1]
@@ -79,18 +84,14 @@ def collate_data(runname, runname_fast, filename=None, regenerate=False, lir_fro
             print name.split('/')[-1]+' failed to load. skipping.'
             continue
 
-        if (prosp is None) or ((prosp_fast is None) & (runname_fast is not None)):
+        if (prosp is None) or (model is None) or ((prosp_fast is None) & (runname_fast is not None)):
             continue
 
         ### prospector first
         for par in pnames:
-            
-            ### switch to tell between 'thetas' and 'extras'
             loc = 'thetas'
             if par in prosp['extras'].keys():
                 loc = 'extras'
-            
-            ### fill it up
             for q in ['q16','q50','q84']:
                 x = prosp[loc][par][q]
                 if par == 'stellar_mass' or par == 'ssfr_100':
@@ -118,11 +119,11 @@ def collate_data(runname, runname_fast, filename=None, regenerate=False, lir_fro
             outprosp['sfr_ratio'][q] += [weighted_quantile(np.log10(prosp['extras']['sfr_100']['chain']/uvir_chain), 
                                                          np.array([float(q[1:])/100.]),weights=prosp['weights'])[0]]
 
-        ### prospector-fast
+        # prospector-fast
         if runname_fast is not None:
             for par in pnames:
 
-                ### switch to tell between 'thetas', 'extras', and 'NOT THERE'
+                # switch to tell between 'thetas', 'extras', and 'NOT THERE'
                 if par in prosp_fast['thetas'].keys():
                     loc = 'thetas'
                 elif par in prosp_fast['extras'].keys():
@@ -130,7 +131,7 @@ def collate_data(runname, runname_fast, filename=None, regenerate=False, lir_fro
                 else:
                     continue
 
-                ### fill it up
+                # fill up quantiles
                 for q in ['q16','q50','q84']:
                     x = prosp_fast[loc][par][q]
                     if par == 'stellar_mass' or par == 'ssfr_100':
@@ -140,6 +141,21 @@ def collate_data(runname, runname_fast, filename=None, regenerate=False, lir_fro
                     except KeyError:
                         continue
         
+                # best-fit!
+                # if it's a theta, must generate best-fit
+                if loc == 'thetas':
+                    amax = prosp_fast['sample_idx'][0]
+                    idx = fres['model'].theta_labels().index(par)
+                    x = fres['chain'][amax,idx]
+                else:
+                    x = prosp_fast[loc][par]['chain'][0]
+                if par == 'stellar_mass' or par == 'ssfr_100':
+                    x = np.log10(x)
+                try:
+                    outprosp_fast['bfit'][par].append(x)
+                except KeyError:
+                    continue
+
         ### now FAST, UV+IR SFRs
         # find correct field, find ID match
         fidx = allfields.index(field[i])
@@ -158,6 +174,14 @@ def collate_data(runname, runname_fast, filename=None, regenerate=False, lir_fro
         sfr_100_ir += [uvir['sfr_IR'][u_idx][0]]
         sfr_100_uv += [uvir['sfr_UV'][u_idx][0]]
 
+        # photometry chi, etc.
+        mask = res['obs']['phot_mask']
+        phot_percentile += ((res['obs']['maggies'][mask] - prosp['obs']['mags'][0,mask]) / res['obs']['maggies'][mask]).tolist()
+        phot_chi += ((res['obs']['maggies'][mask] - prosp['obs']['mags'][0,mask]) / res['obs']['maggies_unc'][mask]).tolist()
+        phot_obslam += (res['obs']['wave_effective'][mask]/1e4).tolist()
+        phot_restlam += (res['obs']['wave_effective'][mask]/1e4/(1+outfast['z'][-1])).tolist()
+        phot_fname += [str(fname) for fname in np.array(res['obs']['filternames'])[mask]]
+
     ### turn everything into numpy arrays
     for k1 in outprosp.keys():
         for k2 in outprosp[k1].keys():
@@ -175,7 +199,12 @@ def collate_data(runname, runname_fast, filename=None, regenerate=False, lir_fro
            'pnames':np.array(pnames),
            'uvir_sfr': np.array(sfr_100_uvir),
            'ir_sfr': np.array(sfr_100_ir),
-           'uv_sfr': np.array(sfr_100_uv)
+           'uv_sfr': np.array(sfr_100_uv),
+           'phot_chi': np.array(phot_chi),
+           'phot_percentile': np.array(phot_percentile),
+           'phot_obslam': np.array(phot_obslam),
+           'phot_restlam': np.array(phot_restlam),
+           'phot_fname': np.array(phot_fname)
           }
 
     ### dump files and return
@@ -196,11 +225,15 @@ def do_all(runname='td_massive', runname_fast='fast_mimic',outfolder=None,**opts
     if len(data['uvir_sfr']) > 400:
         popts = {'fmt':'o', 'capthick':.15,'elinewidth':.15,'alpha':0.35,'color':'0.3','ms':2, 'errorevery': 5000}
 
+    phot_residuals(data,outfolder,popts)
+
     # if we have FAST-mimic runs, do a thorough comparison
     # else just do Prospector-FAST
     if runname_fast is not None:
         fast_comparison(data['fast'],data['prosp_fast'],data['labels'],data['pnames'],
                         outfolder+'fast_to_fastmimic_comparison.png',popts,plabel='FAST-mimic')
+        fast_comparison(data['fast'],data['prosp_fast'],data['labels'],data['pnames'],
+                outfolder+'fast_to_fastmimic_bfit_comparison.png',popts,plabel='FAST-mimic [best-fit]',bfit=True)
         fast_comparison(data['prosp_fast'],data['prosp'],data['labels'],data['pnames'],
                         outfolder+'fastmimic_to_palpha_comparison.png',popts,flabel='FAST-mimic')
         fast_comparison(data['fast'],data['prosp'],data['labels'],data['pnames'],
@@ -213,6 +246,7 @@ def do_all(runname='td_massive', runname_fast='fast_mimic',outfolder=None,**opts
     deltam_with_redshift(data['fast'], data['prosp'], outfolder+'deltam_vs_z.png', filename=outfolder+'data/masscomp.h5')
     prospector_versus_z(data,outfolder+'prospector_versus_z.png',popts)
 
+    # full UV+IR comparison
     uvir_comparison(data,outfolder+'sfr_uvir_comparison', popts, ssfr=False)
     uvir_comparison(data,outfolder+'sfr_uvir_comparison_model',  popts, model_uvir = True, ssfr=False)
     uvir_comparison(data,outfolder+'sfr_uvir_truelir_comparison_model',  popts, model_uvir = 'true_LIR', ssfr=False)
@@ -220,7 +254,7 @@ def do_all(runname='td_massive', runname_fast='fast_mimic',outfolder=None,**opts
     uvir_comparison(data,outfolder+'ssfr_uvir_comparison_model',  popts, model_uvir = True, ssfr=True)
     uvir_comparison(data,outfolder+'ssfr_uvir_truelir_comparison_model',  popts, model_uvir = 'true_LIR', ssfr=True)
 
-def fast_comparison(fast,prosp,parlabels,pnames,outname,popts,flabel='FAST',plabel='Prospector'):
+def fast_comparison(fast,prosp,parlabels,pnames,outname,popts,flabel='FAST',plabel='Prospector',bfit=False):
     
     fig, axes = plt.subplots(2, 2, figsize = (6,6))
     axes = np.ravel(axes)
@@ -233,7 +267,8 @@ def fast_comparison(fast,prosp,parlabels,pnames,outname,popts,flabel='FAST',plab
         else:
             minimum = -np.inf
 
-        ### grab data
+        # grab for FAST
+        # switch for FAST vs non-FAST outputs
         try:
             xfast = np.clip(fast[par]['q50'],minimum,np.inf)
             xfast_up = np.clip(fast[par]['q84'],minimum,np.inf)
@@ -243,10 +278,14 @@ def fast_comparison(fast,prosp,parlabels,pnames,outname,popts,flabel='FAST',plab
             xfast = np.clip(fast[par],minimum,np.inf)
             xerr = None
 
-        yprosp = np.clip(prosp[par]['q50'],minimum,np.inf)
-        yprosp_up = np.clip(prosp[par]['q84'],minimum,np.inf)
-        yprosp_down = np.clip(prosp[par]['q16'],minimum,np.inf)
-        yerr = prosp_dutils.asym_errors(yprosp, yprosp_up, yprosp_down, log=False)
+        if bfit:
+            yprosp = np.clip(prosp['bfit'][par],minimum,np.inf)
+            yerr = None
+        else:
+            yprosp = np.clip(prosp[par]['q50'],minimum,np.inf)
+            yprosp_up = np.clip(prosp[par]['q84'],minimum,np.inf)
+            yprosp_down = np.clip(prosp[par]['q16'],minimum,np.inf)
+            yerr = prosp_dutils.asym_errors(yprosp, yprosp_up, yprosp_down, log=False)
 
         ### plot
         axes[i].errorbar(xfast,yprosp,xerr=xerr,yerr=yerr,**popts)
@@ -337,6 +376,101 @@ def prospector_versus_z(data,outname,popts):
     plt.tight_layout()
     plt.savefig(outname,dpi=dpi)
     plt.close()
+
+def phot_residuals(data,outfolder,popts_orig):
+    """ two plots: 
+    2(chi versus percentiles) by 5 (fields) [obs-frame]
+    2(chi versus percentiles) by 1 [rest-frame]
+    """
+    
+    # pull out field & filter names
+    fields = np.array([f.split('_')[-1] for f in data['phot_fname']])
+    field_names = np.unique(fields)
+    filters = np.array([f.split('_')[0] for f in data['phot_fname']])
+
+    # plot stuff
+    popts = copy.deepcopy(popts_orig)
+    popts['ms'] = 1
+    popts['zorder'] = -5
+    medopts = {'marker':'o','alpha':0.95,'color':'red','ms': 7,'mec':'k','zorder':5}
+    fontsize = 16
+    ylim_chi = (-4,4)
+    ylim_percentile = (-0.25,0.25)
+
+    # residuals, by field and observed-frame filter
+    fig, ax = plt.subplots(5,2, figsize=(8,18))
+    for i,field in enumerate(field_names):
+
+        # determine field and filter names
+        fidx = fields == field
+        fnames = np.unique(filters[fidx])
+
+        # in each field, plot chi and percentile
+        ax[i,0].errorbar(data['phot_obslam'][fidx], data['phot_chi'][fidx], **popts)
+        ax[i,1].errorbar(data['phot_obslam'][fidx], data['phot_percentile'][fidx], **popts)
+
+        # plot the median for these
+        for filter in fnames:
+            fmatch = filters[fidx] == filter
+            lam = data['phot_obslam'][fidx][fmatch][0]
+            ax[i,0].plot(lam, np.median(data['phot_chi'][fidx][fmatch]), **medopts)
+            ax[i,1].plot(lam, np.median(data['phot_percentile'][fidx][fmatch]), **medopts)            
+
+        # labels
+        for a in ax[i,:]: 
+            a.set_xlabel(r'observed wavelength ($\mu$m)',fontsize=fontsize)
+            a.set_xscale('log',nonposx='clip',subsx=(2,4))
+            a.xaxis.set_minor_formatter(FormatStrFormatter('%2.4g'))
+            a.xaxis.set_major_formatter(FormatStrFormatter('%2.4g'))
+            a.tick_params('both', pad=3.5, size=3.5, width=1.0, which='both',labelsize=fontsize)
+            a.axhline(0, linestyle='--', color='k',lw=2,zorder=3)
+            a.text(0.98,0.92,field,fontsize=fontsize,transform=a.transAxes,ha='right')
+
+        ax[i,0].set_ylabel('(f$_{\mathrm{obs}}$-f$_{\mathrm{model}}$)/$\sigma_{\mathrm{obs}}$',fontsize=fontsize)
+        ax[i,1].set_ylabel('(f$_{\mathrm{obs}}$-f$_{\mathrm{model}}$)/f$_{\mathrm{obs}}$',fontsize=fontsize)
+
+        ax[i,0].set_ylim(ylim_chi)
+        ax[i,1].set_ylim(ylim_percentile)
+
+    plt.tight_layout()
+    plt.savefig(outfolder+'residual_by_field.png',dpi=dpi)
+    plt.close()
+ 
+    # residuals by rest-frame wavelength
+    fig, ax = plt.subplots(1,2, figsize=(10,5))
+
+    ax[0].errorbar(data['phot_restlam'], data['phot_chi'], **popts)
+    ax[1].errorbar(data['phot_restlam'], data['phot_percentile'], **popts)
+
+    # plot the median for these
+    for filter in fnames:
+        x, y, bincount = prosp_dutils.running_median(np.log10(data['phot_restlam']),data['phot_chi'],avg=False,return_bincount=True,nbins=20)
+        x, y = x[bincount > nbin_min], y[bincount > nbin_min]
+        ax[0].plot(10**x,y, **medopts)
+
+        x, y, bincount = prosp_dutils.running_median(np.log10(data['phot_restlam']),data['phot_percentile'],avg=False,return_bincount=True,nbins=20)
+        x, y = x[bincount > nbin_min], y[bincount > nbin_min]
+        ax[1].plot(10**x,y, **medopts)
+
+    # labels & scale
+    for a in ax: 
+        a.set_xlabel(r'rest-frame wavelength ($\mu$m)',fontsize=fontsize)
+        a.set_xscale('log',nonposx='clip',subsx=(2,4))
+        a.xaxis.set_minor_formatter(FormatStrFormatter('%2.4g'))
+        a.xaxis.set_major_formatter(FormatStrFormatter('%2.4g'))
+        a.tick_params('both', pad=3.5, size=3.5, width=1.0, which='both',labelsize=fontsize)
+        a.axhline(0, linestyle='--', color='k',lw=2,zorder=3)
+
+    ax[0].set_ylabel('(f$_{\mathrm{obs}}$-f$_{\mathrm{model}}$)/$\sigma_{\mathrm{obs}}$',fontsize=fontsize)
+    ax[1].set_ylabel('(f$_{\mathrm{obs}}$-f$_{\mathrm{model}}$)/f$_{\mathrm{obs}}$',fontsize=fontsize)
+
+    ax[0].set_ylim(ylim_chi)
+    ax[1].set_ylim(ylim_percentile)
+
+    plt.tight_layout()
+    plt.savefig(outfolder+'residual_restframe.png',dpi=dpi)
+    plt.close()
+
 
 def mass_metallicity_relationship(data,outname,popts):
     
@@ -584,7 +718,7 @@ def uvir_comparison(data, outname, popts, model_uvir = False, ssfr=False, filena
         ax[0].set_xlabel(data['labels'][data['pnames'] == 'duste_qpah'][0])
         ax[1].set_xlabel(data['labels'][data['pnames'] == 'fagn'][0])
 
-        ax[0].set_ylim(-3,3)
+        ax[0].set_ylim(-1,1)
         ax[1].set_ylim(-3,3)
 
         plt.tight_layout()

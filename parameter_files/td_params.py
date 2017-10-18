@@ -344,8 +344,8 @@ model_params.append({'name': 'duste_umin', 'N': 1,
                         'units': None,
                         'prior': priors.TopHat(mini=0.1, maxi=25.0)})
 
-model_params.append({'name': 'duste_qpah', 'N': 1, #scale with mass?
-                        'isfree': True,
+model_params.append({'name': 'duste_qpah', 'N': 1,
+                        'isfree': False,
                         'init': 2.0,
                         'init_disp': 3.0,
                         'disp_floor': 3.0,
@@ -426,7 +426,7 @@ model_params.append({'name': 'mass_units', 'N': 1,
 #### resort list of parameters 
 # because we can
 parnames = [m['name'] for m in model_params]
-fit_order = ['massmet','z_fraction', 'dust2', 'dust_index', 'dust1_fraction', 'duste_qpah', 'fagn', 'agn_tau']
+fit_order = ['massmet','z_fraction', 'dust2', 'dust_index', 'dust1_fraction', 'fagn', 'agn_tau']
 tparams = [model_params[parnames.index(i)] for i in fit_order]
 for param in model_params: 
     if param['name'] not in fit_order:
@@ -640,19 +640,21 @@ def load_sps(**extras):
 
 def load_model(objname=None, datdir=None, runname=None, agelims=[], zred=None, alpha_sfh=0.2, **extras):
 
-    ###### REDSHIFT ######
-    ### open file, load data
+    # we'll need this to access specific model parameters
+    n = [p['name'] for p in model_params]
+
+    # first calculate redshift and corresponding t_universe
+    # if no redshift is specified, read from file
     if zred is None:
         datname = datdir + objname.split('_')[0] + '_' + runname + '.dat'
         dat = ascii.read(datname)
         idx = dat['phot_id'] == int(objname.split('_')[-1])
         zred = float(dat['z_best'][idx])
-
-    #### CALCULATE TUNIV #####
     tuniv = WMAP9.age(zred).value
 
-    #### NONPARAMETRIC SFH #####
-    # six bins, four spaced equally in logarithmic space AFTER t=100 Myr + BEFORE tuniv-1 Gyr
+    # now construct the nonparametric SFH
+    # current scheme: six bins, four spaced equally in logarithmic 
+    # space AFTER t=100 Myr + BEFORE tuniv-1 Gyr
     if tuniv > 5:
         tbinmax = (tuniv-2)*1e9
     else:
@@ -661,15 +663,12 @@ def load_model(objname=None, datdir=None, runname=None, agelims=[], zred=None, a
     agebins = np.array([agelims[:-1], agelims[1:]])
     ncomp = len(agelims) - 1
 
-    #### ADJUST MODEL PARAMETERS #####
-    n = [p['name'] for p in model_params]
-
-    #### SET UP AGEBINS
+    # load into `agebins` in the model_params dictionary
     model_params[n.index('agebins')]['N'] = ncomp
     model_params[n.index('agebins')]['init'] = agebins.T
 
-    ### computational z-fraction setup
-    # N-1 bins
+    # now we do the computational z-fraction setup
+    # number of zfrac variables = (number of SFH bins - 1)
     # set initial with a constant SFH
     # if alpha_SFH is a vector, use this as the alpha array
     # else assume all alphas are the same
@@ -684,15 +683,10 @@ def load_model(objname=None, datdir=None, runname=None, agelims=[], zred=None, a
     model_params[n.index('z_fraction')]['init'] = np.array([(i-1)/float(i) for i in range(ncomp,1,-1)])
     model_params[n.index('z_fraction')]['init_disp'] = 0.02
 
-    ### set mass-metallicity prior
+    # set mass-metallicity prior
+    # insert redshift into model dictionary
     model_params[n.index('massmet')]['prior'] = MassMet(z_mini=-1.98, z_maxi=0.19, mass_mini=7, mass_maxi=12.5)
+    model_params[n.index('zred')]['init'] = zred
 
-    #### INSERT REDSHIFT INTO MODEL PARAMETER DICTIONARY ####
-    zind = n.index('zred')
-    model_params[zind]['init'] = zred
-
-    #### CREATE MODEL
-    model = sedmodel.SedModel(model_params)
-
-    return model
+    return sedmodel.SedModel(model_params)
 

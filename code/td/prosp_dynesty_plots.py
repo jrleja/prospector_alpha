@@ -37,77 +37,121 @@ def subcorner(res, eout, parnames, outname=None, maxprob=False):
     for ax in axes.ravel():
         ax.xaxis.set_tick_params(labelsize=tick_fs*.7)
         ax.yaxis.set_tick_params(labelsize=tick_fs*.7)
-        
-    # add SFH plot
-    sfh_ax = fig.add_axes([0.72,0.425,0.25,0.25],zorder=32)
-    add_sfh_plot([eout], fig,
-                 main_color = ['black'],
-                 ax_inset=sfh_ax,
-                 text_size=4,lw=6)
 
-    # create extra parameters
-    axis_size = fig.get_axes()[0].get_position().size
-    xs, ys = 0.44, 0.89
-    xdelta, ydelta = axis_size[0]*1.6, axis_size[1]*2
-    plotloc = 0
+    # extra parameters
     eout_toplot = ['stellar_mass','sfr_100', 'ssfr_100', 'half_time', 'H alpha 6563', 'H alpha/H beta']
     not_log = ['half_time','H alpha/H beta']
     ptitle = [r'log(M$_*$)',r'log(SFR$_{\mathrm{100 Myr}}$)',
               r'log(sSFR$_{\mathrm{100 Myr}}$)',r't$_{\mathrm{half}}$ [Gyr]',
               r'log(EW$_{\mathrm{H \alpha}}$)',r'Balmer decrement']
-    for jj, ename in enumerate(eout_toplot):
 
-        # total obfuscated way to add in axis
-        ax = fig.add_axes([xs+(jj%3)*xdelta, ys-(jj%2)*ydelta, axis_size[0], axis_size[1]])
+    # either we create a new figure for extra parameters
+    # or add to old figure
+    # depending on dimensionality of model (and thus of the plot)
+    if (axes.shape[0] < 6):
 
-        # pull out chain, quantiles
-        weights = eout['weights']
-        if 'H alpha' not in ename:
-            pchain = eout['extras'][ename]['chain']
-            qvalues = [eout['extras'][ename]['q16'],
-                       eout['extras'][ename]['q50'],
-                       eout['extras'][ename]['q84']]
-        elif '6563' in ename:
-            pchain = eout['obs']['elines'][ename]['ew']['chain']
-            qvalues = [eout['obs']['elines'][ename]['ew']['q16'],
-                       eout['obs']['elines'][ename]['ew']['q50'],
-                       eout['obs']['elines'][ename]['ew']['q84']]
-        else:
-            pchain = eout['obs']['elines']['H alpha 6563']['flux']['chain'] / eout['obs']['elines']['H beta 4861']['flux']['chain']
-            qvalues = dyplot._quantile(pchain,np.array([0.16, 0.50, 0.84]),weights=weights)
+        # we usually don't have emission lines
+        eout_toplot, ptitle = eout_toplot[:4], ptitle[:4]
 
-        if ename not in not_log:
-            pchain = np.log10(pchain)
-            qvalues = np.log10(qvalues)
+        # generate fake results file for dynesty
+        nsamp, nvar = eout['weights'].shape[0], len(eout_toplot)
+        fres = {'samples': np.empty(shape=(nsamp,nvar)), 'weights': eout['weights']}
+        for i in range(nvar): 
+            the_chain = eout['extras'][eout_toplot[i]]['chain']
+            if eout_toplot[i] in not_log:
+                fres['samples'][:,i] = the_chain
+            else:
+                fres['samples'][:,i] = np.log10(the_chain)
 
-        # complex smoothing routine to match dynesty
-        bins = int(round(10. / 0.02))
-        n, b = np.histogram(pchain, bins=bins, weights=weights,
-                            range=[pchain.min(),pchain.max()])
-        n = norm_kde(n, 10.)
-        x0 = 0.5 * (b[1:] + b[:-1])
-        y0 = n
-        ax.fill_between(x0, y0, color='k', alpha = 0.6)
+        fig2, axes2 = dyplot.cornerplot(fres, show_titles=True, labels=ptitle, label_kwargs=label_kwargs, title_kwargs=title_kwargs)
+       
+        # add SFH plot
+        sfh_ax = fig2.add_axes([0.7,0.7,0.25,0.25],zorder=32)
+        add_sfh_plot([eout], fig2,
+                     main_color = ['black'],
+                     ax_inset=sfh_ax,
+                     text_size=1.5,lw=2)
+        fig2.savefig('{0}.corner.extra.png'.format(outname))
+        plt.close(fig2)
 
-        # plot and show quantiles
-        for q in qvalues: ax.axvline(q, ls="dashed", color='red')
+    else:
 
-        q_m = qvalues[1]-qvalues[0]
-        q_p = qvalues[2]-qvalues[1]
-        fmt = "{{0:{0}}}".format(".2f").format
-        title = r"${{{0}}}_{{-{1}}}^{{+{2}}}$"
-        title = title.format(fmt(float(qvalues[1])), fmt(float(q_m)), fmt(float(q_p)))
-        title = "{0}\n={1}".format(ptitle[jj], title)
-        ax.set_title(title, va='bottom',**title_kwargs)
-        ax.set_xlabel(ptitle[jj],**label_kwargs)
+        # add SFH plot
+        sfh_ax = fig.add_axes([0.72,0.425,0.25,0.25],zorder=32)
+        add_sfh_plot([eout], fig,
+                     main_color = ['black'],
+                     ax_inset=sfh_ax,
+                     text_size=4,lw=6)
 
-        # set range
-        ax.set_xlim(pchain.min(),pchain.max())
-        ax.set_ylim(0, 1.1 * np.max(n))
-        ax.set_yticklabels([])
-        ax.xaxis.set_major_locator(MaxNLocator(5))
-        [l.set_rotation(45) for l in ax.get_xticklabels()]
-        ax.xaxis.set_tick_params(labelsize=tick_fs*.7)
+        # create extra parameters
+        axis_size = fig.get_axes()[0].get_position().size
+        xs, ys = 0.44, 0.89
+        xdelta, ydelta = axis_size[0]*1.6, axis_size[1]*2
+        plotloc = 0
+        for jj, ename in enumerate(eout_toplot):
+
+            # pull out chain, quantiles
+            weights = eout['weights']
+            if 'H alpha' not in ename:
+                pchain = eout['extras'][ename]['chain']
+                qvalues = [eout['extras'][ename]['q16'],
+                           eout['extras'][ename]['q50'],
+                           eout['extras'][ename]['q84']]
+            elif '6563' in ename:
+                pchain = eout['obs']['elines'][ename]['ew']['chain']
+                qvalues = [eout['obs']['elines'][ename]['ew']['q16'],
+                           eout['obs']['elines'][ename]['ew']['q50'],
+                           eout['obs']['elines'][ename]['ew']['q84']]
+            else:
+                pchain = eout['obs']['elines']['H alpha 6563']['flux']['chain'] / eout['obs']['elines']['H beta 4861']['flux']['chain']
+                qvalues = dyplot._quantile(pchain,np.array([0.16, 0.50, 0.84]),weights=weights)
+
+            # logify. 
+            if ename not in not_log:
+                pchain = np.log10(pchain)
+                qvalues = np.log10(qvalues)
+
+            # make sure we're not producing infinities.
+            # if we are, replace them with minimum.
+            # if everything is infinity, skip and don't add the axis!
+            # one failure mode here: if qvalues include an infinity!
+            infty = ~np.isfinite(pchain)
+            if infty.sum() == pchain.shape[0]:
+                continue
+            if infty.sum():
+                pchain[infty] = pchain[~infty].min()
+
+            # total obfuscated way to add in axis
+            ax = fig.add_axes([xs+(jj%3)*xdelta, ys-(jj%2)*ydelta, axis_size[0], axis_size[1]])
+
+            # complex smoothing routine to match dynesty
+            bins = int(round(10. / 0.02))
+            n, b = np.histogram(pchain, bins=bins, weights=weights,
+                                range=[pchain.min(),pchain.max()])
+            n = norm_kde(n, 10.)
+            x0 = 0.5 * (b[1:] + b[:-1])
+            y0 = n
+            ax.fill_between(x0, y0, color='k', alpha = 0.6)
+
+            # plot and show quantiles
+            for q in qvalues: ax.axvline(q, ls="dashed", color='red')
+
+            q_m = qvalues[1]-qvalues[0]
+            q_p = qvalues[2]-qvalues[1]
+            fmt = "{{0:{0}}}".format(".2f").format
+            title = r"${{{0}}}_{{-{1}}}^{{+{2}}}$"
+            title = title.format(fmt(float(qvalues[1])), fmt(float(q_m)), fmt(float(q_p)))
+            title = "{0}\n={1}".format(ptitle[jj], title)
+            ax.set_title(title, va='bottom',**title_kwargs)
+            ax.set_xlabel(ptitle[jj],**label_kwargs)
+
+            # set range
+            ax.set_xlim(pchain.min(),pchain.max())
+            ax.set_ylim(0, 1.1 * np.max(n))
+            ax.set_yticklabels([])
+            ax.xaxis.set_major_locator(MaxNLocator(5))
+            [l.set_rotation(45) for l in ax.get_xticklabels()]
+            ax.xaxis.set_tick_params(labelsize=tick_fs*.7)
 
     fig.savefig('{0}.corner.png'.format(outname))
     plt.close(fig)

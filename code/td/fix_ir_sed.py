@@ -1,7 +1,7 @@
 import numpy as np
 import prosp_dutils, prospector_io, copy
 import os
-import td_massive_params as pfile
+import td_params as pfile
 from astropy import constants
 from astropy.cosmology import WMAP9
 from scipy.interpolate import interp1d
@@ -32,14 +32,14 @@ def dl07_to_dh02():
     sps = pfile.load_sps(**run_params)
     model = pfile.load_model(**run_params)
     obs = pfile.load_obs(**run_params)
-    mips_idx = [f.name for f in obs['filters']].index('mips_24um_aegis')
+    mips_idx = [f.name for f in obs['filters']].index('mips_24um_goodss')
     model.params['nebemlineinspec'] = True # yeah this is necessary right now
 
     ## generate default model
     theta = copy.copy(model.initial_theta)
     pnames = model.theta_labels()
-    theta[pnames.index('duste_gamma')] = 0.01
-    theta[pnames.index('duste_umin')] = 1.0
+    #theta[pnames.index('duste_gamma')] = 0.01
+    #theta[pnames.index('duste_umin')] = 1.0
     qpah_grid = np.linspace(0,10,101)
 
     ### generate Prospector L_IR
@@ -51,7 +51,7 @@ def dl07_to_dh02():
     lir = prosp_dutils.return_lir(sps.wavelengths,spec)/constants.L_sun.cgs.value
 
     ## range of redshifts
-    zrange = np.linspace(0.1,3,50)
+    zrange = np.linspace(0.5,3,50)
 
     mips_to_lir_dh, mips_to_lir_prosp, qpah_min = [], [], []
     for i, z in enumerate(zrange):
@@ -85,10 +85,23 @@ def dl07_to_dh02():
     ax[1].plot(xplot, np.log10(yplot[0])-np.log10(yplot[1]), 'o',alpha=0.6,linestyle='-',color=color[i],lw=2,label=label[i])
     ax[2].plot(xplot, qpah_min, 'o', alpha=0.6, linestyle='-', color='0.3',lw=2)
 
+    # add in points from Shivaei et al. 2016
+    f24 = np.array([4.7e-3, 21.3e-3, 69.4e-3]) # millijanskies
+    f24_err = np.array([0.4, 0.5, 0.9])
+    lir = np.array([10e10, 16e10, 62e10]) # in Lsun
+    lir_err = np.array([1e10, 2e10, 3e10])
+
+    # build box and fill in
+    f24_lir = np.log10(lir/f24)
+    xr = ax[0].get_xlim()
+    xp = np.array([xr[0], xr[0], xr[1], xr[1]])
+    ax[0].fill_between(xr, [f24_lir.min(),f24_lir.min()],[f24_lir.max(),f24_lir.max()], alpha=0.6, color='red',label='Shivaei+16')
+
+    # labels
     for a in ax: a.set_xlabel('redshift')
-    ax[0].set_ylabel('log(LIR / MIPS flux)')
-    ax[1].set_ylabel(r'$\Delta$ (DH02 - DL07)')
-    ax[2].set_ylabel(r'Q$_{\mathrm{PAH}}$(min)')
+    ax[0].set_ylabel('log(L$_{\mathrm{IR}}$ / f$_{24}$)')
+    ax[1].set_ylabel(r'$\Delta$ (DH02 - DL07) [dex]')
+    ax[2].set_ylabel(r'Q$_{\mathrm{PAH}}$(equivalent)')
 
     ax[0].legend(loc=0, fontsize=12, prop={'size':12}, frameon=True,numpoints=1)
     ax[1].axhline(0, linestyle='--', color='0.5',lw=2,zorder=-1)

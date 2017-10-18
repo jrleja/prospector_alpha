@@ -37,7 +37,7 @@ def sfr_ms(z,logm):
     logm = np.atleast_2d(logm).T
 
     # kick us out if we're doing something bad
-    if (z < 0.5) | (z > 2.5):
+    if (z.any() < 0.5) | (z.any() > 2.5):
         print "we're outside the allowed redshift range. intentionally barfing."
         print 1/0
 
