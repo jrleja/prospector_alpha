@@ -60,7 +60,7 @@ def salim_mainsequence(mass,ssfr=False,**junk):
     salim_sfr = np.log10(10**ssfr_salim*10**mass)
     return salim_sfr
 
-def calculate_mean(frac, ndraw=5e5):
+def calculate_mean(frac, ndraw=500000):
     '''
     given list of N PDFs
     calculate the mean by sampling from the PDFs

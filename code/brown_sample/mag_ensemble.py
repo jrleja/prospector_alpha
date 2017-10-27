@@ -100,7 +100,7 @@ def pdf_distance(chain,truth,truth_chain,bins,delta_functions=False,center_obs=F
     model_pdf,_ = np.histogram(clipped_centered_chain,bins=bins,density=True)
 
     #### observed PDF
-    if (truth_chain == None) or (delta_functions): # we have no errors (dn4000), use delta functions
+    if (truth_chain is None) or (delta_functions): # we have no errors (dn4000), use delta functions
 
         if iteration == 0:
             bias = 0.17
@@ -779,7 +779,7 @@ def fmt_emline_info(alldata,add_abs_err = False):
 
     ##### SIGNAL TO NOISE AND EQW CUTS
     # cuts
-    obslines['sn_cut'] = 8.0
+    obslines['sn_cut'] = 5.0
     obslines['eqw_cut'] = 0.0
     obslines['hdelta_sn_cut'] = 4.0
     obslines['hdelta_eqw_cut'] = -np.inf
@@ -1215,7 +1215,7 @@ def ionization_parameter(e_pinfo, hflag, alldata, outfolder=''):
     d1_idx = pnames == 'dust1_fraction'
     d2_idx = pnames == 'dust2'
     didx_idx = pnames == 'dust_index'
-    ndraw = 1e4
+    ndraw = 10000
     oiii_oii,oiii_oii_edown,oiii_oii_eup = [],[],[]
     for i,dat in enumerate(alldata):
         if keep_idx[i] == False:
@@ -2444,7 +2444,7 @@ def obs_vs_model_bdec(e_pinfo,hflag,outname1='test.png',outname2='test.png'):
     #### create plots
     fig1, ax1 = plt.subplots(1,1, figsize = (6,6))
     fig2, ax2 = plt.subplots(1,2, figsize = (12.5,6))
-    axlims = (-0.15,0.8)
+    axlims = (-0.1,0.55)
     norm_errs = []
     norm_flag = []
 
@@ -2480,8 +2480,8 @@ def obs_vs_model_bdec(e_pinfo,hflag,outname1='test.png',outname2='test.png'):
     #### MAIN FIGURE ERRATA
     #ax1.text(0.04,0.92, r'S/N (H$\alpha$,H$\beta$) > {0}'.format(int(e_pinfo['obs']['sn_cut'])), transform = ax1.transAxes,horizontalalignment='left')
     #ax1.text(0.04,0.92, r'EQW (H$\alpha$,H$\beta$) > {0} $\AA$'.format(int(e_pinfo['obs']['eqw_cut'])), transform = ax1.transAxes,horizontalalignment='left')
-    bpt_legend(ax1,loc=2)
-    ax1.text(0.04,0.87, r'N = '+str(int(np.sum(keep_idx))), transform = ax1.transAxes,horizontalalignment='left')
+    #bpt_legend(ax1,loc=2)
+    #ax1.text(0.04,0.87, r'N = '+str(int(np.sum(keep_idx))), transform = ax1.transAxes,horizontalalignment='left')
     ax1.set_xlabel(r'spectroscopic log(F/F$_0$)$_{\mathrm{H}\alpha}$ - log(F/F$_0$)$_{\mathrm{H}\beta}$')
     ax1.set_ylabel(r'photometric log(F/F$_0$)$_{\mathrm{H}\alpha}$ - log(F/F$_0$)$_{\mathrm{H}\beta}$')
     ax1 = prosp_dutils.equalize_axes(ax1, pl_bdec_measured,pl_bdec_calc_marg[:,0],axlims=axlims)
@@ -2837,7 +2837,6 @@ def plot_emline_comp(alldata,outfolder,hflag):
         (4) model Halpha (from Kennicutt + dust) versus observed Halpha
     '''
 
-    import prospector_io
     ##### Pull relevant information out of alldata
     emline_names = alldata[0]['residuals']['emlines']['em_name']
 

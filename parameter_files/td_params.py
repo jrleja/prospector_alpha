@@ -396,7 +396,7 @@ model_params.append({'name': 'fagn', 'N': 1,
                         'init_disp': 0.03,
                         'disp_floor': 0.02,
                         'units': '',
-                        'prior': priors.LogUniform(mini=1e-5, maxi=3.0)})
+                        'prior': priors.LogUniform(mini=1e-4, maxi=3.0)})
 
 model_params.append({'name': 'agn_tau', 'N': 1,
                         'isfree': True,
@@ -655,10 +655,7 @@ def load_model(objname=None, datdir=None, runname=None, agelims=[], zred=None, a
     # now construct the nonparametric SFH
     # current scheme: six bins, four spaced equally in logarithmic 
     # space AFTER t=100 Myr + BEFORE tuniv-1 Gyr
-    if tuniv > 5:
-        tbinmax = (tuniv-2)*1e9
-    else:
-        tbinmax = (tuniv-1)*1e9
+    tbinmax = (tuniv-1)*1e9
     agelims = agelims[:1] + np.linspace(agelims[1],np.log10(tbinmax),len(agelims)-2).tolist() + [np.log10(tuniv*1e9)]
     agebins = np.array([agelims[:-1], agelims[1:]])
     ncomp = len(agelims) - 1
