@@ -4,6 +4,8 @@ from astropy.io import ascii
 import astropy.coordinates as coords
 from astropy import units as u
 from astropy.cosmology import WMAP9
+from astropy.table import Table
+from scipy.interpolate import interp1d
 
 apps = os.getenv('APPS')
 
@@ -12,7 +14,7 @@ def remove_zp_offsets(field,phot,no_zp_correction=None):
     zp_offsets = td_io.load_zp_offsets(field)
     nbands     = len(zp_offsets)
     if no_zp_correction is None:
-        no_zp_correction = ['irac1','irac2','irac3','irac4','f435w','f606w','f606wcand','f775w','f814w',
+        no_zp_correction = ['f435w','f606w','f606wcand','f775w','f814w',
                             'f814wcand','f850lp','f850lpcand','f125w','f140w','f160w']
     for kk in xrange(nbands):
         filter = zp_offsets[kk]['Band'].lower()+'_'+field.lower()
@@ -37,6 +39,15 @@ def select_td(phot=None,fast=None,zbest=None,gris=None,**extras):
                    ((zbest['z_best_u68'] - zbest['z_best_l68'])/2. < 0.1) & \
                    (zbest['z_best'] - fast['z'] < 0.01)) # this SHOULDN'T matter but some of the FAST z's are not zbest!
     return idx
+
+def select_huge(phot=None,fast=None,zbest=None,gris=None,**extras):
+    np.random.seed(2)
+    idx = np.where((phot['use_phot'] == 1) & 
+                   ((zbest['z_best_u68'] - zbest['z_best_l68'])/2. < 0.1) & \
+                   (phot['f_F160W'] / phot['e_F160W'] > 10) & \
+                   (zbest['z_best'] - fast['z'] < 0.01)) # this SHOULDN'T matter but some of the FAST z's are not zbest!
+    return idx
+
 
 def td_cut(out):
     """ select galaxies spaced evenly in z, mass, sSFR
@@ -94,6 +105,12 @@ def td_cut(out):
         ncut += ngals
 
     return out
+
+huge_sample = {
+             'selection_function': select_huge,
+             'runname': 'td_huge',
+             'rm_zp_offsets': True,
+              }
 
 td_sample = {
              'selection_function': select_td,
@@ -182,6 +199,11 @@ def build_sample(sample=None):
 
     if 'master_cut' in sample.keys():
         out = sample['master_cut'](out) 
+
+    # count galaxies
+    count = 0
+    for i in range(len(out['fast'])): count += len(out['fast'][i])
+    print 'Total of {0} galaxies'.format(count)
 
     # write out for each field
     for i,field in enumerate(fields):
@@ -306,28 +328,99 @@ def build_sample_dynamics(sample=dynamic_sample,print_match=True):
     print 'number of matched galaxies: {0} (out of {1})'.format(len(ids),len(bez))
     ascii.write([ids], output=id_str_out, Writer=ascii.NoHeader,overwrite=True)
 
+def build_sample_hstacks():
+    """select a sample of galaxies from the 3D-HST catalogs for Herschel stacking
+    bin in FAST mass and redshift
+    require SFR(IR+UV) >= SFR(MS) - 0.3 dex
+    """
 
+    ### output
+    fields = ['AEGIS','COSMOS','GOODSN','GOODSS','UDS']
+    outfolder = '/Users/joel/code/python/prospector_alpha/data/3dhst/hstacks/'
+    if not os.path.isdir(outfolder):
+        os.makedirs(outfolder)
 
+    # IDs, masses, redshifts, UV+IR SFRs, coordinates
+    ordered_names = ['ID','ra','dec','zred','log_mass','log_uvir_sfr']
+    out = {q: [] for q in ordered_names}
+    for field in fields:
 
+        # load data
+        print 'loading '+field
+        phot = td_io.load_phot_v41(field)
+        fast = td_io.load_fast_v41(field)
+        zbest = td_io.load_zbest(field)
+        mips = td_io.load_mips_data(field)
+  
+        # make catalog cuts
+        best_z, lmass = np.array(zbest['z_best']), np.array(fast['lmass'])
+        good = np.where((phot['use_phot'] == 1) & \
+                       ((zbest['z_best_u68'] - zbest['z_best_l68'])/2. < 0.1) & \
+                       ((best_z >= 0.5) & (best_z < 3.0)) & \
+                       (phot['f_F160W'] / phot['e_F160W'] > 10) & \
+                       ((best_z - fast['z']) < 0.01) & \
+                       (mips['sfr'] > sfr_ms(best_z,lmass)/2.))
 
+        phot = phot[good]
+        fast = fast[good]
+        zbest = zbest[good]
+        mips = mips[good]
+        gris = gris[good]
 
+        # save outputs
+        # IDs, masses, redshifts, UV+IR SFRs, coordinates 
+        out['ID'] += [field + '_' + str(i) for i in fast['id']]
+        out['zred'] += best_z[good].tolist()
+        out['log_mass'] += lmass[good].tolist()
+        out['log_uvir_sfr'] += np.log10(mips['sfr']).tolist()
+        out['ra'] += phot['ra'].tolist()
+        out['dec'] += phot['dec'].tolist()
 
+    # format output
+    for key in out.keys(): out[key] = np.array(out[key])
+    print 'Total of {0} galaxies'.format(len(out['ID']))
 
+    # now subdivide into mass, Z bins
+    mbins = np.array([9,9.8,10.6,12])
+    zbins = np.array([0.5,1.0,1.5,2.0,2.5,3.0])
+    n_mbins, n_zbins = mbins.shape[0]-1, zbins.shape[0]-1
+    for i in range(n_mbins):
+        for j in range(n_zbins):
+            idx = (out['log_mass'] > mbins[i]) & (out['log_mass'] <= mbins[i+1]) & \
+                  (out['zred'] > zbins[j]) & (out['zred'] <= zbins[j+1])
+            print '{0} < logM < {1}, {2} < z < {3}: {4}'.format(mbins[i],mbins[i+1],zbins[j],zbins[j+1],idx.sum())
 
+            outname = outfolder + 'logm_{:1.2f}_{:1.2f}_z_{:1.2f}_{:1.2f}.cat'.format(mbins[i],mbins[i+1],zbins[j],zbins[j+1])
+            ascii.write([out[key][idx] for key in ordered_names], output=outname, names=ordered_names,
+                        delimiter=' ', format='commented_header',overwrite=True)
 
+def sfr_ms(z,logm):
+    """ returns the SFR of the star-forming sequence from Whitaker+14
+    as a function of mass and redshift
+    note that this is only valid over 0.5 < z < 2.5.
+    we use the quadratic form (as opposed to the broken power law form)
+    """
 
+    # sanitize logm
+    logm = np.atleast_2d(logm).T
+    z = np.atleast_2d(z).T
+    sfr_out = np.zeros_like(logm)
 
+    # parameters from whitaker+14
+    zwhit = np.array([0.75, 1.25, 1.75, 2.25])
+    a = np.array([-27.4,-26.03,-24.04,-19.99])
+    b = np.array([5.02, 4.62, 4.17, 3.44])
+    c = np.array([-0.22, -0.19, -0.16, -0.13])
 
+    # generate SFR(M) at all redshifts 
+    log_sfr = a + b*logm + c*logm**2
 
+    # interpolate to proper redshift
+    for i in range(sfr_out.shape[0]): 
+        tmp = interp1d(zwhit, log_sfr[i,:],fill_value='extrapolate')
+        sfr_out[i] = 10**tmp(z[i])
 
-
-
-
-
-
-
-
-
+    return sfr_out.squeeze()
 
 def calc_uvj_flag(rf):
     """calculate a UVJ flag
@@ -360,178 +453,6 @@ def calc_uvj_flag(rf):
     uvj_flag[outside_box] = 0
     
     return uvj_flag
-
-
-def build_sample_onekrun(rm_zp_offsets=True):
-
-    '''
-    selects a sample of galaxies for 1k run
-    evenly spaced in five redshift bins out to z=3
-    '''
-
-    zbins = [(0.4,0.8),(0.8,1.2),(1.2,1.6),(1.6,2.0),(2.0,2.5)]
-
-    # output
-    field = 'COSMOS'
-    basename = 'onek'
-    fast_str_out = '/Users/joel/code/python/prospector_alpha/data/'+field+'_'+basename+'.fout'
-    ancil_str_out = '/Users/joel/code/python/prospector_alpha/data/'+field+'_'+basename+'.dat'
-    phot_str_out = '/Users/joel/code/python/prospector_alpha/data/'+field+'_'+basename+'.cat'
-    id_str_out   = '/Users/joel/code/python/prospector_alpha/data/'+field+'_'+basename+'.ids'
-
-    # load data
-    # use grism redshift
-    phot = read_sextractor.load_phot_v41(field)
-    fast = read_sextractor.load_fast_v41(field)
-    rf = read_sextractor.load_rf_v41(field)
-    lineinfo = load_linelist()
-    mips = prosp_dutils.load_mips_data(field)
-    
-    # remove junk
-    # 153, 155, 161 are U, V, J
-    good = (phot['use_phot'] == 1) & \
-           (phot['f_IRAC4'] < 1e7) & (phot['f_IRAC3'] < 1e7) & (phot['f_IRAC2'] < 1e7) & (phot['f_IRAC1'] < 1e7) & \
-           (fast['lmass'] > 10.3)
-
-    phot = phot[good]
-    fast = fast[good]
-    rf = rf[good]
-    lineinfo = lineinfo[good]
-    mips = mips[good]
-    
-    # define UVJ flag, S/N, HA EQW
-    uvj_flag = calc_uvj_flag(rf)
-    sn_F160W = phot['f_F160W']/phot['e_F160W']
-    Ha_EQW_obs = lineinfo['Ha_EQW_obs']
-    lineinfo.rename_column('zgris' , 'z')
-    lineinfo['uvj_flag'] = uvj_flag
-    lineinfo['sn_F160W'] = sn_F160W
-
-    # mips
-    phot['f_MIPS_24um'] = mips['f24tot']
-    phot['e_MIPS_24um'] = mips['ef24tot']
-
-    for i in xrange(len(mips.dtype.names)):
-        tempname=mips.dtype.names[i]
-        if tempname != 'z_best' and tempname != 'id':
-            lineinfo[tempname] = mips[tempname]
-        elif tempname == 'z_best':
-            lineinfo['z_sfr'] = mips[tempname]
-    
-    # split into bins
-    ngal = 1000
-    n_per_bin = ngal / len(zbins)
-    
-    for z in zbins:
-        selection = np.where((lineinfo['zbest'] >= z[0]) & (lineinfo['zbest'] < z[1]))[0]
-
-        if np.sum(selection) < n_per_bin:
-            print 'ERROR: Not enough galaxies in bin!'
-            print np.sum(selection),n_per_bin
-                
-        # choose random set of indices
-        random_index = random.sample(xrange(len(selection)), n_per_bin)
-        if z[0] != zbins[0][0]:
-            fast_out = vstack([fast_out,fast[selection[random_index]]])
-            phot_out = vstack([phot_out,phot[selection[random_index]]])
-            lineinfo_out = vstack([lineinfo_out,lineinfo[selection[random_index]]])
-        else:
-            fast_out = fast[selection[random_index]]
-            phot_out = phot[selection[random_index]]
-            lineinfo_out = lineinfo[selection[random_index]]
-    
-    # rename bands in photometric catalogs
-    for column in phot_out.colnames:
-        if column[:2] == 'f_' or column[:2] == 'e_':
-            phot_out.rename_column(column, column.lower()+'_'+field.lower())    
-
-    if rm_zp_offsets:
-        phot_out = remove_zp_offsets(field,phot_out)
-
-    ascii.write(phot_out, output=phot_str_out, 
-                delimiter=' ', format='commented_header')
-    ascii.write(fast_out, output=fast_str_out, 
-                delimiter=' ', format='commented_header',
-                include_names=fast.keys()[:11])
-    ascii.write(lineinfo_out, output=ancil_str_out, 
-                delimiter=' ', format='commented_header')
-    ascii.write([np.array(phot_out['id'],dtype='int')], output=id_str_out, Writer=ascii.NoHeader)
-
-def build_sample_general():
-
-    '''
-    selects a sample of galaxies "randomly"
-    to add: output for the EAZY parameters, so I can include p(z) [or whatever I need for that]
-    '''
-
-    # output
-    field = 'COSMOS'
-    basename = 'gensamp'
-    fast_str_out = '/Users/joel/code/python/prospector_alpha/data/'+field+'_'+basename+'.fout'
-    ancil_str_out = '/Users/joel/code/python/prospector_alpha/data/'+field+'_'+basename+'.dat'
-    phot_str_out = '/Users/joel/code/python/prospector_alpha/data/'+field+'_'+basename+'.cat'
-    id_str_out   = '/Users/joel/code/python/prospector_alpha/data/'+field+'_'+basename+'.ids'
-
-    # load data
-    # use grism redshift
-    phot = read_sextractor.load_phot_v41(field)
-    fast = read_sextractor.load_fast_v41(field)
-    rf = read_sextractor.load_rf_v41(field)
-    lineinfo = load_linelist()
-    mips = prosp_dutils.load_mips_data(os.getenv('APPS')+'/prospector_alpha/data/MIPS/cosmos_3dhst.v4.1.4.sfr')
-    
-    # remove junk
-    # 153, 155, 161 are U, V, J
-    good = (phot['use_phot'] == 1) & \
-           (phot['f_IRAC4'] < 1e7) & (phot['f_IRAC3'] < 1e7) & (phot['f_IRAC2'] < 1e7) & (phot['f_IRAC1'] < 1e7) & \
-           (phot['f_F160W']/phot['e_F160W'] > 100) & (fast['lmass'] > 10)
-
-    phot = phot[good]
-    fast = fast[good]
-    rf = rf[good]
-    lineinfo = lineinfo[good]
-    mips = mips[good]
-    
-    # define UVJ flag, S/N, HA EQW
-    uvj_flag = calc_uvj_flag(rf)
-    sn_F160W = phot['f_F160W']/phot['e_F160W']
-    Ha_EQW_obs = lineinfo['Ha_EQW_obs']
-    lineinfo.rename_column('zgris' , 'z')
-    lineinfo['uvj_flag'] = uvj_flag
-    lineinfo['sn_F160W'] = sn_F160W
-
-    # mips
-    phot['f_MIPS_24um'] = mips['f24tot']
-    phot['e_MIPS_24um'] = mips['ef24tot']
-
-    for i in xrange(len(mips.dtype.names)):
-        tempname=mips.dtype.names[i]
-        if tempname != 'z_best' and tempname != 'id':
-            lineinfo[tempname] = mips[tempname]
-        elif tempname == 'z_best':
-            lineinfo['z_sfr'] = mips[tempname]
-    
-    # split into bins
-    selection = np.arange(0,np.sum(good))
-    random_index = random.sample(xrange(len(selection)), 108)
-    fast_out = fast[selection][random_index]
-    phot_out = phot[selection][random_index]
-    lineinfo = lineinfo[selection][random_index]
-    
-    # rename bands in photometric catalogs
-    for column in phot_out.colnames:
-        if column[:2] == 'f_' or column[:2] == 'e_':
-            phot_out.rename_column(column, column.lower()+'_'+field.lower())    
-
-    ascii.write(phot_out, output=phot_str_out, 
-                delimiter=' ', format='commented_header')
-    ascii.write(fast_out, output=fast_str_out, 
-                delimiter=' ', format='commented_header',
-                include_names=fast.keys()[:11])
-    ascii.write(lineinfo, output=ancil_str_out, 
-                delimiter=' ', format='commented_header')
-    ascii.write([np.array(phot['id'],dtype='int')], output=id_str_out, Writer=ascii.NoHeader)
-    print 1/0
 
 def load_rachel_sample():
 

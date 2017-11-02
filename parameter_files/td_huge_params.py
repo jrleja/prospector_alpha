@@ -21,7 +21,7 @@ jansky_mks = 1e-26
 APPS = os.getenv('APPS')
 run_params = {'verbose':True,
               'debug': False,
-              'outfile': APPS+'/prospector_alpha/results/td/GOODSS_47721',
+              'outfile': APPS+'/prospector_alpha/results/td_huge/AEGIS_3',
               'nofork': True,
               # dynesty params
               'nested_bound': 'multi', # bounding method
@@ -29,7 +29,7 @@ run_params = {'verbose':True,
               'nested_walks': 50, # MC walks
               'nested_nlive_batch': 200, # size of live point "batches"
               'nested_nlive_init': 200, # number of initial live points
-              'nested_weight_kwargs': {'pfrac': 1.0}, # weight posterior over evidence by 100%
+              'nested_weight_kwargs': {'pfrac': 1.0,'post_thresh':np.inf}, # weight posterior over evidence by 100%
               'nested_dlogz_init': 0.01,
               # Model info
               'zcontinuous': 2,
@@ -39,8 +39,8 @@ run_params = {'verbose':True,
               'agelims': [0.0,8.0,8.5,9.0,9.5,9.8,10.0],
               # Data info (phot = .cat, dat = .dat, fast = .fout)
               'datdir':APPS+'/prospector_alpha/data/3dhst/',
-              'runname': 'td',
-              'objname':'GOODSS_47721'
+              'runname': 'td_huge',
+              'objname':'AEGIS_3'
               }
 ############
 # OBS

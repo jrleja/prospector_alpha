@@ -14,7 +14,7 @@ mass_fnc = interp2d(mcorr['fast_mass'], mcorr['z'], mcorr['log_mprosp_mfast'], k
 dloc = '/Users/joel/code/python/prospector_alpha/plots/td/fast_plots/data/ssfrcomp.h5'
 with open(dloc, "r") as f:
     ssfrcorr = hickle.load(f)
-ssfr_fnc = interp2d(ssfrcorr['log_sfruvir_mfast'], ssfrcorr['z'], ssfrcorr['log_sfrprosp_sfruvir'], kind='linear')
+ssfr_fnc = interp2d(ssfrcorr['log_ssfruvir_mfast'], ssfrcorr['z'], ssfrcorr['log_ssfrprosp_ssfruvir'], kind='linear')
 
 def sf_fraction(z,logm):
     """this returns the fraction of star-forming galaxies as a function of 
@@ -37,7 +37,7 @@ def sfr_ms(z,logm):
     logm = np.atleast_2d(logm).T
 
     # kick us out if we're doing something bad
-    if (z.any() < 0.5) | (z.any() > 2.5):
+    if (z < 0.5).any() | (z > 2.5).any():
         print "we're outside the allowed redshift range. intentionally barfing."
         print 1/0
 
@@ -128,7 +128,9 @@ def sfrd(z,logm_min=9, logm_max=13, dm=0.01, use_whit12=False,
         sfr = sfr_ms(z,logm)
     # input: log(sfr[UVIR]/M[fast]), z. output: log(sfr[prosp]/sfr[uvir])
     if apply_pcorrections:
-        sfr += ssfr_fnc(np.log10(sfr/10**logm),z)
+        ssfr = np.log10(sfr/10**logm)
+        ssfr += ssfr_fnc(ssfr,z)
+        sfr = 10**ssfr * 10**logm
 
     # multiply n(M) by SFR(M) to get SFR / Mpc^-3 / dex
     spars = mf_parameters(z,sf=True)
@@ -168,8 +170,39 @@ def drho_dt(z, logm_min=9, logm_max=13, dm=0.01, dz=0.001,
 
     return sfrd
 
+def zfourge_param_rhostar(z, massloss_correction=False, apply_pcorrections=False, logm_interp=11, **opts):
+    """using equation (5) in Tomczak et al. 2014 instead of calculating directly from evolution of mass function
+    this removes the "bump" at z~1.5 which is likely erroneous!
+    applies for 9 < log(M) < 13
+    """
+
+    # this is the function we'll need
+    def zfourge_rhostar(z):
+        a, b = -0.33, 8.75
+        return (a*(1+z)+b)
+
+    # turn into rhodot
+    nz, dz = len(z), 0.005
+    rhodot = np.zeros(nz)
+    for i in range(nz):
+        upz, downz = z[i]+dz/2., z[i]-dz/2.
+        logrho_down = zfourge_rhostar(downz)
+        logrho_up = zfourge_rhostar(upz)
+        if apply_pcorrections:
+            logm_increase = mass_fnc(logm_interp,z[i])[0]
+            logrho_down += logm_increase
+            logrho_up += logm_increase
+        delta_rho = 10**logrho_down - 10**logrho_up
+        delta_t = (WMAP9.age(downz).value - WMAP9.age(upz).value)*1e9
+        rhodot[i] = delta_rho/delta_t
+
+    if massloss_correction:
+        rhodot /= 0.64
+
+    return np.log10(rhodot)
+
 def plot_sfrd(logm_min=9,logm_max=13,dm=0.01,use_whit12=False,
-              massloss_correction=False, apply_pcorrections=False):
+              massloss_correction=False):
     """ compare SFRD from mass function(z) versus observed SFR
     """
 
@@ -181,37 +214,47 @@ def plot_sfrd(logm_min=9,logm_max=13,dm=0.01,use_whit12=False,
             'logm_max': logm_max,
             'dm': dm,
             'use_whit12': use_whit12,
-            'massloss_correction': massloss_correction,
-            'apply_pcorrections': apply_pcorrections
+            'massloss_correction': massloss_correction
            }
 
     # calculate both
-    sf_sfrd, mf_sfrd = [], []
+    mf_sfrd = zfourge_param_rhostar(zrange, **opts)
+    mf_sfrd_prosp = zfourge_param_rhostar(zrange, apply_pcorrections = True, **opts)
+    sf_sfrd, sf_sfrd_prosp,  = [], []
+    # mf_sfrd, mf_sfrd_prosp = [], []
     for z in zrange:
         sf_sfrd += [sfrd(z,**opts)]
-        mf_sfrd += [drho_dt(z, dz=dz, **opts)]
+        sf_sfrd_prosp += [sfrd(z,apply_pcorrections=True,**opts)]
+        # mf_sfrd += [drho_dt(z, dz=dz, **opts)]
+        # mf_sfrd_prosp += [drho_dt(z,apply_pcorrections=True,dz=dz, **opts)]
 
-    # plot both
-    fig, ax = plt.subplots(1,1, figsize=(4, 4))
+    # plot options
     red, blue = '#FF3D0D', '#1C86EE'
     popts = {
              'linewidth': 3,
              'alpha': 0.9
             }
-    ax.plot(zrange, np.log10(sf_sfrd), color=blue, label='star formation', **popts)
-    ax.plot(zrange, np.log10(mf_sfrd), color=red, label='mass function',**popts)
 
-    # plot sfrd
+    # Plot1: change in SFRD
+    fig, ax = plt.subplots(1,2, figsize=(8, 4))
+    ax[0].plot(zrange, np.log10(sf_sfrd), color=blue, label='UV+IR SFRs', **popts)
+    ax[0].plot(zrange, np.log10(sf_sfrd_prosp), '--', color=blue, label='Prospector SFRs', **popts)
+
+    # Plot2: change in phi*
+    ax[1].plot(zrange, mf_sfrd, color=red, label='mass (FAST)',**popts)
+    ax[1].plot(zrange, mf_sfrd_prosp, '--', color=red, label='mass (Prospector)',**popts)
+    #ax[1].plot(zrange, sfrd_zfourge_rhodot, '--', color='purple', label='mass ZFOURGE',**popts)
+
+    # Madau+15
     phi_madau = 0.015*(1+zrange)**2.7 / (1+((1+zrange)/2.9)**5.6)
     phi_madau = np.log10(phi_madau) - 0.24 # salpeter correction
-    ax.plot(zrange, phi_madau, color='green', label='Madau et al. 2015', **popts)
 
-    # labels and legends
-    ax.set_xlabel('redshift')
-    ax.set_ylabel(r'log(SFRD) [M$_{\odot}$/yr]')
-
-    ax.legend(loc=4, prop={'size':12},
-              scatterpoints=1,fancybox=True)
+    # labels, legends, and add Madau
+    for a in ax:
+        a.set_xlabel('redshift')
+        a.set_ylabel(r'log(SFRD) [M$_{\odot}$/yr]')
+        a.plot(zrange, phi_madau, '-', color='green', label='Madau et al. 2015', lw=1.5)
+        a.legend(loc=4, prop={'size':10}, scatterpoints=1,fancybox=True)
 
     plt.tight_layout()
     plt.show()
