@@ -5,7 +5,7 @@
 ### Requested number of nodes
 #SBATCH -N 1
 ### Requested computing time in minutes
-#SBATCH -t 10080
+#SBATCH -t 5760
 ### Partition or queue name
 #SBATCH -p ozone
 ### memory per cpu, in MB
@@ -26,10 +26,10 @@ FIELD2=${OBJID2%_*}
 srun -n 1 --exclusive --mpi=pmi2 python $APPS/prospector/scripts/prospector_dynesty.py \
 --param_file="$APPS"/prospector_alpha/parameter_files/td_huge_params.py \
 --objname="$OBJID1" --nested_dlogz_init=2000 \
---outfile="$APPS"/prospector_alpha/results/td_huge/"FIELD1"/"$OBJID1" &
+--outfile="$APPS"/prospector_alpha/results/td_huge/"$FIELD1"/"$OBJID1" &
 
 srun -n 2 --exclusive --mpi=pmi2 python $APPS/prospector/scripts/prospector_dynesty.py \
 --param_file="$APPS"/prospector_alpha/parameter_files/td_huge_params.py \
 --objname="$OBJID2" --nested_dlogz_init=2000 \
---outfile="$APPS"/prospector_alpha/results/td_huge/"FIELD2"/"$OBJID2" &
+--outfile="$APPS"/prospector_alpha/results/td_huge/"$FIELD2"/"$OBJID2" &
 wait
