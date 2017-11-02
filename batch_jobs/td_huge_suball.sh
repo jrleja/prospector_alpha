@@ -16,18 +16,20 @@
 #SBATCH -o td_huge_%a.out
 #SBATCH -e td_huge_%a.err
 IDFILE=$APPS"/prospector_alpha/data/3dhst/td_huge.ids"
-let n1=SLURM_ARRAY_TASK_ID*2 
-let n2=n1+1 
+n1=`expr $SLURM_ARRAY_TASK_ID \* 2 - 1`
+n2=`expr $n1 + 1`
 OBJID1=$(sed -n "${n1}p" "$IDFILE")
 OBJID2=$(sed -n "${n2}p" "$IDFILE")
+FIELD1=${OBJID1%_*}
+FIELD2=${OBJID2%_*}
 
 srun -n 1 --exclusive --mpi=pmi2 python $APPS/prospector/scripts/prospector_dynesty.py \
 --param_file="$APPS"/prospector_alpha/parameter_files/td_huge_params.py \
---objname="$OBJID1" --dlogz_init=10000000000 \
---outfile="$APPS"/prospector_alpha/results/td_huge/"$OBJID1" &
+--objname="$OBJID1" --nested_dlogz_init=2000 \
+--outfile="$APPS"/prospector_alpha/results/td_huge/"FIELD1"/"$OBJID1" &
 
 srun -n 2 --exclusive --mpi=pmi2 python $APPS/prospector/scripts/prospector_dynesty.py \
 --param_file="$APPS"/prospector_alpha/parameter_files/td_huge_params.py \
---objname="$OBJID2" --dlogz_init=10000000000 \
---outfile="$APPS"/prospector_alpha/results/td_huge/"$OBJID2" &
+--objname="$OBJID2" --nested_dlogz_init=2000 \
+--outfile="$APPS"/prospector_alpha/results/td_huge/"FIELD2"/"$OBJID2" &
 wait
