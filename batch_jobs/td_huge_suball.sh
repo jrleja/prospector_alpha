@@ -16,7 +16,8 @@
 #SBATCH -o td_huge_%a.out
 #SBATCH -e td_huge_%a.err
 IDFILE=$APPS"/prospector_alpha/data/3dhst/td_huge.ids"
-n1=`expr $SLURM_ARRAY_TASK_ID \* 2 - 1`
+x=`expr $SLURM_ARRAY_TASK_ID + 9999`
+n1=`expr $x \* 2 - 1`
 n2=`expr $n1 + 1`
 OBJID1=$(sed -n "${n1}p" "$IDFILE")
 OBJID2=$(sed -n "${n2}p" "$IDFILE")
