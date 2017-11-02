@@ -25,11 +25,11 @@ FIELD2=${OBJID2%_*}
 
 srun -n 1 --exclusive --mpi=pmi2 python $APPS/prospector/scripts/prospector_dynesty.py \
 --param_file="$APPS"/prospector_alpha/parameter_files/td_huge_params.py \
---objname="$OBJID1" --nested_dlogz_init=2000 \
+--objname="$OBJID1" \
 --outfile="$APPS"/prospector_alpha/results/td_huge/"$FIELD1"/"$OBJID1" &
 
-srun -n 2 --exclusive --mpi=pmi2 python $APPS/prospector/scripts/prospector_dynesty.py \
+srun -n 1 --exclusive --mpi=pmi2 python $APPS/prospector/scripts/prospector_dynesty.py \
 --param_file="$APPS"/prospector_alpha/parameter_files/td_huge_params.py \
---objname="$OBJID2" --nested_dlogz_init=2000 \
+--objname="$OBJID2" \
 --outfile="$APPS"/prospector_alpha/results/td_huge/"$FIELD2"/"$OBJID2" &
 wait
