@@ -4,8 +4,9 @@ import numpy as np
 import argparse
 from copy import deepcopy
 from prospector_io import load_prospector_data, create_prosp_filename
-import prosp_dynesty_plots
+# import prosp_dynesty_plots
 from dynesty.plotting import _quantile as weighted_quantile
+from prospect.models import sedmodel
 
 def set_sfh_time_vector(res,ncalc):
     """if parameterized, calculate linearly in 100 steps from t=0 to t=tage
@@ -27,7 +28,7 @@ def set_sfh_time_vector(res,ncalc):
         sys.exit('ERROR: not sure how to set up the time array here!')
     return t
 
-def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=False,
+def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True,
                           **kwargs):
     """calculate extra quantities: star formation history, stellar mass, spectra, photometry, etc
     shorten_spec: if on, return only the 50th / 84th / 16th percentiles. else return all spectra.
@@ -72,9 +73,9 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=False,
         eout['thetas'][p] = {'q50': q50, 'q16': q16, 'q84': q84}
 
     # extras
-    extra_parnames = ['half_time','sfr_100','ssfr_100','stellar_mass','lir','luv','lmir','lbol']
+    extra_parnames = ['half_time','sfr_100','ssfr_100','stellar_mass','lir','luv','lmir','lbol','luv_young','lir_young']
     if 'fagn' in parnames:
-        extra_parnames += ['l_agn', 'fmir']
+        extra_parnames += ['l_agn', 'fmir', 'luv_agn', 'lir_agn']
     for p in extra_parnames: eout['extras'][p] = deepcopy(fmt)
 
     # sfh
@@ -89,6 +90,14 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=False,
     eout['obs']['elines'] = {key: {'ew': deepcopy(fmt), 'flux': deepcopy(fmt)} for key in elines}
     eout['obs']['dn4000'] = deepcopy(fmt)
     res['model'].params['nebemlineinspec'] = True
+
+    # generate model w/o dependencies for young star contribution
+    model_params = deepcopy(res['model'].config_list)
+    for j in range(len(model_params)):
+        if model_params[j]['name'] == 'mass':
+            print model_params[j]['name']
+            model_params[j].pop('depends_on', None)
+    nodep_model = sedmodel.SedModel(model_params)
 
     # sample in the posterior
     for jj,sidx in enumerate(sample_idx):
@@ -130,11 +139,21 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=False,
             eout['obs']['elines'][e]['flux']['chain'][jj] = props['emlines'][e]['flux']
             eout['obs']['elines'][e]['ew']['chain'][jj] = props['emlines'][e]['eqw']
 
+        nagn_thetas = deepcopy(thetas)
         if 'fagn' in parnames:
-            nagn_thetas = deepcopy(thetas)
             nagn_thetas[parnames.index('fagn')] = 0.0
-            props = prosp_dutils.measure_restframe_properties(sps, thetas=nagn_thetas, model=res['model'], measure_mir=True)
+            props = prosp_dutils.measure_restframe_properties(sps, thetas=nagn_thetas, model=res['model'], 
+                                                              measure_mir=True,measure_ir = True, measure_luv = True)
             eout['extras']['fmir']['chain'][jj] = (eout['extras']['lmir']['chain'][jj]-props['lmir'])/eout['extras']['lmir']['chain'][jj]
+            eout['extras']['luv_agn']['chain'][jj] = props['luv']
+            eout['extras']['lir_agn']['chain'][jj] = props['lir']
+
+        # isolate young star contribution
+        nodep_model.params['mass'] = np.zeros_like(res['model'].params['mass'])
+        nodep_model.params['mass'][0] = res['model'].params['mass'][0]
+        out = prosp_dutils.measure_restframe_properties(sps, model = nodep_model, thetas = nagn_thetas, measure_ir = True, measure_luv = True)
+        eout['extras']['luv_young']['chain'][jj] = out['luv']
+        eout['extras']['lir_young']['chain'][jj] = out['lir']
 
         t3 = time.time()
         print('loop {0} took {1}s ({2}s for absorption+emission)'.format(jj,t3 - t1,t3 - t2))
@@ -169,11 +188,18 @@ def post_processing(param_name, objname=None, runname = None, overwrite=True, **
     # bookkeeping: where are we coming from and where are we going?
     pfile = model_setup.import_module_from_file(param_name)
     run_outfile = pfile.run_params['outfile']
+
     if runname is None:
         runname = run_outfile.split('/')[-2]
         obj_outfile = "/".join(run_outfile.split('/')[:-1]) + '/' + objname
     else:
         obj_outfile = "/".join(run_outfile.split('/')[:-2]) + '/' + runname + '/' + objname
+
+    # account for unique td_huge storage situation
+    if 'td_huge' in obj_outfile:
+        field = obj_outfile.split('/')[-1].split('_')[0]
+        obj_outfile = "/".join(obj_outfile.split('/')[:-1])+'/'+field+'/'+obj_outfile.split('/')[-1]  
+
     plot_outfolder = os.getenv('APPS')+'/prospector_alpha/plots/'+runname+'/'
 
     # check for output folder, create if necessary
@@ -206,7 +232,7 @@ def post_processing(param_name, objname=None, runname = None, overwrite=True, **
     hickle.dump(extra_output,open(extra_filename, "w"))
 
     # make standard plots
-    prosp_dynesty_plots.make_all_plots(filebase=obj_outfile,outfolder=plot_outfolder)
+    # prosp_dynesty_plots.make_all_plots(filebase=obj_outfile,outfolder=plot_outfolder)
 
 
 def do_all(param_name=None,runname=None,**kwargs):
