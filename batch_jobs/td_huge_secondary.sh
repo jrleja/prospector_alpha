@@ -16,7 +16,7 @@
 ### mail
 #SBATCH --mail-type=END
 #SBATCH --mail-user=joel.leja@gmail.com
-IDFILE=$APPS"/prospector_alpha/data/3dhst/huge.ids"
+IDFILE=$APPS"/prospector_alpha/data/3dhst/td_huge.ids"
 x=`expr $SLURM_ARRAY_TASK_ID - 1`
 
 for value in {1..16}
