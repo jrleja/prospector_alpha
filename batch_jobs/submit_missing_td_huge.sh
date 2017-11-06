@@ -9,8 +9,10 @@ do
     OBJID=$(sed -n "${n}p" "$IDFILE")
     FIELD=${OBJID%_*}
     mod=${OBJID//[ ]/*}
-    if ! ls $APPS/prospector_alpha/results/td_huge/$field/*$mod*h5 1> /dev/null 2>&1; then
-        sbatch -o td_huge_${value}.out -e td_huge_${value}.err submit_one_td_huge.sh ${OBJID} ${FIELD} $value
+    if ! ls $APPS/prospector_alpha/results/td_huge/$field/*$mod*model 1> /dev/null 2>&1; then
+        OUTFILE="$APPS"/prospector_alpha/results/td_huge/"${FIELD}"/"${OBJID}"
+        echo ${OBJID} ${OUTFILE} $value
+        sbatch -o td_huge_${value}.out -e td_huge_${value}.err submit_one_td_huge.sh ${OBJID} ${OUTFILE}
     fi
 done
 wait
