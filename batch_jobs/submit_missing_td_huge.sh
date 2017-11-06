@@ -8,10 +8,9 @@ for value in {1..54418}
 do
     OBJID=$(sed -n "${n}p" "$IDFILE")
     FIELD=${OBJID%_*}
-
-      if ! ls $APPS/prospector_alpha/results/$runname/*$mod*model 1> /dev/null 2>&1; then
+    mod=${OBJID//[ ]/*}
+    if ! ls $APPS/prospector_alpha/results/td_huge/$field/*$mod*h5 1> /dev/null 2>&1; then
         sbatch -o td_huge_${value}.out -e td_huge_${value}.err submit_one_td_huge.sh ${OBJID} ${FIELD} $value
-      fi
-    sleep 0.5
+    fi
 done
 wait
