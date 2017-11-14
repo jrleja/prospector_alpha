@@ -7,9 +7,9 @@
 ### Requested computing time in minutes
 #SBATCH -t 1440
 ### Partition or queue name
-#SBATCH -p conroy,general,conroy-intel
+#SBATCH -p conroy,general,conroy-intel,shared
 ### memory per cpu, in MB
-#SBATCH --mem-per-cpu=3000
+#SBATCH --mem-per-cpu=4000
 ### Job name
 #SBATCH -J 'bseds_np'
 ### output and error logs
