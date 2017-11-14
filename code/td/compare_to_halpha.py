@@ -4,23 +4,27 @@ import os, hickle, td_io, prosp_dutils
 from prospector_io import load_prospector_extra
 from astropy.cosmology import WMAP9
 from astropy import units as u
+from scipy.interpolate import interp2d
 
 plt.ioff()
 
-plotopts = {
-         'fmt':'o',
-         'ecolor':'k',
-         'capthick':0.4,
-         'elinewidth':0.4,
-         'alpha':0.5,
-         'ms':0.0,
-         'zorder':-2
-        } 
-def collate_data(runname, filename=None, regenerate=False, nsamp=100):
+def nii_ha_ratio():
+    """generates interpolator for the NII / Ha ratio
+    """
+    # table 1 of Faisst et al. 2017
+    zred = np.linspace(0.0,2.6,14)
+    mass = np.linspace(8.5,11.1,14)
+    dat = np.loadtxt(os.getenv('APPS')+'/prospector_alpha/data/faisst_et_al_2017_tbl1.txt',delimiter=',')
+
+    # interpolate
+    func = interp2d(mass, zred, dat, kind='cubic')
+    return func
+
+def collate_data(runname, filename=None, regenerate=False, **opts):
     
     ### if it's already made, load it and give it back
     # else, start with the making!
-    if os.path.isfile(filename) and regenerate == False:
+    if os.path.isfile(filename) and (regenerate == False):
         with open(filename, "r") as f:
             outdict=hickle.load(f)
             return outdict
@@ -40,6 +44,7 @@ def collate_data(runname, filename=None, regenerate=False, nsamp=100):
     ### load up ancillary dataset
     basenames, _, _ = prosp_dutils.generate_basenames(runname)
     field = [name.split('/')[-1].split('_')[0] for name in basenames]
+    nii_ha_fnc = nii_ha_ratio()
 
     ancil = []
     allfields = np.unique(field).tolist()
@@ -55,29 +60,34 @@ def collate_data(runname, filename=None, regenerate=False, nsamp=100):
             print name.split('/')[-1]+' loaded.'
         except:
             continue
+        if prosp is None:
+            continue
         out['objname'].append(name.split('/')[-1])
         objfield = out['objname'][-1].split('_')[0]
         objnumber = int(out['objname'][-1].split('_')[1])
 
-        # fill out model data
+        # fill in model data
         # comes out in rest-frame EW and Lsun
-        hidx = prosp['model_emline']['emnames'] == 'Halpha'
-        for q in qvals: out['ha_ew_mod'][q].append(prosp['model_emline']['eqw'][q][hidx][0])
-        for q in qvals: out['ha_flux_mod'][q].append(prosp['model_emline']['flux'][q][hidx][0])
+        for q in qvals: out['ha_ew_mod'][q].append(prosp['obs']['elines']['H alpha 6563']['ew'][q])
+        for q in qvals: out['ha_flux_mod'][q].append(prosp['obs']['elines']['H alpha 6563']['flux'][q])
 
-        # fill out observed data
-        # comes out in rest-frame EW and (10**-17 ergs / s / cm**2) ?
+        # fill in observed data
+        # comes out in observed-frame EW and (10**-17 ergs / s / cm**2)
         fidx = allfields.index(objfield)
         oidx = ancil[fidx]['phot_id'] == objnumber
 
-        zred = ancil[fidx]['z_max_grism'][oidx][0]
+        # account for NII / Halpha ratio, distance
+        zred = ancil[fidx]['z_best'][oidx][0]
+        mass = np.log10(prosp['extras']['stellar_mass']['q50'])
+        nii_correction = float(1-nii_ha_fnc(mass,zred))
         lumdist = WMAP9.luminosity_distance(zred).value
         dfactor = 4*np.pi*(u.Mpc.to(u.cm) * lumdist)**2
 
-        out['ha_flux_obs']['val'].append(ancil[fidx]['Ha_FLUX'][oidx][0] * 1e-17 * dfactor / 3.846e33)
-        out['ha_flux_obs']['err'].append(ancil[fidx]['Ha_FLUX_ERR'][oidx][0] * 1e-17 * dfactor / 3.846e33)
-        out['ha_ew_obs']['val'].append(ancil[fidx]['Ha_EQW'][oidx][0]/(1+zred))
-        out['ha_ew_obs']['err'].append(ancil[fidx]['Ha_EQW_ERR'][oidx][0]/(1+zred))
+        # fill in and march on
+        out['ha_flux_obs']['val'].append(ancil[fidx]['Ha_FLUX'][oidx][0] * 1e-17 * dfactor / 3.828e33 * nii_correction)
+        out['ha_flux_obs']['err'].append(ancil[fidx]['Ha_FLUX_ERR'][oidx][0] * 1e-17 * dfactor / 3.828e33 * nii_correction)
+        out['ha_ew_obs']['val'].append(ancil[fidx]['Ha_EQW'][oidx][0]/(1+zred) * nii_correction)
+        out['ha_ew_obs']['err'].append(ancil[fidx]['Ha_EQW_ERR'][oidx][0]/(1+zred) * nii_correction)
 
     for key in out.keys():
         if type(out[key]) == dict:
@@ -106,20 +116,30 @@ def plot(data, outfolder):
     # set it up
     fig, ax = plt.subplots(1,2, figsize=(10.5, 5))
     fs = 18 # font size
-    ms = 8
-    alpha = 0.9
-    color = '#545454'
+    symopts = {'ms':1.2,'alpha':0.6,'color':'#545454','linestyle':' '}
+    ebaropts = {'fmt':'o', 'ecolor':'k', 'capthick':0.1, 'elinewidth':0.1, 'alpha':0.3, 'ms':0.0, 'zorder':-2} 
+    sn_limit = 5
+    sn_mod_limit = 5
+
+    # make cuts
+    sn = data['ha_flux_obs']['val'] / data['ha_flux_obs']['err']
+    sn_mod = data['ha_flux_mod']['q50'] / ((data['ha_flux_mod']['q84'] - data['ha_flux_mod']['q16'])/2.)
+    sn_ew = data['ha_ew_obs']['val'] / data['ha_ew_obs']['err']
+    sn_mod_ew = data['ha_ew_mod']['q50'] / ((data['ha_ew_mod']['q84'] - data['ha_ew_mod']['q16'])/2.)
+    idx = (sn > sn_limit) & np.isfinite(sn) & \
+          (sn_mod > sn_mod_limit) & \
+          (sn_ew > sn_limit) & np.isfinite(sn_ew) & \
+          (sn_mod_ew > sn_mod_limit)
+
+    # grab data
+    xplot = data['ha_flux_obs']['val'][idx]
+    yplot = data['ha_flux_mod']['q50'][idx]
+    xplot_err = data['ha_flux_obs']['err'][idx]
+    yplot_err = prosp_dutils.asym_errors(yplot,data['ha_flux_mod']['q84'][idx],data['ha_flux_mod']['q16'][idx])
 
     # make plots
-    xplot = data['ha_flux_obs']['val']
-    yplot = data['ha_flux_mod']['q50']
-    xplot_err = data['ha_flux_obs']['err']
-    yplot_err = prosp_dutils.asym_errors(yplot,data['ha_flux_mod']['q84'],data['ha_flux_mod']['q16'])
-    ax[0].errorbar(xplot, yplot, xerr=xplot_err, yerr=yplot_err,
-                   **plotopts)
-    ax[0].plot(xplot, yplot, 'o', linestyle=' ', 
-               alpha=alpha, markeredgecolor='k',
-               color=color,ms=ms)
+    ax[0].errorbar(xplot, yplot, xerr=xplot_err, yerr=yplot_err, **ebaropts)
+    ax[0].plot(xplot, yplot, 'o', **symopts)
     
     ax[0].set_xlabel(r'observed L(H$\alpha$) [L$_{\odot}$]',fontsize=fs)
     ax[0].set_ylabel(r'model L(H$\alpha$) [L$_{\odot}$]',fontsize=fs)
@@ -130,6 +150,7 @@ def plot(data, outfolder):
 
     ## line of equality + range
     min, max = np.min([xplot.min(),yplot.min()])*0.5, np.max([xplot.max(),yplot.max()])*2
+    min, max = 6e6,5e9
     ax[0].axis((min,max,min,max))
     ax[0].plot([min,max],[min,max],linestyle='--',color='0.1',alpha=0.8)
 
@@ -138,16 +159,15 @@ def plot(data, outfolder):
     ax[0].text(0.02,0.92,'offset='+"{:.2f}".format(off)+' dex',fontsize=fs,transform=ax[0].transAxes)
     ax[0].text(0.02,0.865,'scatter='+"{:.2f}".format(scat)+' dex',fontsize=fs,transform=ax[0].transAxes)
 
+    # grab data
+    xplot = data['ha_ew_obs']['val'][idx]
+    yplot = data['ha_ew_mod']['q50'][idx]
+    xplot_err = data['ha_ew_obs']['err'][idx]
+    yplot_err = prosp_dutils.asym_errors(yplot,data['ha_ew_mod']['q84'][idx],data['ha_ew_mod']['q16'][idx])
+
     # make plots
-    xplot = data['ha_ew_obs']['val']
-    yplot = data['ha_ew_mod']['q50']
-    xplot_err = data['ha_ew_obs']['err']
-    yplot_err = prosp_dutils.asym_errors(yplot,data['ha_ew_mod']['q84'],data['ha_ew_mod']['q16'])
-    ax[1].errorbar(xplot, yplot, xerr=xplot_err, yerr=yplot_err,
-                   **plotopts)
-    ax[1].plot(xplot, yplot, 'o', linestyle=' ', 
-               alpha=alpha, markeredgecolor='k',
-               color=color,ms=ms)
+    ax[1].errorbar(xplot, yplot, xerr=xplot_err, yerr=yplot_err, **ebaropts)
+    ax[1].plot(xplot, yplot, 'o', **symopts)
     
     ax[1].set_xlabel(r'observed EW(H$\alpha$)',fontsize=fs)
     ax[1].set_ylabel(r'model EW(H$\alpha$)',fontsize=fs)
@@ -158,10 +178,11 @@ def plot(data, outfolder):
 
     ## line of equality + range
     min, max = np.min([xplot.min(),yplot.min()])*0.5, np.max([xplot.max(),yplot.max()])*2
+    min, max = 8,1e3
     ax[1].axis((min,max,min,max))
     ax[1].plot([min,max],[min,max],linestyle='--',color='0.1',alpha=0.8)
 
-   # offset and scatter
+    # offset and scatter
     off,scat = prosp_dutils.offset_and_scatter(np.log10(xplot),np.log10(yplot),biweight=True)
     ax[1].text(0.02,0.92,'offset='+"{:.2f}".format(off)+' dex',fontsize=fs,transform=ax[1].transAxes)
     ax[1].text(0.02,0.865,'scatter='+"{:.2f}".format(scat)+' dex',fontsize=fs,transform=ax[1].transAxes)

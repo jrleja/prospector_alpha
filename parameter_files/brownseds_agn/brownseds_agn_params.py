@@ -497,7 +497,7 @@ model_params.append({'name': 'fagn', 'N': 1,
                         'init_disp': 0.05,
                         'disp_floor': 0.01,
                         'units': '',
-                        'prior': priors.LogUniform(mini=1e-5, maxi=3.0)})
+                        'prior': priors.LogUniform(mini=0.000316228, maxi=3.0)})
 
 model_params.append({'name': 'agn_tau', 'N': 1,
                         'isfree': True,

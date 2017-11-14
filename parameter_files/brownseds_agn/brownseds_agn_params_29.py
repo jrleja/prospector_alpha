@@ -497,7 +497,7 @@ model_params.append({'name': 'fagn', 'N': 1,
                         'init_disp': 0.05,
                         'disp_floor': 0.01,
                         'units': '',
-                        'prior': priors.LogUniform(mini=1e-5, maxi=3.0)})
+                        'prior': priors.LogUniform(mini=0.000316228, maxi=3.0)})
 
 model_params.append({'name': 'agn_tau', 'N': 1,
                         'isfree': True,
@@ -697,7 +697,7 @@ def load_model(objname='',datname='', agelims=[], **extras):
     model_params[n.index('z_fraction')]['N'] = ncomp-1
     tilde_alpha = np.array([ncomp-i for i in xrange(1,ncomp)])
     model_params[n.index('z_fraction')]['prior'] = priors.Beta(alpha=tilde_alpha, beta=np.ones_like(tilde_alpha),mini=0.0,maxi=1.0)
-    model_params[n.index('z_fraction')]['init'] = np.array([(i-1)/float(i) for i in range(ncomp+1,1,-1)])
+    model_params[n.index('z_fraction')]['init'] = np.array([(i-1)/float(i) for i in range(ncomp,1,-1)])
     model_params[n.index('z_fraction')]['init_disp'] = 0.02
 
     model_params[n.index('sfr_fraction')]['N'] = ncomp-1

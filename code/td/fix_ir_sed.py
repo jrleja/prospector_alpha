@@ -127,7 +127,7 @@ def mips_to_lir(mips_flux,z):
     # else, scale the nearest conversion factor by the 
     # ratio of luminosity distances, since nonlinear error due to distances will dominate
     if z > 0.1:
-        intfnc = interp1d(conversion['Redshift'],conversion['fac_MIPS24um'], bounds_error = True, fill_value = 0)
+        intfnc = interp1d(conversion['Redshift'],conversion['fac_MIPS24um'], bounds_error = False, fill_value = 0)
         fac = intfnc(z)
     else:
         near_idx = np.abs(conversion['Redshift']-z).argmin()

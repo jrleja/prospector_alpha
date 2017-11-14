@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import os, hickle, td_io, prosp_dutils, copy
 from prospector_io import load_prospector_data
 from astropy.cosmology import WMAP9
-import td_params as pfile
+import td_huge_params as pfile
 from matplotlib.ticker import MaxNLocator, FormatStrFormatter
 from dynesty.plotting import _quantile as weighted_quantile
 
@@ -15,7 +15,7 @@ dpi = 160
 cmap = 'cool'
 minsfr = 0.01
 
-def do_all(runname='td', outfolder=None,**opts):
+def do_all(runname='td_huge', outfolder=None,**opts):
 
     if outfolder is None:
         outfolder = os.getenv('APPS') + '/prospector_alpha/plots/'+runname+'/fast_plots/'
@@ -29,9 +29,9 @@ def do_all(runname='td', outfolder=None,**opts):
               'nbins_vertical':4,              # number of bins in vertical stack
               'horizontal_bin_colors': ['#45ADA8','#FC913A','#FF4E50'],
               'vertical_bin_colors': ['red','#FC913A','#45ADA8','#323299'],
-              'low_mass_cutoff':10.0,          # log(M) where we stop stacking and plotting
+              'low_mass_cutoff':9.0,          # log(M) where we stop stacking and plotting
               'show_disp':[0.16,0.84],         # percentile of population distribution to show on plot
-              'adjust_sfr': -0.2,              # adjust whitaker SFRs by how much?
+              'adjust_sfr': -0.25,             # adjust whitaker SFRs by how much?
               'zbins': [(0.5,1.),(1.,1.5),(1.5,2.),(2.,2.5)]
              }
 
@@ -234,17 +234,17 @@ def plot_stacked_sfh(dat,outfolder,**opts):
     # options for points on MS (left-hand side)
     fontsize = 14
     ms_plot_opts = {
-                    'alpha':0.8,
-                    'mew':0.4,
+                    'alpha':0.5,
+                    'mew':0.2,
                     'mec': 'k',
                     'linestyle':' ',
                     'marker':'o',
-                    'ms':5
+                    'ms':1.5
                    }
     # options for stripes delineating MS bins (left-hand side)
     size = 1.25
     ms_line_plot_opts = {
-                         'lw':2.5*size,
+                         'lw':2.*size,
                          'linestyle':'-',
                          'alpha':0.8,
                          'zorder':-32
@@ -404,7 +404,7 @@ def plot_stacked_sfh(dat,outfolder,**opts):
 
             # no bottom line for the bottom one
             # adjust label for bottom one
-            ytext = yr[idx]+(sigup+sigdown)/2.+0.23
+            ytext = yr[idx]+(sigup+sigdown)/2.+0.25
             if i == 0:
                 ytext = yr[idx]+sigup+0.1
             else:
@@ -418,7 +418,7 @@ def plot_stacked_sfh(dat,outfolder,**opts):
                            color=opts['vertical_bin_colors'][i],
                            **ms_line_plot_opts)
 
-            ax[j,0].text(xr[idx],ytext,labels[i],color=opts['vertical_bin_colors'][i], rotation=27)
+            ax[j,0].text(xr[idx],ytext,labels[i],color=opts['vertical_bin_colors'][i], rotation=24)
 
     plt.tight_layout()
     plt.savefig(outname_ms_vertical,dpi=150)

@@ -34,14 +34,12 @@ def select_ha(phot=None,fast=None,zbest=None,gris=None,**extras):
     return np.random.choice(idx,40,replace=False)
 
 def select_td(phot=None,fast=None,zbest=None,gris=None,**extras):
-    np.random.seed(2)
     idx = np.where((phot['use_phot'] == 1) & 
                    ((zbest['z_best_u68'] - zbest['z_best_l68'])/2. < 0.1) & \
                    (zbest['z_best'] - fast['z'] < 0.01)) # this SHOULDN'T matter but some of the FAST z's are not zbest!
     return idx
 
 def select_huge(phot=None,fast=None,zbest=None,gris=None,**extras):
-    np.random.seed(2)
     idx = np.where((phot['use_phot'] == 1) & 
                    ((zbest['z_best_u68'] - zbest['z_best_l68'])/2. < 0.1) & \
                    (phot['f_F160W'] / phot['e_F160W'] > 10) & \
@@ -217,6 +215,38 @@ def build_sample(sample=None):
                     delimiter=' ', format='commented_header',overwrite=True)
 
     ascii.write([out['ids']], output=id_str_out, Writer=ascii.NoHeader,overwrite=True)
+
+def load_master_sample():
+    """builds a 'master' sample with a very simple photometric cut
+    this can be used for comparison to subsamples of this sample
+    """
+    fields = ['AEGIS','COSMOS','GOODSN','GOODSS','UDS']
+    out = {key: [] for key in ['zbest','uvir_sfr','fast_logmass','id']}
+
+    for field in fields:
+
+        # load data
+        print 'loading '+field
+        
+        # define a master catalog
+        # let's keep it simple here (and FULL OF CRAP of course!)
+        phot = td_io.load_phot_v41(field)
+        fast = td_io.load_fast_v41(field)
+        good = (phot['use_phot'] == 1) & np.isfinite(fast['lmass'])
+        phot = phot[good]
+        fast = fast[good]
+
+        # load the rest of the data
+        zbest = td_io.load_zbest(field)[good]
+        mips = td_io.load_mips_data(field)[good]
+
+        # fill the data
+        out['zbest'] += np.array(zbest['z_best']).tolist()
+        out['uvir_sfr'] += np.array(mips['sfr']).tolist()
+        out['fast_logmass'] += np.array(fast['lmass']).tolist()
+        out['id'] += [field+'_'+str(name) for name in phot['id']]
+
+    return out 
 
 def build_sample_dynamics(sample=dynamic_sample,print_match=True):
     """finds Rachel's galaxies in the threedhst catalogs

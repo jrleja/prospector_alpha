@@ -7,6 +7,7 @@ from astropy.cosmology import WMAP9
 from dynesty.plotting import _quantile as weighted_quantile
 from fix_ir_sed import mips_to_lir
 import copy
+from scipy.stats import spearmanr
 
 plt.ioff()
 
@@ -18,6 +19,26 @@ minssfr = 10**minlogssfr
 minsfr = 0.0001
 
 nbin_min = 5
+
+def sfr_ratio_for_fast(tau,tage):
+    """ get ratio of instantaneous SFR to 100 Myr SFR
+    """
+    tau, tage = float(tau), float(tage)
+    norm = tau*(1-np.exp(-tage/tau))
+    sfr_inst = np.exp(-tage/tau)/norm
+    sfr_100myr = integrate_exp_tau(tage-0.1,tage,tau,tage) / (0.1/tage)
+
+    return sfr_100myr/sfr_inst
+
+def integrate_exp_tau(t1,t2,tau,tage):
+    """ integrate exponentially declining function
+    """
+    # write down both halves of integral
+    integrand = tau*(np.exp(-t1/tau)-np.exp(-t2/tau))
+    norm = tau*(1-np.exp(-tage/tau))
+
+    return integrand/norm
+
 
 def collate_data(runname, runname_fast, filename=None, regenerate=False, lir_from_mips=False):
     
@@ -38,7 +59,7 @@ def collate_data(runname, runname_fast, filename=None, regenerate=False, lir_fro
     enames = ['model_uvir_sfr', 'model_uvir_ssfr', 'sfr_ratio','model_uvir_truelir_sfr', 'model_uvir_truelir_ssfr', 'sfr_ratio_truelir'] # must calculate here
 
     outprosp, outprosp_fast, outfast, outlabels = {},{'bfit':{}},{},{}
-    sfr_100_uvir, sfr_100_uv, sfr_100_ir = [], [], []
+    sfr_100_uvir, sfr_100_uv, sfr_100_ir, objname = [], [], [], []
     phot_chi, phot_percentile, phot_obslam, phot_restlam, phot_fname = [], [], [], [], []
     outfast['z'] = []
 
@@ -86,6 +107,8 @@ def collate_data(runname, runname_fast, filename=None, regenerate=False, lir_fro
 
         if (prosp is None) or (model is None) or ((prosp_fast is None) & (runname_fast is not None)):
             continue
+
+        objname.append(name.split('/')[-1])
 
         ### prospector first
         for par in pnames:
@@ -170,7 +193,8 @@ def collate_data(runname, runname_fast, filename=None, regenerate=False, lir_fro
         # fill it up
         outfast['stellar_mass'] += [fast['lmass'][f_idx][0]]
         outfast['dust2'] += [prosp_dutils.av_to_dust2(fast['Av'][f_idx][0])]
-        outfast['sfr_100'] += [10**fast['lsfr'][f_idx][0]]
+        sfr_ratio = sfr_ratio_for_fast(10**(fast['ltau'][f_idx]-9),10**(fast['lage'][f_idx]-9))
+        outfast['sfr_100'] += [(10**fast['lsfr'][f_idx][0])*sfr_ratio]
         outfast['half_time'] += [prosp_dutils.exp_decl_sfh_half_time(10**fast['lage'][f_idx][0],10**fast['ltau'][f_idx][0])/1e9]
         outfast['z'] += [fast['z'][f_idx][0]]
         sfr_100_uvir += [uvir['sfr'][u_idx][0]]
@@ -195,6 +219,7 @@ def collate_data(runname, runname_fast, filename=None, regenerate=False, lir_fro
     for key in outfast: outfast[key] = np.array(outfast[key])
 
     out = {
+           'obname':objname,
            'fast':outfast,
            'prosp':outprosp,
            'prosp_fast': outprosp_fast,
@@ -224,14 +249,20 @@ def do_all(runname='td_massive', runname_fast='fast_mimic',outfolder=None,**opts
 
     data = collate_data(runname,runname_fast,filename=outfolder+'data/fastcomp.h5',**opts)
 
+    # different plot options based on sample size
     popts = {'fmt':'o', 'capthick':1.5,'elinewidth':1.5,'alpha':0.8,'color':'0.3','ms':5,'markeredgecolor':'k'} # for small samples
     if len(data['uvir_sfr']) > 400:
         popts = {'fmt':'o', 'capthick':.15,'elinewidth':.15,'alpha':0.35,'color':'0.3','ms':2, 'errorevery': 5000}
+    if len(data['uvir_sfr']) > 4000:
+        popts = {'fmt':'o', 'capthick':.05,'elinewidth':.05,'alpha':0.2,'color':'0.3','ms':0.5, 'errorevery': 5000}
 
-    phot_residuals(data,outfolder,popts)
 
     # if we have FAST-mimic runs, do a thorough comparison
     # else just do Prospector-FAST
+    fast_comparison(data['fast'],data['prosp'],data['labels'],data['pnames'],
+                    outfolder+'fast_to_palpha_comparison.png',popts)
+    delta_age_versus_delta_mass(data['fast'],data['prosp'],
+                    outfolder+'deltat_deltam_fast_to_palpha.png',popts)   
     if runname_fast is not None:
         fast_comparison(data['fast'],data['prosp_fast'],data['labels'],data['pnames'],
                         outfolder+'fast_to_fastmimic_comparison.png',popts,plabel='FAST-mimic')
@@ -239,15 +270,18 @@ def do_all(runname='td_massive', runname_fast='fast_mimic',outfolder=None,**opts
                         outfolder+'fast_to_fastmimic_bfit_comparison.png',popts,plabel='FAST-mimic',bfit=True)
         fast_comparison(data['prosp_fast'],data['prosp'],data['labels'],data['pnames'],
                         outfolder+'fastmimic_to_palpha_comparison.png',popts,flabel='FAST-mimic')
-        fast_comparison(data['fast'],data['prosp'],data['labels'],data['pnames'],
-                        outfolder+'fast_to_palpha_comparison.png',popts)
-    else:
-        fast_comparison(data['fast'],data['prosp'],data['labels'],data['pnames'],
-                        outfolder+'fast_to_palpha_comparison.png',popts)
+        delta_age_versus_delta_mass(data['fast'],data['prosp_fast'],
+                        outfolder+'deltat_deltam_fast_to_fastmimic.png',popts)
+        delta_age_versus_delta_mass(data['prosp_fast'],data['prosp'],
+                        outfolder+'deltat_deltam_fastmimic_to_palpha.png',popts)        
+        delta_age_versus_delta_mass(data['fast'],data['prosp'],
+                        outfolder+'deltat_deltam_fast_to_palpha.png',popts)  
 
+    phot_residuals(data,outfolder,popts)
     mass_metallicity_relationship(data, outfolder+'massmet_vs_z.png', popts)
     deltam_with_redshift(data['fast'], data['prosp'], data['fast']['z'], outfolder+'deltam_vs_z.png', filename=outfolder+'data/masscomp.h5')
     prospector_versus_z(data,outfolder+'prospector_versus_z.png',popts)
+    sfr_mass_density_comparison(data,outfolder=outfolder)
 
     # full UV+IR comparison
     uvir_comparison(data,outfolder+'sfr_uvir_comparison', popts, ssfr=False)
@@ -337,6 +371,61 @@ def fast_comparison(fast,prosp,parlabels,pnames,outname,popts,flabel='FAST',plab
     plt.savefig(outname,dpi=dpi)
     plt.close()
 
+def delta_age_versus_delta_mass(fast,prosp,outname,popts):
+
+    # try some y-variables
+    if type(fast['half_time']) == type({}):
+        mfast = fast['stellar_mass']['q50']
+        tfast = fast['half_time']['q50']
+        dfast = fast['dust2']['q50']
+    else:
+        tfast = fast['half_time']
+        dfast = fast['dust2']
+        mfast = fast['stellar_mass']
+    params = [np.log10(prosp['half_time']['q50']/tfast),
+              prosp['dust2']['q50'] - dfast]
+    ylabels = [r'log(t$_{\mathrm{Prosp}}$/t$_{\mathrm{FAST}}$)',
+               r'$\tau_{\mathrm{diffuse,Prosp}}-\tau_{\mathrm{diffuse,FAST}}$']
+    ylims = [(-2.5,2.5),
+             (-2,2)]
+    xlim = (-1.5,1.5)
+
+    if 'massmet_2' in prosp.keys():
+        params.append(prosp['massmet_2']['q50'])
+        ylabels.append(r'log(Z$_{\mathrm{Prosp}}$/Z$_{\odot}$)')
+        ylims.append((-2,2))
+
+    # plot geometry
+    ysize = 2.666666
+    fig, ax = plt.subplots(1, len(params), figsize = (ysize*len(params),ysize+0.2))
+    ax = ax.ravel()
+    medopts = {'marker':' ','alpha':0.95,'color':'red','ms': 7,'mec':'k','zorder':5}
+
+    # x variable
+    delta_mass = prosp['stellar_mass']['q50'] - mfast
+
+    for i, par in enumerate(params):
+        ax[i].errorbar(delta_mass,par,**popts)
+        ax[i].set_xlabel(r'log(M$_{\mathrm{Prosp}}$/M$_{\mathrm{FAST}}$)')
+        ax[i].set_ylabel(ylabels[i])
+
+        ax[i].set_xlim(xlim)
+        ax[i].set_ylim(ylims[i])
+        ax[i].text(0.02,0.9,r'$\rho_{\mathrm{S}}$='+'{:1.2f}'.format(spearmanr(delta_mass,par)[0]),transform=ax[i].transAxes)
+
+        ax[i].axhline(0, linestyle='--', color='k',lw=1,zorder=10)
+        ax[i].axvline(0, linestyle='--', color='k',lw=1,zorder=10)
+
+        # running median
+        in_plot = (delta_mass > xlim[0]) & (delta_mass < xlim[1])
+        x, y, bincount = prosp_dutils.running_median(delta_mass[in_plot],par[in_plot],avg=True,return_bincount=True,nbins=20)
+        x, y = x[bincount > nbin_min], y[bincount > nbin_min]
+        ax[i].plot(x,y, **medopts)
+
+    plt.tight_layout()
+    plt.savefig(outname,dpi=dpi)
+    plt.close()
+
 def prospector_versus_z(data,outname,popts):
     
     fig, axes = plt.subplots(2, 3, figsize = (10,6.66))
@@ -398,7 +487,7 @@ def phot_residuals(data,outfolder,popts_orig):
     medopts = {'marker':'o','alpha':0.95,'color':'red','ms': 7,'mec':'k','zorder':5}
     fontsize = 16
     ylim_chi = (-4,4)
-    ylim_percentile = (-0.25,0.25)
+    ylim_percentile = (-0.65,0.65)
 
     # residuals, by field and observed-frame filter
     fig, ax = plt.subplots(5,2, figsize=(8,18))
@@ -747,6 +836,91 @@ def uvir_comparison(data, outname, popts, model_uvir = False, ssfr=False, filena
         plt.savefig(outname+'_par_variation.png',dpi=dpi)
         plt.close()
 
+def sfr_mass_density_comparison(data, outfolder=None):
 
+    ### physics choices
+    zbins = [(0.5,1.),(1.,1.5),(1.5,2.),(2.,2.5),(2.5,3.0)]
+    mass_options = {
+                    'xdata': data['fast']['stellar_mass'],
+                    'ydata': data['prosp']['stellar_mass']['q50'],
+                    'min': 8,
+                    'max': 12,
+                    'ylabel': r'N*M$_{\mathrm{stellar}}$',
+                    'xlabel': r'log(M$_*$/M$_{\odot}$)',
+                    'norm': 1e13,
+                    'name': 'rhomass_fast_comparison.png',
+                    'rho_label': r'$\rho_{\mathrm{Prosp}}/\rho_{\mathrm{FAST}}$=',
+                    'ysource': 'FAST'
+                   }
+
+    sfr_options = {
+                   'xdata': np.log10(np.clip(data['uvir_sfr'],0.001,np.inf)),
+                   'ydata': np.log10(np.clip(data['prosp']['sfr_100']['q50'],0.001,np.inf)),
+                   'min': -3,
+                   'max': 5,
+                   'ylabel': r'N*SFR',
+                   'xlabel': r'log(SFR) [M$_{\odot}$/yr]',
+                   'norm': 1e4,
+                   'name': 'rhosfr_uvir_comparison.png',
+                   'rho_label': r'$\rho_{\mathrm{Prosp}}/\rho_{\mathrm{UV+IR}}$=',
+                   'ysource': 'UV+IR'
+                   }
+
+    ### plot choices
+    nbins = 20
+    histopts = {'drawstyle':'steps-mid','alpha':1.0, 'lw':1, 'linestyle': '-'}
+    fontopts = {'fontsize':10}
+    pcolor = '#1C86EE'
+    oldcolor = '#FF3D0D'
+
+    # plot mass + mass density distribution
+    for opt in [mass_options,sfr_options]:
+        fig, ax = plt.subplots(5,2,figsize=(5,9))
+        for i,zbin in enumerate(zbins):
+
+            # masses & indexes
+            idx = (data['fast']['z'] > zbin[0]) & \
+                  (data['fast']['z'] < zbin[1]) & \
+                  (opt['xdata'] > opt['min']) & \
+                  (opt['xdata'] < opt['max']) & \
+                  (opt['ydata'] > opt['min']) & \
+                  (opt['ydata'] < opt['max'])
+
+            master_dat = opt['xdata'][idx]
+            sample_dat = opt['ydata'][idx]
+
+            # mass histograms. get bins from master histogram
+            hist_master, bins = np.histogram(master_dat,bins=nbins,density=False)
+            hist_sample, bins = np.histogram(sample_dat,bins=bins,density=False)
+            bins_mid = (bins[1:]+bins[:-1])/2.
+
+            # mass distribution
+            ax[i,0].plot(bins_mid,hist_master,color=oldcolor, **histopts)
+            ax[i,0].plot(bins_mid,hist_sample,color=pcolor, **histopts)
+
+            # mass density distribution
+            ax[i,1].plot(bins_mid,hist_master*10**bins_mid/opt['norm'],color=oldcolor, **histopts)
+            ax[i,1].plot(bins_mid,hist_sample*10**bins_mid/opt['norm'],color=pcolor, **histopts)
+
+            # axis labels
+            ax[i,0].set_ylabel(r'N')
+            ax[i,1].set_ylabel(opt['ylabel'])
+            for a in ax[i,:]: a.set_ylim(a.get_ylim()[0],a.get_ylim()[1]*1.1)
+
+            # text labels
+            rhofrac = (10**sample_dat).sum() / (10**master_dat).sum()
+            ax[i,0].text(0.98, 0.91,'{:1.1f} < z < {:1.1f}'.format(zbin[0],zbin[1]), transform=ax[i,0].transAxes,ha='right',**fontopts)
+            ax[i,1].text(0.02, 0.91,opt['rho_label']+'{:1.2f}'.format(rhofrac),
+                         transform=ax[i,1].transAxes,ha='left',**fontopts)
+
+        # only bottom axes
+        ax[0,0].text(0.98, 0.82, 'Prospector', transform=ax[0,0].transAxes,ha='right',color=pcolor,**fontopts)
+        ax[0,0].text(0.98, 0.73, opt['ysource'], transform=ax[0,0].transAxes,ha='right',color=oldcolor,**fontopts)
+
+        for a in ax[-1,:]: a.set_xlabel(opt['xlabel'])
+
+        fig.tight_layout()
+        fig.subplots_adjust(wspace=0.4,hspace=0.0)
+        fig.savefig(outfolder+opt['name'],dpi=150)
 
 

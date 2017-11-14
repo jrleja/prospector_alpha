@@ -3,7 +3,6 @@ import matplotlib.pyplot as plt
 import os, hickle, td_io, prosp_dutils, copy
 from prospector_io import load_prospector_data, load_prospector_extra
 from astropy.cosmology import WMAP9
-import td_params as pfile
 from prospect.models import sedmodel
 from matplotlib.ticker import MaxNLocator, FormatStrFormatter
 from dynesty.plotting import _quantile as weighted_quantile
@@ -18,7 +17,12 @@ cmap = 'cool'
 minsfr = 0.01
 
 def collate_data(runname, filename=None, regenerate=False, nsamp=100, add_fagn=True, lir_from_mips=True):
-    
+    """must rewrite this such that NO CHAINS are saved!
+    want to return AGN_FRAC and OLD_FRAC
+    which is (SFR_AGN) / (SFR_UVIR_LIR_PROSP), (SFR_OLD) / (SFR_UVIR_LIR_PROSP)
+    also compare (SFR_UVIR_PROSP) to (SFR_PROSP)
+    """
+
     ### if it's already made, load it and give it back
     # else, start with the making!
     if os.path.isfile(filename) and regenerate == False:
@@ -27,39 +31,26 @@ def collate_data(runname, filename=None, regenerate=False, nsamp=100, add_fagn=T
 
         return outdict
 
-    # load obs dict and sps object
-    # we only want these once, they're heavy
-    run_params = pfile.run_params
-    sps = pfile.load_sps(**run_params)
-    obs = pfile.load_obs(**run_params)
-    objnames = np.genfromtxt(run_params['datdir']+run_params['runname']+'.ids',dtype=[('objnames', '|S40')])
-
     ### define output containers
-    sfr_uvir_obs, fagn, objname = [], [], []
-    sfr_uvir_prosp, sfr_uvir_prosp_up, sfr_uvir_prosp_do, sfr_uvir_prosp_chain = [], [], [], []
-    sfr_uvir_lir_prosp, sfr_uvir_lir_prosp_up, sfr_uvir_lir_prosp_do, sfr_uvir_lir_prosp_chain = [], [], [], []
-    sfr_prosp, sfr_prosp_up, sfr_prosp_do, sfr_prosp_chain = [], [], [], []
-    ssfr_prosp, ssfr_prosp_up, ssfr_prosp_do, ssfr_prosp_chain = [], [], [], []
-    logzsol = []
-
-    sfr_source = {}
-    sfr_source_names = ['young_stars','agn']
-    for i,source in enumerate(sfr_source_names): 
-        sfr_source[source] = []
-        sfr_source[source+'_up'] = []
-        sfr_source[source+'_do'] = []
-        sfr_source[source+'_chain'] = []
+    out = {}
+    qvals = ['q50','q84','q16']
+    for par in ['sfr_uvir_truelir_prosp', 'sfr_uvir_lirfrommips_prosp', 'sfr_prosp', 'ssfr_prosp', 'logzsol', 'fagn','agn_heating_fraction','old_star_heating_fraction']:
+        out[par] = {}
+        for q in qvals: out[par][q] = []
+    for par in ['sfr_uvir_obs','objname']: out[par] = []
 
     ### fill output containers
     basenames, _, _ = prosp_dutils.generate_basenames(runname)
     field = [name.split('/')[-1].split('_')[0] for name in basenames]
 
+    ### load necessary information
     uvirlist = []
     allfields = np.unique(field).tolist()
     for f in allfields:
         uvirlist.append(td_io.load_mips_data(f))
 
-    for i, name in enumerate(basenames):
+    ### iterate over items
+    for i, name in enumerate(basenames[:100]):
 
         # load output from fit
         try:
@@ -70,162 +61,59 @@ def collate_data(runname, filename=None, regenerate=False, nsamp=100, add_fagn=T
         if prosp is None:
             continue
 
-        objname.append(name.split('/')[-1])
-        print 'loaded '+objname[-1]
+        out['objname'] += [name.split('/')[-1]]
+        print 'loaded ' + out['objname'][-1]
 
-        # generate two new models
-        # one has all of the 'depends_on' functions stripped
-        # so we can update masses without having them overridden by the z_fraction variables
-        run_params['objname'] = objnames['objnames'][i]
-        oldmodel = pfile.load_model(**run_params)
-        model_params = copy.deepcopy(oldmodel.config_list)
-        for j in range(len(model_params)):
-            if model_params[j]['name'] == 'mass':
-                model_params[j].pop('depends_on', None)
-        model = sedmodel.SedModel(model_params)
+        # Variable model parameters
 
-        # if we only sample once, use best-fit
-        # otherwise, take `nsamp` samples from posterior
-        if nsamp == 1:
-            sample_idx = [res['lnprobability'].argmax()]
-        else:
-            weights = res['weights'][prosp['sample_idx']]
-            sample_idx = np.random.choice(prosp['sample_idx'], size=nsamp, p=weights/weights.sum(), replace=False)
+        # Variable + nonvariable model parameters ('extras')
+        for q in qvals: 
+            out['fagn'][q] = prosp['thetas']['fagn'][q] 
+            out['logzsol'][q] = prosp['thetas']['massmet_2'][q] 
+            out['sfr_prosp'][q] = prosp['extras']['sfr_100'][q]
+            out['ssfr_prosp'][q] = prosp['extras']['ssfr_100'][q]
 
-        # here we calculate SFR(UV+IR) with LIR + LUV from:
-        # (a) the 'true' L_IR and L_UV,
-        # (b) L_IR estimated from MIPS flux,
-        # (a) true L_IR with no AGN contribution,
-        # (b) true L_IR with only heating from young stars
-        true_sfr_uvir_prosp, model_lir_sfr_uvir, sidx_map = [], [], []
-        for source in sfr_source_names: sfr_source[source+'_chain'].append([])
-        for k, sidx in enumerate(sample_idx):
-            
-            # calculate thetas, bookkeeping
-            sidx_map.append(np.where(prosp['sample_idx'] == sidx)[0][0])
-            theta = copy.copy(res['chain'][sidx])
-
-            # pass thetas to model with dependencies
-            # then pull out the masses and f_agn
-            oldmodel.set_parameters(theta)
-            mass = copy.copy(oldmodel.params['mass'])
-            fagn_mod = copy.copy(oldmodel.params['fagn'])
-
-            # calculate UV+IR SFR using new thetas
-            out = prosp_dutils.measure_restframe_properties(sps, model = oldmodel, thetas = theta, measure_ir = True, measure_luv = True)
-            model_lir_sfr_uvir.append(prosp_dutils.sfr_uvir(out['lir'],out['luv']))
-
-            # also calculate UV+IR SFR a second way, by extrapolating from the MIPS flux
-            # input for this LIR must be in janskies
-            midx = np.array(['mips' in u for u in res['obs']['filternames']],dtype=bool)
-            mips_flux = prosp['obs']['mags'][sidx_map[-1],midx].squeeze() * 3631 * 1e3
-            lir = mips_to_lir(mips_flux, res['model'].params['zred'][0])
-            true_sfr_uvir_prosp.append(prosp_dutils.sfr_uvir(lir,out['luv']))
-
-            # calculate AGN contribution, young star contribution to LUV, LIR
-            for source in sfr_source_names:
-                if source == 'agn':
-                    theta[model.theta_index['fagn']] = 0.0
-                    out = prosp_dutils.measure_restframe_properties(sps, model = model, thetas = theta, measure_ir = True, measure_luv = True)
-                    model.params['fagn'] = fagn_mod
-                    sfr_source[source+'_chain'][-1] += [model_lir_sfr_uvir[-1] - prosp_dutils.sfr_uvir(out['lir'],out['luv'])]
-
-                if source == 'young_stars':
-                    theta[model.theta_index['fagn']] = 0.0
-                    model.params['mass'] = np.zeros_like(mass)
-                    model.params['mass'][0] = mass[0]
-                    if model.params['agebins'][0][1] != 8:
-                        model.params['mass'][1] = mass[1]
-                    out = prosp_dutils.measure_restframe_properties(sps, model = model, thetas = theta, measure_ir = True, measure_luv = True)
-                    model.params['mass'] = mass
-                    sfr_source[source+'_chain'][-1] += [prosp_dutils.sfr_uvir(out['lir'],out['luv'])]
-
-
-        #### append everything
-        if nsamp > 1:
-            mid, up, down = weighted_quantile(true_sfr_uvir_prosp, np.array([0.5, 0.84, 0.16]), weights=res['weights'][sample_idx])
-        else:
-            mid, up, down = true_sfr_uvir_prosp[-1], true_sfr_uvir_prosp[-1], true_sfr_uvir_prosp[-1]
-        sfr_uvir_prosp.append(mid)
-        sfr_uvir_prosp_up.append(up)
-        sfr_uvir_prosp_do.append(down)
-        sfr_uvir_prosp_chain.append(true_sfr_uvir_prosp)
-
-        if nsamp > 1:
-            mid, up, down = weighted_quantile(model_lir_sfr_uvir, np.array([0.5, 0.84, 0.16]), weights=res['weights'][sample_idx])
-        else:
-            mid, up, down = model_lir_sfr_uvir[-1], model_lir_sfr_uvir[-1], model_lir_sfr_uvir[-1]
-        sfr_uvir_lir_prosp.append(mid)
-        sfr_uvir_lir_prosp_up.append(up)
-        sfr_uvir_lir_prosp_do.append(down)
-        sfr_uvir_lir_prosp_chain.append(model_lir_sfr_uvir)
-
-        for source in sfr_source_names:
-            if nsamp > 1:
-                mid, up, down = weighted_quantile(sfr_source[source+'_chain'][-1], np.array([0.5, 0.84, 0.16]), weights=res['weights'][sample_idx])
-            else:
-                mid, up, down = sfr_source[source+'_chain'][-1], sfr_source[source+'_chain'][-1], sfr_source[source+'_chain'][-1]
-            sfr_source[source].append(mid)
-            sfr_source[source+'_up'].append(up)
-            sfr_source[source+'_do'].append(down)
-
-        ### now the easy stuff
-        sfr_prosp.append(prosp['extras']['sfr_100']['q50'])
-        sfr_prosp_up.append(prosp['extras']['sfr_100']['q84'])
-        sfr_prosp_do.append(prosp['extras']['sfr_100']['q16'])
-        sfr_prosp_chain.append(prosp['extras']['sfr_100']['chain'][np.array(sidx_map)].squeeze())
-        ssfr_prosp.append(prosp['extras']['ssfr_100']['q50'])
-        ssfr_prosp_up.append(prosp['extras']['ssfr_100']['q84'])
-        ssfr_prosp_do.append(prosp['extras']['ssfr_100']['q16'])
-        ssfr_prosp_chain.append(prosp['extras']['ssfr_100']['chain'][np.array(sidx_map)].squeeze())
-
-        if nsamp > 1:
-            fagn.append(weighted_quantile(res['chain'][sample_idx,model.theta_labels().index('fagn')],np.array([0.5]),weights=res['weights'][sample_idx]))
-            logzsol.append(weighted_quantile(res['chain'][sample_idx,model.theta_labels().index('massmet_2')],np.array([0.5]),weights=res['weights'][sample_idx]))
-        else:
-            fagn.append(res['chain'][sample_idx,model.theta_labels().index('fagn')])
-            logzsol.append(res['chain'][sample_idx,model.theta_labels().index('massmet_2')])
-
-
-        ### now UV+IR SFRs
+        # observed UV+IR SFRs
         # find correct field, find ID match
-        uvir = uvirlist[allfields.index(field[i])]
-        u_idx = uvir['id'] == int(name.split('_')[-1])
-        sfr_uvir_obs.append(uvir['sfr'][u_idx][0])
+        u_idx = uvirlist[allfields.index(field[i])]['id'].astype(int) == int(out['objname'][-1].split('_')[-1])
+        out['sfr_uvir_obs'] += [uvirlist[allfields.index(field[i])]['sfr'][u_idx][0]]
 
-    ### turn everything into numpy arrays
-    for source in sfr_source_names:
-        sfr_source[source] = np.array(sfr_source[source])
-        sfr_source[source+'_up'] = np.array(sfr_source[source+'_up'])
-        sfr_source[source+'_do'] = np.array(sfr_source[source+'_do'])
+        # Ratios and calculations
+        # here we calculate SFR(UV+IR) with LIR + LUV from:
+        # (a) the 'true' L_IR and L_UV in the model,
+        # (b) L_IR estimated from MIPS flux,
+        # (c) true L_IR with no AGN contribution,
+        # (d) true L_IR with only heating from young stars
+        sfr_uvir_truelir_prosp = prosp_dutils.sfr_uvir(prosp['extras']['lir']['chain'],prosp['extras']['luv']['chain'])
+        agn_heating_fraction = 1-prosp_dutils.sfr_uvir(prosp['extras']['lir_agn']['chain'],prosp['extras']['luv_agn']['chain']) / sfr_uvir_truelir_prosp
+        old_star_heating_fraction = 1-prosp_dutils.sfr_uvir(prosp['extras']['lir_young']['chain'],prosp['extras']['luv_young']['chain']) / sfr_uvir_truelir_prosp
 
-    out = {
-           'sfr_source': sfr_source,
-           'sfr_uvir_obs': np.array(sfr_uvir_obs),
-           'sfr_uvir_prosp': np.array(sfr_uvir_prosp),
-           'sfr_uvir_prosp_up': np.array(sfr_uvir_prosp_up),
-           'sfr_uvir_prosp_do': np.array(sfr_uvir_prosp_do),
-           'sfr_uvir_prosp_chain': sfr_uvir_prosp_chain,
-           'sfr_uvir_lir_prosp': np.array(sfr_uvir_lir_prosp),
-           'sfr_uvir_lir_prosp_up': np.array(sfr_uvir_lir_prosp_up),
-           'sfr_uvir_lir_prosp_do': np.array(sfr_uvir_lir_prosp_do),
-           'sfr_uvir_lir_prosp_chain': sfr_uvir_lir_prosp_chain,
-           'sfr_prosp': np.array(sfr_prosp),
-           'sfr_prosp_up': np.array(sfr_prosp_up),
-           'sfr_prosp_do': np.array(sfr_prosp_do),
-           'sfr_prosp_chain': sfr_prosp_chain,
-           'ssfr_prosp': np.array(ssfr_prosp),
-           'ssfr_prosp_up': np.array(ssfr_prosp_up),
-           'ssfr_prosp_do': np.array(ssfr_prosp_do),
-           'ssfr_prosp_chain': ssfr_prosp_chain,
-           'fagn': np.array(fagn),
-           'logzsol': np.array(logzsol),
-           'objname': np.array(objname)
-          }
+        # MIPS flux needs some careful treatment
+        # input for this LIR must be in janskies
+        midx = np.array(['mips' in u for u in res['obs']['filternames']],dtype=bool)
+        mips_flux = prosp['obs']['mags'][:,midx].squeeze() * 3631 * 1e3
+        lir = mips_to_lir(mips_flux, res['model'].params['zred'][0])
+        sfr_uvir_lirfrommips_prosp = prosp_dutils.sfr_uvir(lir,prosp['extras']['luv']['chain'])
+
+        # turn all of these into percentiles
+        pars = ['agn_heating_fraction', 'old_star_heating_fraction','sfr_uvir_truelir_prosp','sfr_uvir_lirfrommips_prosp']
+        vals = [agn_heating_fraction, old_star_heating_fraction, sfr_uvir_truelir_prosp, sfr_uvir_lirfrommips_prosp]
+        for p, v in zip(pars,vals):
+            mid, up, down = weighted_quantile(v, np.array([0.5, 0.84, 0.16]), weights=res['weights'][prosp['sample_idx']])
+            out[p]['q50'] += [mid]
+            out[p]['q50'] += [up]
+            out[p]['q50'] += [down]
+
+    for key in out.keys():
+        if type(out[key]) == dict:
+            for key2 in out[key].keys(): out[key][key2] = np.array(out[key][key2])
+        else:
+            out[key] = np.array(out[key])
 
     ### dump files and return
     hickle.dump(out,open(filename, "w"))
     return out
+
 
 def do_all(runname='td_massive', outfolder=None,**opts):
 
@@ -275,6 +163,10 @@ def uvir_comparison(data, outfolder,color_by_fagn=False,color_by_logzsol=True):
     ax.yaxis.set_major_formatter(FormatStrFormatter('%2.4g'))
 
     ##### Plot (UV+IR SFR / Prosp SFR)
+    """ we want to save AGN_FRAC and OLD_FRAC
+    which is (SFR_AGN) / (SFR_UVIR_LIR_PROSP), (SFR_OLD) / (SFR_UVIR_LIR_PROSP)
+    also compare (SFR_UVIR_PROSP) to (SFR_PROSP)
+    """
     uvir_frac, uvir_frac_up, uvir_frac_do = [], [], []
     agn_frac, agn_frac_up, agn_frac_do = [], [], []
     old_frac, old_frac_up, old_frac_do = [], [], []
