@@ -501,7 +501,7 @@ model_params.append({'name': 'fagn', 'N': 1,
 
 model_params.append({'name': 'agn_tau', 'N': 1,
                         'isfree': True,
-                        'init': 4.0,
+                        'init': 10.0,
                         'init_disp': 10,
                         'disp_floor': 2,
                         'units': '',
