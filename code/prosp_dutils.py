@@ -1172,7 +1172,7 @@ def measure_emlines(smooth_spec,sps,enames=None):
 
     ### define emission lines
     # legacy code compatible
-    if enames is None:
+    if type(enames) == bool:
         lines = np.array(['Hdelta','Hbeta','[OIII]1','[OIII]2','Halpha','[NII]'])
         fsps_name = np.array(['H delta 4102','H beta 4861','[OIII]4960','[OIII]5007','H alpha 6563','[NII]6585'])
     else:
