@@ -55,7 +55,7 @@ def load_obs(objname=None, datdir=None, runname=None, err_floor=0.05, zperr=True
     '''
 
     ### open file, load data
-    photname = datdir + objname.split('_')[0] + '_' + runname + '.cat'
+    photname = datdir + runname + '.cat'
     with open(photname, 'r') as f:
         hdr = f.readline().split()
     dtype = np.dtype([(hdr[1],'S20')] + [(n, np.float) for n in hdr[2:]])
@@ -646,7 +646,7 @@ def load_model(objname=None, datdir=None, runname=None, agelims=[], zred=None, a
     # first calculate redshift and corresponding t_universe
     # if no redshift is specified, read from file
     if zred is None:
-        datname = datdir + objname.split('_')[0] + '_' + runname + '.dat'
+        datname = datdir + runname + '.dat'
         dat = ascii.read(datname)
         idx = dat['phot_id'] == int(objname.split('_')[-1])
         zred = float(dat['z_best'][idx])
