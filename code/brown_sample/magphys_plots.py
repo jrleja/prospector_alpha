@@ -55,6 +55,43 @@ class jLogFormatter(mpl.ticker.LogFormatter):
 minorFormatter = jLogFormatter(base=10, labelOnlyBase=False)
 majorFormatter = jLogFormatter(base=10, labelOnlyBase=True)
 
+def read_magphys_sfh(idx,met):
+
+  sfh_file = os.getenv('magphys')+'/OptiLIB_cb07_sfh.txt'
+
+  age,sfr = [],[]
+  with open(sfh_file, 'r') as f:
+    found = False
+    for line in f:
+      if not found:
+        if line.find('#') != -1:
+          if int(line.split()[1]) == idx and \
+             float(line.split()[2]) == met:
+            found = True
+        continue
+      else:
+        if line.find('#') == -1:
+          _ = line.split()
+          age.append(float(_[0]))
+          sfr.append(float(_[1]))
+        else:
+          break
+
+  if len(age) == 0:
+    print "couldn't match metallicity and index! something is wrong."
+    print 1/0
+
+  return np.array(age),np.array(sfr)
+
+def slice_name(objname):
+  # retain up to 2 letters in front of name
+  for i, c in enumerate(objname):
+    if c.isdigit() and i <= 2:
+      break
+    elif i == 2:
+      objname=objname[:i] + objname[i+1:]
+  return objname
+
 def read_magphys_output(objname=None):
 
   '''
@@ -68,6 +105,15 @@ def read_magphys_output(objname=None):
   GALAXY_ID.sed has main parameters of the best-fit model,
   and the SED of the best-fit model.
   '''
+  from astropy.cosmology import WMAP9
+  project_info = {
+                  'idfile': os.getenv('APPS')+"/threedhst_bsfh/data/brownseds_data/photometry/namelist.txt",
+                  'datname':os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/table1.fits',
+                  'photname':os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/table3.fits',
+                  'extinctname':os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/table4.fits',
+                  'herschname':os.getenv('APPS')+'/threedhst_bsfh/data/brownseds_data/photometry/kingfish.brownapertures.flux.fits',
+                  'output': '/Users/joel/code/magphys/output'
+                 }
 
   if objname is None:
     objname = np.loadtxt(project_info['idfile'],delimiter='#',dtype = str)[0]
@@ -175,7 +221,7 @@ def read_magphys_output(objname=None):
 
   # cm^2
   pc = 3.085677581467192e18  # cm
-  dfactor = 4*np.pi*(pc*cosmo.luminosity_distance(metadata['redshift']).value *
+  dfactor = 4*np.pi*(pc*WMAP9.luminosity_distance(metadata['redshift']).value *
                     1e6)**2 / (1+metadata['redshift'])
 
   model['spec'] *= to_maggies / dfactor
@@ -196,7 +242,7 @@ def read_magphys_output(objname=None):
   magsfr = sfh['sfr']*magmass
   magtime = np.abs(np.max(sfh['age']) - sfh['age'])
 
-  sfr_10 = integral_average(magtime,magsfr,0,1e7)
+  sfr_10 = prosp_dutils.integral_average(magtime,magsfr,0,1e7)
   if np.isfinite(sfr_10) == False:
     print 1/0
   model['full_parameters'] = np.append(model['full_parameters'],sfr_10)

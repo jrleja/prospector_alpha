@@ -2,19 +2,20 @@ import numpy as np
 from scipy.integrate import simps
 from astropy.cosmology import WMAP9
 import matplotlib.pyplot as plt
-from scipy.interpolate import interp1d, interp2d
+from scipy.interpolate import interp1d, interp2d, RectBivariateSpline
 import hickle
 
 
-dloc = '/Users/joel/code/python/prospector_alpha/plots/td/fast_plots/data/masscomp.h5'
+dloc = '/Users/joel/code/python/prospector_alpha/plots/td_huge/fast_plots/data/masscomp.h5'
 with open(dloc, "r") as f:
     mcorr = hickle.load(f)
 mass_fnc = interp2d(mcorr['fast_mass'], mcorr['z'], mcorr['log_mprosp_mfast'], kind='linear')
 
-dloc = '/Users/joel/code/python/prospector_alpha/plots/td/fast_plots/data/ssfrcomp.h5'
+dloc = '/Users/joel/code/python/prospector_alpha/plots/td_huge/fast_plots/data/sfrcomp.h5'
 with open(dloc, "r") as f:
-    ssfrcorr = hickle.load(f)
-ssfr_fnc = interp2d(ssfrcorr['log_ssfruvir_mfast'], ssfrcorr['z'], ssfrcorr['log_ssfrprosp_ssfruvir'], kind='linear')
+    sfrcorr = hickle.load(f)
+# sfr_fnc = RectBivariateSpline(sfrcorr['mass'], sfrcorr['z'], sfrcorr['sfr'],kx=1,ky=1)
+sfr_fnc = RectBivariateSpline(sfrcorr['mass'], sfrcorr['z'], sfrcorr['sfr_corr'],kx=1,ky=1)
 
 def sf_fraction(z,logm):
     """this returns the fraction of star-forming galaxies as a function of 
@@ -122,23 +123,50 @@ def sfrd(z,logm_min=9, logm_max=13, dm=0.01, use_whit12=False,
 
     # first, get the star-forming sequence
     # also apply corrections to SFR if necessary
-    if use_whit12:
+    if apply_pcorrections:
+        sfr = sfr_fnc(logm,z).squeeze()
+    elif use_whit12:
         sfr = sfr_ms12(z,logm)
     else:
         sfr = sfr_ms(z,logm)
-    # input: log(sfr[UVIR]/M[fast]), z. output: log(sfr[prosp]/sfr[uvir])
-    if apply_pcorrections:
-        ssfr = np.log10(sfr/10**logm)
-        ssfr += ssfr_fnc(ssfr,z)
-        sfr = 10**ssfr * 10**logm
 
     # multiply n(M) by SFR(M) to get SFR / Mpc^-3 / dex
-    spars = mf_parameters(z,sf=True)
-    phi_sf = sfr * mf_phi(spars,logm)
+    starforming_numdens = mf_phi(mf_parameters(z,sf=True),logm)
+    starforming_function = sfr * starforming_numdens
+    # starforming_function = sfr_fnc(logm,z) * mf_phi(mf_parameters(z,sf=True),logm)
 
     # integrate over stellar mass to get SFRD
-    sfrd = simps(phi_sf,dx=dm)
+    sfrd = simps(starforming_function,dx=dm)
 
+    # what the hell! interpolation!
+    '''
+    if (z > 0.95) & (z < 1.05) & (apply_pcorrections):
+
+        fig1, ax1 = plt.subplots(1,1, figsize=(5, 5))
+        """
+        idx = np.array(sfrcorr['z']) == 1.25
+        ax1.plot(np.array(sfrcorr['mass'])[idx],np.array(sfrcorr['sfr'])[idx],'o',linestyle=' ',color='red')
+        idx = np.array(sfrcorr['z']) == 0.75
+        ax1.plot(np.array(sfrcorr['mass'])[idx],np.array(sfrcorr['sfr'])[idx],'o',linestyle=' ',color='blue')
+        """
+        ax1.plot(logm,sfr_fnc(logm,1.25),linestyle='-',color='red')
+        ax1.plot(logm,sfr_fnc(logm,0.75),linestyle='-',color='blue')
+        ax1.plot(logm,sfr_fnc(logm,1.0),linestyle='-',color='k')
+        fig1.show()
+        
+        fig2, ax2 = plt.subplots(1,1, figsize=(5, 5))
+        ax2.plot(logm, np.log10(mf_phi(mf_parameters(1.0,sf=True),logm)),color='black')
+        ax2.plot(logm, np.log10(mf_phi(mf_parameters(0.75,sf=True),logm)),color='blue')
+        ax2.plot(logm, np.log10(mf_phi(mf_parameters(1.25,sf=True),logm)),color='red')
+        fig2.show()
+
+        fig3, ax3 = plt.subplots(1,1, figsize=(5, 5))
+        for zpl, col in zip([0.75,1.0,1.25],['blue','black','red']):
+            sf = sfr_fnc(logm,zpl).squeeze() * mf_phi(mf_parameters(zpl,sf=True),logm)
+            ax3.plot(logm, sf,color=col)
+        fig3.show()
+        print 1/0
+    '''
     return sfrd
 
 def drho_dt(z, logm_min=9, logm_max=13, dm=0.01, dz=0.001, 
@@ -201,7 +229,7 @@ def zfourge_param_rhostar(z, massloss_correction=False, apply_pcorrections=False
 
     return np.log10(rhodot)
 
-def plot_sfrd(logm_min=9,logm_max=13,dm=0.01,use_whit12=False,
+def plot_sfrd(logm_min=9.0,logm_max=11.5,dm=0.01,use_whit12=False,
               massloss_correction=False):
     """ compare SFRD from mass function(z) versus observed SFR
     """
@@ -221,7 +249,6 @@ def plot_sfrd(logm_min=9,logm_max=13,dm=0.01,use_whit12=False,
     mf_sfrd = zfourge_param_rhostar(zrange, **opts)
     mf_sfrd_prosp = zfourge_param_rhostar(zrange, apply_pcorrections = True, **opts)
     sf_sfrd, sf_sfrd_prosp,  = [], []
-    # mf_sfrd, mf_sfrd_prosp = [], []
     for z in zrange:
         sf_sfrd += [sfrd(z,**opts)]
         sf_sfrd_prosp += [sfrd(z,apply_pcorrections=True,**opts)]
@@ -236,25 +263,22 @@ def plot_sfrd(logm_min=9,logm_max=13,dm=0.01,use_whit12=False,
             }
 
     # Plot1: change in SFRD
-    fig, ax = plt.subplots(1,2, figsize=(8, 4))
-    ax[0].plot(zrange, np.log10(sf_sfrd), color=blue, label='UV+IR SFRs', **popts)
-    ax[0].plot(zrange, np.log10(sf_sfrd_prosp), '--', color=blue, label='Prospector SFRs', **popts)
-
-    # Plot2: change in phi*
-    ax[1].plot(zrange, mf_sfrd, color=red, label='mass (FAST)',**popts)
-    ax[1].plot(zrange, mf_sfrd_prosp, '--', color=red, label='mass (Prospector)',**popts)
-    #ax[1].plot(zrange, sfrd_zfourge_rhodot, '--', color='purple', label='mass ZFOURGE',**popts)
+    fig, ax = plt.subplots(1,1, figsize=(5, 5))
+    ax.plot(zrange, mf_sfrd, color=red, label='mass (FAST)',**popts)
+    ax.plot(zrange, np.log10(sf_sfrd), color=blue, label='UV+IR SFRs', **popts)
+    ax.plot(zrange, mf_sfrd_prosp, '--', color=red, label='mass (Prospector)',**popts)
+    ax.plot(zrange, np.log10(sf_sfrd_prosp), '--', color=blue, label='Prospector SFRs', **popts)
 
     # Madau+15
     phi_madau = 0.015*(1+zrange)**2.7 / (1+((1+zrange)/2.9)**5.6)
     phi_madau = np.log10(phi_madau) - 0.24 # salpeter correction
 
     # labels, legends, and add Madau
-    for a in ax:
-        a.set_xlabel('redshift')
-        a.set_ylabel(r'log(SFRD) [M$_{\odot}$/yr]')
-        a.plot(zrange, phi_madau, '-', color='green', label='Madau et al. 2015', lw=1.5)
-        a.legend(loc=4, prop={'size':10}, scatterpoints=1,fancybox=True)
+    ax.set_xlabel('redshift')
+    ax.set_ylabel(r'log(SFRD) [M$_{\odot}$ yr$^{-1}$ Mpc$^{-3}$]')
+    ax.plot(zrange, phi_madau, '-', color='green', label='Madau et al. 2015', **popts)
+    ax.legend(loc=4, prop={'size':10}, scatterpoints=1,fancybox=True)
 
     plt.tight_layout()
-    plt.show()
+    plt.savefig('/Users/joel/code/python/prospector_alpha/plots/td_huge/fast_plots/madau_plot.png',dpi=150)
+    plt.close()

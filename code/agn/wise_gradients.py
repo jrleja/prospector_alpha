@@ -128,7 +128,7 @@ def collate_data(alldata,alldata_noagn):
     return out
 
 def plot_all(agn_evidence,runname='brownseds_agn',runname_noagn='brownseds_np',alldata=None,
-             alldata_noagn=None,agn_idx=None,outfolder=None,regenerate=False, **popts):
+             alldata_noagn=None,agn_idx=None,outfolder=None,regenerate=False,paperplot=True, **popts):
 
     #### load alldata
     if alldata is None:
@@ -145,7 +145,7 @@ def plot_all(agn_evidence,runname='brownseds_agn',runname_noagn='brownseds_np',a
 
     #### plot data
     if regenerate:
-        plot_composites(pdata,outfolder_overlays,['WISE W1','WISE W2'])
+        plot_composites(pdata,outfolder_overlays,['WISE W1','WISE W2'],paperplot=paperplot)
 
     #### load data
     with open(outfile, "rb") as f:
@@ -228,7 +228,7 @@ def plot_summary(pdata, outfolder, outdict,idx, agn_idx=Ellipsis, **popts):
     plt.close()
 
 def plot_composites(pdata,outfolder,contours,contour_colors=True,
-                    calibration_plot=True,brown_data=False):
+                    calibration_plot=True,brown_data=False,paperplot=False):
 
     ### image qualities
     fs = 10 # fontsize
@@ -242,12 +242,13 @@ def plot_composites(pdata,outfolder,contours,contour_colors=True,
     gradient, gradient_error, arcsec,objname_out, obj_size_kpc, background_out = [], [], [], [], [], []
 
     ### begin loop
+    fig = None
     for idx in xrange(len(pdata['objname'])):
 
-        '''
-        if 'NGC 1068' not in pdata['objname'][idx]:
-            continue
-        '''
+        if paperplot:
+            if ('NGC 4168' not in pdata['objname'][idx]) & ('NGC 1275' not in pdata['objname'][idx]):
+                continue
+
         ### load object information
         objname = pdata['objname'][idx]
         fagn = pdata['pars']['fagn']['q50'][idx]
@@ -320,11 +321,14 @@ def plot_composites(pdata,outfolder,contours,contour_colors=True,
 
         ### subtract background from both images
         # identify background pixels.
-        # background is any pixel consistent within 1sigma of background!
-        mean1, median1, std1 = sigma_clipped_stats(w1_convolved, sigma=3.0,iters=10)
+        # background is any pixel consistent within X sigma of background!
+        sigma = 3.0
+        if paperplot:
+            sigma = 5.0
+        mean1, median1, std1 = sigma_clipped_stats(w1_convolved, sigma=sigma,iters=10)
         background1 = img1_slice < (median1+std1) 
         img1_slice -= median1
-        mean2, median2, std2 = sigma_clipped_stats(data2, sigma=3.0, iters=10)
+        mean2, median2, std2 = sigma_clipped_stats(data2, sigma=sigma, iters=10)
         background2 = img2_slice < (median2+std2)
         img2_slice -= median2
 
@@ -337,17 +341,35 @@ def plot_composites(pdata,outfolder,contours,contour_colors=True,
         flux_color[background] = np.nan
 
         ### plot colormap
-        fig, ax = plt.subplots(1,2, figsize=(12,6))
+        count = 0
+        if paperplot:
+            if fig is None:
+                fig, axall = plt.subplots(1,2, figsize=(12,6))
+                fig.subplots_adjust(right=0.8,wspace=0.4,hspace=0.3,left=0.12)
+                cb_ax = fig.add_axes([0.83, 0.15, 0.05, 0.7])
+                ax = np.ravel(axall[0])
+            else:
+                ax = np.ravel(axall[1])
+                count = 1
+            vmin, vmax = -0.4,1.05
+        else:
+            fig, ax = plt.subplots(1,2, figsize=(12,6))
+            vmin, vmax = color_limits[0], color_limits[1]
         ax = np.ravel(ax)
-        img = ax[0].imshow(flux_color, origin='lower',extent=extent,vmin=color_limits[0],vmax=color_limits[1])
+        img = ax[0].imshow(flux_color, origin='lower',extent=extent,vmin=vmin,vmax=vmax,cmap='plasma')
 
-        cbar = fig.colorbar(img, ax=ax[0])
-        cbar.formatter.set_powerlimits((0, 0))
-        cbar.update_ticks()
-        ax[0].set_title(contours[0]+'-'+contours[1]+' color')
+        if not paperplot:
+            cbar = fig.colorbar(img, ax=ax[0])
+        elif count == 0:
+            cbar = fig.colorbar(img, cax=cb_ax)
+            cbar.set_label('(W1-W2) [Vega]', fontdict={'fontsize':18})
+
+        ax[0].set_xlabel(r'$\Delta$(arcsec)')
+        ax[0].set_ylabel(r'$\Delta$(arcsec)')
 
         ### plot W1 contours
-        plot_contour(ax[0],np.log10(img2_slice),ncontours=20)
+        if not paperplot:
+            plot_contour(ax[0],np.log10(img2_slice),ncontours=20)
 
         ### find image center in W2 image, and mark it
         # do this by finding the source closest to center
@@ -400,10 +422,14 @@ def plot_composites(pdata,outfolder,contours,contour_colors=True,
         wise_psf = 6 # in arcseconds
         start = 0.85*extent[0]
 
-        ax[0].plot([start,start+wise_psf],[start,start],lw=2,color='k')
-        ax[0].text(start+wise_psf/2.,start+1, '6"', ha='center')
-        ax[0].set_xlim(extent[0],extent[1]) # reset plot limits b/c of text stuff
-        ax[0].set_ylim(extent[2],extent[3])
+        if not paperplot:
+            ax[0].plot([start,start+wise_psf],[start,start],lw=2,color='k')
+            ax[0].text(start+wise_psf/2.,start+1, '6"', ha='center')
+            ax[0].set_xlim(extent[0],extent[1]) # reset plot limits b/c of text stuff
+            ax[0].set_ylim(extent[2],extent[3])
+        else:
+            ax[0].set_xlim(-65,65)
+            ax[0].set_ylim(-65,65)
 
         ### gradient
         phys_scale = float(1./WMAP9.arcsec_per_kpc_proper(pdata['z'][idx]).value)
@@ -415,15 +441,20 @@ def plot_composites(pdata,outfolder,contours,contour_colors=True,
                                   noise1_slice, noise2_slice, background,
                                   ax, center,
                                   tbl['peak_value'][idxmax], (xarcsec,yarcsec),
-                                  phys_scale)
-
-        ax[1].text(0.05,0.06,r'f$_{\mathrm{AGN,MIR}}$='+"{:.2f}".format(pdata['pars']['fagn']['q50'][idx])+\
-                                ' ('+"{:.2f}".format(pdata['pars']['fagn']['q84'][idx]) +
-                                ') ('+"{:.2f}".format(pdata['pars']['fagn']['q16'][idx])+')',
-                                transform=ax[1].transAxes,color='black',fontsize=9)
+                                  phys_scale,paperplot=paperplot)
 
         obj_size_phys = phot_size*phys_scale
-        ax[1].axvline(phot_size, linestyle='--', color='0.2',lw=2,zorder=-1)
+        if not paperplot:
+            ax[1].text(0.05,0.06,r'f$_{\mathrm{AGN,MIR}}$='+"{:.2f}".format(pdata['pars']['fagn']['q50'][idx])+\
+                                    ' ('+"{:.2f}".format(pdata['pars']['fagn']['q84'][idx]) +
+                                    ') ('+"{:.2f}".format(pdata['pars']['fagn']['q16'][idx])+')',
+                                    transform=ax[1].transAxes,color='black',fontsize=9)
+
+            ax[1].axvline(phot_size, linestyle='--', color='0.2',lw=2,zorder=-1)
+
+        else:
+            ax[0].text(0.98,0.94,objname,transform=ax[0].transAxes,fontsize=14,weight='bold',ha='right')
+            ax[0].text(0.98,0.88,r'$\nabla$(2 kpc)='+"{:.2f}".format(grad[1]),fontsize=14,transform=ax[0].transAxes,ha='right')
 
         gradient.append(grad)
         gradient_error.append(graderr)
@@ -433,9 +464,16 @@ def plot_composites(pdata,outfolder,contours,contour_colors=True,
         background_out.append(back)
         print objname, back
 
-        plt.tight_layout()
-        plt.savefig(outfolder+'/'+objname+'.png',dpi=150)
-        plt.close()
+        # I/O
+        outname = outfolder+'/'+objname+'.png'
+        if paperplot:
+            outname = outfolder+'/sample_wise_gradient.png'
+
+        if (not paperplot) | (count == 1):
+            if not paperplot:
+                plt.tight_layout()
+            plt.savefig(outname,dpi=150)
+            plt.close()
 
     out = {
             'gradient': np.array(gradient),
@@ -445,10 +483,10 @@ def plot_composites(pdata,outfolder,contours,contour_colors=True,
             'objname': objname_out,
             'background_fraction': np.array(background_out)
           }
+    if not paperplot:
+        pickle.dump(out,open(outfile, "wb"))
 
-    pickle.dump(out,open(outfile, "wb"))
-
-def measure_gradient(flux1, flux2, noise1, noise2, background, ax, center, peakflux, center_arcsec, phys_scale):
+def measure_gradient(flux1, flux2, noise1, noise2, background, ax, center, peakflux, center_arcsec, phys_scale,paperplot=False):
     # http://photutils.readthedocs.io/en/stable/api/photutils.aperture.SkyCircularAnnulus.html#photutils.aperture.SkyCircularAnnulus
     # http://photutils.readthedocs.io/en/stable/photutils/aperture.html
 
@@ -507,8 +545,9 @@ def measure_gradient(flux1, flux2, noise1, noise2, background, ax, center, peakf
             good = good[1:]
 
             ### plot
-            ax[1].errorbar(x_arcsec[good],grad_plot[good],yerr=graderr_plot[good], 
-                           fmt='o',ms=8,elinewidth=1.5,color='k',ecolor='k',linestyle='-')
+            if not paperplot:
+                ax[1].errorbar(x_arcsec[good],grad_plot[good],yerr=graderr_plot[good], 
+                               fmt='o',ms=8,elinewidth=1.5,color='k',ecolor='k',linestyle='-')
 
         else:
 
@@ -522,39 +561,43 @@ def measure_gradient(flux1, flux2, noise1, noise2, background, ax, center, peakf
             graderr_kpc = np.array([np.sqrt(err[1]**2+err[0]**2),
                                     np.sqrt(err[2]**2+err[3]**2)/2.])
 
-            ### add in important gradients
-            ax[1].errorbar(arcsec_calc,grad_calc,yerr=graderr_calc,
-                           fmt='o',ms=10,elinewidth=2.0,color='red',ecolor='red',linestyle=' ')
+
 
             ### show circles for physical gradients
-            circ=plt.Circle(center_arcsec, radius=r_out_calc[-2]*px_scale, fill=False,lw=1.5,color='red',linestyle='--',alpha=0.8,zorder=5)
+            circ=plt.Circle(center_arcsec, radius=r_out_calc[-2]*px_scale, fill=False,lw=2,color='black',linestyle='--',zorder=5)
             ax[0].add_patch(circ)
-            circ=plt.Circle(center_arcsec, radius=r_out_calc[-1]*px_scale, fill=False,lw=1.5,color='red',linestyle='--',alpha=0.8,zorder=5)
+            circ=plt.Circle(center_arcsec, radius=r_out_calc[-1]*px_scale, fill=False,lw=2,color='black',linestyle='--',zorder=5)
             ax[0].add_patch(circ)
 
-            ### add text
-            ax[1].text(0.05,0.93,r'$\nabla$(1 kpc)='+"{:.3f}".format(grad_kpc[0])+r'$\pm$'+"{:.3f}".format(graderr_kpc[0]),
-                                transform=ax[1].transAxes,color='red')
-            ax[1].text(0.05,0.86,r'$\nabla$(2 kpc)='+"{:.3f}".format(grad_kpc[1])+r'$\pm$'+"{:.3f}".format(graderr_kpc[1]),
-                                transform=ax[1].transAxes,color='red')
+            ### add in important gradients
+            if not paperplot:
+                ax[1].errorbar(arcsec_calc,grad_calc,yerr=graderr_calc,
+                               fmt='o',ms=10,elinewidth=2.0,color='red',ecolor='red',linestyle=' ')
+
+                ### add text
+                ax[1].text(0.05,0.93,r'$\nabla$(1 kpc)='+"{:.3f}".format(grad_kpc[0])+r'$\pm$'+"{:.3f}".format(graderr_kpc[0]),
+                                    transform=ax[1].transAxes,color='red')
+                ax[1].text(0.05,0.86,r'$\nabla$(2 kpc)='+"{:.3f}".format(grad_kpc[1])+r'$\pm$'+"{:.3f}".format(graderr_kpc[1]),
+                                    transform=ax[1].transAxes,color='red')
 
     ### labels
-    ax[1].axhline(0, linestyle='--', color='0.2',lw=2,zorder=-1)
-    ax[1].set_xlabel('arcseconds from center')
-    ax[1].set_ylabel(r'$\nabla$(W1-W2) [magnitude/arcsecond]')
+    if not paperplot:
+        ax[1].axhline(0, linestyle='--', color='0.2',lw=2,zorder=-1)
+        ax[1].set_xlabel('arcseconds from center')
+        ax[1].set_ylabel(r'$\nabla$(W1-W2) [magnitude/arcsecond]')
 
-    ### symmetric y-axis
-    ymax = np.abs(ax[1].get_ylim()).max()
-    ax[1].set_ylim(-ymax,ymax)
+        ### symmetric y-axis
+        ymax = np.abs(ax[1].get_ylim()).max()
+        ax[1].set_ylim(-ymax,ymax)
 
-    ### second axis
-    y1, y2 = ax[1].get_ylim()
-    x1, x2 = ax[1].get_xlim()
-    ax2 = ax[1].twiny()
-    ax2.set_xlim(x1*phys_scale, x2*phys_scale)
-    ax2.set_xlabel(r'kpc from center')
-    ax2.set_ylim(y1, y2)
-    
+        ### second axis
+        y1, y2 = ax[1].get_ylim()
+        x1, x2 = ax[1].get_xlim()
+        ax2 = ax[1].twiny()
+        ax2.set_xlim(x1*phys_scale, x2*phys_scale)
+        ax2.set_xlabel(r'kpc from center')
+        ax2.set_ylim(y1, y2)
+        
     return grad_kpc, graderr_kpc, arcsec_calc, back
 
 def calc_dist(wcs, pix_center, size, im_shape):
@@ -565,7 +608,7 @@ def calc_dist(wcs, pix_center, size, im_shape):
 
     ### define center coordinates
     center_coordinates = SkyCoord.from_pixel(pix_center[0][0],pix_center[0][1],wcs)
-    out = np.empty(4)
+    out = np.zeros(4,dtype=int)
 
     ### find X UP, X DOWN
     calc_dist = 0.0
@@ -574,7 +617,7 @@ def calc_dist(wcs, pix_center, size, im_shape):
         pix -=1
         new_coordinates = SkyCoord.from_pixel(pix,pix_center[0][1],wcs)
         calc_dist = new_coordinates.separation(center_coordinates).arcsec
-    out[0] = pix
+    out[0] = int(pix)
 
     calc_dist = 0.0
     pix = np.ceil(pix_center[0][0])
@@ -582,7 +625,7 @@ def calc_dist(wcs, pix_center, size, im_shape):
         pix +=1
         new_coordinates = SkyCoord.from_pixel(pix,pix_center[0][1],wcs)
         calc_dist = new_coordinates.separation(center_coordinates).arcsec
-    out[1] = pix
+    out[1] = int(pix)
 
     ### FIND Y UP, Y DOWN
     calc_dist = 0.0
@@ -591,7 +634,7 @@ def calc_dist(wcs, pix_center, size, im_shape):
         pix -=1
         new_coordinates = SkyCoord.from_pixel(pix_center[0][0],pix,wcs)
         calc_dist = new_coordinates.separation(center_coordinates).arcsec
-    out[2] = pix
+    out[2] = int(pix)
 
     calc_dist = 0.0
     pix = np.ceil(pix_center[0][1])
@@ -599,7 +642,7 @@ def calc_dist(wcs, pix_center, size, im_shape):
         pix +=1
         new_coordinates = SkyCoord.from_pixel(pix_center[0][0],pix,wcs)
         calc_dist = new_coordinates.separation(center_coordinates).arcsec
-    out[3] = pix
+    out[3] = int(pix)
 
     return out
 
@@ -814,7 +857,7 @@ def psf_match(f1,f2, test=False, data1_res=1.375):
         plt.colorbar(img,ax=ax[0])
         ax[0].set_title(f1+' PSF')
 
-        convolved_psf1 = convolve_fft(psf1, kernel,interpolate_nan=False)
+        convolved_psf1 = convolve_fft(psf1, kernel,interpolate_nan='fill')
         img = sedax[0].imshow(convolved_psf1/convolved_psf1.max(), cmap='Greys_r', origin='lower')
         plt.colorbar(img,ax=sedax)
         sedax[0].set_title(f1+' PSF convolved')
@@ -849,11 +892,11 @@ def match_resolution(image,f1,f2,kernel=None,data1_res=None):
     import time
 
     ### grab kernel
-    if kernel == None:
+    if kernel is None:
         kernel, resolution = psf_match(f1,f2,data1_res=data1_res)
 
     t1 = time.time()
-    convolved_image = convolve_fft(image, kernel,interpolate_nan=False)
+    convolved_image = convolve_fft(image, kernel,interpolate_nan='fill')
     d1 = time.time() - t1
     print('convolution took {0}s'.format(d1))
 

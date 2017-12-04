@@ -8,6 +8,7 @@ from dynesty.plotting import _quantile as weighted_quantile
 from fix_ir_sed import mips_to_lir
 import copy
 from scipy.stats import spearmanr
+from stack_td_sfh import sfr_ms
 
 plt.ioff()
 
@@ -62,6 +63,7 @@ def collate_data(runname, runname_fast, filename=None, regenerate=False, lir_fro
     sfr_100_uvir, sfr_100_uv, sfr_100_ir, objname = [], [], [], []
     phot_chi, phot_percentile, phot_obslam, phot_restlam, phot_fname = [], [], [], [], []
     outfast['z'] = []
+    outfast['uvj'] = []
 
     for i,par in enumerate(pnames+enames):
         
@@ -84,11 +86,12 @@ def collate_data(runname, runname_fast, filename=None, regenerate=False, lir_fro
         basenames_fast, _, _ = prosp_dutils.generate_basenames(runname_fast)
     field = [name.split('/')[-1].split('_')[0] for name in basenames]
 
-    fastlist, uvirlist = [], []
+    fastlist, uvirlist, adatlist = [], [], []
     allfields = np.unique(field).tolist()
     for f in allfields:
         fastlist.append(td_io.load_fast(runname,f))
         uvirlist.append(td_io.load_ancil_data(runname,f))
+        adatlist.append(td_io.load_ancil_data(runname,f))
 
     for i, name in enumerate(basenames):
 
@@ -110,7 +113,7 @@ def collate_data(runname, runname_fast, filename=None, regenerate=False, lir_fro
 
         objname.append(name.split('/')[-1])
 
-        ### prospector first
+        # prospector first
         for par in pnames:
             if par in prosp['thetas'].keys():
                 loc = 'thetas'
@@ -182,13 +185,18 @@ def collate_data(runname, runname_fast, filename=None, regenerate=False, lir_fro
                 except KeyError:
                     continue
 
-        ### now FAST, UV+IR SFRs
+        ### now FAST, UV+IR SFRs, UVJ
         # find correct field, find ID match
         fidx = allfields.index(field[i])
         fast = fastlist[fidx]
         uvir = uvirlist[fidx]
         f_idx = fast['id'] == int(name.split('_')[-1])
         u_idx = uvir['phot_id'] == int(name.split('_')[-1])
+
+        # UVJ
+        adat = adatlist[fidx]
+        aidx = adat['phot_id'] == int(objname[-1].split('_')[-1])
+        outfast['uvj'] += [adat['uvj'][aidx][0]]
 
         # fill it up
         outfast['stellar_mass'] += [fast['lmass'][f_idx][0]]
@@ -219,7 +227,7 @@ def collate_data(runname, runname_fast, filename=None, regenerate=False, lir_fro
     for key in outfast: outfast[key] = np.array(outfast[key])
 
     out = {
-           'obname':objname,
+           'objname':objname,
            'fast':outfast,
            'prosp':outprosp,
            'prosp_fast': outprosp_fast,
@@ -247,7 +255,9 @@ def do_all(runname='td_massive', runname_fast='fast_mimic',outfolder=None,**opts
             os.makedirs(outfolder)
             os.makedirs(outfolder+'data/')
 
-    data = collate_data(runname,runname_fast,filename=outfolder+'data/fastcomp.h5',**opts)
+    # load all data 
+    fastfile = outfolder+'data/fastcomp.h5'
+    data = collate_data(runname,runname_fast,filename=fastfile,**opts)
 
     # different plot options based on sample size
     popts = {'fmt':'o', 'capthick':1.5,'elinewidth':1.5,'alpha':0.8,'color':'0.3','ms':5,'markeredgecolor':'k'} # for small samples
@@ -256,6 +266,27 @@ def do_all(runname='td_massive', runname_fast='fast_mimic',outfolder=None,**opts
     if len(data['uvir_sfr']) > 4000:
         popts = {'fmt':'o', 'capthick':.05,'elinewidth':.05,'alpha':0.2,'color':'0.3','ms':0.5, 'errorevery': 5000}
 
+    # star-forming sequence
+    idx = (data['uvir_sfr'] > 0) #& (data['fast']['uvj'] < 3) # to make it look like Kate's selection
+    star_forming_sequence(np.log10(data['uvir_sfr'][idx]),
+                          data['fast']['stellar_mass'][idx],
+                          data['fast']['z'][idx],
+                          outfolder+'star_forming_sequence_uvir.png',popts,
+                          xlabel='[FAST]', ylabel='[UV+IR]')
+
+    # idx = np.ones_like(data['fast']['stellar_mass'],dtype=bool) # we want them all
+    star_forming_sequence(np.log10(data['prosp']['sfr_100']['q50'][idx]),
+                          data['fast']['stellar_mass'][idx],
+                          data['fast']['z'][idx],
+                          outfolder+'star_forming_sequence_prospector.png',popts,
+                          xlabel='[FAST]', ylabel='[Prospector]',outfile=outfolder+'data/sfrcomp.h5',
+                          correct_prosp=np.log10(data['uvir_sfr'])[idx],correct_prosp_mass=data['prosp']['stellar_mass']['q50'][idx])
+
+    star_forming_sequence(np.log10(data['prosp']['sfr_100']['q50'][idx]),
+                          data['prosp']['stellar_mass']['q50'][idx],
+                          data['fast']['z'][idx],
+                          outfolder+'star_forming_sequence_pure_prospector.png',popts,
+                          xlabel='[Prospector]', ylabel='[Prospector]',priors=True,correct_prosp=np.log10(data['uvir_sfr'])[idx])
 
     # if we have FAST-mimic runs, do a thorough comparison
     # else just do Prospector-FAST
@@ -329,14 +360,14 @@ def fast_comparison(fast,prosp,parlabels,pnames,outname,popts,flabel='FAST',plab
 
         ### if we have some enforced minimum, don't include in scatter calculation
         if ((xfast == xfast.min()).sum()-1 != 0) | ((yprosp == yprosp.min()).sum()-1 != 0):
-            good = (xfast != xfast.min()) & (yprosp != yprosp.min())
+            good = (xfast != xfast.min()) & (yprosp != yprosp.min()) & np.isfinite(xfast) & np.isfinite(yprosp)
         else:
-            good = np.ones_like(xfast,dtype=bool)
+            good = np.isfinite(xfast) & np.isfinite(yprosp)
 
         ## log axes & range
         if par[:3] == 'sfr' or par == 'half_time': 
             axes[i] = prosp_dutils.equalize_axes(axes[i], np.log10(xfast), np.log10(yprosp), dynrange=0.1, line_of_equality=True, log_in_linear=True)
-            off,scat = prosp_dutils.offset_and_scatter(np.log10(xfast[good]),np.log10(yprosp[good]),biweight=True)     
+            off,scat = prosp_dutils.offset_and_scatter(np.log10(xfast[good]),np.log10(yprosp[good]),biweight=True)  
             axes[i].set_xscale('log',nonposx='clip',subsx=([1]))
             axes[i].set_yscale('log',nonposy='clip',subsy=([1]))
             axes[i].xaxis.set_minor_formatter(FormatStrFormatter('%2.4g'))
@@ -450,7 +481,7 @@ def prospector_versus_z(data,outname,popts):
         yerr = prosp_dutils.asym_errors(yprosp, yprosp_up, yprosp_down, log=False)
         axes[i].errorbar(zred,yprosp,yerr=yerr,**popts)
         axes[i].set_xlabel('redshift')
-        axes[i].set_ylabel('Prospector '+data['labels'][data['pnames'] == par][0])
+        axes[i].set_ylabel('Prospector ' + data['labels'][data['pnames'] == par][0])
 
         # add tuniv
         if par == 'half_time':
@@ -563,7 +594,6 @@ def phot_residuals(data,outfolder,popts_orig):
     plt.savefig(outfolder+'residual_restframe.png',dpi=dpi)
     plt.close()
 
-
 def mass_metallicity_relationship(data,outname,popts):
     
     # plot information
@@ -629,6 +659,108 @@ def mass_metallicity_relationship(data,outname,popts):
                    scatterpoints=1,fancybox=True)
 
     plt.savefig(outname,dpi=dpi)
+    plt.close()
+
+def star_forming_sequence(sfr,mass,zred,outname,popts,xlabel=None,ylabel=None,outfile=None,priors=False,
+                          correct_prosp=None,correct_prosp_mass=None):
+    """ Plot star-forming sequence for whatever SFR + mass combination is input
+    impossible to replicate the Whitaker+14 work without pre-selection with UVJ cuts
+    we don't have UVJ cuts (THOUGH WE CAN GET THEM IF DESIRED)
+    instead, use a sSFR cut
+    """
+
+    # set redshift binning + figsize
+    zbins = np.linspace(0.5,2.5,5)
+    fig, ax = plt.subplots(2,2,figsize=(6,6))
+    ax = np.ravel(ax)
+    medopts = {'marker':' ','alpha':0.85,'color':'red','zorder':5,'lw':1.5}
+    corrected_opts = {'marker':' ','alpha':0.85,'color':'orange','zorder':5,'lw':1.5}
+    
+    # min, max for data + model
+    logm_min, logm_max = 8.5, 11.5
+    logsfr_min, logsfr_max = -2,3.3
+    ssfr_min = -10.8
+    ssfr_max = -8 # from Prospector physics
+    mbins = np.linspace(logm_min,logm_max,14)
+    prior_opts = {'linestyle':'--','color':'k','zorder':5,'lw':1.5}
+
+    # whitaker+14 information
+    zwhit = np.array([0.75, 1.25, 1.75, 2.25])
+    logm_whit = np.linspace(logm_min,logm_max,50)
+    whitopts = {'color':'blue','alpha':0.85,'lw':1.5,'zorder':5}
+
+    # let's go!
+    mass_save, sfr_save, sfr_corrected_save, z_save = [], [], [], []
+    for i in range(len(zbins)-1):
+
+        # the data
+        in_bin = (zred > zbins[i]) & \
+                 (zred <= zbins[i+1]) & \
+                 (np.isfinite(sfr)) & \
+                 (np.log10(10**sfr/10**mass) > ssfr_min)
+        ax[i].errorbar(mass[in_bin], sfr[in_bin], **popts)
+
+        # the data-driven relationship
+        x, y, bincount = prosp_dutils.running_median(mass[in_bin], 10**sfr[in_bin],bins=mbins,avg=True,return_bincount=True)
+        ax[i].errorbar(x, np.log10(y), **medopts)
+        mass_save += x.tolist()
+        sfr_save.append(y.tolist())
+        z_save += np.repeat(zwhit[i],len(x)).tolist()
+
+        # correct for Prospector sSFR ceiling
+        if correct_prosp is not None:
+            # if our mass vector is not Prospector mass, find it in keywords
+            if correct_prosp_mass is None:
+                pmass = mass[in_bin]
+            else:
+                pmass = correct_prosp_mass[in_bin]
+
+            # take anything within 0.3 dex of the prior limit
+            idx_atlimit = (sfr[in_bin] - pmass) > ssfr_max-0.3
+            sfr_new, sfr_corr = sfr[in_bin], correct_prosp[in_bin]
+            sfr_new[idx_atlimit] = sfr_corr[idx_atlimit]
+            x, y, bincount = prosp_dutils.running_median(mass[in_bin], 10**sfr_new,bins=mbins,avg=True,return_bincount=True)
+            ax[i].errorbar(x, np.log10(y), **corrected_opts)
+            sfr_corrected_save.append(y.tolist())
+
+        # the old model
+        sfr_whit = sfr_ms(zwhit[i],logm_whit)
+        ax[i].plot(logm_whit, sfr_whit, **whitopts)
+
+        # the labels
+        ax[i].set_xlabel(r'log(M/M$_{\odot}$) ' + xlabel)
+        ax[i].set_ylabel(r'log(SFR/M$_{\odot}$ yr$^{-1}$) ' + ylabel)
+        ax[i].text(0.02, 0.93, "{0:.1f}".format(zbins[i])+'<z<'+"{0:.1f}".format(zbins[i+1]),transform=ax[i].transAxes)
+
+        # the ranges
+        ax[i].set_xlim(logm_min,logm_max)
+        ax[i].set_ylim(logsfr_min,logsfr_max)
+
+        # the guiderails
+        if np.isfinite(ssfr_min):
+            ax[i].plot([logm_min,logm_max],[ssfr_min+logm_min,ssfr_min+logm_max],**prior_opts)
+            ax[i].text(9.5,ssfr_min+9.6,'sSFR cut',rotation=30,fontsize=8)
+        if priors:
+            ax[i].text(logm_min+0.3,ssfr_max+logm_min+1.5,'Prospector prior',rotation=30,fontsize=8)
+            ax[i].plot([logm_min,logm_max],[ssfr_max+logm_min,ssfr_max+logm_max],**prior_opts)
+
+    ax[0].text(0.02,0.87,'Whitaker+14',color=whitopts['color'],transform=ax[0].transAxes)
+    # flip the geometry
+    if correct_prosp is not None:
+        ax[0].text(0.02,0.81,'<data>(corr)',color=corrected_opts['color'],transform=ax[0].transAxes)
+        ax[0].text(0.02,0.75,'<data>',color=medopts['color'],transform=ax[0].transAxes)
+    else:
+        ax[0].text(0.02,0.81,'<data>',color=medopts['color'],transform=ax[0].transAxes)
+
+    # save
+    if outfile is not None:
+        out = {'mass':x,'sfr':np.dstack((sfr_save)).squeeze(),'sfr_corr':None,'z':zwhit}
+        if correct_prosp is not None:
+            out['sfr_corr'] = np.dstack((sfr_corrected_save)).squeeze()
+        hickle.dump(out,open(outfile, "w"))
+
+    plt.tight_layout()
+    plt.savefig(outname,dpi=150)
     plt.close()
 
 def deltam_with_redshift(fast, prosp, z, outname, filename=None):

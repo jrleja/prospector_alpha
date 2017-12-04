@@ -1,4 +1,4 @@
-import td_io, os, prosp_dutils
+import td_io, os, prosp_dutils, hickle
 import numpy as np
 from astropy.io import ascii
 import astropy.coordinates as coords
@@ -158,6 +158,7 @@ def build_sample(sample=None):
         zbest = td_io.load_zbest(field)
         mips = td_io.load_mips_data(field)
         gris = td_io.load_grism_dat(field,process=True)
+        rf = td_io.load_rf_v41(field)
 
         # make catalog cuts
         good = sample['selection_function'](fast=fast,phot=phot,zbest=zbest,gris=gris)
@@ -179,6 +180,9 @@ def build_sample(sample=None):
             elif (name == 'z') or (name == 'z_best'):
                 zbest['z_sfr'] = mips[name]
         for name in gris.dtype.names: zbest[name] = gris[name]
+
+        # save UVJ cut in .dat file
+        zbest['uvj'] = calc_uvj_flag(rf[good])
 
         # rename bands in photometric catalogs
         for column in phot.colnames:
@@ -247,6 +251,103 @@ def load_master_sample():
         out['id'] += [field+'_'+str(name) for name in phot['id']]
 
     return out 
+
+def build_sample_lyc():
+    """function to select LyC candidates from the 3D-HST catalogs
+    """
+    ### output
+    fields = ['GOODSS']
+    id_str_out = '/Users/joel/code/python/prospector_alpha/data/3dhst/td_lyc.ids'
+    out = {
+           'fast': [],
+           'zbest': [],
+           'phot': [],
+           'ids': []
+          }
+
+    # list of candidates
+    # 3dhst_id,F275W_sig,F336W_sig,F435W_sig,F606W_sig,match_dist,muse_id,z,z_conf,z_type
+    lyc_list = '/Users/joel/code/python/prospector_alpha/data/3dhst/lyc/master_cat.csv'
+    lyc_cands = np.loadtxt(lyc_list,delimiter=',')
+    # add one additional value to the list
+    lyc_cands = np.append(lyc_cands,np.atleast_2d(np.zeros(10)),axis=0)
+    lyc_cands[-1,0] = 28459.0
+    lyc_cands[-1,7] = 3.251272
+
+    for field in fields:
+
+        # load data
+        print 'loading '+field
+        phot = td_io.load_phot_v41(field)
+        fast = td_io.load_fast_v41(field)
+        zbest = td_io.load_zbest(field)
+        mips = td_io.load_mips_data(field)
+        gris = td_io.load_grism_dat(field,process=True)
+        rf = td_io.load_rf_v41(field)
+
+        # match to lyc candidates
+        good = (np.in1d(phot['id'],lyc_cands[:,0].astype(int))) & (np.array(phot['use_phot'],dtype=bool))
+
+        phot = phot[good]
+        fast = fast[good]
+        zbest = zbest[good]
+        mips = mips[good]
+        gris = gris[good]
+
+        # add in mips
+        phot['f_MIPS_24um'] = mips['f24tot']
+        phot['e_MIPS_24um'] = mips['ef24tot']
+
+        # save UV+IR SFRs + emission line info in .dat file
+        for name in mips.dtype.names:
+            if (name != 'z') & (name != 'id') & (name != 'z_best'):
+                zbest[name] = mips[name]
+            elif (name == 'z') or (name == 'z_best'):
+                zbest['z_sfr'] = mips[name]
+        for name in gris.dtype.names: zbest[name] = gris[name]
+
+
+        # replace z_best with MUSE redshifts
+        for i, id in enumerate(phot['id']):
+            match = lyc_cands[:,0].astype(int) == id
+            zbest['z_best'][i] = lyc_cands[match,7]
+            print zbest['z_best'][i], id
+
+        # save UVJ cut in .dat file
+        zbest['uvj'] = calc_uvj_flag(rf[good])
+
+        # rename bands in photometric catalogs
+        for column in phot.colnames:
+            if column[:2] == 'f_' or column[:2] == 'e_':
+                phot.rename_column(column, column.lower()+'_'+field.lower())    
+
+        # treat ZP offsets (don't do space photometry!)
+        phot = remove_zp_offsets(field,phot)
+
+        # save for writing out
+        out['phot'].append(phot)
+        out['fast'].append(fast)
+        out['zbest'].append(zbest)
+        out['ids'] += [field+'_'+str(id) for id in phot['id']]
+
+    # count galaxies
+    count = 0
+    for i in range(len(out['fast'])): count += len(out['fast'][i])
+    print 'Total of {0} galaxies'.format(count)
+
+    # write out for each field
+    for i,field in enumerate(fields):
+        outbase = '/Users/joel/code/python/prospector_alpha/data/3dhst/td_lyc'
+        ascii.write(out['phot'][i], output=outbase+'.cat', 
+                    delimiter=' ', format='commented_header',overwrite=True)
+        ascii.write(out['fast'][i], output=outbase+'.fout', 
+                    delimiter=' ', format='commented_header',
+                    include_names=out['fast'][i].keys()[:11],overwrite=True)
+        ascii.write(out['zbest'][i], output=outbase+'.dat', 
+                    delimiter=' ', format='commented_header',overwrite=True)
+
+    ascii.write([out['ids']], output=id_str_out, Writer=ascii.NoHeader,overwrite=True)
+
 
 def build_sample_dynamics(sample=dynamic_sample,print_match=True):
     """finds Rachel's galaxies in the threedhst catalogs
@@ -360,8 +461,7 @@ def build_sample_dynamics(sample=dynamic_sample,print_match=True):
 
 def build_sample_hstacks():
     """select a sample of galaxies from the 3D-HST catalogs for Herschel stacking
-    bin in FAST mass and redshift
-    require SFR(IR+UV) >= SFR(MS) - 0.3 dex
+    here we take anything with log(sSFR) > -10.8, as measured by Prospector 
     """
 
     ### output
@@ -370,9 +470,22 @@ def build_sample_hstacks():
     if not os.path.isdir(outfolder):
         os.makedirs(outfolder)
 
-    # IDs, masses, redshifts, UV+IR SFRs, coordinates
-    ordered_names = ['ID','ra','dec','zred','log_mass','log_uvir_sfr']
-    out = {q: [] for q in ordered_names}
+    ### hack to pick out the ancillary data
+    with open('/Users/joel/code/python/prospector_alpha/plots/td_huge/fast_plots/data/fastcomp.h5', "r") as f:
+        ancil = hickle.load(f)
+    
+    ### pull out IDs and field names
+    # this is for the sSFR cut
+    ssfr_min = -10.8
+    fnames, fids = [], []
+    for name in ancil['objname']:
+        temp = name.split('_')
+        fnames += [temp[0]]
+        fids += [temp[1]]
+    fnames, fids = np.array(fnames), np.array(fids,dtype=int)
+
+    ### iterate over each field
+    names = ['ID','ra','dec','zred','log_mass','log_sfr']
     for field in fields:
 
         # load data
@@ -381,31 +494,43 @@ def build_sample_hstacks():
         fast = td_io.load_fast_v41(field)
         zbest = td_io.load_zbest(field)
         mips = td_io.load_mips_data(field)
-  
-        # make catalog cuts
-        best_z, lmass = np.array(zbest['z_best']), np.array(fast['lmass'])
-        good = np.where((phot['use_phot'] == 1) & \
-                       ((zbest['z_best_u68'] - zbest['z_best_l68'])/2. < 0.1) & \
-                       ((best_z >= 0.5) & (best_z < 3.0)) & \
-                       (phot['f_F160W'] / phot['e_F160W'] > 10) & \
-                       ((best_z - fast['z']) < 0.01) & \
-                       (mips['sfr'] > sfr_ms(best_z,lmass)/2.))
+        gris = td_io.load_grism_dat(field,process=True)
 
-        phot = phot[good]
-        fast = fast[good]
-        zbest = zbest[good]
-        mips = mips[good]
-        gris = gris[good]
+        # only get galaxies which we have prospector measurements for!
+        in_field = fnames == field
+        matches = np.in1d(phot['id'],fids[in_field])
+
+        phot = phot[matches]
+        fast = fast[matches]
+        zbest = zbest[matches]
+        mips = mips[matches]
+        gris = gris[matches]
+
+        # now make sSFR cuts
+        starforming = ancil['prosp']['ssfr_100']['q50'][in_field] > ssfr_min
+        phot = phot[starforming]
+        fast = fast[starforming]
+        zbest = zbest[starforming]
+        mips = mips[starforming]
+        gris = gris[starforming]
 
         # save outputs
         # IDs, masses, redshifts, UV+IR SFRs, coordinates 
-        out['ID'] += [field + '_' + str(i) for i in fast['id']]
-        out['zred'] += best_z[good].tolist()
-        out['log_mass'] += lmass[good].tolist()
-        out['log_uvir_sfr'] += np.log10(mips['sfr']).tolist()
-        out['ra'] += phot['ra'].tolist()
-        out['dec'] += phot['dec'].tolist()
+        out = {}
+        out['ID'] = np.array([field + '_' + str(i) for i in fast['id']])
+        out['zred'] = np.array(zbest['z_best'])
+        out['log_mass'] = (ancil['prosp']['stellar_mass']['q50'][in_field])[starforming]
+        out['log_sfr'] = (ancil['prosp']['sfr_100']['q50'][in_field])[starforming]
+        out['ra'] = phot['ra']
+        out['dec'] = phot['dec']
+        
+        print field+' has {0} eligible galaxies'.format(len(out['ID']))
+        outname = outfolder + field + '.cat'
+        ascii.write([out[key] for key in names], output=outname, names=names,
+                     delimiter=' ', format='commented_header',overwrite=True)
 
+
+    """
     # format output
     for key in out.keys(): out[key] = np.array(out[key])
     print 'Total of {0} galaxies'.format(len(out['ID']))
@@ -423,7 +548,7 @@ def build_sample_hstacks():
             outname = outfolder + 'logm_{:1.2f}_{:1.2f}_z_{:1.2f}_{:1.2f}.cat'.format(mbins[i],mbins[i+1],zbins[j],zbins[j+1])
             ascii.write([out[key][idx] for key in ordered_names], output=outname, names=ordered_names,
                         delimiter=' ', format='commented_header',overwrite=True)
-
+    """
 def sfr_ms(z,logm):
     """ returns the SFR of the star-forming sequence from Whitaker+14
     as a function of mass and redshift
@@ -454,8 +579,10 @@ def sfr_ms(z,logm):
 
 def calc_uvj_flag(rf):
     """calculate a UVJ flag
-    0 = quiescent, 1 = starforming"""
-    import numpy as np
+    0 = quiescent, 1 = starforming
+    taken from Whitaker et al. 2012
+    U-V > 0.8(V-J) + 0.7, U-V > 1.3, V-J < 1.5
+    """
 
     umag = 25 - 2.5*np.log10(rf['L153'])
     vmag = 25 - 2.5*np.log10(rf['L155'])
@@ -470,17 +597,17 @@ def calc_uvj_flag(rf):
     # star-forming
     sfing = (u_v < 1.3) | (v_j >= 1.5)
     uvj_flag[sfing] = 1
-    sfing = (v_j >= 0.92) & (v_j <= 1.6) & (u_v <= 0.8*v_j+0.7)
+    sfing = (v_j >= 0.75) & (v_j <= 1.5) & (u_v <= 0.8*v_j+0.7)
     uvj_flag[sfing] = 1
     
     # dusty star-formers
-    dusty_sf = (uvj_flag == 1) & (u_v >= -1.2*v_j+2.8)
+    dusty_sf = (uvj_flag == 1) & (u_v >= 1.3)
     uvj_flag[dusty_sf] = 2
     
     # outside box
     # from van der wel 2014
-    outside_box = (u_v < 0) | (u_v > 2.5) | (v_j > 2.3) | (v_j < -0.3)
-    uvj_flag[outside_box] = 0
+    #outside_box = (u_v < 0) | (u_v > 2.5) | (v_j > 2.3) | (v_j < -0.3)
+    #uvj_flag[outside_box] = 0
     
     return uvj_flag
 

@@ -454,8 +454,7 @@ def sfr_ms(z,logm,adjust_sfr=0.0,**opts):
     b = np.array([1.11, 1.31, 1.49, 1.62])
 
     # check with redshift
-    idx = np.where(zwhit == z[0])
-    idx = idx[0][0]
+    idx = np.where(zwhit == z[0])[0][0]
     if idx == -1:
         print 'this is really poorly implemented, fix it'
         print 1/0

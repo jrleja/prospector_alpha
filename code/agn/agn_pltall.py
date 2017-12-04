@@ -7,7 +7,7 @@ from astropy import constants
 from matplotlib.ticker import MaxNLocator
 
 def plot(runname='brownseds_agn',runname_noagn='brownseds_np',
-         alldata=None,alldata_noagn=None,open_all=True,outfolder=None,fmir=True):
+         alldata=None,alldata_noagn=None,open_all=True,outfolder=None,fmir=True,regenerate=False):
 
     #### load alldata
     if alldata is None:
@@ -73,12 +73,18 @@ def plot(runname='brownseds_agn',runname_noagn='brownseds_np',
                     alldata=alldata_sub,alldata_noagn=alldata_noagn,outfolder=outfolder,**popts)
     '''
     agn_evidence = {}
-    print 'PLOTTING MASS-METALLICITY DIAGRAM'
-    delta_mass_met.plot_comparison(runname=runname,alldata=alldata_sub,alldata_noagn=alldata_noagn,outfolder=outfolder,plt_idx=agn_idx,**popts)  
-    print 1/0
     print 'PLOTTING WISE GRADIENTS'
     agn_evidence = wise_gradients.plot_all(agn_evidence,runname=runname,runname_noagn=runname_noagn,alldata=alldata_sub,
-                                           alldata_noagn=alldata_noagn,agn_idx=agn_idx,regenerate=False,outfolder=outfolder, **popts)
+                                           alldata_noagn=alldata_noagn,agn_idx=agn_idx,regenerate=regenerate,outfolder=outfolder, **popts)
+    
+    # f_AGN, IR for IC 0883
+    names = [dat['objname'] for dat in alldata_sub]
+    idx = names.index('IC 0883')
+    fidx = alldata[idx]['pextras']['parnames'] == 'fmir'
+    fagn_ir = (alldata[idx]['lmir'] / alldata[idx]['lir']) * alldata[idx]['pextras']['flatchain'][:,fidx].squeeze()
+    print 1/0
+    print 'PLOTTING MASS-METALLICITY DIAGRAM'
+    delta_mass_met.plot_comparison(runname=runname,alldata=alldata_sub,alldata_noagn=alldata_noagn,outfolder=outfolder,plt_idx=agn_idx,**popts)  
     print 'PLOTTING XRAY LUMINOSITY'
     agn_evidence = xray_luminosity.make_plot(agn_evidence,runname=runname,alldata=alldata_sub,outfolder=outfolder,idx=agn_idx,**popts)
     print 'PLOTTING BPT DIAGRAM'

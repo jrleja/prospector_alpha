@@ -464,9 +464,9 @@ def plot(pdata,
 
 def plot_model_corrs(pdata,color_by=None,idx=None,**popts):
 
-    fig, ax = plt.subplots(2,2, figsize=(11, 10))
+    fig, ax = plt.subplots(2,2, figsize=(12, 10))
     cb_ax = fig.add_axes([0.83, 0.15, 0.05, 0.7])
-    fig.subplots_adjust(right=0.8,wspace=0.3,hspace=0.3,left=0.12)
+    fig.subplots_adjust(right=0.8,wspace=0.4,hspace=0.3,left=0.12)
     ax = np.ravel(ax)
 
     #### fagn labeling
@@ -477,9 +477,9 @@ def plot_model_corrs(pdata,color_by=None,idx=None,**popts):
                                      pdata['fagn_down'],log=True)
 
     #### y-axis
-    ypar = ['mass','sfr','ssfr','lir']
+    ypar = ['mass','sfr','ssfr','lir_luv']
     ylabels = [r'log(M$_{*}$) [M$_{\odot}$]', r'log(SFR) [M$_{\odot}$/yr]',
-               r'log(sSFR) [yr$^{-1}$]',r'log(L$_{\mathrm{IR}}$)']
+               r'log(sSFR) [yr$^{-1}$]',r'log(L$_{\mathrm{IR}}$/L$_{\mathrm{UV}}$)']
     cb = pdata['d2']
     for ii, yp in enumerate(ypar):
 
