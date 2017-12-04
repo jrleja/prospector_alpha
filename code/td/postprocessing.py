@@ -232,7 +232,7 @@ def post_processing(param_name, objname=None, runname = None, overwrite=True, **
     hickle.dump(extra_output,open(extra_filename, "w"))
 
     # make standard plots
-    # prosp_dynesty_plots.make_all_plots(filebase=obj_outfile,outfolder=plot_outfolder)
+    prosp_dynesty_plots.make_all_plots(filebase=obj_outfile,outfolder=plot_outfolder)
 
 
 def do_all(param_name=None,runname=None,**kwargs):
