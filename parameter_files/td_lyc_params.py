@@ -36,11 +36,11 @@ run_params = {'verbose':True,
               'compute_vega_mags': False,
               'initial_disp':0.1,
               'interp_type': 'logarithmic',
-              'agelims': [0.0,8.0,8.5,9.0,9.5,9.8,10.0],
+              'agelims': [0.0,7.3,8.0,8.5,9.0,9.5,9.8,10.0],
               # Data info (phot = .cat, dat = .dat, fast = .fout)
               'datdir':APPS+'/prospector_alpha/data/3dhst/',
               'runname': 'td_lyc',
-              'objname':'GOODSS_20161'
+              'objname':'GOODSS_30269'
               }
 ############
 # OBS
@@ -110,9 +110,19 @@ def load_obs(objname=None, datdir=None, runname=None, err_floor=0.05, zperr=True
     neg = (maggies < 0) & (np.abs(maggies/maggies_unc) > 2)
     phot_mask[neg] = False
 
+    ### also mask Ly-alpha emission
+    # must load redshift
+    datname = datdir + runname + '.dat'
+    dat = ascii.read(datname)
+    idx = dat['phot_id'] == int(objname.split('_')[-1])
+    zred = float(dat['z_best'][idx])
+    ofilters = observate.load_filters(filters)
+    wavemax = np.array([f.wavelength[f.transmission > (f.transmission.max()*0.1)].max() for f in ofilters]) / (1+zred)
+    phot_mask[wavemax < 1230] = False
+
     ### build output dictionary
     obs = {}
-    obs['filters'] = observate.load_filters(filters)
+    obs['filters'] = ofilters
     obs['wave_effective'] = np.array([filt.wave_effective for filt in obs['filters']])
     obs['phot_mask'] = phot_mask
     obs['maggies'] = maggies
@@ -379,7 +389,7 @@ model_params.append({'name': 'gas_logz', 'N': 1,
 
 model_params.append({'name': 'gas_logu', 'N': 1, # scale with sSFR?
                         'isfree': False,
-                        'init': -2.0,
+                        'init': -1.0,
                         'units': '',
                         'prior': priors.TopHat(mini=-4.0, maxi=-1.0)})
 
@@ -656,7 +666,7 @@ def load_model(objname=None, datdir=None, runname=None, agelims=[], zred=None, a
     # current scheme: six bins, four spaced equally in logarithmic 
     # space AFTER t=100 Myr + BEFORE tuniv-1 Gyr
     tbinmax = (tuniv-1)*1e9
-    agelims = agelims[:1] + np.linspace(agelims[1],np.log10(tbinmax),len(agelims)-2).tolist() + [np.log10(tuniv*1e9)]
+    agelims = agelims[:2] + np.linspace(agelims[2],np.log10(tbinmax),len(agelims)-3).tolist() + [np.log10(tuniv*1e9)]
     agebins = np.array([agelims[:-1], agelims[1:]])
     ncomp = len(agelims) - 1
 
