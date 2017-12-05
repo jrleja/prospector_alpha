@@ -4,7 +4,7 @@ import numpy as np
 import argparse
 from copy import deepcopy
 from prospector_io import load_prospector_data, create_prosp_filename
-# import prosp_dynesty_plots
+import prosp_dynesty_plots
 from dynesty.plotting import _quantile as weighted_quantile
 from prospect.models import sedmodel
 

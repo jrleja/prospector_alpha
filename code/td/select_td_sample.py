@@ -46,6 +46,16 @@ def select_huge(phot=None,fast=None,zbest=None,gris=None,**extras):
                    (zbest['z_best'] - fast['z'] < 0.01)) # this SHOULDN'T matter but some of the FAST z's are not zbest!
     return idx
 
+def select_huge_supp(phot=None,fast=None,zbest=None,gris=None,**extras):
+    # pick out td_huge selection and new selection
+    # find where they diverge
+    idx_huge = select_huge(phot=phot,fast=fast,zbest=zbest,gris=gris,**extras)
+    idx = np.where((phot['use_phot'] == 1) & \
+                   ((zbest['z_best_u68'] - zbest['z_best_l68'])/2. < 0.25) & \
+                   (phot['f_F160W'] / phot['e_F160W'] > 10) & \
+                   (zbest['z_best'] >= 0.5) & (zbest['z_best'] <= 2.5))
+    idx_supp = idx[0][~np.in1d(idx[0],idx_huge[0])]
+    return idx_supp
 
 def td_cut(out):
     """ select galaxies spaced evenly in z, mass, sSFR
@@ -109,6 +119,13 @@ huge_sample = {
              'runname': 'td_huge',
              'rm_zp_offsets': True,
               }
+
+huge_supp_sample = {
+                    'selection_function': select_huge_supp,
+                    'runname': 'td_huge_supp',
+                    'rm_zp_offsets': True,
+                    }
+
 
 td_sample = {
              'selection_function': select_td,
@@ -225,7 +242,7 @@ def load_master_sample():
     this can be used for comparison to subsamples of this sample
     """
     fields = ['AEGIS','COSMOS','GOODSN','GOODSS','UDS']
-    out = {key: [] for key in ['zbest','uvir_sfr','fast_logmass','id']}
+    out = {key: [] for key in ['zbest','uvir_sfr','fast_logmass','id','z_best_u68','z_best_l68','f_F160W','e_F160W','fast_z']}
 
     for field in fields:
 
@@ -248,7 +265,12 @@ def load_master_sample():
         out['zbest'] += np.array(zbest['z_best']).tolist()
         out['uvir_sfr'] += np.array(mips['sfr']).tolist()
         out['fast_logmass'] += np.array(fast['lmass']).tolist()
+        out['fast_z'] += np.array(fast['z']).tolist()
         out['id'] += [field+'_'+str(name) for name in phot['id']]
+        out['z_best_u68'] += np.array(zbest['z_best_u68']).tolist()
+        out['z_best_l68'] += np.array(zbest['z_best_l68']).tolist()
+        out['f_F160W'] += np.array(phot['f_F160W']).tolist()
+        out['e_F160W'] += np.array(phot['e_F160W']).tolist()
 
     return out 
 

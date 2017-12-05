@@ -412,11 +412,11 @@ def sed_figure(outname = None,
     
     # add SFH 
     if add_sfh:
-        sfh_ax = fig.add_axes([0.425,0.385,0.15,0.2],zorder=32)
+        sfh_ax = fig.add_axes([0.425,0.4,0.15,0.2],zorder=32)
         add_sfh_plot(eout, fig,
                      main_color = ['black'],
                      ax_inset=sfh_ax,
-                     text_size=0.6,lw=1.5)
+                     text_size=0.45,lw=1.13)
 
     if outname is not None:
         fig.savefig(outname, bbox_inches='tight', dpi=180)
@@ -441,6 +441,9 @@ def make_all_plots(filebase=None,
         res, powell_results, model, eout = load_prospector_data(filebase, hdf5=True)
     except IOError:
         print 'failed to load results for {0}'.format(objname)
+        return
+
+    if (res is None) or (eout is None):
         return
     
     # transform to preferred model variables
