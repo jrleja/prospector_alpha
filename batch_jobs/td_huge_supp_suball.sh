@@ -17,4 +17,5 @@ OBJID=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$IDFILE")
 srun -n 1 --mpi=pmi2 python $APPS/prospector/scripts/prospector_dynesty.py \
 --param_file="$APPS"/prospector_alpha/parameter_files/td_huge_params.py \
 --objname="$OBJID" \
---outfile="$APPS"/prospector_alpha/results/td_huge_supp/"$OBJID"
+--outfile="$APPS"/prospector_alpha/results/td_huge_supp/"$OBJID" \
+--runname="td_huge_supp"
