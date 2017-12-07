@@ -656,6 +656,9 @@ def load_model(objname=None, datdir=None, runname=None, agelims=[], zred=None, a
     # current scheme: six bins, four spaced equally in logarithmic 
     # space AFTER t=100 Myr + BEFORE tuniv-1 Gyr
     tbinmax = (tuniv-1)*1e9
+    if tbinmax < 0:
+        tbinmax = (tuniv-0.25)*1e9
+
     agelims = agelims[:1] + np.linspace(agelims[1],np.log10(tbinmax),len(agelims)-2).tolist() + [np.log10(tuniv*1e9)]
     agebins = np.array([agelims[:-1], agelims[1:]])
     ncomp = len(agelims) - 1
