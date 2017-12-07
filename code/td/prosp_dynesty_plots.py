@@ -77,11 +77,11 @@ def subcorner(res, eout, parnames, outname=None, maxprob=False):
     else:
 
         # add SFH plot
-        sfh_ax = fig.add_axes([0.72,0.425,0.25,0.25],zorder=32)
+        sfh_ax = fig.add_axes([0.75,0.435,0.22,0.22],zorder=32)
         add_sfh_plot([eout], fig,
                      main_color = ['black'],
                      ax_inset=sfh_ax,
-                     text_size=4,lw=6)
+                     text_size=2,lw=4)
 
         # create extra parameters
         axis_size = fig.get_axes()[0].get_position().size
@@ -225,10 +225,9 @@ def add_sfh_plot(eout,fig,ax_loc=None,
             ymax = np.max([ymax,perc.max()])
 
     #### labels, format, scales !
-    if tmin:
-        xmin = tmin
+    xmin = np.min(t[t>0.001])/3.
 
-    axlim_sfh=[xmax, xmin*3, ymin*.7, ymax*1.4]
+    axlim_sfh=[xmax, xmin, ymin*.7, ymax*1.4]
     ax_inset.axis(axlim_sfh)
     ax_inset.set_ylabel(r'SFR [M$_{\odot}$/yr]',fontsize=axfontsize*3,labelpad=1.5*text_size)
     ax_inset.set_xlabel(r't$_{\mathrm{lookback}}$ [Gyr]',fontsize=axfontsize*3,labelpad=1.5*text_size)
@@ -439,7 +438,7 @@ def make_all_plots(filebase=None,
     objname = filebase.split('/')[-1]
     try:
         res, powell_results, model, eout = load_prospector_data(filebase, hdf5=True)
-    except IOError:
+    except IOError,TypeError:
         print 'failed to load results for {0}'.format(objname)
         return
 
@@ -494,7 +493,7 @@ def do_all(runname=None,**extras):
     """
 
     filebase, param_basename, ancilname = prosp_dutils.generate_basenames(runname)
-    for jj in xrange(len(filebase)):
+    for jj in xrange(11,len(filebase)):
         print 'iteration '+str(jj) 
 
         make_all_plots(filebase=filebase[jj],\

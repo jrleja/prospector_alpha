@@ -25,4 +25,4 @@ $APPS/prospector_alpha/parameter_files/td_lyc_params.py \
 --objname="$OBJID" \
 --overwrite=True \
 --shorten_spec=True \
---runname="td_lyc2"
+--runname="td_lyc"

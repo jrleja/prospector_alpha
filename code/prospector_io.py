@@ -59,14 +59,15 @@ def load_prospector_data(filebase,no_sample_results=False,objname=None,runname=N
     if (objname is not None) & (runname is not None):
         filebase = os.getenv('APPS')+'/prospector_alpha/results/'+runname+'/'+runname+'_'+objname
     mcmc_filename, model_filename, extra_name = create_prosp_filename(filebase)
+    if (mcmc_filename) is None:
+        return None, None, None, None
 
     if not hdf5:
         mcmc_filename = mcmc_filename[-3:]
 
+    extra_output = None
     if load_extra_output:
         extra_output = load_prospector_extra(filebase,objname=objname,runname=runname)
-    else:
-        extra_output = None
 
     if no_sample_results:
         model, powell_results = read_results.read_model(model_filename)
@@ -88,7 +89,7 @@ def load_prospector_extra(filebase,objname=None,runname=None):
     if (objname is not None) & (runname is not None):
         filebase = os.getenv('APPS')+'/prospector_alpha/results/'+runname+'/'+runname+'_'+objname
     mcmc_filename, model_filename, extra_name = create_prosp_filename(filebase)
-
+    
     try:
         with open(extra_name, "r") as f:
             extra_output=hickle.load(f)
