@@ -300,7 +300,7 @@ model_params.append({'name': 'dust1_fraction', 'N': 1,
                         'init_disp': 0.8,
                         'disp_floor': 0.8,
                         'units': '',
-                        'prior': priors.ClippedNormal(mini=0.0, maxi=2.0, mean=1.0, sigma=0.3)})
+                        'prior': priors.TopHat(mini=0.0, maxi=2.0)})
 
 model_params.append({'name': 'dust2', 'N': 1,
                         'isfree': True,
@@ -308,7 +308,7 @@ model_params.append({'name': 'dust2', 'N': 1,
                         'init_disp': 0.25,
                         'disp_floor': 0.15,
                         'units': '',
-                        'prior': priors.TopHat(mini=0.0, maxi=3.0)})
+                        'prior': priors.TopHat(mini=0.0, maxi=1.0)})
 
 model_params.append({'name': 'dust_index', 'N': 1,
                         'isfree': True,
