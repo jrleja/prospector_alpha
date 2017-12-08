@@ -166,10 +166,10 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True,
         ndust_thetas = deepcopy(thetas)
         ndust_thetas[parnames.index('dust1_fraction')] = 0.0
         ndust_thetas[parnames.index('dust2')] = 0.0
-        res['model'].params['add_neb_emission'] = np.array([False])
-        res['model'].params['add_neb_continuum'] = np.array([False])
-        res['model'].params['add_igm_absorption'] = np.array([False])
-        _,eout['obs']['lyc']['mags'][jj,:],_ = res['model'].mean_model(ndust_thetas, fobs, sps=sps)
+        res['model'].params['add_neb_emission'] = np.array([0])
+        res['model'].params['add_neb_continuum'] = np.array([0])
+        res['model'].params['add_igm_absorption'] = np.array([0])
+        _,eout['obs']['lyc']['mags'][jj,:],__ = res['model'].mean_model(ndust_thetas, fobs, sps=sps)
         res['model'].params['add_neb_emission'] = np.array([True])
         res['model'].params['add_neb_continuum'] = np.array([True])
         res['model'].params['add_igm_absorption'] = np.array([True])
@@ -187,7 +187,7 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True,
 
     q50, q16, q84 = weighted_quantile(eout['obs']['lyc']['mags'][:,0]/eout['obs']['lyc']['mags'][:,1], np.array([0.5, 0.16, 0.84]), weights=eout['weights'])
     for q,qstr in zip([q50,q16,q84],['rq50','rq16','rq84']): eout['obs']['lyc'][qstr] = q
-    print 1/0
+
     for key1 in eout['obs']['elines'].keys():
         for key2 in ['ew','flux']:
             q50, q16, q84 = weighted_quantile(eout['obs']['elines'][key1][key2]['chain'], np.array([0.5, 0.16, 0.84]), weights=eout['weights'])
