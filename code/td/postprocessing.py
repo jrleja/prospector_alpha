@@ -166,9 +166,9 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True,
         ndust_thetas = deepcopy(thetas)
         ndust_thetas[parnames.index('dust1_fraction')] = 0.0
         ndust_thetas[parnames.index('dust2')] = 0.0
-        res['model'].params['add_neb_emission'] = np.array([0])
-        res['model'].params['add_neb_continuum'] = np.array([0])
-        res['model'].params['add_igm_absorption'] = np.array([0])
+        res['model'].params['add_neb_emission'] = np.array([False])
+        res['model'].params['add_neb_continuum'] = np.array([False])
+        res['model'].params['add_igm_absorption'] = np.array([False])
         _,eout['obs']['lyc']['mags'][jj,:],__ = res['model'].mean_model(ndust_thetas, fobs, sps=sps)
         res['model'].params['add_neb_emission'] = np.array([True])
         res['model'].params['add_neb_continuum'] = np.array([True])
