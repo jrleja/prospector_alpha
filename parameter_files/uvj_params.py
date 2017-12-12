@@ -48,21 +48,26 @@ def plot_uvj():
     
     # line is UV = 0.8*VJ+0.7
     # constant UV=1.3, VJ=1.5
-    plt.plot([-0.5,0.75],[1.3,1.3],linestyle='-',color='k')
-    plt.plot([0.75,1.5],[1.3,1.9],linestyle='-',color='k')
-    plt.plot([1.5,1.5],[1.9,4],linestyle='-',color='k')
+    fig, ax = plt.subplots(1,1, figsize=(5, 5))
+    ax.plot([-0.5,0.75],[1.3,1.3],linestyle='-',color='k')
+    ax.plot([0.75,1.5],[1.3,1.9],linestyle='-',color='k')
+    ax.plot([1.5,1.5],[1.9,4],linestyle='-',color='k')
 
-    plt.xlim(-0.5,2.5)
-    plt.ylim(0,3)
+    ax.set_xlim(-0.5,2.5)
+    ax.set_ylim(0,3)
+    ax.set_xlabel('V-J')
+    ax.set_ylabel('U-V')
 
     # star-forming line: UV = 0.8*VJ
     uv, vj = starforming_uvj()
-    plt.plot(vj,uv,'o',linestyle='-',color='blue')
+    ax.plot(vj,uv,'o',linestyle='-',color='blue')
     uv, vj = quiescent_uvj()
-    plt.plot(vj,uv,'o',linestyle='-',color='red')
-    plt.show()
+    ax.plot(vj,uv,'o',linestyle='-',color='red')
 
-    return uvj_flag
+    for i in range(1,11):
+        uv, vj = return_uvj(i)
+        ax.text(vj-0.05,uv+0.1, str(i), color='k')
+    plt.show()
 
 def quiescent_uvj():
     vj = np.linspace(0.55,1.35,4)
@@ -102,7 +107,7 @@ def load_obs(**extras):
     # do this by fixing V-flux in maggies
     # this corresponds roughly to M~1e10
     vflux = 5e7
-    maggies = np.array([10**(-uv/2.5), 1, 10**(-vj/2.5)]) * vflux
+    maggies = np.array([10**(-uv/2.5), 1, 10**(vj/2.5)]) * vflux
     maggies_unc = maggies / 100.
 
     ### build output dictionary
