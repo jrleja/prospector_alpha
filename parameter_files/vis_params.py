@@ -72,7 +72,7 @@ def find_filters(key):
 def load_obs(**extras):
 
     # signal to noise ratio
-    snr = 40
+    snr = 20
 
     # what are our mock parameters?
     params = {
@@ -533,7 +533,7 @@ def load_sps(**extras):
     sps = NebSFH(**extras)
     return sps
 
-def load_model(objname=None, datdir=None, runname=None, agelims=[], zred=None, alpha_sfh=0.2, **extras):
+def load_model(objname=None, datdir=None, runname=None, agelims=[], zred=None, alpha_sfh=1., **extras):
 
     # we'll need this to access specific model parameters
     n = [p['name'] for p in model_params]
