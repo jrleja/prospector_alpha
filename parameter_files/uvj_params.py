@@ -21,7 +21,7 @@ jansky_mks = 1e-26
 APPS = os.getenv('APPS')
 run_params = {'verbose':True,
               'debug': False,
-              'outfile': 'uvj_1',
+              'outfile': APPS+'/prospector_alpha/results/uvj/uvj_1',
               # dynesty params
               'nested_bound': 'multi', # bounding method
               'nested_sample': 'rwalk', # sampling method
