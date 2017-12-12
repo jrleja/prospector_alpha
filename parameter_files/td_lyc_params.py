@@ -376,12 +376,12 @@ model_params.append({'name': 'gas_logu', 'N': 1, # scale with sSFR?
 ##### AGN dust ##############
 model_params.append({'name': 'add_agn_dust', 'N': 1,
                         'isfree': False,
-                        'init': True,
+                        'init': False,
                         'units': '',
                         'prior': None})
 
 model_params.append({'name': 'fagn', 'N': 1,
-                        'isfree': True,
+                        'isfree': False,
                         'init': 0.01,
                         'init_disp': 0.03,
                         'disp_floor': 0.02,
@@ -389,7 +389,7 @@ model_params.append({'name': 'fagn', 'N': 1,
                         'prior': priors.LogUniform(mini=1e-4, maxi=3.0)})
 
 model_params.append({'name': 'agn_tau', 'N': 1,
-                        'isfree': True,
+                        'isfree': False,
                         'init': 20.0,
                         'init_disp': 5,
                         'disp_floor': 2,
@@ -416,7 +416,7 @@ model_params.append({'name': 'mass_units', 'N': 1,
 #### resort list of parameters 
 # because we can
 parnames = [m['name'] for m in model_params]
-fit_order = ['massmet','z_fraction', 'dust2', 'dust_index', 'dust1_fraction', 'fagn', 'agn_tau']
+fit_order = ['massmet','z_fraction', 'dust2', 'dust_index', 'dust1_fraction']
 tparams = [model_params[parnames.index(i)] for i in fit_order]
 for param in model_params: 
     if param['name'] not in fit_order:
