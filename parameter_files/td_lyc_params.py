@@ -40,12 +40,26 @@ run_params = {'verbose':True,
               # Data info (phot = .cat, dat = .dat, fast = .fout)
               'datdir':APPS+'/prospector_alpha/data/3dhst/',
               'runname': 'td_lyc',
-              'objname':'GOODSS_30269'
+              'objname':'63036'
               }
 ############
 # OBS
 #############
+['f435w', 'f606w', 'f775w', 'f814w', 'f850lp', 'f098m', 'f105w',
+       'f125w', 'f140w', 'f160w'],
 
+ftranslate = {'f435w': 'acs_wfc_f435w',
+              'f606w': 'wfc3_uvis_f606w',
+              'f775w': 'acs_wfc_f775w',
+              'f814w': 'wfc3_uvis_f814w',
+              'f850lp':'acs_wfc_f850lp',
+              'f098m':'wfc3_ir_f098m',
+              'f105w':'wfc3_ir_f105w',
+              'f125w':'wfc3_ir_f125w',
+              'f140w':'wfc3_ir_f140w',
+              'f160w':'wfc3_ir_f160w'
+              }
+    
 def load_obs(objname=None, datdir=None, runname=None, err_floor=0.05, zperr=True, no_zp_corrs=False, **extras):
 
     ''' 
@@ -58,57 +72,23 @@ def load_obs(objname=None, datdir=None, runname=None, err_floor=0.05, zperr=True
     photname = datdir + runname + '.cat'
     with open(photname, 'r') as f:
         hdr = f.readline().split()
-    dtype = np.dtype([(hdr[1],'S20')] + [(n, np.float) for n in hdr[2:]])
-    dat = np.loadtxt(photname, comments = '#', delimiter=' ', dtype = dtype)
+    dtype = np.dtype([(n, np.float) for n in hdr[1:]])
+    dat = np.loadtxt(photname, comments = '#', dtype = dtype)
 
     ### extract filters, fluxes, errors for object
     # from ReadMe: "All fluxes are normalized to an AB zeropoint of 25, such that: magAB = 25.0-2.5*log10(flux)
-    obj_idx = (dat['id'] == objname.split('_')[-1])
+    obj_idx = dat['id'] == int(objname)
     filters = np.array([f[2:] for f in dat.dtype.names if f[0:2] == 'f_'])
     flux = np.squeeze([dat[obj_idx]['f_'+f] for f in filters])
     unc = np.squeeze([dat[obj_idx]['e_'+f] for f in filters])
-
-    ### add correction to MIPS magnitudes (only MIPS 24 right now!)
-    # due to weird MIPS filter conventions
-    dAB_mips_corr = np.array([-0.03542,-0.07669,-0.03807]) # 24, 70, 160, in AB magnitudes
-    dflux = 10**(-dAB_mips_corr/2.5)
-
-    mips_idx = np.array(['mips_24um' in f for f in filters],dtype=bool)
-    flux[mips_idx] *= dflux[0]
-    unc[mips_idx] *= dflux[0]
 
     ### define photometric mask, convert to maggies
     phot_mask = (flux != unc) & (flux != -99.0) & (unc > 0)
     maggies = flux/(1e10)
     maggies_unc = unc/(1e10)
 
-    # deal with the zeropoint errors
-    # ~5% to ~20% effect
-    # either REMOVE them or INFLATE THE ERRORS by them
-    # in general, we don't inflate errors of space-based bands
-    # if use_zp is set, RE-APPLY these offsets
-    if (zperr) or (no_zp_corrs):
-        no_zp_correction = ['f435w','f606w','f606wcand','f775w','f814w',
-                            'f814wcand','f850lp','f850lpcand','f125w','f140w','f160w']
-        zp_offsets = load_zp_offsets(None)
-        band_names = np.array([x['Band'].lower()+'_'+x['Field'].lower() for x in zp_offsets])
-        for ii,f in enumerate(filters):
-            match = band_names == f
-            if match.sum():
-                in_exempt = len([s for s in no_zp_correction if s in f])
-                if (no_zp_corrs) & (not in_exempt):
-                    maggies[ii] /= zp_offsets[match]['Flux-Correction'][0]
-                    maggies_unc[ii] /= zp_offsets[match]['Flux-Correction'][0]
-                if zperr & (not in_exempt):
-                    maggies_unc[ii] = ( (maggies_unc[ii]**2) + (maggies[ii]*(1-zp_offsets[match]['Flux-Correction'][0]))**2 ) **0.5
-
     ### implement error floor
     maggies_unc = np.clip(maggies_unc, maggies*err_floor, np.inf)
-
-    ### if we have super negative flux, then mask it !
-    ### where super negative is <0 with 95% certainty
-    neg = (maggies < 0) & (np.abs(maggies/maggies_unc) > 2)
-    phot_mask[neg] = False
 
     ### also mask Ly-alpha emission
     # must load redshift
@@ -116,7 +96,7 @@ def load_obs(objname=None, datdir=None, runname=None, err_floor=0.05, zperr=True
     dat = ascii.read(datname)
     idx = dat['phot_id'] == int(objname.split('_')[-1])
     zred = float(dat['z_best'][idx])
-    ofilters = observate.load_filters(filters)
+    ofilters = observate.load_filters([ftranslate[f] for f in filters])
     wavemax = np.array([f.wavelength[f.transmission > (f.transmission.max()*0.1)].max() for f in ofilters]) / (1+zred)
     phot_mask[wavemax < 1230] = False
 
@@ -658,7 +638,7 @@ def load_model(objname=None, datdir=None, runname=None, agelims=[], zred=None, a
     if zred is None:
         datname = datdir + runname + '.dat'
         dat = ascii.read(datname)
-        idx = dat['phot_id'] == int(objname.split('_')[-1])
+        idx = dat['phot_id'] == int(objname)
         zred = float(dat['z_best'][idx])
     tuniv = WMAP9.age(zred).value
 

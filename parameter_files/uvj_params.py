@@ -78,7 +78,7 @@ def return_uvj(uvj_key):
 
     # calculate colors based off of uvj_key
     uvj_key -= 1    # SLURM arrays don't zero-index, so we translate here
-    if uvj_key <= 6:
+    if uvj_key <= 5:
         uv, vj = starforming_uvj()
         uv, vj = uv[uvj_key], vj[uvj_key]
     else:
