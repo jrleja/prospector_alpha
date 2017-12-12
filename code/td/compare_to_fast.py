@@ -8,7 +8,6 @@ from dynesty.plotting import _quantile as weighted_quantile
 from fix_ir_sed import mips_to_lir
 import copy
 from scipy.stats import spearmanr
-from stack_td_sfh import sfr_ms
 
 plt.ioff()
 
@@ -265,9 +264,6 @@ def do_all(runname='td_massive', runname_fast='fast_mimic',outfolder=None,**opts
         popts = {'fmt':'o', 'capthick':.15,'elinewidth':.15,'alpha':0.35,'color':'0.3','ms':2, 'errorevery': 5000}
     if len(data['uvir_sfr']) > 4000:
         popts = {'fmt':'o', 'capthick':.05,'elinewidth':.05,'alpha':0.2,'color':'0.3','ms':0.5, 'errorevery': 5000}
-
-    # agn plots
-    agn_plots(data, outfolder+'agn_strength.png',popts)
 
     # star-forming sequence
     idx = (data['uvir_sfr'] > 0) #& (data['fast']['uvj'] < 3) # to make it look like Kate's selection
@@ -663,85 +659,6 @@ def mass_metallicity_relationship(data,outname,popts):
 
     plt.savefig(outname,dpi=dpi)
     plt.close()
-
-def agn_plots(data,outname,popts):
-    """doing this properly requires using the whole f_AGN PDF
-    but one-point estimates will do for now
-    """
-
-    # plot information
-    fig, axes = plt.subplots(2, 2, figsize = (5,5))
-    axes = np.ravel(axes)
-    xlim = (9,11.5)
-    ylim = (1e-2,1.0)
-
-    # redshift, mass bins
-    zbins = np.linspace(0.5,2.5,5)
-    sigma_ms = 0.3 # star-forming sequence scatter in dex
-    nbins = len(zbins)-1
-    massbins = np.linspace(xlim[0],xlim[1],5)
-
-    # SFR bins
-    sfrlabels = ['above MS', 'on MS', 'below MS']
-    sfrcolors = ['#45ADA8','#FC913A','#FF4E50']
-
-    for i in range(nbins):
-
-        # sort into redshift bins
-        idx = (data['fast']['z'] > zbins[i]) & (data['fast']['z'] <= zbins[i+1])
-        xm, xm_up, xm_down = [data['prosp']['stellar_mass'][q][idx] for q in ['q50','q84','q16']]
-        sfr, sfr_up, sfr_down = [np.log10(data['prosp']['sfr_100'][q][idx]) for q in ['q50','q84','q16']]
-        xm_sig = (xm_up-xm_down)/2.
-        yz, yz_up, yz_down = [data['prosp']['fagn'][q][idx] for q in ['q50','q84','q16']]
-
-        # loop over SFR bins
-        # use Whitaker+14 SFR adjusted downwards for now (not that bad?)
-        # assume sigma = 0.3, take within 1 sigma of MS
-        sfr_expected = sfr_ms((zbins[i] + zbins[i+1])/2.,xm,adjust_sfr=0.0)
-        for j in range(3):
-            if j == 0:
-                idx = ((sfr_expected+sigma_ms) < sfr)
-            if j == 1:
-                idx = ((sfr_expected-sigma_ms) < sfr) & ((sfr_expected+sigma_ms) > sfr)
-            if j == 2:
-                idx = ((sfr_expected-sigma_ms) > sfr)
-
-            # calculate weighted average in mass bins (this is sick)
-            # should rig this to get errors someday
-            mbins, avg = prosp_dutils.running_median(xm[idx],yz[idx],avg=True,weights=None,bins=massbins)
-            axes[i].errorbar(mbins,avg,color=sfrcolors[j],label=sfrlabels[j],ms=5)
-
-        # scale
-        axes[i].set_yscale('log',nonposy='clip',subsy=([3]))
-        axes[i].yaxis.set_minor_formatter(FormatStrFormatter('%2.4g'))
-        axes[i].yaxis.set_major_formatter(FormatStrFormatter('%2.4g'))
-
-        # labels
-        if i > 1:
-            axes[i].set_xlabel('log(M/M$_{\odot}$)')
-        else:
-            for tl in axes[i].get_xticklabels():tl.set_visible(False)
-            plt.setp(axes[i].get_xminorticklabels(), visible=False)
-        if (i == 2) or (i == 0):
-            axes[i].set_ylabel(r'log(f$_{\mathrm{AGN,MIR}}$)')
-        else:
-            for tl in axes[i].get_yticklabels():tl.set_visible(False)
-            plt.setp(axes[i].get_yminorticklabels(), visible=False)
-
-        # text
-        axes[i].text(0.96,0.92,"{0:.1f}".format(zbins[i])+'<z<'+"{0:.1f}".format(zbins[i+1]),transform=axes[i].transAxes,ha='right')
-
-    for a in axes:
-        a.set_xlim(xlim)
-        a.set_ylim(ylim)
-
-    axes[0].legend(loc=2, prop={'size':8},
-                   scatterpoints=1,fancybox=True)
-    plt.tight_layout(h_pad=-0.1,w_pad=-0.1)
-    fig.subplots_adjust(wspace=0.0,hspace=0.0)
-    plt.savefig(outname,dpi=dpi)
-    plt.close()
-    print 1/0
 
 def star_forming_sequence(sfr,mass,zred,outname,popts,xlabel=None,ylabel=None,outfile=None,priors=False,
                           correct_prosp=None,correct_prosp_mass=None):
