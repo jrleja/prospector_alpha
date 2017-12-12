@@ -280,7 +280,7 @@ model_params.append({'name': 'dust1_fraction', 'N': 1,
                         'init_disp': 0.8,
                         'disp_floor': 0.8,
                         'units': '',
-                        'prior': priors.ClippedNormal(mini=0.0, maxi=2.0, mean=1.0, sigma=0.3)}))
+                        'prior': priors.ClippedNormal(mini=0.0, maxi=2.0, mean=1.0, sigma=0.3)})
 
 model_params.append({'name': 'dust2', 'N': 1,
                         'isfree': True,
