@@ -30,7 +30,7 @@ run_params = {'verbose':True,
               'nested_nlive_init': 200, # number of initial live points
               'nested_weight_kwargs': {'pfrac': 1.0}, # weight posterior over evidence by 100%
               'nested_dlogz_init': 0.01,
-              'nested_stop_kwargs': {'post_thresh': 0.01, 'n_mc':50} #higher threshold, more MCMC
+              'nested_stop_kwargs': {'post_thresh': 0.015, 'n_mc':50}, #higher threshold, more MCMC
               # Model info
               'zcontinuous': 2,
               'compute_vega_mags': False,
@@ -109,7 +109,7 @@ def load_obs(**extras):
     # this corresponds roughly to M~1e10
     vflux = 5e7
     maggies = np.array([10**(-uv/2.5), 1, 10**(vj/2.5)]) * vflux
-    maggies_unc = maggies / 100.
+    maggies_unc = maggies / 40.
 
     ### build output dictionary
     obs = {}

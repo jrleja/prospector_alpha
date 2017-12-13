@@ -200,7 +200,7 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True,
 
     return eout
 
-def post_processing(param_name, objname=None, runname = None, overwrite=True, **kwargs):
+def post_processing(param_name, objname=None, runname = None, overwrite=True, obj_outfile=None, **kwargs):
     """Driver. Loads output, runs post-processing routine.
     overwrite=False will return immediately if post-processing file already exists.
     if runname is specified, we can pass in parameter file for run A with outputs at location runname
@@ -211,16 +211,17 @@ def post_processing(param_name, objname=None, runname = None, overwrite=True, **
     pfile = model_setup.import_module_from_file(param_name)
     run_outfile = pfile.run_params['outfile']
 
-    if runname is None:
-        runname = run_outfile.split('/')[-2]
-        obj_outfile = "/".join(run_outfile.split('/')[:-1]) + '/' + objname
-    else:
-        obj_outfile = "/".join(run_outfile.split('/')[:-2]) + '/' + runname + '/' + objname
+    if obj_outfile is None:
+        if runname is None:
+            runname = run_outfile.split('/')[-2]
+            obj_outfile = "/".join(run_outfile.split('/')[:-1]) + '/' + objname
+        else:
+            obj_outfile = "/".join(run_outfile.split('/')[:-2]) + '/' + runname + '/' + objname
 
-    # account for unique td_huge storage situation
-    if runname == 'td_huge':
-        field = obj_outfile.split('/')[-1].split('_')[0]
-        obj_outfile = "/".join(obj_outfile.split('/')[:-1])+'/'+field+'/'+obj_outfile.split('/')[-1]  
+        # account for unique td_huge storage situation
+        if runname == 'td_huge':
+            field = obj_outfile.split('/')[-1].split('_')[0]
+            obj_outfile = "/".join(obj_outfile.split('/')[:-1])+'/'+field+'/'+obj_outfile.split('/')[-1]  
 
     plot_outfolder = os.getenv('APPS')+'/prospector_alpha/plots/'+runname+'/'
 

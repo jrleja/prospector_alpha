@@ -31,6 +31,7 @@ run_params = {'verbose':True,
               'nested_nlive_init': 200, # number of initial live points
               'nested_weight_kwargs': {'pfrac': 1.0}, # weight posterior over evidence by 100%
               'nested_dlogz_init': 0.01,
+              'nested_stop_kwargs': {'post_thresh': 0.015, 'n_mc':50}, #higher threshold, more MCMC
               # Model info
               'zcontinuous': 2,
               'compute_vega_mags': False,
@@ -69,7 +70,7 @@ def find_filters(key):
 
     return filters
 
-def load_obs(**extras):
+def load_obs(filter_key=1, **extras):
 
     # signal to noise ratio
     snr = 20
@@ -91,7 +92,7 @@ def load_obs(**extras):
     for p in params.keys(): params[p] = np.atleast_1d(params[p])
 
     # what are our filters?
-    filters = find_filters(extras['filter_key'])
+    filters = find_filters(filter_key)
 
     # load model, sps
     mod = load_model(**extras)
