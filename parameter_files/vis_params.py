@@ -109,7 +109,7 @@ def load_obs(filter_key=1, **extras):
     # Generate the photometry, add noise
     mod.params.update(params)
     spec, maggies, _ = mod.mean_model(mod.theta, obs, sps=sps)
-    maggies_unc = maggies / snr
+    maggies_unc = (maggies / snr).squeeze()
     phot_mask = np.ones_like(maggies,dtype=bool)
 
     ### build output dictionary
