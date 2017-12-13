@@ -67,13 +67,11 @@ def find_filters(key):
         filters += ['herschel_pacs_100','herschel_pacs_160','herschel_pacs_70']
     if key >= 9:
         filters += ['herschel_spire_250','herschel_spire_350','herschel_spire_500']
-
+    if key == 10:
+        filters = ['galex_FUV','galex_NUV','sdss_u','sdss_g','sdss_r','sdss_i','sdss_z','twomass_J','twomass_H','twomass_Ks','wise_w3']
     return filters
 
 def load_obs(filter_key=1, **extras):
-
-    # signal to noise ratio
-    snr = 20
 
     # what are our mock parameters?
     params = {
@@ -95,13 +93,18 @@ def load_obs(filter_key=1, **extras):
     filters = find_filters(filter_key)
 
     # load model, sps
-    mod = load_model(**extras)
-    sps = load_sps(**extras)
+    mod = load_model(**run_params)
+    sps = load_sps(**run_params)
 
     # we will also need an obs dictionary
     obs = {}
     obs['filters'] = observate.load_filters(filters)
     obs['wavelength'] = None
+
+    # signal to noise ratio
+    snr = 20
+    if filter_key == 10:
+        snr = np.array([np.repeat(10,10).tolist() + [4]])
 
     # Generate the photometry, add noise
     mod.params.update(params)
@@ -534,7 +537,7 @@ def load_sps(**extras):
     sps = NebSFH(**extras)
     return sps
 
-def load_model(objname=None, datdir=None, runname=None, agelims=[], zred=None, alpha_sfh=1., **extras):
+def load_model(agelims=[], alpha_sfh=1., **extras):
 
     # we'll need this to access specific model parameters
     n = [p['name'] for p in model_params]
