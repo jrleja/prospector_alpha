@@ -30,7 +30,7 @@ run_params = {'verbose':True,
               'nested_nlive_init': 200, # number of initial live points
               'nested_weight_kwargs': {'pfrac': 1.0}, # weight posterior over evidence by 100%
               'nested_dlogz_init': 0.01,
-              'nested_stop_kwargs': {'post_thresh': 0.015, 'n_mc':50}, #higher threshold, more MCMC
+              'nested_stop_kwargs': {'post_thresh': 0.01, 'n_mc':50}, #higher threshold, more MCMC
               # Model info
               'zcontinuous': 2,
               'compute_vega_mags': False,
@@ -54,8 +54,8 @@ def plot_uvj():
     ax.plot([0.75,1.5],[1.3,1.9],linestyle='-',color='k')
     ax.plot([1.5,1.5],[1.9,4],linestyle='-',color='k')
 
-    ax.set_xlim(-0.5,2.5)
-    ax.set_ylim(0,3)
+    ax.set_xlim(0,2.5)
+    ax.set_ylim(0,2.5)
     ax.set_xlabel('V-J')
     ax.set_ylabel('U-V')
 
@@ -297,7 +297,7 @@ model_params.append({'name': 'dust_index', 'N': 1,
                         'init_disp': 0.25,
                         'disp_floor': 0.15,
                         'units': '',
-                        'prior': priors.TopHat(mini=-2.2, maxi=0.4)})
+                        'prior': priors.TopHat(mini=-1, maxi=0.4)})
 
 model_params.append({'name': 'dust1_index', 'N': 1,
                         'isfree': False,
@@ -538,7 +538,7 @@ def load_sps(**extras):
     sps = NebSFH(**extras)
     return sps
 
-def load_model(agelims=[], zred=None, alpha_sfh=1.0, **extras):
+def load_model(agelims=[], zred=None, alpha_sfh=0.2, **extras):
 
     # we'll need this to access specific model parameters
     n = [p['name'] for p in model_params]
