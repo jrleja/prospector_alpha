@@ -21,7 +21,7 @@ jansky_mks = 1e-26
 APPS = os.getenv('APPS')
 run_params = {'verbose':True,
               'debug': False,
-              'outfile': APPS+'/prospector_alpha/results/td_lyc/GOODSS_20161',
+              'outfile': APPS+'/prospector_alpha/results/td_lyc/63036',
               'nofork': True,
               # dynesty params
               'nested_bound': 'multi', # bounding method
@@ -36,7 +36,7 @@ run_params = {'verbose':True,
               'compute_vega_mags': False,
               'initial_disp':0.1,
               'interp_type': 'logarithmic',
-              'agelims': [0.0,7.698,8.0,8.5,9.0,9.5,9.8,10.0],
+              'agelims': [0.0,8.0,8.5,9.0,9.5,9.8,10.0],
               # Data info (phot = .cat, dat = .dat, fast = .fout)
               'datdir':APPS+'/prospector_alpha/data/3dhst/',
               'runname': 'td_lyc',
@@ -45,9 +45,6 @@ run_params = {'verbose':True,
 ############
 # OBS
 #############
-['f435w', 'f606w', 'f775w', 'f814w', 'f850lp', 'f098m', 'f105w',
-       'f125w', 'f140w', 'f160w'],
-
 ftranslate = {'f435w': 'acs_wfc_f435w',
               'f606w': 'wfc3_uvis_f606w',
               'f775w': 'acs_wfc_f775w',
@@ -57,7 +54,12 @@ ftranslate = {'f435w': 'acs_wfc_f435w',
               'f105w':'wfc3_ir_f105w',
               'f125w':'wfc3_ir_f125w',
               'f140w':'wfc3_ir_f140w',
-              'f160w':'wfc3_ir_f160w'
+              'f160w':'wfc3_ir_f160w',
+              'F1':'spitzer_irac_ch1',
+              'F2':'spitzer_irac_ch2',
+              'F3':'spitzer_irac_ch3',
+              'F4':'spitzer_irac_ch4',
+              'Fm24': 'spitzer_mips_24'
               }
     
 def load_obs(objname=None, datdir=None, runname=None, err_floor=0.05, zperr=True, no_zp_corrs=False, **extras):
