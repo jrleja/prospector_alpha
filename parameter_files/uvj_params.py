@@ -297,7 +297,7 @@ model_params.append({'name': 'dust_index', 'N': 1,
                         'init_disp': 0.25,
                         'disp_floor': 0.15,
                         'units': '',
-                        'prior': priors.TopHat(mini=-1, maxi=0.4)})
+                        'prior': priors.ClippedNormal(mini=-0.8, maxi=0.4, mean=0.0, sigma=0.5)})
 
 model_params.append({'name': 'dust1_index', 'N': 1,
                         'isfree': False,

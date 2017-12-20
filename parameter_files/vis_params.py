@@ -77,7 +77,7 @@ def load_obs(filter_key=1, **extras):
     params = {
               'logmass': 10,
               'logzsol': -0.75,
-              'zfraction': np.array([0.625,0.6,0.5,0.55555556,0.4]), # hacked, gently rising
+              'z_fraction': np.array([0.625,0.6,0.5,0.55555556,0.4]), # hacked, gently rising
               'dust2': 0.5,
               'dust1_fraction': 0.9,
               'fagn': 0.05,
@@ -537,7 +537,7 @@ def load_sps(**extras):
     sps = NebSFH(**extras)
     return sps
 
-def load_model(agelims=[], alpha_sfh=1., **extras):
+def load_model(agelims=[], alpha_sfh=0.2, **extras):
 
     # we'll need this to access specific model parameters
     n = [p['name'] for p in model_params]
