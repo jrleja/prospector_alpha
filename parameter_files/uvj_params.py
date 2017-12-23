@@ -30,7 +30,7 @@ run_params = {'verbose':True,
               'nested_nlive_init': 200, # number of initial live points
               'nested_weight_kwargs': {'pfrac': 1.0}, # weight posterior over evidence by 100%
               'nested_dlogz_init': 0.01,
-              'nested_stop_kwargs': {'post_thresh': 0.01, 'n_mc':50}, #higher threshold, more MCMC
+              'nested_stop_kwargs': {'post_thresh': 0.004, 'n_mc':50}, #higher threshold, more MCMC
               # Model info
               'zcontinuous': 2,
               'compute_vega_mags': False,
@@ -297,7 +297,7 @@ model_params.append({'name': 'dust_index', 'N': 1,
                         'init_disp': 0.25,
                         'disp_floor': 0.15,
                         'units': '',
-                        'prior': priors.ClippedNormal(mini=-0.8, maxi=0.4, mean=0.0, sigma=0.5)})
+                        'prior': priors.ClippedNormal(mini=-0.8, maxi=0.4, mean=0.0, sigma=0.4)})
 
 model_params.append({'name': 'dust1_index', 'N': 1,
                         'isfree': False,

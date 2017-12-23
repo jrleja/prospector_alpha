@@ -22,9 +22,11 @@ trans = {
          'dust1_fraction': 'birth-cloud\ndust', 
          'duste_qpah': 'PAH strength',
          'duste_gamma': 'hot dust\nfraction',
-         'duste_umin': 'typical\nradiation\nintensity'
+         'duste_umin': 'typical radiation\nintensity',
+         'fagn': r'log(AGN fraction)',
+         'agn_tau': r'AGN optical depth'
         }
-fs_global = 14
+fs_global = 10
 lw = 2
 alpha_posterior = 0.4
 colors = {'samples':'k', 
@@ -32,6 +34,7 @@ colors = {'samples':'k',
           'data': '#9400D3',
           'truth': '#1974D2'}
 minlogssfr, maxlogssfr = -8, -13
+minfagn, maxfagn = -3, -0.5
 
 def collate_data(runname, filename=None, regenerate=False, **opts):
     """we need chains for all parameters (not SFH) + [sSFR 100, mass-weighted age]
@@ -61,7 +64,11 @@ def collate_data(runname, filename=None, regenerate=False, **opts):
                 continue
             if key not in out['pars'].keys():
                 out['pars'][key] = []
-            out['pars'][key] += [res['chain'][eout['sample_idx'],j]]
+            if key == 'fagn':
+                samp = np.log10(res['chain'][eout['sample_idx'],j])
+            else:
+                samp = res['chain'][eout['sample_idx'],j]
+            out['pars'][key] += [samp]
         out['pars']['dust1_fraction'][-1] = out['pars']['dust1_fraction'][-1] * out['pars']['dust2'][-1]
 
         # grab sSFR 100, mass-weighted age
@@ -83,6 +90,7 @@ def collate_data(runname, filename=None, regenerate=False, **opts):
         # grab truths
         if i == 0:
             out['truths'] = res['obs']['true_params']
+            out['truths']['fagn'] = np.log10(out['truths']['fagn'])
 
             # calculate sSFR, mean age for true model
             masses = vis_params.zfrac_to_masses(logmass=res['obs']['true_params']['logmass'], 
@@ -139,7 +147,7 @@ def plot_addfilts(data,outfolder):
         if i == 6:
             xlim[1] = 550
 
-        fig, sedax, stellax, dustax, dustemax = make_fig(phot=data['filters'][idx],posterior=posterior)
+        fig, sedax, stellax, dustax, dustemax, agnax = make_fig(phot=data['filters'][idx],posterior=posterior)
 
         # plot SED
         plot_sed(sedax,data['mod_obs'][idx],data['data'][idx],data['filters'][idx],xlim,ylim,posterior=posterior)
@@ -147,8 +155,9 @@ def plot_addfilts(data,outfolder):
         # plot PDFs
         labels = [['logmass','ssfr_100','mean_age','logzsol'], \
                   ['dust2','dust1_fraction','dust_index'], \
-                  ['duste_qpah','duste_gamma','duste_umin']]
-        axes = [stellax,dustax,dustemax]
+                  ['duste_qpah','duste_gamma','duste_umin'], \
+                  ['fagn','agn_tau']]
+        axes = [stellax,dustax,dustemax,agnax]
         for par, ax in zip(labels,axes):
             for k, (p, a) in enumerate(zip(par,ax)):
                 samp = np.array(data['pars'][p][idx])
@@ -157,7 +166,7 @@ def plot_addfilts(data,outfolder):
                     max = plot_pdf(a,samp,data['weights'][idx])
                 plot_prior(a,data['mod'],p,max)
                 a.axvline(data['truths'][p], linestyle='-', color=colors['truth'],lw=lw,zorder=1)
-                a.set_xlabel(trans[p],fontsize=fs_global)
+                a.set_xlabel(trans[p],fontsize=fs_global-1)
 
         fig.subplots_adjust(hspace=0.00,wspace=0.0)
         if i == 0:
@@ -171,21 +180,23 @@ def make_fig(posterior=True,phot=None):
     fig = plt.figure(figsize=(12, 7))
     sedax = fig.add_axes([0.07,0.1,0.39,0.6])
 
-    delx, dely = 0.04, 0.155
+    delx, dely = 0.04, 0.105
     sizex, sizey = 0.08, 0.14
-    ystart = 0.74
+    ystart = 0.805
     stellax = [fig.add_axes([0.665+(sizex+delx)*(j-1),ystart,sizex,sizey]) for j in range(4)]
     dustax = [fig.add_axes([0.74+(sizex+delx)*(j-1),ystart-dely-sizey,sizex,sizey]) for j in range(3)]
     dustemax = [fig.add_axes([0.74+(sizex+delx)*(j-1),ystart-2*(dely+sizey),sizex,sizey]) for j in range(3)]
+    agnax = [fig.add_axes([0.82+(sizex+delx)*(j-1),ystart-3*(dely+sizey),sizex,sizey]) for j in range(2)]
 
     # add labels
-    xt,yt = 0.535,0.77
+    xt,yt = 0.535,0.84
     fig.text(xt-0.065,yt, 'Stellar\nparameters',color='black',fontsize=fs_global+2,weight='semibold',ha='center')
     fig.text(xt,yt-dely-sizey-0.015, 'Dust\nattenuation\nparameters',color='black',fontsize=fs_global+2,weight='semibold',ha='center')
     fig.text(xt,yt-2*(dely+sizey)-0.015, 'Dust\nemission\nparameters',color='black',fontsize=fs_global+2,weight='semibold',ha='center')
+    fig.text(xt+0.07,yt-3*(dely+sizey)-0.015, 'AGN\nparameters',color='black',fontsize=fs_global+2,weight='semibold',ha='center')
 
     # add headers
-    xt, yt = 0.75, 0.945
+    xt, yt = 0.79, 0.975
     delx = 0.06
     fig.text(xt-2*delx+0.01,yt, 'key:',fontsize=fs_global+2,weight='semibold',color='k')
     fig.text(xt-delx,yt, 'prior',fontsize=fs_global+2,weight='semibold',color=colors['prior'])
@@ -240,7 +251,7 @@ def make_fig(posterior=True,phot=None):
             fig.text(xt,yt-6*dely, '       Herschel SPIRE/'+r'${0}$'.format("".join(match)),
                      fontsize=fs_global+3,color='#9b0000')
 
-    return fig, sedax, stellax, dustax, dustemax
+    return fig, sedax, stellax, dustax, dustemax, agnax
 
 def plot_sed(ax,obs,truths,filters,xlim,ylim,truth=True,posterior=True):
 
@@ -327,7 +338,7 @@ def plot_pdf(ax,samples,weights):
     fmt = "{{0:{0}}}".format(".1f").format
     title = r"${{{0}}}_{{-{1}}}^{{+{2}}}$"
     title = title.format(fmt(float(qvalues[1])), fmt(float(q_m)), fmt(float(q_p)))
-    ax.set_title(title, va='bottom', fontsize=fs_global)
+    ax.set_title(title, va='center', fontsize=fs_global-2)
 
     return y0.max()
 
@@ -368,12 +379,18 @@ def plot_prior(ax,mod,par,max,nsamp=10000):
         prior = d2_prior.distribution.rvs(size=nsamp,*d2_prior.args,loc=d2_prior.loc,scale=d2_prior.scale) * \
                 d1_prior.distribution.rvs(size=nsamp,*d1_prior.args,loc=d1_prior.loc,scale=d1_prior.scale)
 
+    elif par == 'fagn':
+
+        parsamp = np.array([minfagn, maxfagn])
+        priorsamp = np.repeat(1./4.,2)
+
     else:
         prior = mod._config_dict[par]['prior']
 
         # sample PDF at regular intervals
         parsamp = np.linspace(prior.range[0],prior.range[1],nsamp)
         priorsamp = prior.distribution.pdf(parsamp,*prior.args,loc=prior.loc, scale=prior.scale)
+
 
     # build our own prior histogram if we don't have fancy built-in Prospector objects
     if parsamp is None:
@@ -383,10 +400,13 @@ def plot_prior(ax,mod,par,max,nsamp=10000):
     # plot prior
     if max is None:
         max = priorsamp.max()
+
     ax.plot(parsamp,priorsamp/max,color=colors['prior'],lw=lw,linestyle='--',label='prior')
 
     if par == 'ssfr_100':
         ax.set_xlim(maxlogssfr,minlogssfr)
+    if par == 'fagn':
+        ax.set_xlim(minfagn,maxfagn)
 
     # simple y-axis labels
     ax.yaxis.set_major_formatter(FormatStrFormatter('%i'))
