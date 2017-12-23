@@ -460,6 +460,14 @@ def sfh_half_time(x,sfh_params,c):
         sf_start = sfh_params['sf_start']
     return integrate_sfh(sf_start,x,sfh_params)-c
 
+def massweighted_age(sfh_params):
+    """calculate mass-weighted age.
+    currently only works for nonparameteric SFH
+    """
+    avg_age_per_bin = (10**sfh_params['agebins']).sum(axis=1)/2.
+    mwa = (sfh_params['mass_fraction'] * avg_age_per_bin).sum()/1e9
+    return mwa
+
 def halfmass_assembly_time(sfh_params):
 
     from scipy.optimize import brentq
@@ -1061,16 +1069,13 @@ def estimate_xray_lum(sfr):
 
 def measure_restframe_properties(sps, model = None, thetas = None, emlines = False,
                                  measure_ir = False, measure_luv = False, measure_mir = False,
-                                 abslines = False, restframe_optical_photometry = False):
-    '''
-    takes spec(on)-spec(off) to measure emission line luminosity
-    sideband is defined for each emission line after visually 
-    inspecting the spectral sampling density around each line
+                                 abslines = False, measure_uvj = False):
+    """measures a variety of rest-frame properties: total IR luminosity,
+    total UV luminosity, total MIR luminosity, emission line luminosity, etc.
+    absorption line depths can be measured as well, via fixed definitions.
 
-    if we pass spec, then avoid the first model call
-
-    flux comes out in Lsun
-    '''
+    as written, this will NOT work if zred is a variable.
+    """
     out = {}
 
     # constants
@@ -1091,9 +1096,9 @@ def measure_restframe_properties(sps, model = None, thetas = None, emlines = Fal
     ### if we want restframe optical photometry, generate fake obs file
     ### else generate NO obs file (don't do extra filter convolutions if not necessary)
     obs = {'filters': [], 'wavelength': None}
-    if restframe_optical_photometry:
+    if measure_uvj:
         from sedpy.observate import load_filters
-        filters = ['bessell_U','bessell_V','twomass_J','bessell_B','bessell_R','twomass_Ks']
+        filters = ['bessell_U','bessell_V','twomass_J']# ,'bessell_B','bessell_R','twomass_Ks']
         obs['filters'] += load_filters(filters)
 
     ### calculate SED. comes out as maggies per Hz, @ 10pc
@@ -1130,9 +1135,9 @@ def measure_restframe_properties(sps, model = None, thetas = None, emlines = Fal
         out['luv'] = return_luv(w,spec, z=None)/constants.L_sun.cgs.value # comes out in ergs/s, convert to Lsun
     if measure_mir:
         out['lmir'] = return_lmir(w,spec, z=None)/constants.L_sun.cgs.value # comes out in ergs/s, convert to Lsun
-    if restframe_optical_photometry:
-        out['mags'] = mags
-        out['photname'] = np.array(filters)
+    if measure_uvj:
+        out['uvj'] = mags
+        out['photname'] = filters
 
     return out
 

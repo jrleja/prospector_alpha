@@ -54,8 +54,8 @@ def select_huge_supp(phot=None,fast=None,zbest=None,gris=None,**extras):
                    ((zbest['z_best_u68'] - zbest['z_best_l68'])/2. < 0.25) & \
                    (phot['f_F160W'] / phot['e_F160W'] > 10) & \
                    (zbest['z_best'] >= 0.5) & (zbest['z_best'] <= 2.5))
-    idx_supp = idx[0][~np.in1d(idx[0],idx_huge[0])]
-    return idx_supp
+    #idx_supp = idx[0][~np.in1d(idx[0],idx_huge[0])]
+    return np.unique(np.concatenate((idx_huge[0],idx[0])))
 
 def td_cut(out):
     """ select galaxies spaced evenly in z, mass, sSFR
@@ -122,10 +122,9 @@ huge_sample = {
 
 huge_supp_sample = {
                     'selection_function': select_huge_supp,
-                    'runname': 'td_huge_supp',
+                    'runname': 'td_huge',
                     'rm_zp_offsets': True,
                     }
-
 
 td_sample = {
              'selection_function': select_td,
@@ -369,7 +368,6 @@ def build_sample_lyc():
                     delimiter=' ', format='commented_header',overwrite=True)
 
     ascii.write([out['ids']], output=id_str_out, Writer=ascii.NoHeader,overwrite=True)
-
 
 def build_sample_dynamics(sample=dynamic_sample,print_match=True):
     """finds Rachel's galaxies in the threedhst catalogs

@@ -8,6 +8,7 @@ from dynesty.plotting import _quantile as weighted_quantile
 from fix_ir_sed import mips_to_lir
 import copy
 from scipy.stats import spearmanr
+from stack_td_sfh import sfr_ms
 
 plt.ioff()
 
@@ -265,6 +266,21 @@ def do_all(runname='td_massive', runname_fast='fast_mimic',outfolder=None,**opts
     if len(data['uvir_sfr']) > 4000:
         popts = {'fmt':'o', 'capthick':.05,'elinewidth':.05,'alpha':0.2,'color':'0.3','ms':0.5, 'errorevery': 5000}
 
+    # UVJ star-forming sequence
+    """
+    idx = (data['fast']['uvj'] < 3) # to make it look like Kate's selection
+    star_forming_sequence(np.log10(data['prosp']['sfr_100']['q50'][idx]),
+                          data['prosp']['stellar_mass']['q50'][idx],
+                          data['fast']['z'][idx],
+                          outfolder+'uvj_starforming.png',popts,
+                          xlabel='[Prospector]', ylabel='[Prospector]',priors=True,ssfr_min=-np.inf)
+    idx = (data['fast']['uvj'] == 3) # to make it look like Kate's selection
+    star_forming_sequence(np.log10(data['prosp']['sfr_100']['q50'][idx]),
+                          data['prosp']['stellar_mass']['q50'][idx],
+                          data['fast']['z'][idx],
+                          outfolder+'uvj_quiescent.png',popts,
+                          xlabel='[Prospector]', ylabel='[Prospector]',priors=True,ssfr_min=-np.inf)
+    """
     # star-forming sequence
     idx = (data['uvir_sfr'] > 0) #& (data['fast']['uvj'] < 3) # to make it look like Kate's selection
     star_forming_sequence(np.log10(data['uvir_sfr'][idx]),
@@ -661,7 +677,7 @@ def mass_metallicity_relationship(data,outname,popts):
     plt.close()
 
 def star_forming_sequence(sfr,mass,zred,outname,popts,xlabel=None,ylabel=None,outfile=None,priors=False,
-                          correct_prosp=None,correct_prosp_mass=None):
+                          correct_prosp=None,correct_prosp_mass=None, ssfr_min = -10.8):
     """ Plot star-forming sequence for whatever SFR + mass combination is input
     impossible to replicate the Whitaker+14 work without pre-selection with UVJ cuts
     we don't have UVJ cuts (THOUGH WE CAN GET THEM IF DESIRED)
@@ -678,7 +694,6 @@ def star_forming_sequence(sfr,mass,zred,outname,popts,xlabel=None,ylabel=None,ou
     # min, max for data + model
     logm_min, logm_max = 8.5, 11.5
     logsfr_min, logsfr_max = -2,3.3
-    ssfr_min = -10.8
     ssfr_max = -8 # from Prospector physics
     mbins = np.linspace(logm_min,logm_max,14)
     prior_opts = {'linestyle':'--','color':'k','zorder':5,'lw':1.5}

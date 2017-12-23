@@ -7,7 +7,7 @@
 ### Requested computing time in minutes
 #SBATCH -t 960
 ### Partition or queue name
-#SBATCH -p ozone
+#SBATCH -p conroy,shared,conroy-intel,serial_requeue
 ### memory per cpu, in MB
 #SBATCH --mem-per-cpu=4000
 ### Job name

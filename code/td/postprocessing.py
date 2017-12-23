@@ -4,7 +4,7 @@ import numpy as np
 import argparse
 from copy import deepcopy
 from prospector_io import load_prospector_data, create_prosp_filename
-import prosp_dynesty_plots
+# import prosp_dynesty_plots
 from dynesty.plotting import _quantile as weighted_quantile
 from prospect.models import sedmodel
 
@@ -73,7 +73,7 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True,
         eout['thetas'][p] = {'q50': q50, 'q16': q16, 'q84': q84}
 
     # extras
-    extra_parnames = ['half_time','sfr_100','ssfr_100','stellar_mass','lir','luv','lmir','lbol','luv_young','lir_young']
+    extra_parnames = ['avg_age','sfr_100','ssfr_100','stellar_mass','lir','luv','lmir','lbol','luv_young','lir_young']
     if 'fagn' in parnames:
         extra_parnames += ['l_agn', 'fmir', 'luv_agn', 'lir_agn']
     for p in extra_parnames: eout['extras'][p] = deepcopy(fmt)
@@ -85,18 +85,20 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True,
     # observables
     eout['obs']['spec'] = np.zeros(shape=(ncalc,sps.wavelengths.shape[0]))
     eout['obs']['mags'] = np.zeros(shape=(ncalc,len(res['obs']['filters'])))
+    eout['obs']['uvj'] = np.zeros(shape=(ncalc,3))
     eout['obs']['lam_obs'] = sps.wavelengths
     elines = ['H beta 4861', 'H alpha 6563']
     eout['obs']['elines'] = {key: {'ew': deepcopy(fmt), 'flux': deepcopy(fmt)} for key in elines}
     eout['obs']['dn4000'] = deepcopy(fmt)
     res['model'].params['nebemlineinspec'] = True
 
+    """
     # special 4 rohan
     eout['obs']['lyc'] = {'mags':np.zeros(shape=(ncalc,2))}
-
     from sedpy.observate import load_filters
     filters = ['wfc3_uvis_f336w','wfc3_uvis_f606w']
     fobs = {'filters': load_filters(filters), 'wavelength': None}
+    """
 
     # generate model w/o dependencies for young star contribution
     model_params = deepcopy(res['model'].config_list)
@@ -117,11 +119,10 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True,
         eout['obs']['spec'][jj,:],eout['obs']['mags'][jj,:],sm = res['model'].mean_model(thetas, res['obs'], sps=sps)
 
         # calculate SFH-based quantities
-        sfh_params = prosp_dutils.find_sfh_params(res['model'],thetas,
-                                                  res['obs'],sps,sm=sm)
+        sfh_params = prosp_dutils.find_sfh_params(res['model'],thetas,res['obs'],sps,sm=sm)
         eout['extras']['stellar_mass']['chain'][jj] = sfh_params['mass']
         eout['sfh']['sfh'][jj,:] = prosp_dutils.return_full_sfh(eout['sfh']['t'], sfh_params)
-        eout['extras']['half_time']['chain'][jj] = prosp_dutils.halfmass_assembly_time(sfh_params)
+        eout['extras']['avg_age']['chain'][jj] = prosp_dutils.massweighted_age(sfh_params)
         eout['extras']['sfr_100']['chain'][jj] = prosp_dutils.calculate_sfr(sfh_params, 0.1,  minsfr=-np.inf, maxsfr=np.inf)
         eout['extras']['ssfr_100']['chain'][jj] = eout['extras']['sfr_100']['chain'][jj].squeeze() / eout['extras']['stellar_mass']['chain'][jj].squeeze()
 
@@ -134,14 +135,14 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True,
 
         # measure from rest-frame spectrum
         t2 = time.time()
-        props = prosp_dutils.measure_restframe_properties(sps, thetas = thetas,
-                                                          model=res['model'],
-                                                          measure_ir=True, measure_luv=True, measure_mir=True, 
-                                                          emlines=elines)
+        props = prosp_dutils.measure_restframe_properties(sps, thetas = thetas, model=res['model'], measure_uvj=True, 
+                                                          measure_ir=True, measure_luv=True, measure_mir=True, emlines=elines)
         eout['extras']['lir']['chain'][jj] = props['lir']
         eout['extras']['luv']['chain'][jj] = props['luv']
         eout['extras']['lmir']['chain'][jj] = props['lmir']
         eout['obs']['dn4000']['chain'][jj] = props['dn4000']
+        eout['obs']['uvj'][jj,:] = props['uvj']
+
         for e in elines: 
             eout['obs']['elines'][e]['flux']['chain'][jj] = props['emlines'][e]['flux']
             eout['obs']['elines'][e]['ew']['chain'][jj] = props['emlines'][e]['eqw']
@@ -163,6 +164,7 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True,
         eout['extras']['lir_young']['chain'][jj] = out['lir']
 
         # rohan special
+        """
         ndust_thetas = deepcopy(thetas)
         ndust_thetas[parnames.index('dust1_fraction')] = 0.0
         ndust_thetas[parnames.index('dust2')] = 0.0
@@ -173,7 +175,7 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True,
         res['model'].params['add_neb_emission'] = np.array([True])
         res['model'].params['add_neb_continuum'] = np.array([True])
         res['model'].params['add_igm_absorption'] = np.array([True])
-
+        """
         t3 = time.time()
         print('loop {0} took {1}s ({2}s for absorption+emission)'.format(jj,t3 - t1,t3 - t2))
 
@@ -185,9 +187,11 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True,
     q50, q16, q84 = weighted_quantile(eout['obs']['dn4000']['chain'], np.array([0.5, 0.16, 0.84]), weights=eout['weights'])
     for q,qstr in zip([q50,q16,q84],['q50','q16','q84']): eout['obs']['dn4000'][qstr] = q
 
+    """
+    # 4 rohan
     q50, q16, q84 = weighted_quantile(eout['obs']['lyc']['mags'][:,0]/eout['obs']['lyc']['mags'][:,1], np.array([0.5, 0.16, 0.84]), weights=eout['weights'])
     for q,qstr in zip([q50,q16,q84],['rq50','rq16','rq84']): eout['obs']['lyc'][qstr] = q
-
+    """
     for key1 in eout['obs']['elines'].keys():
         for key2 in ['ew','flux']:
             q50, q16, q84 = weighted_quantile(eout['obs']['elines'][key1][key2]['chain'], np.array([0.5, 0.16, 0.84]), weights=eout['weights'])
@@ -200,7 +204,8 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True,
 
     return eout
 
-def post_processing(param_name, objname=None, runname = None, overwrite=True, obj_outfile=None, **kwargs):
+def post_processing(param_name, objname=None, runname = None, overwrite=True, obj_outfile=None,
+                    plot_outfolder=None, **kwargs):
     """Driver. Loads output, runs post-processing routine.
     overwrite=False will return immediately if post-processing file already exists.
     if runname is specified, we can pass in parameter file for run A with outputs at location runname
@@ -223,7 +228,8 @@ def post_processing(param_name, objname=None, runname = None, overwrite=True, ob
             field = obj_outfile.split('/')[-1].split('_')[0]
             obj_outfile = "/".join(obj_outfile.split('/')[:-1])+'/'+field+'/'+obj_outfile.split('/')[-1]  
 
-    plot_outfolder = os.getenv('APPS')+'/prospector_alpha/plots/'+runname+'/'
+    if plot_outfolder is None:
+        plot_outfolder = os.getenv('APPS')+'/prospector_alpha/plots/'+runname+'/'
 
     # check for output folder, create if necessary
     if not os.path.isdir(plot_outfolder):
@@ -255,7 +261,7 @@ def post_processing(param_name, objname=None, runname = None, overwrite=True, ob
     hickle.dump(extra_output,open(extra_filename, "w"))
 
     # make standard plots
-    prosp_dynesty_plots.make_all_plots(filebase=obj_outfile,outfolder=plot_outfolder)
+    # prosp_dynesty_plots.make_all_plots(filebase=obj_outfile,outfolder=plot_outfolder)
 
 
 def do_all(param_name=None,runname=None,**kwargs):
