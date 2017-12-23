@@ -21,7 +21,7 @@ jansky_mks = 1e-26
 APPS = os.getenv('APPS')
 run_params = {'verbose':True,
               'debug': False,
-              'outfile': APPS+'/prospector_alpha/results/td_lyc/GOODSS_30269',
+              'outfile': APPS+'/prospector_alpha/results/td_lyc/63036',
               'nofork': True,
               # dynesty params
               'nested_bound': 'multi', # bounding method
@@ -40,12 +40,28 @@ run_params = {'verbose':True,
               # Data info (phot = .cat, dat = .dat, fast = .fout)
               'datdir':APPS+'/prospector_alpha/data/3dhst/',
               'runname': 'td_lyc',
-              'objname':'GOODSS_30269'
+              'objname':'63036'
               }
 ############
 # OBS
 #############
-
+ftranslate = {'f435w': 'acs_wfc_f435w',
+              'f606w': 'wfc3_uvis_f606w',
+              'f775w': 'acs_wfc_f775w',
+              'f814w': 'wfc3_uvis_f814w',
+              'f850lp':'acs_wfc_f850lp',
+              'f098m':'wfc3_ir_f098m',
+              'f105w':'wfc3_ir_f105w',
+              'f125w':'wfc3_ir_f125w',
+              'f140w':'wfc3_ir_f140w',
+              'f160w':'wfc3_ir_f160w',
+              'F1':'spitzer_irac_ch1',
+              'F2':'spitzer_irac_ch2',
+              'F3':'spitzer_irac_ch3',
+              'F4':'spitzer_irac_ch4',
+              'Fm24': 'spitzer_mips_24'
+              }
+    
 def load_obs(objname=None, datdir=None, runname=None, err_floor=0.05, zperr=True, no_zp_corrs=False, **extras):
 
     ''' 
@@ -55,68 +71,34 @@ def load_obs(objname=None, datdir=None, runname=None, err_floor=0.05, zperr=True
     '''
 
     ### open file, load data
-    photname = datdir + objname.split('_')[0] + '_' + runname + '.cat'
+    photname = datdir + runname + '.cat'
     with open(photname, 'r') as f:
         hdr = f.readline().split()
-    dtype = np.dtype([(hdr[1],'S20')] + [(n, np.float) for n in hdr[2:]])
-    dat = np.loadtxt(photname, comments = '#', delimiter=' ', dtype = dtype)
+    dtype = np.dtype([(n, np.float) for n in hdr[1:]])
+    dat = np.loadtxt(photname, comments = '#', dtype = dtype)
 
     ### extract filters, fluxes, errors for object
     # from ReadMe: "All fluxes are normalized to an AB zeropoint of 25, such that: magAB = 25.0-2.5*log10(flux)
-    obj_idx = (dat['id'] == objname.split('_')[-1])
+    obj_idx = dat['id'] == int(objname)
     filters = np.array([f[2:] for f in dat.dtype.names if f[0:2] == 'f_'])
     flux = np.squeeze([dat[obj_idx]['f_'+f] for f in filters])
     unc = np.squeeze([dat[obj_idx]['e_'+f] for f in filters])
-
-    ### add correction to MIPS magnitudes (only MIPS 24 right now!)
-    # due to weird MIPS filter conventions
-    dAB_mips_corr = np.array([-0.03542,-0.07669,-0.03807]) # 24, 70, 160, in AB magnitudes
-    dflux = 10**(-dAB_mips_corr/2.5)
-
-    mips_idx = np.array(['mips_24um' in f for f in filters],dtype=bool)
-    flux[mips_idx] *= dflux[0]
-    unc[mips_idx] *= dflux[0]
 
     ### define photometric mask, convert to maggies
     phot_mask = (flux != unc) & (flux != -99.0) & (unc > 0)
     maggies = flux/(1e10)
     maggies_unc = unc/(1e10)
 
-    # deal with the zeropoint errors
-    # ~5% to ~20% effect
-    # either REMOVE them or INFLATE THE ERRORS by them
-    # in general, we don't inflate errors of space-based bands
-    # if use_zp is set, RE-APPLY these offsets
-    if (zperr) or (no_zp_corrs):
-        no_zp_correction = ['f435w','f606w','f606wcand','f775w','f814w',
-                            'f814wcand','f850lp','f850lpcand','f125w','f140w','f160w']
-        zp_offsets = load_zp_offsets(None)
-        band_names = np.array([x['Band'].lower()+'_'+x['Field'].lower() for x in zp_offsets])
-        for ii,f in enumerate(filters):
-            match = band_names == f
-            if match.sum():
-                in_exempt = len([s for s in no_zp_correction if s in f])
-                if (no_zp_corrs) & (not in_exempt):
-                    maggies[ii] /= zp_offsets[match]['Flux-Correction'][0]
-                    maggies_unc[ii] /= zp_offsets[match]['Flux-Correction'][0]
-                if zperr & (not in_exempt):
-                    maggies_unc[ii] = ( (maggies_unc[ii]**2) + (maggies[ii]*(1-zp_offsets[match]['Flux-Correction'][0]))**2 ) **0.5
-
     ### implement error floor
     maggies_unc = np.clip(maggies_unc, maggies*err_floor, np.inf)
 
-    ### if we have super negative flux, then mask it !
-    ### where super negative is <0 with 95% certainty
-    neg = (maggies < 0) & (np.abs(maggies/maggies_unc) > 2)
-    phot_mask[neg] = False
-
     ### also mask Ly-alpha emission
     # must load redshift
-    datname = datdir + objname.split('_')[0] + '_' + runname + '.dat'
+    datname = datdir + runname + '.dat'
     dat = ascii.read(datname)
     idx = dat['phot_id'] == int(objname.split('_')[-1])
     zred = float(dat['z_best'][idx])
-    ofilters = observate.load_filters(filters)
+    ofilters = observate.load_filters([ftranslate[f] for f in filters])
     wavemax = np.array([f.wavelength[f.transmission > (f.transmission.max()*0.1)].max() for f in ofilters]) / (1+zred)
     phot_mask[wavemax < 1230] = False
 
@@ -308,7 +290,7 @@ model_params.append({'name': 'dust2', 'N': 1,
                         'init_disp': 0.25,
                         'disp_floor': 0.15,
                         'units': '',
-                        'prior': priors.TopHat(mini=0.0, maxi=3.0)})
+                        'prior': priors.TopHat(mini=0.0, maxi=1.0)})
 
 model_params.append({'name': 'dust_index', 'N': 1,
                         'isfree': True,
@@ -396,12 +378,12 @@ model_params.append({'name': 'gas_logu', 'N': 1, # scale with sSFR?
 ##### AGN dust ##############
 model_params.append({'name': 'add_agn_dust', 'N': 1,
                         'isfree': False,
-                        'init': True,
+                        'init': False,
                         'units': '',
                         'prior': None})
 
 model_params.append({'name': 'fagn', 'N': 1,
-                        'isfree': True,
+                        'isfree': False,
                         'init': 0.01,
                         'init_disp': 0.03,
                         'disp_floor': 0.02,
@@ -409,7 +391,7 @@ model_params.append({'name': 'fagn', 'N': 1,
                         'prior': priors.LogUniform(mini=1e-4, maxi=3.0)})
 
 model_params.append({'name': 'agn_tau', 'N': 1,
-                        'isfree': True,
+                        'isfree': False,
                         'init': 20.0,
                         'init_disp': 5,
                         'disp_floor': 2,
@@ -436,7 +418,7 @@ model_params.append({'name': 'mass_units', 'N': 1,
 #### resort list of parameters 
 # because we can
 parnames = [m['name'] for m in model_params]
-fit_order = ['massmet','z_fraction', 'dust2', 'dust_index', 'dust1_fraction', 'fagn', 'agn_tau']
+fit_order = ['massmet','z_fraction', 'dust2', 'dust_index', 'dust1_fraction']
 tparams = [model_params[parnames.index(i)] for i in fit_order]
 for param in model_params: 
     if param['name'] not in fit_order:
@@ -447,6 +429,7 @@ model_params = tparams
 class MassMet(priors.Prior):
     """A Gaussian prior designed to approximate the Gallazzi et al. 2005 
     stellar mass--stellar metallicity relationship.
+
     Must be updated to have relevant functions of `distribution` in `priors.py`
     in order to be run with a nested sampler.
     """
@@ -481,10 +464,13 @@ class MassMet(priors.Prior):
     def __call__(self, x, **kwargs):
         """Compute the value of the probability density function at x and
         return the ln of that.
+
         :params x:
             x[0] = mass, x[1] = metallicity. Used to calculate the prior
+
         :param kwargs: optional
             All extra keyword arguments are used to update the `prior_params`.
+
         :returns lnp:
             The natural log of the prior probability at x, scalar or ndarray of
             same length as the prior object.
@@ -500,6 +486,7 @@ class MassMet(priors.Prior):
 
     def sample(self, nsample=None, **kwargs):
         """Draw a sample from the prior distribution.
+
         :param nsample: (optional)
             Unused
         """
@@ -513,9 +500,11 @@ class MassMet(priors.Prior):
     def unit_transform(self, x, **kwargs):
         """Go from a value of the CDF (between 0 and 1) to the corresponding
         parameter value.
+
         :param x:
             A scalar or vector of same length as the Prior with values between
             zero and one corresponding to the value of the CDF.
+
         :returns theta:
             The parameter value corresponding to the value of the CDF given by
             `x`.
@@ -649,9 +638,9 @@ def load_model(objname=None, datdir=None, runname=None, agelims=[], zred=None, a
     # first calculate redshift and corresponding t_universe
     # if no redshift is specified, read from file
     if zred is None:
-        datname = datdir + objname.split('_')[0] + '_' + runname + '.dat'
+        datname = datdir + runname + '.dat'
         dat = ascii.read(datname)
-        idx = dat['phot_id'] == int(objname.split('_')[-1])
+        idx = dat['phot_id'] == int(objname)
         zred = float(dat['z_best'][idx])
     tuniv = WMAP9.age(zred).value
 
@@ -689,3 +678,4 @@ def load_model(objname=None, datdir=None, runname=None, agelims=[], zred=None, a
     model_params[n.index('zred')]['init'] = zred
 
     return sedmodel.SedModel(model_params)
+

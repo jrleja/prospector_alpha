@@ -277,7 +277,7 @@ def build_sample_lyc():
     """function to select LyC candidates from the 3D-HST catalogs
     """
     ### output
-    fields = ['GOODSS']
+    fields = ['GOODSS','GOODSN']
     id_str_out = '/Users/joel/code/python/prospector_alpha/data/3dhst/td_lyc.ids'
     out = {
            'fast': [],
@@ -289,11 +289,7 @@ def build_sample_lyc():
     # list of candidates
     # 3dhst_id,F275W_sig,F336W_sig,F435W_sig,F606W_sig,match_dist,muse_id,z,z_conf,z_type
     lyc_list = '/Users/joel/code/python/prospector_alpha/data/3dhst/lyc/master_cat.csv'
-    lyc_cands = np.loadtxt(lyc_list,delimiter=',')
-    # add one additional value to the list
-    lyc_cands = np.append(lyc_cands,np.atleast_2d(np.zeros(10)),axis=0)
-    lyc_cands[-1,0] = 28459.0
-    lyc_cands[-1,7] = 3.251272
+    lyc_cands = np.genfromtxt(lyc_list,dtype=[('field','S6'),('id',int),('zred',float)])
 
     for field in fields:
 
@@ -307,7 +303,8 @@ def build_sample_lyc():
         rf = td_io.load_rf_v41(field)
 
         # match to lyc candidates
-        good = (np.in1d(phot['id'],lyc_cands[:,0].astype(int))) & (np.array(phot['use_phot'],dtype=bool))
+        idx = lyc_cands['field'] == field
+        good = (np.in1d(phot['id'],lyc_cands['id'][idx])) & (np.array(phot['use_phot'],dtype=bool))
 
         phot = phot[good]
         fast = fast[good]
@@ -327,11 +324,10 @@ def build_sample_lyc():
                 zbest['z_sfr'] = mips[name]
         for name in gris.dtype.names: zbest[name] = gris[name]
 
-
         # replace z_best with MUSE redshifts
         for i, id in enumerate(phot['id']):
-            match = lyc_cands[:,0].astype(int) == id
-            zbest['z_best'][i] = lyc_cands[match,7]
+            match = lyc_cands['id'] == id
+            zbest['z_best'][i] = lyc_cands['zred'][match]
             print zbest['z_best'][i], id
 
         # save UVJ cut in .dat file
@@ -358,7 +354,7 @@ def build_sample_lyc():
 
     # write out for each field
     for i,field in enumerate(fields):
-        outbase = '/Users/joel/code/python/prospector_alpha/data/3dhst/td_lyc'
+        outbase = '/Users/joel/code/python/prospector_alpha/data/3dhst/'+field+'_td_lyc'
         ascii.write(out['phot'][i], output=outbase+'.cat', 
                     delimiter=' ', format='commented_header',overwrite=True)
         ascii.write(out['fast'][i], output=outbase+'.fout', 
