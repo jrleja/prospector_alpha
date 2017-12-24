@@ -1,0 +1,4 @@
+# field phot_id z_best_s use_phot use_zgrism z_best z_best_l95 z_best_l68 z_best_u68 z_best_u95 sfr sfr_IR sfr_UV L_IR L_UV flag z_sfr z_type f24tot ef24tot L_1600 L_2800 beta Ha_FLUX Ha_FLUX_ERR Ha_EQW Ha_EQW_ERR number grism_id z_max_grism uvj
+# Author: I. Momcheva (Sat Oct  3 21:18:14 2015)
+goodsn 13286 3 1 0 3.23 2.028 2.101 2.269 2.317 5.9779 0.83641 5.1415 7673500000.0 21441000000.0 1.0 2.18 3.0 1.937 8.507 24684000000.0 14294000000.0 -1.86 -99.0 -99.0 -99.0 -99.0 13286 goodsn-34-G141_13286 2.00567 1.0
+goodsn 22478 3 1 0 3.24 2.959 3.034 3.234 3.295 6.4406 -99.0 6.4406 -99.0 26858000000.0 2.0 3.135 3.0 -2.427 8.015 21187000000.0 17905000000.0 -1.19 -99.0 -99.0 -99.0 -99.0 22478 goodsn-36-G141_22478 0.58487 1.0
