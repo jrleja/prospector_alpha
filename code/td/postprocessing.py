@@ -251,7 +251,8 @@ def post_processing(param_name, objname=None, runname = None, overwrite=True, ob
             if 'prospector_alpha' in res['run_params'][key]:
                 res['run_params'][key] = os.getenv('APPS')+'/prospector_alpha'+res['run_params'][key].split('prospector_alpha')[-1]
     sps = pfile.load_sps(**res['run_params'])
-    obs = pfile.load_obs(**res['run_params'])
+    #obs = pfile.load_obs(**res['run_params'])
+    obs = res['obs']
 
     # sample from chain
     extra_output = calc_extra_quantities(res,sps,obs,**kwargs)
