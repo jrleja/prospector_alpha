@@ -108,6 +108,7 @@ def load_obs(filter_key=1, **extras):
 
     # Generate the photometry, add noise
     mod.params.update(params)
+    mod.params['nebemlineinspec'] = True
     spec, maggies, _ = mod.mean_model(mod.theta, obs, sps=sps)
     maggies_unc = np.atleast_1d((maggies / snr).squeeze())
     phot_mask = np.ones_like(maggies,dtype=bool)
@@ -296,7 +297,7 @@ model_params.append({'name': 'dust_index', 'N': 1,
                         'init_disp': 0.25,
                         'disp_floor': 0.15,
                         'units': '',
-                        'prior': priors.TopHat(mini=-2.2, maxi=0.4)})
+                        'prior': priors.TopHat(mini=-1, maxi=0.4)})
 
 model_params.append({'name': 'dust1_index', 'N': 1,
                         'isfree': False,
@@ -544,7 +545,7 @@ def load_model(agelims=[], alpha_sfh=0.2, **extras):
 
     # first calculate redshift and corresponding t_universe
     # if no redshift is specified, read from file
-    zred = 0.0001
+    zred = model_params[n.index('zred')]['init']
     tuniv = WMAP9.age(zred).value
 
     # now construct the nonparametric SFH

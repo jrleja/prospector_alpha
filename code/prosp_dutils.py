@@ -554,16 +554,15 @@ def generate_basenames(runname,ancilname=None):
 
     else:
 
-        id_list = os.getenv('APPS')+"/prospector_alpha/data/"+runname+".ids"
-        ids = np.loadtxt(id_list, dtype='|S20')
-        ngals = len(ids)
+        # read file names directly from the results folder
+        results_dir = os.getenv('APPS')+"/prospector_alpha/results/"+runname
+        all_ids = ["_".join(f.split('_')[:-2]) for f in os.listdir(results_dir)]
+        ids = list(set(all_ids))
 
-        parm_basename = runname+"_params"
-        ancilname=None
-
-        for jj in xrange(ngals):
-            filebase.append(os.getenv('APPS')+"/prospector_alpha/results/"+runname+'/'+runname+'_'+ids[jj])
-            parm.append(os.getenv('APPS')+"/prospector_alpha/parameter_files/"+runname+'/'+parm_basename+'_'+str(jj+1)+'.py') 
+        # construct outputs
+        parm = os.getenv('APPS')+"/prospector_alpha/parameter_files/"+runname+"_params.py"
+        filebase = [os.getenv('APPS')+"/prospector_alpha/results/"+runname+'/'+id for id in ids]
+        ancilname = None
 
     return filebase,parm,ancilname
 

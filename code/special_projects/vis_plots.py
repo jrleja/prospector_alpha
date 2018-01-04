@@ -33,8 +33,11 @@ colors = {'samples':'k',
           'prior': '#FF420E',
           'data': '#9400D3',
           'truth': '#1974D2'}
-minlogssfr, maxlogssfr = -8, -13
-minfagn, maxfagn = -3, -0.5
+
+limits = {
+         'ssfr_100':(-13,-8), 
+         'fagn': (-3,-0.5)
+         }
 
 def collate_data(runname, filename=None, regenerate=False, **opts):
     """we need chains for all parameters (not SFH) + [sSFR 100, mass-weighted age]
@@ -71,12 +74,12 @@ def collate_data(runname, filename=None, regenerate=False, **opts):
             out['pars'][key] += [samp]
         out['pars']['dust1_fraction'][-1] = out['pars']['dust1_fraction'][-1] * out['pars']['dust2'][-1]
 
-        # grab sSFR 100, mass-weighted age
-        time_per_bin = np.diff(10**mod.params['agebins'], axis=-1)[:,0]
-        age_in_bin = np.sum(10**mod.params['agebins'],axis=-1)/2.
-        sfr_in_bin = eout['sfh']['sfh'][:,::2]
-        out['pars']['mean_age'] += [((sfr_in_bin*time_per_bin) * age_in_bin).mean(axis=1) / (sfr_in_bin*time_per_bin).mean(axis=1)/1e9]
-        out['pars']['ssfr_100'] += [np.log10(eout['extras']['ssfr_100']['chain']).tolist()]
+        # mean age
+        out['pars']['mean_age'] += [eout['extras']['avg_age']['chain'].tolist()]
+        # use (SFR / total mass formed) as sSFR, easy to calculate analytically
+        ssfr_100 = eout['extras']['ssfr_100']['chain'] 
+        smass = eout['extras']['stellar_mass']['chain'] / (10**res['chain'][eout['sample_idx'],mod.theta_index['logmass']]).squeeze()
+        out['pars']['ssfr_100'] += [np.log10(ssfr_100*smass).tolist()]
 
         # grab data
         tobs = {
@@ -88,21 +91,24 @@ def collate_data(runname, filename=None, regenerate=False, **opts):
         out['data'] += [tobs]
 
         # grab truths
+        # rename dust
         if i == 0:
             out['truths'] = res['obs']['true_params']
+            out['truths']['dust1_fraction'] *= out['truths']['dust2']
             out['truths']['fagn'] = np.log10(out['truths']['fagn'])
 
             # calculate sSFR, mean age for true model
             masses = vis_params.zfrac_to_masses(logmass=res['obs']['true_params']['logmass'], 
-                                                z_fraction=res['obs']['true_params']['zfraction'], 
+                                                z_fraction=res['obs']['true_params']['z_fraction'], 
                                                 agebins=mod.params['agebins'])
+            time_per_bin = np.diff(10**mod.params['agebins'], axis=-1)[:,0]
+            age_in_bin = np.sum(10**mod.params['agebins'],axis=-1)/2.
 
             # fudge total mass into stellar mass by using Leja+15 mass-loss formula
             # this avoids a second model call
             sfr = masses[0] / time_per_bin[0]
-            smass = (masses * massloss_correction(np.log10(age_in_bin))).sum()
-            out['truths']['ssfr_100'] = -10.1 # np.log10(sfr / smass)
-            out['truths']['mean_age'] = 7.5 # ((age_in_bin[:,None] * masses).mean() / masses.mean())/1e9
+            out['truths']['ssfr_100'] = np.log10(sfr / masses.sum())
+            out['truths']['mean_age'] = ((age_in_bin[:,None] * masses).mean() / masses.mean())/1e9
 
         # grab observables
         out['mod_obs'] += [eout['obs']]
@@ -124,7 +130,6 @@ def do_all(runname='vis', outfolder=None,**opts):
     data = collate_data(runname,filename=outfolder+'data/dat.h5',**opts)
     for i in range(len(data['filters'])): data['filters'][i] = load_filters(data['filters'][i])
 
-    vis_params.run_params['alpha_sfh'] = 1.0 # hack for now!
     data['mod'] = vis_params.load_model(**vis_params.run_params)
     plot_addfilts(data,outfolder)
 
@@ -239,13 +244,13 @@ def make_fig(posterior=True,phot=None):
             fig.text(xt,yt-4*dely, '        WISE '+r'${0}$'.format(",".join(match)),
                      fontsize=fs_global+3,color='red')
 
-        hpacs = ['herschel_pacs_100','herschel_pacs_160','herschel_pacs_70']
+        hpacs = ['herschel_pacs_70','herschel_pacs_100','herschel_pacs_160']
         match = ','.join([f.split('_')[-1] if f in fnames else '' for f in hpacs])
         if len(match) > 2:
             fig.text(xt,yt-5*dely, 'FIR: Herschel PACS/'+r'${0}$'.format("".join(match)),
                      fontsize=fs_global+3,color='#9b0000')
 
-        hspire = ['herschel_spire_250','herschel_spire_350']#,'herschel_spire_500']
+        hspire = ['herschel_spire_250','herschel_spire_350','herschel_spire_500']
         match = ','.join([f[-3:] if f in fnames else '' for f in hspire])
         if len(match) > 2:
             fig.text(xt,yt-6*dely, '       Herschel SPIRE/'+r'${0}$'.format("".join(match)),
@@ -278,8 +283,8 @@ def plot_sed(ax,obs,truths,filters,xlim,ylim,truth=True,posterior=True):
     modspec_lam = modspec_lam*(1+zred)/1e4
     
     # plot model spectra
-    pspec = prosp_dutils.smooth_spectrum(modspec_lam*1e4,spec_pdf[:,1],4000,minlam=1e3,maxlam=1e6)
-    tspec = prosp_dutils.smooth_spectrum(modspec_lam*1e4,spec_truth,4000,minlam=1e3,maxlam=1e6)
+    pspec = prosp_dutils.smooth_spectrum(modspec_lam*1e4,spec_pdf[:,1],4000,minlam=1e3,maxlam=2e4)
+    tspec = prosp_dutils.smooth_spectrum(modspec_lam*1e4,spec_truth,4000,minlam=1e3,maxlam=2e4)
 
     nz = pspec > 0
     if posterior:
@@ -288,7 +293,7 @@ def plot_sed(ax,obs,truths,filters,xlim,ylim,truth=True,posterior=True):
         ax.fill_between(modspec_lam[nz], spec_pdf[nz,0], spec_pdf[nz,2],
                           color=colors['samples'], alpha=alpha_posterior,zorder=-1,label='posterior')
     if truth:
-        ax.plot(modspec_lam[nz], spec_truth[nz], linestyle='-',
+        ax.plot(modspec_lam[nz], tspec[nz], linestyle='-',
                   color=colors['truth'], alpha=0.9,zorder=-1,label = 'truth',lw=lw)  
 
     # plot data
@@ -342,7 +347,7 @@ def plot_pdf(ax,samples,weights):
 
     return y0.max()
 
-def plot_prior(ax,mod,par,max,nsamp=10000):
+def plot_prior(ax,mod,par,max,nsamp=100000):
     """plot prior by using information from Prospector prior object
     """
     
@@ -361,12 +366,11 @@ def plot_prior(ax,mod,par,max,nsamp=10000):
         for n in range(nsamp): mass[:,n] = vis_params.zfrac_to_masses(logmass=logmass, z_fraction=zprior.sample(), agebins=agebins)
 
         # final conversion
-        # convert to sSFR (STELLAR MASS) or mean_age
+        # convert to sSFR or mean age
         time_per_bin = 10**agebins[0,1] - 10**agebins[0,0]
         age_in_bin = np.sum(10**agebins,axis=-1)/2.
         if par == 'ssfr_100':
-            smass = mass * massloss_correction(np.log10(age_in_bin))[:,None]
-            prior = np.log10(mass[0,:]/time_per_bin/smass.sum(axis=0))
+            prior = np.log10(mass[0,:]/time_per_bin/mass.sum(axis=0))
         elif par == 'mean_age':
             prior = ((age_in_bin[:,None] * mass).mean(axis=0) / mass.mean(axis=0))/1e9
 
@@ -381,8 +385,9 @@ def plot_prior(ax,mod,par,max,nsamp=10000):
 
     elif par == 'fagn':
 
-        parsamp = np.array([minfagn, maxfagn])
-        priorsamp = np.repeat(1./4.,2)
+        parsamp = np.array([limits[par][0], limits[par][1]])
+        fagn_lim = np.log10(mod._config_dict['fagn']['prior'].range)
+        priorsamp = np.repeat(1./(fagn_lim[1]-fagn_lim[0]),2)
 
     else:
         prior = mod._config_dict[par]['prior']
@@ -394,7 +399,7 @@ def plot_prior(ax,mod,par,max,nsamp=10000):
 
     # build our own prior histogram if we don't have fancy built-in Prospector objects
     if parsamp is None:
-        priorsamp, bins = np.histogram(prior,bins=20,density=True)
+        priorsamp, bins = np.histogram(prior,bins=20,density=True,range=limits.get(par,None))
         parsamp = (bins[1:]+bins[:-1])/2.
 
     # plot prior
@@ -403,19 +408,9 @@ def plot_prior(ax,mod,par,max,nsamp=10000):
 
     ax.plot(parsamp,priorsamp/max,color=colors['prior'],lw=lw,linestyle='--',label='prior')
 
-    if par == 'ssfr_100':
-        ax.set_xlim(maxlogssfr,minlogssfr)
-    if par == 'fagn':
-        ax.set_xlim(minfagn,maxfagn)
+    if par in limits.keys():
+        ax.set_xlim(limits[par])
 
     # simple y-axis labels
     ax.yaxis.set_major_formatter(FormatStrFormatter('%i'))
     ax.yaxis.set_major_locator(plt.MultipleLocator(1))
-
-def massloss_correction(t):
-    """ from Leja+15, for BC03 model + Chabrier IMF
-    this gets us most of the way there
-    """
-    dlogm = 1.04 - 0.24*t + 0.01*t**2
-    return 10**dlogm
-

@@ -4,7 +4,7 @@ import numpy as np
 import argparse
 from copy import deepcopy
 from prospector_io import load_prospector_data, create_prosp_filename
-# import prosp_dynesty_plots
+import prosp_dynesty_plots
 from dynesty.plotting import _quantile as weighted_quantile
 from prospect.models import sedmodel
 
@@ -73,7 +73,7 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True,
         eout['thetas'][p] = {'q50': q50, 'q16': q16, 'q84': q84}
 
     # extras
-    extra_parnames = ['avg_age','sfr_100','ssfr_100','stellar_mass','lir','luv','lmir','lbol','luv_young','lir_young']
+    extra_parnames = ['avg_age','half_time','sfr_100','ssfr_100','stellar_mass','lir','luv','lmir','lbol','luv_young','lir_young']
     if 'fagn' in parnames:
         extra_parnames += ['l_agn', 'fmir', 'luv_agn', 'lir_agn']
     for p in extra_parnames: eout['extras'][p] = deepcopy(fmt)
@@ -123,6 +123,7 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True,
         eout['extras']['stellar_mass']['chain'][jj] = sfh_params['mass']
         eout['sfh']['sfh'][jj,:] = prosp_dutils.return_full_sfh(eout['sfh']['t'], sfh_params)
         eout['extras']['avg_age']['chain'][jj] = prosp_dutils.massweighted_age(sfh_params)
+        eout['extras']['half_time']['chain'][jj] = prosp_dutils.halfmass_assembly_time(sfh_params)
         eout['extras']['sfr_100']['chain'][jj] = prosp_dutils.calculate_sfr(sfh_params, 0.1,  minsfr=-np.inf, maxsfr=np.inf)
         eout['extras']['ssfr_100']['chain'][jj] = eout['extras']['sfr_100']['chain'][jj].squeeze() / eout['extras']['stellar_mass']['chain'][jj].squeeze()
 
@@ -262,7 +263,7 @@ def post_processing(param_name, objname=None, runname = None, overwrite=True, ob
     hickle.dump(extra_output,open(extra_filename, "w"))
 
     # make standard plots
-    # prosp_dynesty_plots.make_all_plots(filebase=obj_outfile,outfolder=plot_outfolder)
+    prosp_dynesty_plots.make_all_plots(filebase=obj_outfile,outfolder=plot_outfolder)
 
 
 def do_all(param_name=None,runname=None,**kwargs):

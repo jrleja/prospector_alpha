@@ -494,7 +494,7 @@ def do_all(runname=None,**extras):
     """
 
     filebase, param_basename, ancilname = prosp_dutils.generate_basenames(runname)
-    for jj in xrange(11,len(filebase)):
+    for jj in range(len(filebase)):
         print 'iteration '+str(jj) 
 
         make_all_plots(filebase=filebase[jj],\
