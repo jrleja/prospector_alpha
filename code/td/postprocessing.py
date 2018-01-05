@@ -92,13 +92,11 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True,
     eout['obs']['dn4000'] = deepcopy(fmt)
     res['model'].params['nebemlineinspec'] = True
 
-    """
     # special 4 rohan
     eout['obs']['lyc'] = {'mags':np.zeros(shape=(ncalc,2))}
     from sedpy.observate import load_filters
     filters = ['wfc3_uvis_f336w','wfc3_uvis_f606w']
     fobs = {'filters': load_filters(filters), 'wavelength': None}
-    """
 
     # generate model w/o dependencies for young star contribution
     model_params = deepcopy(res['model'].config_list)
@@ -165,7 +163,6 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True,
         eout['extras']['lir_young']['chain'][jj] = out['lir']
 
         # rohan special
-        """
         ndust_thetas = deepcopy(thetas)
         ndust_thetas[parnames.index('dust1_fraction')] = 0.0
         ndust_thetas[parnames.index('dust2')] = 0.0
@@ -176,7 +173,7 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True,
         res['model'].params['add_neb_emission'] = np.array([True])
         res['model'].params['add_neb_continuum'] = np.array([True])
         res['model'].params['add_igm_absorption'] = np.array([True])
-        """
+
         t3 = time.time()
         print('loop {0} took {1}s ({2}s for absorption+emission)'.format(jj,t3 - t1,t3 - t2))
 
@@ -188,11 +185,10 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True,
     q50, q16, q84 = weighted_quantile(eout['obs']['dn4000']['chain'], np.array([0.5, 0.16, 0.84]), weights=eout['weights'])
     for q,qstr in zip([q50,q16,q84],['q50','q16','q84']): eout['obs']['dn4000'][qstr] = q
 
-    """
-    # 4 rohan
+    # for rohan
     q50, q16, q84 = weighted_quantile(eout['obs']['lyc']['mags'][:,0]/eout['obs']['lyc']['mags'][:,1], np.array([0.5, 0.16, 0.84]), weights=eout['weights'])
     for q,qstr in zip([q50,q16,q84],['rq50','rq16','rq84']): eout['obs']['lyc'][qstr] = q
-    """
+
     for key1 in eout['obs']['elines'].keys():
         for key2 in ['ew','flux']:
             q50, q16, q84 = weighted_quantile(eout['obs']['elines'][key1][key2]['chain'], np.array([0.5, 0.16, 0.84]), weights=eout['weights'])
