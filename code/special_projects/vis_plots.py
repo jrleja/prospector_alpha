@@ -14,10 +14,10 @@ from copy import copy
 
 trans = {
          'logmass': 'log(M/M$_{\odot}$)', 
-         'ssfr_100': r'log(sSFR / yr$^{-1}$)',
+         'ssfr_100': r'log(sSFR/yr$^{-1}$)',
          'dust2': r'diffuse dust', 
          'logzsol': r'log(Z/Z$_{\odot}$)', 
-         'mean_age': r't$_{\mathrm{avg}}$/Gyr',
+         'mean_age': r'log(stellar age/yr)',
          'dust_index': 'attenuation\ncurve',
          'dust1_fraction': 'birth-cloud\ndust', 
          'duste_qpah': 'PAH strength',
@@ -75,13 +75,18 @@ def collate_data(runname, filename=None, regenerate=False, **opts):
         out['pars']['dust1_fraction'][-1] = out['pars']['dust1_fraction'][-1] * out['pars']['dust2'][-1]
 
         # mean age
-        out['pars']['mean_age'] += [eout['extras']['avg_age']['chain'].tolist()]
+        out['pars']['mean_age'] += [np.log10(eout['extras']['avg_age']['chain']*1e9).tolist()]
         # use (SFR / total mass formed) as sSFR, easy to calculate analytically
         ssfr_100 = eout['extras']['ssfr_100']['chain'] 
         smass = eout['extras']['stellar_mass']['chain'] / (10**res['chain'][eout['sample_idx'],mod.theta_index['logmass']]).squeeze()
         out['pars']['ssfr_100'] += [np.log10(ssfr_100*smass).tolist()]
 
         # grab data
+        if i == 0:
+            sps = vis_params.load_sps(**vis_params.run_params)
+        mod.params.update(res['obs']['true_params'])
+        mod.params['nebemlineinspec'] = np.atleast_1d(True)
+        res['obs']['true_spec'], _, _ = mod.mean_model(mod.theta, res['obs'], sps=sps)
         tobs = {
                'maggies': res['obs']['maggies'], 
                'maggies_unc': res['obs']['maggies_unc'],
@@ -108,7 +113,7 @@ def collate_data(runname, filename=None, regenerate=False, **opts):
             # this avoids a second model call
             sfr = masses[0] / time_per_bin[0]
             out['truths']['ssfr_100'] = np.log10(sfr / masses.sum())
-            out['truths']['mean_age'] = ((age_in_bin[:,None] * masses).mean() / masses.mean())/1e9
+            out['truths']['mean_age'] = np.log10(((age_in_bin[:,None] * masses).mean() / masses.mean()))
 
         # grab observables
         out['mod_obs'] += [eout['obs']]
@@ -138,6 +143,7 @@ def plot_addfilts(data,outfolder):
     # loop over fits
     names_to_loop = ['1']+data['names'][:-1].tolist()
     xlim, ylim = [.09,30], [1e-8,7e-6]
+    ssfr_prior = None
     for i, name in enumerate(names_to_loop):
 
         # show posterior?
@@ -169,7 +175,9 @@ def plot_addfilts(data,outfolder):
                 max = None
                 if posterior:
                     max = plot_pdf(a,samp,data['weights'][idx])
-                plot_prior(a,data['mod'],p,max)
+                if (p == 'ssfr_100') & (i == 0):
+                    ssfr_prior = samp
+                plot_prior(a,data['mod'],p,max,ssfr_prior=ssfr_prior)
                 a.axvline(data['truths'][p], linestyle='-', color=colors['truth'],lw=lw,zorder=1)
                 a.set_xlabel(trans[p],fontsize=fs_global-1)
 
@@ -347,7 +355,7 @@ def plot_pdf(ax,samples,weights):
 
     return y0.max()
 
-def plot_prior(ax,mod,par,max,nsamp=100000):
+def plot_prior(ax,mod,par,max,nsamp=100000,ssfr_prior=None):
     """plot prior by using information from Prospector prior object
     """
     
@@ -355,6 +363,7 @@ def plot_prior(ax,mod,par,max,nsamp=100000):
     # for most, we use the built-in Prospector prior object
     parsamp = None
     if (par == 'ssfr_100') | (par == 'mean_age'):
+
 
         # grab zfraction prior, sample
         logmass = 1 # doesn't matter, but needs definition
@@ -370,9 +379,10 @@ def plot_prior(ax,mod,par,max,nsamp=100000):
         time_per_bin = 10**agebins[0,1] - 10**agebins[0,0]
         age_in_bin = np.sum(10**agebins,axis=-1)/2.
         if par == 'ssfr_100':
-            prior = np.log10(mass[0,:]/time_per_bin/mass.sum(axis=0))
+            # prior = np.log10(mass[0,:]/time_per_bin/mass.sum(axis=0))
+            prior = ssfr_prior
         elif par == 'mean_age':
-            prior = ((age_in_bin[:,None] * mass).mean(axis=0) / mass.mean(axis=0))/1e9
+            prior = np.log10((age_in_bin[:,None] * mass).mean(axis=0) / mass.mean(axis=0))
 
     elif par == 'dust1_fraction':
 
@@ -399,8 +409,14 @@ def plot_prior(ax,mod,par,max,nsamp=100000):
 
     # build our own prior histogram if we don't have fancy built-in Prospector objects
     if parsamp is None:
-        priorsamp, bins = np.histogram(prior,bins=20,density=True,range=limits.get(par,None))
-        parsamp = (bins[1:]+bins[:-1])/2.
+        if par == 'ssfr_100':
+            bins = int(round(10. / 0.02))
+            n, b = np.histogram(prior, bins=bins, range=[prior.min(),prior.max()],density=True)
+            priorsamp = norm_kde(n, 10.)
+            parsamp = 0.5 * (b[1:] + b[:-1])
+        else:
+            priorsamp, bins = np.histogram(prior,bins=20,density=True,range=limits.get(par,None))
+            parsamp = (bins[1:]+bins[:-1])/2.
 
     # plot prior
     if max is None:

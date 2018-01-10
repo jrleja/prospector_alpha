@@ -40,7 +40,7 @@ def subcorner(res, eout, parnames, outname=None, maxprob=False):
 
 
     # extra parameters
-    eout_toplot = ['stellar_mass','sfr_100', 'ssfr_100', 'half_time', 'H alpha 6563', 'H alpha/H beta']
+    eout_toplot = ['stellar_mass','sfr_100', 'ssfr_100', 'avg_age', 'H alpha 6563', 'H alpha/H beta']
     not_log = ['half_time','H alpha/H beta']
     ptitle = [r'log(M$_*$)',r'log(SFR$_{\mathrm{100 Myr}}$)',
               r'log(sSFR$_{\mathrm{100 Myr}}$)',r't$_{\mathrm{half}}$ [Gyr]',

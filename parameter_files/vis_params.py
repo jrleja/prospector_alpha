@@ -31,7 +31,7 @@ run_params = {'verbose':True,
               'nested_nlive_init': 200, # number of initial live points
               'nested_weight_kwargs': {'pfrac': 1.0}, # weight posterior over evidence by 100%
               'nested_dlogz_init': 0.01,
-              'nested_stop_kwargs': {'post_thresh': 0.015, 'n_mc':50}, #higher threshold, more MCMC
+              'nested_stop_kwargs': {'post_thresh': 0.012, 'n_mc':50}, #higher threshold, more MCMC
               # Model info
               'zcontinuous': 2,
               'compute_vega_mags': False,
@@ -108,7 +108,6 @@ def load_obs(filter_key=1, **extras):
 
     # Generate the photometry, add noise
     mod.params.update(params)
-    mod.params['nebemlineinspec'] = True
     spec, maggies, _ = mod.mean_model(mod.theta, obs, sps=sps)
     maggies_unc = np.atleast_1d((maggies / snr).squeeze())
     phot_mask = np.ones_like(maggies,dtype=bool)

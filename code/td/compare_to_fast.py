@@ -7,8 +7,9 @@ from astropy.cosmology import WMAP9
 from dynesty.plotting import _quantile as weighted_quantile
 from fix_ir_sed import mips_to_lir
 import copy
-from scipy.stats import spearmanr
+from scipy.stats import spearmanr, mode
 from stack_td_sfh import sfr_ms
+import td_huge_params as pfile
 
 plt.ioff()
 
@@ -40,9 +41,49 @@ def integrate_exp_tau(t1,t2,tau,tage):
 
     return integrand/norm
 
+def calc_uvj_flag(uvj, return_colors = False):
+    """calculate a UVJ flag as Whitaker et al. 2012
+    U-V > 0.8(V-J) + 0.7, U-V > 1.3, V-J < 1.5
+    """
 
-def collate_data(runname, runname_fast, filename=None, regenerate=False, lir_from_mips=False):
+    uvjmag = 25 - 2.5*np.log10(uvj)
     
+    u_v = uvjmag[:,0]-uvjmag[:,1]
+    v_j = uvjmag[:,1]-uvjmag[:,2]  
+    if return_colors:
+        return u_v, v_j
+    
+    # initialize flag to 3, for quiescent
+    uvj_flag = np.repeat(3,uvjmag.shape[0])
+    
+    # star-forming
+    sfing = (u_v < 1.3) | (v_j >= 1.5)
+    uvj_flag[sfing] = 1
+    sfing = (v_j >= 0.75) & (v_j <= 1.5) & (u_v <= 0.8*v_j+0.7)
+    uvj_flag[sfing] = 1
+    
+    # dusty star-formers
+    dusty_sf = (uvj_flag == 1) & (u_v >= 1.3)
+    uvj_flag[dusty_sf] = 2
+    
+    return uvj_flag
+
+def collate_data(runname, runname_fast, filename=None, regenerate=False, calc_dmips=False, nobj=None, **kwargs):
+    """
+    regenerate, boolean: 
+        if true, always load individual files to re-create data
+        else will check for existence of data file
+
+    calc_dmips, boolean:
+        if true, calculate the difference in IR fluxes due to nebemlineinspec keyword 
+        only set if necessary, this means instantiating an SPS and doing a model call every loop
+
+    nobj, int:
+        only load X number of objects. useful for re-making catalog for testing purposes.
+    """
+    
+    sps = None
+
     ### if it's already made, load it and give it back
     # else, start with the making!
     if os.path.isfile(filename) and regenerate == False:
@@ -54,16 +95,16 @@ def collate_data(runname, runname_fast, filename=None, regenerate=False, lir_fro
     parlabels = [r'log(M$_{\mathrm{stellar}}$/M$_{\odot}$)', 'SFR [M$_{\odot}$/yr]',
                  r'$\tau_{\mathrm{diffuse}}$', r'log(sSFR) [yr$^-1$]',
                  r"t$_{\mathrm{half-mass}}$ [Gyr]", r'log(Z/Z$_{\odot}$)', r'Q$_{\mathrm{PAH}}$',
-                 r'f$_{\mathrm{AGN}}$', 'dust index']
+                 r'f$_{\mathrm{AGN}}$', 'dust index', r'f$_{\mathrm{AGN,MIR}}$']
     fnames = ['stellar_mass','sfr_100','dust2','ssfr_100','half_time'] # take for fastmimic too
     pnames = fnames+['massmet_2', 'duste_qpah', 'fagn', 'dust_index', 'fmir'] # already calculated in Prospector
     enames = ['model_uvir_sfr', 'model_uvir_ssfr', 'sfr_ratio','model_uvir_truelir_sfr', 'model_uvir_truelir_ssfr', 'sfr_ratio_truelir'] # must calculate here
 
     outprosp, outprosp_fast, outfast, outlabels = {},{'bfit':{}},{},{}
     sfr_100_uvir, sfr_100_uv, sfr_100_ir, objname = [], [], [], []
-    phot_chi, phot_percentile, phot_obslam, phot_restlam, phot_fname = [], [], [], [], []
+    phot_chi, phot_percentile, phot_obslam, phot_restlam, phot_fname, dmips = [], [], [], [], [], []
     outfast['z'] = []
-    outfast['uvj'] = []
+    outfast['uvj'], outfast['uvj_prosp'], outfast['uv_chain'], outfast['vj_chain'] = [], [], [], []
 
     for i,par in enumerate(pnames+enames):
         
@@ -79,9 +120,11 @@ def collate_data(runname, runname_fast, filename=None, regenerate=False, lir_fro
         ### it's always in Prospector
         outprosp[par] = {}
         outprosp[par]['q50'],outprosp[par]['q84'],outprosp[par]['q16'] = [],[],[]
-    
+
     # fill output containers
     basenames, _, _ = prosp_dutils.generate_basenames(runname)
+    if nobj is not None:
+        basenames = basenames[:nobj]
     if runname_fast is not None:
         basenames_fast, _, _ = prosp_dutils.generate_basenames(runname_fast)
     field = [name.split('/')[-1].split('_')[0] for name in basenames]
@@ -111,6 +154,23 @@ def collate_data(runname, runname_fast, filename=None, regenerate=False, lir_fro
         if (prosp is None) or (model is None) or ((prosp_fast is None) & (runname_fast is not None)):
             continue
 
+        # we need SPS object to calculate difference with best-fit
+        midx = np.array(['mips' in u for u in res['obs']['filternames']],dtype=bool)
+        if calc_dmips:
+            if sps is None:
+                sps = pfile.load_sps(**res['run_params'])
+
+            # calculate difference in best-fit MIPS value
+            bfit_theta = res['chain'][prosp['sample_idx'][0],:]
+            model.params['nebemlineinspec'] = np.atleast_1d(False)
+            _,mag_em,_ = model.mean_model(bfit_theta, res['obs'], sps=sps)
+
+            dmips += ((prosp['obs']['mags'][0,midx] - mag_em[midx]) / prosp['obs']['mags'][0,midx]).tolist()
+            print dmips[-1]
+        else:
+            dmips += [None]
+
+        # object name
         objname.append(name.split('/')[-1])
 
         # prospector first
@@ -128,7 +188,6 @@ def collate_data(runname, runname_fast, filename=None, regenerate=False, lir_fro
                 outprosp[par][q].append(x)
         
         # input flux must be in mJy
-        midx = np.array(['mips' in u for u in res['obs']['filternames']],dtype=bool)
         mips_flux = prosp['obs']['mags'][:,midx].squeeze() * 3631 * 1e3
         lir = mips_to_lir(mips_flux, res['model'].params['zred'][0])
         uvir_chain = prosp_dutils.sfr_uvir(lir,prosp['extras']['luv']['chain'])
@@ -197,6 +256,15 @@ def collate_data(runname, runname_fast, filename=None, regenerate=False, lir_fro
         adat = adatlist[fidx]
         aidx = adat['phot_id'] == int(objname[-1].split('_')[-1])
         outfast['uvj'] += [adat['uvj'][aidx][0]]
+        try:
+            outfast['uvj_prosp'] += mode(calc_uvj_flag(prosp['obs']['uvj']))[0].tolist()
+            mags = 25 - 2.5*np.log10(prosp['obs']['uvj'])
+            outfast['uv_chain'] += [mags[:,0]-mags[:,1]]
+            outfast['vj_chain'] += [mags[:,1]-mags[:,2]]
+        except KeyError:
+            outfast['uvj_prosp'] += [-1]
+            outfast['uv_chain'] += [None]
+            outfast['vj_chain'] += [None]
 
         # fill it up
         outfast['stellar_mass'] += [fast['lmass'][f_idx][0]]
@@ -240,7 +308,8 @@ def collate_data(runname, runname_fast, filename=None, regenerate=False, lir_fro
            'phot_percentile': np.array(phot_percentile),
            'phot_obslam': np.array(phot_obslam),
            'phot_restlam': np.array(phot_restlam),
-           'phot_fname': np.array(phot_fname)
+           'phot_fname': np.array(phot_fname),
+           'dmips': np.array(dmips)
           }
 
     ### dump files and return
@@ -282,14 +351,13 @@ def do_all(runname='td_massive', runname_fast='fast_mimic',outfolder=None,**opts
                           xlabel='[Prospector]', ylabel='[Prospector]',priors=True,ssfr_min=-np.inf)
     """
     # star-forming sequence
-    idx = (data['uvir_sfr'] > 0) #& (data['fast']['uvj'] < 3) # to make it look like Kate's selection
+    idx = (data['uvir_sfr'] > 0) & (data['fast']['uvj_prosp'] < 3) # to make it look like Kate's selection
     star_forming_sequence(np.log10(data['uvir_sfr'][idx]),
                           data['fast']['stellar_mass'][idx],
                           data['fast']['z'][idx],
                           outfolder+'star_forming_sequence_uvir.png',popts,
                           xlabel='[FAST]', ylabel='[UV+IR]')
 
-    # idx = np.ones_like(data['fast']['stellar_mass'],dtype=bool) # we want them all
     star_forming_sequence(np.log10(data['prosp']['sfr_100']['q50'][idx]),
                           data['fast']['stellar_mass'][idx],
                           data['fast']['z'][idx],
@@ -303,12 +371,21 @@ def do_all(runname='td_massive', runname_fast='fast_mimic',outfolder=None,**opts
                           outfolder+'star_forming_sequence_pure_prospector.png',popts,
                           xlabel='[Prospector]', ylabel='[Prospector]',priors=True,correct_prosp=np.log10(data['uvir_sfr'])[idx])
 
+    idx = (data['fast']['uvj_prosp'] == 3) # only quiescent
+    star_forming_sequence(np.log10(data['prosp']['sfr_100']['q50'][idx]),
+                          data['prosp']['stellar_mass']['q50'][idx],
+                          data['fast']['z'][idx],
+                          outfolder+'star_forming_sequence_quiescent_prospector.png',popts,
+                          xlabel='[Prospector]', ylabel='quiescent ',priors=True)
+
+
     # if we have FAST-mimic runs, do a thorough comparison
     # else just do Prospector-FAST
+    data['labels'] = np.array(data['labels'].tolist() + [r'f$_{\mathrm{AGN,MIR}}$']) # hack, remove once this is rerun
     fast_comparison(data['fast'],data['prosp'],data['labels'],data['pnames'],
                     outfolder+'fast_to_palpha_comparison.png',popts)
     delta_age_versus_delta_mass(data['fast'],data['prosp'],
-                    outfolder+'deltat_deltam_fast_to_palpha.png',popts)   
+                    outfolder+'deltat_deltam_fast_to_palpha.png',popts)
     if runname_fast is not None:
         fast_comparison(data['fast'],data['prosp_fast'],data['labels'],data['pnames'],
                         outfolder+'fast_to_fastmimic_comparison.png',popts,plabel='FAST-mimic')
@@ -677,7 +754,7 @@ def mass_metallicity_relationship(data,outname,popts):
     plt.close()
 
 def star_forming_sequence(sfr,mass,zred,outname,popts,xlabel=None,ylabel=None,outfile=None,priors=False,
-                          correct_prosp=None,correct_prosp_mass=None, ssfr_min = -10.8):
+                          correct_prosp=None,correct_prosp_mass=None, ssfr_min = -np.inf):
     """ Plot star-forming sequence for whatever SFR + mass combination is input
     impossible to replicate the Whitaker+14 work without pre-selection with UVJ cuts
     we don't have UVJ cuts (THOUGH WE CAN GET THEM IF DESIRED)
@@ -693,7 +770,7 @@ def star_forming_sequence(sfr,mass,zred,outname,popts,xlabel=None,ylabel=None,ou
     
     # min, max for data + model
     logm_min, logm_max = 8.5, 11.5
-    logsfr_min, logsfr_max = -2,3.3
+    logsfr_min, logsfr_max = -4,3.3
     ssfr_max = -8 # from Prospector physics
     mbins = np.linspace(logm_min,logm_max,14)
     prior_opts = {'linestyle':'--','color':'k','zorder':5,'lw':1.5}
