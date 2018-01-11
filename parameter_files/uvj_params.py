@@ -49,15 +49,11 @@ def plot_uvj():
     
     # line is UV = 0.8*VJ+0.7
     # constant UV=1.3, VJ=1.5
+    lw = 1.5
     fig, ax = plt.subplots(1,1, figsize=(5, 5))
-    ax.plot([-0.5,0.75],[1.3,1.3],linestyle='-',color='k')
-    ax.plot([0.75,1.5],[1.3,1.9],linestyle='-',color='k')
-    ax.plot([1.5,1.5],[1.9,4],linestyle='-',color='k')
-
-    ax.set_xlim(0,2.5)
-    ax.set_ylim(0,2.5)
-    ax.set_xlabel('V-J')
-    ax.set_ylabel('U-V')
+    ax.plot([-0.5,0.75],[1.3,1.3],linestyle='-',color='k',lw=lw)
+    ax.plot([0.75,1.5],[1.3,1.9],linestyle='-',color='k',lw=lw)
+    ax.plot([1.5,1.5],[1.9,4],linestyle='-',color='k',lw=lw)
 
     # star-forming line: UV = 0.8*VJ
     uv, vj = starforming_uvj()
@@ -68,6 +64,23 @@ def plot_uvj():
     for i in range(1,11):
         uv, vj = return_uvj(i)
         ax.text(vj-0.05,uv+0.1, str(i), color='k')
+
+    # plot rotated UVJ axis
+    # perpendicular line has slope -1.25, make it pass thru (1.75,0.9) 
+    # UV = -1.25*VJ+2.875
+    if True:
+        vj = np.linspace(0,2.5)
+        uv = -1.25*vj+3
+        ax.plot(vj,uv,linestyle='--',color='0.5',lw=lw)
+
+        ax.arrow(1.745, 0.805, 0.2, 0.2, head_width=0.2, head_length=0.1, fc='0.5', ec='k', lw=lw,width=0.08)
+        ax.text(1.65, 1.13, '"dusty"',fontsize=14,weight='semibold')
+
+    ax.set_xlim(0,2.5)
+    ax.set_ylim(0,2.5)
+    ax.set_xlabel('V-J')
+    ax.set_ylabel('U-V')
+
     plt.show()
 
 def quiescent_uvj():
@@ -80,16 +93,25 @@ def starforming_uvj():
     uv = vj * 0.8 + 0.2
     return uv, vj
 
-def return_uvj(uvj_key):
+def return_uvj(uvj_key, old_method=False):
 
-    # calculate colors based off of uvj_key
+    # old method: a few simple lines, hand-chosen
+    # new method: the whole grid
     uvj_key -= 1    # SLURM arrays don't zero-index, so we translate here
-    if uvj_key <= 5:
-        uv, vj = starforming_uvj()
-        uv, vj = uv[uvj_key], vj[uvj_key]
+    if old_method:
+        if uvj_key <= 5:
+            uv, vj = starforming_uvj()
+            uv, vj = uv[uvj_key], vj[uvj_key]
+        else:
+            uv, vj = quiescent_uvj()
+            uv, vj = uv[uvj_key-6], vj[uvj_key-6]
+
     else:
-        uv, vj = quiescent_uvj()
-        uv, vj = uv[uvj_key-6], vj[uvj_key-6]
+        uv = np.arange(25)/10.+0.05
+        vj = np.arange(25)/10.+0.05
+
+        uv = uv[uvj_key % 25]
+        vj = vj[uvj_key / 25]
 
     return uv, vj
 
@@ -121,6 +143,8 @@ def load_obs(**extras):
     obs['wavelength'] = None
     obs['spectrum'] = None
     obs['logify_spectrum'] = False
+    obs['uv'] = uv
+    obs['vj'] = vj
 
     return obs
 
