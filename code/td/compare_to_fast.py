@@ -41,17 +41,16 @@ def integrate_exp_tau(t1,t2,tau,tage):
 
     return integrand/norm
 
-def calc_uvj_flag(uvj, return_colors = False):
+def calc_uvj_flag(uvj, return_dflag = True):
     """calculate a UVJ flag as Whitaker et al. 2012
     U-V > 0.8(V-J) + 0.7, U-V > 1.3, V-J < 1.5
+    1 = star-forming, 2 = dusty star-forming, 3 = quiescent
     """
 
     uvjmag = 25 - 2.5*np.log10(uvj)
     
     u_v = uvjmag[:,0]-uvjmag[:,1]
     v_j = uvjmag[:,1]-uvjmag[:,2]  
-    if return_colors:
-        return u_v, v_j
     
     # initialize flag to 3, for quiescent
     uvj_flag = np.repeat(3,uvjmag.shape[0])
@@ -65,7 +64,12 @@ def calc_uvj_flag(uvj, return_colors = False):
     # dusty star-formers
     dusty_sf = (uvj_flag == 1) & (u_v >= 1.3)
     uvj_flag[dusty_sf] = 2
-    
+
+    # dust flag: dusty=True
+    if return_dflag:
+        dflag= (u_v < (-1.25*v_j+2.875))
+        return uvj_flag, dflag
+
     return uvj_flag
 
 def collate_data(runname, runname_fast, filename=None, regenerate=False, calc_dmips=False, nobj=None, **kwargs):
@@ -96,7 +100,7 @@ def collate_data(runname, runname_fast, filename=None, regenerate=False, calc_dm
                  r'$\tau_{\mathrm{diffuse}}$', r'log(sSFR) [yr$^-1$]',
                  r"t$_{\mathrm{half-mass}}$ [Gyr]", r'log(Z/Z$_{\odot}$)', r'Q$_{\mathrm{PAH}}$',
                  r'f$_{\mathrm{AGN}}$', 'dust index', r'f$_{\mathrm{AGN,MIR}}$']
-    fnames = ['stellar_mass','sfr_100','dust2','ssfr_100','half_time'] # take for fastmimic too
+    fnames = ['stellar_mass','sfr_100','dust2','ssfr_100','avg_age','half_time'] # take for fastmimic too
     pnames = fnames+['massmet_2', 'duste_qpah', 'fagn', 'dust_index', 'fmir'] # already calculated in Prospector
     enames = ['model_uvir_sfr', 'model_uvir_ssfr', 'sfr_ratio','model_uvir_truelir_sfr', 'model_uvir_truelir_ssfr', 'sfr_ratio_truelir'] # must calculate here
 
@@ -104,7 +108,7 @@ def collate_data(runname, runname_fast, filename=None, regenerate=False, calc_dm
     sfr_100_uvir, sfr_100_uv, sfr_100_ir, objname = [], [], [], []
     phot_chi, phot_percentile, phot_obslam, phot_restlam, phot_fname, dmips = [], [], [], [], [], []
     outfast['z'] = []
-    outfast['uvj'], outfast['uvj_prosp'], outfast['uv_chain'], outfast['vj_chain'] = [], [], [], []
+    outfast['uvj'], outfast['uvj_prosp'], outfast['uvj_dust_prosp'] = [], [], []
 
     for i,par in enumerate(pnames+enames):
         
@@ -168,7 +172,7 @@ def collate_data(runname, runname_fast, filename=None, regenerate=False, calc_dm
             dmips += ((prosp['obs']['mags'][0,midx] - mag_em[midx]) / prosp['obs']['mags'][0,midx]).tolist()
             print dmips[-1]
         else:
-            dmips += [None]
+            dmips += [-1]
 
         # object name
         objname.append(name.split('/')[-1])
@@ -256,15 +260,15 @@ def collate_data(runname, runname_fast, filename=None, regenerate=False, calc_dm
         adat = adatlist[fidx]
         aidx = adat['phot_id'] == int(objname[-1].split('_')[-1])
         outfast['uvj'] += [adat['uvj'][aidx][0]]
+
         try:
-            outfast['uvj_prosp'] += mode(calc_uvj_flag(prosp['obs']['uvj']))[0].tolist()
-            mags = 25 - 2.5*np.log10(prosp['obs']['uvj'])
-            outfast['uv_chain'] += [mags[:,0]-mags[:,1]]
-            outfast['vj_chain'] += [mags[:,1]-mags[:,2]]
+            uvj_flag, uvj_dust_flag = calc_uvj_flag(prosp['obs']['uvj'])
+            outfast['uvj_prosp'] += mode(uvj_flag)[0].tolist()
+            outfast['uvj_dust_prosp'] += mode(uvj_dust_flag)[0].tolist()
+            print outfast['uvj_dust_prosp'][-1]
         except KeyError:
             outfast['uvj_prosp'] += [-1]
-            outfast['uv_chain'] += [None]
-            outfast['vj_chain'] += [None]
+            outfast['uvj_dust_prosp'] += [-1]
 
         # fill it up
         outfast['stellar_mass'] += [fast['lmass'][f_idx][0]]
