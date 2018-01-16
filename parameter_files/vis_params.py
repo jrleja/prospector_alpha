@@ -31,7 +31,7 @@ run_params = {'verbose':True,
               'nested_nlive_init': 200, # number of initial live points
               'nested_weight_kwargs': {'pfrac': 1.0}, # weight posterior over evidence by 100%
               'nested_dlogz_init': 0.01,
-              'nested_stop_kwargs': {'post_thresh': 0.012, 'n_mc':50}, #higher threshold, more MCMC
+              'nested_stop_kwargs': {'post_thresh': 0.009, 'n_mc':50}, #higher threshold, more MCMC
               # Model info
               'zcontinuous': 2,
               'compute_vega_mags': False,
@@ -82,7 +82,7 @@ def load_obs(filter_key=1, **extras):
               'dust1_fraction': 0.9,
               'fagn': 0.05,
               'agn_tau': 20,
-              'duste_qpah': 0.2,
+              'duste_qpah': 0.5,
               'duste_umin': 2,
               'duste_gamma': 0.2,
               'dust_index': -0.3
