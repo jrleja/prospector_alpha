@@ -65,7 +65,7 @@ def calc_uvj_flag(uvj, return_dflag = True):
     dusty_sf = (uvj_flag == 1) & (u_v >= 1.3)
     uvj_flag[dusty_sf] = 2
 
-    # dust flag: dusty=True
+    # dust flag: if True, has very little dust
     if return_dflag:
         dflag= (u_v < (-1.25*v_j+2.875))
         return uvj_flag, dflag
@@ -108,7 +108,7 @@ def collate_data(runname, runname_fast, filename=None, regenerate=False, calc_dm
     sfr_100_uvir, sfr_100_uv, sfr_100_ir, objname = [], [], [], []
     phot_chi, phot_percentile, phot_obslam, phot_restlam, phot_fname, dmips = [], [], [], [], [], []
     outfast['z'] = []
-    outfast['uvj'], outfast['uvj_prosp'], outfast['uvj_dust_prosp'] = [], [], []
+    outfast['uvj'], outfast['uvj_prosp'], outfast['uvj_dust_prosp'], outfast['uv'], outfast['vj'] = [], [], [], [], []
 
     for i,par in enumerate(pnames+enames):
         
@@ -265,10 +265,15 @@ def collate_data(runname, runname_fast, filename=None, regenerate=False, calc_dm
             uvj_flag, uvj_dust_flag = calc_uvj_flag(prosp['obs']['uvj'])
             outfast['uvj_prosp'] += mode(uvj_flag)[0].tolist()
             outfast['uvj_dust_prosp'] += mode(uvj_dust_flag)[0].tolist()
-            print outfast['uvj_dust_prosp'][-1]
+            uv = 2.5*np.log10(prosp['obs']['uvj'][:,1]/prosp['obs']['uvj'][:,0]) 
+            vj = 2.5*np.log10(prosp['obs']['uvj'][:,2]/prosp['obs']['uvj'][:,1])
+            outfast['uv'] += weighted_quantile(uv, 0.5, weights=prosp['weights'])
+            outfast['vj'] += weighted_quantile(vj, 0.5, weights=prosp['weights'])
         except KeyError:
             outfast['uvj_prosp'] += [-1]
             outfast['uvj_dust_prosp'] += [-1]
+            outfast['uv'] += [-1]
+            outfast['vj'] += [-1]
 
         # fill it up
         outfast['stellar_mass'] += [fast['lmass'][f_idx][0]]

@@ -552,6 +552,12 @@ def generate_basenames(runname,ancilname=None):
             filebase.append(os.getenv('APPS')+'/prospector_alpha/results/'+runname+'/'+ids[jj])
             parm.append(os.getenv('APPS')+"/prospector_alpha/parameter_files/"+parm_basename+'.py') 
 
+    elif 'vis' in runname:
+
+        ids = ['vis_'+str(id) for id in np.arange(10)+1]
+        filebase = [os.getenv('APPS')+'/prospector_alpha/results/'+runname+'/'+id for id in ids]
+        ancilname = '_'
+
     else:
 
         # read file names directly from the results folder
@@ -649,26 +655,6 @@ def integral_average(x,y,x0,x1):
     I1 = integrate.simps(yarr_new, xarr_new) / (x1 - x0)
 
     return I1
-
-def create_prosp_filename(filebase):
-
-    # find most recent output file
-    # with the objname
-    folder = "/".join(filebase.split('/')[:-1])
-    filename = filebase.split("/")[-1]
-    files = [f for f in os.listdir(folder) if "_".join(f.split('_')[:-2]) == filename]  
-    times = [f.split('_')[-2] for f in files]
-
-    # if we found no files, skip this object
-    if len(times) == 0:
-        print 'Failed to find any files to extract times in ' + folder + ' of form ' + filename
-        return None,None
-
-    # load results
-    mcmc_filename=filebase+'_'+max(times)+"_mcmc"
-    model_filename=filebase+'_'+max(times)+"_model"
-
-    return mcmc_filename,model_filename
 
 def av_to_dust2(av):
     return av/1.086

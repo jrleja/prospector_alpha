@@ -17,7 +17,7 @@ trans = {
          'ssfr_100': r'log(sSFR/yr$^{-1}$)',
          'dust2': r'diffuse dust', 
          'logzsol': r'log(Z/Z$_{\odot}$)', 
-         'mean_age': r'log(stellar age/yr)',
+         'mean_age': r'stellar age [Gyr]',
          'dust_index': 'attenuation\ncurve',
          'dust1_fraction': 'birth-cloud\ndust', 
          'duste_qpah': 'PAH strength',
@@ -75,7 +75,7 @@ def collate_data(runname, filename=None, regenerate=False, **opts):
         out['pars']['dust1_fraction'][-1] = out['pars']['dust1_fraction'][-1] * out['pars']['dust2'][-1]
 
         # mean age
-        out['pars']['mean_age'] += [np.log10(eout['extras']['avg_age']['chain']*1e9).tolist()]
+        out['pars']['mean_age'] += [eout['extras']['avg_age']['chain'].tolist()]
         # use (SFR / total mass formed) as sSFR, easy to calculate analytically
         ssfr_100 = eout['extras']['ssfr_100']['chain'] 
         smass = eout['extras']['stellar_mass']['chain'] / (10**res['chain'][eout['sample_idx'],mod.theta_index['logmass']]).squeeze()
@@ -113,7 +113,7 @@ def collate_data(runname, filename=None, regenerate=False, **opts):
             # this avoids a second model call
             sfr = masses[0] / time_per_bin[0]
             out['truths']['ssfr_100'] = np.log10(sfr / masses.sum())
-            out['truths']['mean_age'] = np.log10(((age_in_bin[:,None] * masses).mean() / masses.mean()))
+            out['truths']['mean_age'] = ((age_in_bin[:,None] * masses).mean() / masses.mean())/1e9
 
         # grab observables
         out['mod_obs'] += [eout['obs']]
@@ -382,7 +382,7 @@ def plot_prior(ax,mod,par,max,nsamp=100000,ssfr_prior=None):
             # prior = np.log10(mass[0,:]/time_per_bin/mass.sum(axis=0))
             prior = ssfr_prior
         elif par == 'mean_age':
-            prior = np.log10((age_in_bin[:,None] * mass).mean(axis=0) / mass.mean(axis=0))
+            prior = ((age_in_bin[:,None] * mass).mean(axis=0) / mass.mean(axis=0))/1e9
 
     elif par == 'dust1_fraction':
 
