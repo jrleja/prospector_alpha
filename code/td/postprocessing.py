@@ -4,7 +4,7 @@ import numpy as np
 import argparse
 from copy import deepcopy
 from prospector_io import load_prospector_data, create_prosp_filename
-#import prosp_dynesty_plots
+import prosp_dynesty_plots
 from dynesty.plotting import _quantile as weighted_quantile
 from prospect.models import sedmodel
 
@@ -28,7 +28,7 @@ def set_sfh_time_vector(res,ncalc):
         sys.exit('ERROR: not sure how to set up the time array here!')
     return t
 
-def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True,
+def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True, measure_abslines=False,
                           **kwargs):
     """calculate extra quantities: star formation history, stellar mass, spectra, photometry, etc
     shorten_spec: if on, return only the 50th / 84th / 16th percentiles. else return all spectra.
@@ -91,6 +91,9 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True,
     eout['obs']['elines'] = {key: {'ew': deepcopy(fmt), 'flux': deepcopy(fmt)} for key in elines}
     eout['obs']['dn4000'] = deepcopy(fmt)
     res['model'].params['nebemlineinspec'] = True
+    if measure_abslines:
+        abslines = ['halpha_wide', 'halpha_narrow', 'hbeta', 'hdelta_wide', 'hdelta_narrow']
+        eout['obs']['abslines'] = {key+'_ew': deepcopy(fmt) for key in abslines}
 
     '''
     # special 4 rohan
@@ -135,7 +138,7 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True,
 
         # measure from rest-frame spectrum
         t2 = time.time()
-        props = prosp_dutils.measure_restframe_properties(sps, thetas = thetas, model=res['model'], measure_uvj=True, 
+        props = prosp_dutils.measure_restframe_properties(sps, thetas = thetas, model=res['model'], measure_uvj=True, abslines=measure_abslines, 
                                                           measure_ir=True, measure_luv=True, measure_mir=True, emlines=elines)
         eout['extras']['lir']['chain'][jj] = props['lir']
         eout['extras']['luv']['chain'][jj] = props['luv']
@@ -146,6 +149,9 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True,
         for e in elines: 
             eout['obs']['elines'][e]['flux']['chain'][jj] = props['emlines'][e]['flux']
             eout['obs']['elines'][e]['ew']['chain'][jj] = props['emlines'][e]['eqw']
+
+        if measure_abslines:
+            for a in abslines: eout['obs']['abslines'][a+'_ew']['chain'][jj] = props['abslines'][a]['eqw']
 
         nagn_thetas = deepcopy(thetas)
         if 'fagn' in parnames:
@@ -197,6 +203,11 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True,
             q50, q16, q84 = weighted_quantile(eout['obs']['elines'][key1][key2]['chain'], np.array([0.5, 0.16, 0.84]), weights=eout['weights'])
             for q,qstr in zip([q50,q16,q84],['q50','q16','q84']): eout['obs']['elines'][key1][key2][qstr] = q
 
+    if measure_abslines:
+        for key in eout['obs']['abslines'].keys():
+            q50, q16, q84 = weighted_quantile(eout['obs']['abslines'][key]['chain'], np.array([0.5, 0.16, 0.84]), weights=eout['weights'])
+            for q,qstr in zip([q50,q16,q84],['q50','q16','q84']): eout['obs']['abslines'][key][qstr] = q
+
     if shorten_spec:
         spec_pdf = np.zeros(shape=(len(sps.wavelengths),3))
         for jj in xrange(spec_pdf.shape[0]): spec_pdf[jj,:] = weighted_quantile(eout['obs']['spec'][:,jj], np.array([0.5, 0.16, 0.84]), weights=eout['weights'])
@@ -205,7 +216,7 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True,
     return eout
 
 def post_processing(param_name, objname=None, runname = None, overwrite=True, obj_outfile=None,
-                    plot_outfolder=None, **kwargs):
+                    plot_outfolder=None, plot=False, **kwargs):
     """Driver. Loads output, runs post-processing routine.
     overwrite=False will return immediately if post-processing file already exists.
     if runname is specified, we can pass in parameter file for run A with outputs at location runname
@@ -251,7 +262,6 @@ def post_processing(param_name, objname=None, runname = None, overwrite=True, ob
             if 'prospector_alpha' in res['run_params'][key]:
                 res['run_params'][key] = os.getenv('APPS')+'/prospector_alpha'+res['run_params'][key].split('prospector_alpha')[-1]
     sps = pfile.load_sps(**res['run_params'])
-    #obs = pfile.load_obs(**res['run_params'])
     obs = res['obs']
 
     # sample from chain
@@ -262,7 +272,8 @@ def post_processing(param_name, objname=None, runname = None, overwrite=True, ob
     hickle.dump(extra_output,open(extra_filename, "w"))
 
     # make standard plots
-    # prosp_dynesty_plots.make_all_plots(filebase=obj_outfile,outfolder=plot_outfolder)
+    if plot is not False:
+        prosp_dynesty_plots.make_all_plots(filebase=obj_outfile,outfolder=plot_outfolder)
 
 
 def do_all(param_name=None,runname=None,**kwargs):

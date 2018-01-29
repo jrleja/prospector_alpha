@@ -7,6 +7,7 @@ from prospect.models import sedmodel
 from matplotlib.ticker import MaxNLocator, FormatStrFormatter
 from dynesty.plotting import _quantile as weighted_quantile
 from fix_ir_sed import mips_to_lir
+from scipy.stats import spearmanr
 
 plt.ioff()
 
@@ -17,6 +18,9 @@ cmap = 'cool'
 minsfr, minssfr = 0.01, 1e-13
 ms, s = 0.5, 1 # symbol sizes
 alpha, alpha_scat = 0.1, 0.3
+medopts = {'marker':' ','alpha':0.95,'color':'red','ms': 7,'mec':'k','zorder':5}
+popts = {'fmt':'o', 'capthick':.05,'elinewidth':.05,'alpha':0.2,'color':'0.3','ms':0.5}
+nbin_min = 10
 
 def collate_data(runname, filename=None, regenerate=False, nobj=None, **opts):
     """must rewrite this such that NO CHAINS are saved!
@@ -37,7 +41,8 @@ def collate_data(runname, filename=None, regenerate=False, nobj=None, **opts):
     out = {}
     qvals = ['q50','q84','q16']
     for par in ['sfr_uvir_truelir_prosp', 'sfr_uvir_lirfrommips_prosp', 'sfr_prosp', 'ssfr_prosp','avg_age', \
-                'logzsol', 'fagn','agn_heating_fraction','old_star_heating_fraction', 'young_star_heating_fraction']:
+                'logzsol', 'fagn','agn_heating_fraction','old_star_heating_fraction', 'young_star_heating_fraction',
+                'dust2', 'dust_index']:
         out[par] = {}
         for q in qvals: out[par][q] = []
     for par in ['sfr_uvir_obs','objname']: out[par] = []
@@ -75,6 +80,8 @@ def collate_data(runname, filename=None, regenerate=False, nobj=None, **opts):
         for q in qvals: 
             out['fagn'][q] += [prosp['thetas']['fagn'][q]]
             out['logzsol'][q] += [prosp['thetas']['massmet_2'][q]]
+            out['dust2'][q] += [prosp['thetas']['dust2'][q]]
+            out['dust_index'][q] += [prosp['thetas']['dust_index'][q]]
             out['sfr_prosp'][q] += [prosp['extras']['sfr_100'][q]]
             out['ssfr_prosp'][q] += [prosp['extras']['ssfr_100'][q]]
             out['avg_age'][q] += [prosp['extras']['avg_age'][q]]
@@ -92,23 +99,20 @@ def collate_data(runname, filename=None, regenerate=False, nobj=None, **opts):
         lir_young, luv_young = prosp['extras']['lir_young']['chain'], prosp['extras']['luv_young']['chain']
 
         # Ratios and calculations
-        # here we calculate SFR(UV+IR) with LIR + LUV from:
-        # (a) the 'true' L_IR and L_UV in the model
-        # (b) true L_IR with only heating from AGN
-        # (c) true L_IR with only heating from old stars
-        # (c) true L_IR with only heating from young stars
+        # here we calculate SFR(UV+IR) with LIR from:
+        # (a) the 'true' L_IR in the model
+        # (b) L_IR estimated from the model MIPS flux using DH02 templates
         sfr_uvir_truelir_prosp = prosp_dutils.sfr_uvir(lir_tot,luv_tot)
-        agn_heating_fraction = 1-prosp_dutils.sfr_uvir(lir_agn,luv_agn) / sfr_uvir_truelir_prosp
-        young_star_heating_fraction = prosp_dutils.sfr_uvir(lir_young, luv_young) / sfr_uvir_truelir_prosp
-        old_star_heating_fraction = 1- young_star_heating_fraction - agn_heating_fraction
 
-        # we also calculate SFR (UV+IR) using L_IR estimated from MIPS flux
-        # MIPS flux needs some careful treatment
-        # input for this LIR must be in janskies
         midx = np.array(['mips' in u for u in res['obs']['filternames']],dtype=bool)
-        mips_flux = prosp['obs']['mags'][:,midx].squeeze() * 3631 * 1e3
+        mips_flux = prosp['obs']['mags'][:,midx].squeeze() * 3631 * 1e3 # input for this LIR must be in janskies
         lir = mips_to_lir(mips_flux, res['model'].params['zred'][0])
         sfr_uvir_lirfrommips_prosp = prosp_dutils.sfr_uvir(lir,prosp['extras']['luv']['chain'])
+
+        # here we estimate LIR+LUV fractions for AGN, young stars, and old stars
+        agn_heating_fraction = 1-(lir_agn+luv_agn) / (lir_tot+luv_tot)
+        young_star_heating_fraction = (lir_young + luv_young) / (lir_tot+luv_tot)
+        old_star_heating_fraction = 1- young_star_heating_fraction - agn_heating_fraction
 
         # turn all of these into percentiles
         pars = ['agn_heating_fraction', 'old_star_heating_fraction', 'young_star_heating_fraction', \
@@ -143,6 +147,8 @@ def do_all(runname='td_huge', outfolder=None,**opts):
 
     plot_uvir_comparison(data,outfolder)
     plot_heating_sources(data,outfolder)
+    plot_heating_sources(data,outfolder,old_stars_only=True)
+    plot_rankorder_correlations(data, outfolder+'deltasfr_spearman.png')
 
 def plot_uvir_comparison(data, outfolder):
 
@@ -175,10 +181,9 @@ def plot_uvir_comparison(data, outfolder):
     plt.tight_layout()
     plt.close()
 
-def plot_heating_sources(data, outfolder, color_by_fagn=False, color_by_logzsol=True):
+def plot_heating_sources(data, outfolder, color_by_fagn=False, color_by_logzsol=True, old_stars_only=False):
 
     fig, ax = plt.subplots(1, 1, figsize = (5,4))
-    fig2, ax2 = plt.subplots(1, 3, figsize = (9,3))
 
     # first plot SFR ratio versus heating by young stars
     # grab quantities
@@ -190,15 +195,15 @@ def plot_heating_sources(data, outfolder, color_by_fagn=False, color_by_logzsol=
     if color_by_fagn:
         colorvar = np.log10(data['fagn']['q50'])
         colorlabel = r'log(f$_{\mathrm{AGN}}$)'
-        ax2_outstring = '_fagn'
+        ax1_outstring = '_fagn'
     elif color_by_logzsol:
         colorvar = data['logzsol']['q50']
         colorlabel = r'log(Z/Z$_{\odot}$)'
-        ax2_outstring = '_logzsol'
+        ax1_outstring = '_logzsol'
     else:
         colorvar = np.log10(np.clip(data['ssfr_prosp']['q50'],minssfr,np.inf))
         colorlabel = r'log(sSFR$_{\mathrm{SED}}$)'
-        ax2_outstring = '_ssfr'
+        ax1_outstring = '_ssfr'
 
     pts = ax.scatter(x, y, s=s, cmap=cmap, c=colorvar, vmin=colorvar.min(), vmax=colorvar.max(),alpha=alpha_scat)
     cb = fig.colorbar(pts, ax=ax, aspect=10)
@@ -211,23 +216,82 @@ def plot_heating_sources(data, outfolder, color_by_fagn=False, color_by_logzsol=
     ax.set_xlabel('fraction of heating from young stars')
 
     # next plot the sources of the heating
-    y1, y2, y3 = [data[x+'_heating_fraction']['q50'] for x in 'young_star', 'old_star', 'agn']
-    x = np.log10(np.clip(data['ssfr_prosp']['q50'],minssfr,np.inf))
-    for i,p in enumerate([y1,y2,y3]): ax2[i].plot(x, p, 'o', color='0.4',markeredgecolor='k',ms=ms,alpha=alpha)
+    if old_stars_only:
+        fig2, ax2 = plt.subplots(1, 1, figsize = (4,4))
+        ax2 = np.atleast_1d(ax2)
+        yvars = [data['old_star_heating_fraction']['q50']]
+        ylabels = [r'(L$_{\mathrm{IR}}$+L$_{\mathrm{UV}}$)$_{\mathrm{old\/stars}}$/(L$_{\mathrm{IR}}$+L$_{\mathrm{UV}}$)$_{\mathrm{total}}$']
+        ax2_outname = 'heating_fraction_vs_ssfr.png'
+    else:
+        fig2, ax2 = plt.subplots(1, 3, figsize = (9,3))
+        yvars = [data[x+'_heating_fraction']['q50'] for x in ['young_star', 'old_star', 'agn']]
+        ylabels = [r'(L$_{\mathrm{IR}}$+L$_{\mathrm{UV}}$)$_{\mathrm{young\/stars}}$/(L$_{\mathrm{IR}}$+L$_{\mathrm{UV}}$)$_{\mathrm{total}}$',
+                   r'(L$_{\mathrm{IR}}$+L$_{\mathrm{UV}}$)$_{\mathrm{old\/stars}}$/(L$_{\mathrm{IR}}$+L$_{\mathrm{UV}}$)$_{\mathrm{total}}$',
+                   r'(L$_{\mathrm{IR}}$+L$_{\mathrm{UV}}$)$_{\mathrm{AGN}}$/(L$_{\mathrm{IR}}$+L$_{\mathrm{UV}}$)$_{\mathrm{total}}$']
+        ax2_outname = 'heating_fraction_vs_ssfr_all.png'
+    xvar = np.log10(np.clip(data['ssfr_prosp']['q50'],minssfr,np.inf))
+    for i,yvar in enumerate(yvars): 
+        ax2[i].errorbar(xvar, yvar, **popts)
+        x, y, bincount = prosp_dutils.running_median(xvar,yvar,avg=False,return_bincount=True,nbins=20)
+        x, y = x[bincount > nbin_min], y[bincount > nbin_min]
+        ax2[i].plot(x,y, **medopts)
 
     # labels and limits
     for a in ax2: 
         a.set_xlabel('log(sSFR$_{\mathrm{Prosp}}$)')
         a.set_ylim(0,1)
-    ax2[0].set_ylabel('fraction of energy from young stars')
-    ax2[1].set_ylabel('fraction of energy from old stars')
-    ax2[2].set_ylabel('fraction of energy from AGN')
+        a.set_ylabel(ylabels[i])
 
     # clean up
     fig.tight_layout()
     fig2.tight_layout()
 
-    fig.savefig(outfolder+'uvir_frac'+ax2_outstring+'.png',dpi=dpi)
-    fig2.savefig(outfolder+'heating_fraction_against_ssfr.png',dpi=dpi)
+    fig.savefig(outfolder+'uvir_frac'+ax1_outstring+'.png',dpi=dpi)
+    fig2.savefig(outfolder+ax2_outname,dpi=dpi)
     plt.close()
+    plt.close()
+
+def plot_rankorder_correlations(data, outname):
+    """delta(sSFR) versus log(Z/Zsun), stellar age, fagn
+    more interpreted: AGN heating, young star heating, old star heating etc
+    """
+
+    # define variables of interest
+    xvars = [data['old_star_heating_fraction']['q50'], data['agn_heating_fraction']['q50'],
+             data['logzsol']['q50'],np.log10(data['fagn']['q50']),np.log10(data['avg_age']['q50']),
+             ]
+    xlabels = [r'(L$_{\mathrm{IR}}$+L$_{\mathrm{UV}}$)$_{\mathrm{old\/stars}}$/(L$_{\mathrm{IR}}$+L$_{\mathrm{UV}}$)$_{\mathrm{total}}$',
+               r'(L$_{\mathrm{IR}}$+L$_{\mathrm{UV}}$)$_{\mathrm{AGN}}$/(L$_{\mathrm{IR}}$+L$_{\mathrm{UV}}$)$_{\mathrm{total}}$',
+               r'log(Z/Z$_{\odot}$)']
+    xlim = [(-0.02,1.02),(-0.02,1.02),(-2,0.2)]
+    yvar = np.log10(data['sfr_prosp']['q50'] / data['sfr_uvir_obs'])
+    ylim = (-3.0, 3.0)
+    idx = data['sfr_uvir_obs'] > 0
+
+    # plot geometry
+    fig, ax = plt.subplots(1, 3, figsize = (9,3))
+    ax = ax.ravel()
+
+    for i, (xvar,xlabel) in enumerate(zip(xvars,xlabels)):
+
+        ax[i].errorbar(xvar[idx],yvar[idx],**popts)
+        ax[i].set_xlabel(xlabel)
+        ax[i].set_ylabel(r'log(SFR$_{\mathrm{Prosp}}$/SFR$_{\mathrm{UV+IR}}$)')
+
+        ax[i].set_xlim(xlim[i])
+        ax[i].set_ylim(ylim)
+
+        rho_spear = spearmanr(xvar[idx],yvar[idx])[0]
+        ax[i].text(0.02,0.92,r'$\rho_{\mathrm{S}}$='+'{:1.2f}'.format(rho_spear),transform=ax[i].transAxes)
+
+        ax[i].axhline(0, linestyle='--', color='k',lw=1,zorder=10)
+
+        # running median
+        in_plot = (yvar > ylim[0]) & (yvar < ylim[1]) & idx
+        x, y, bincount = prosp_dutils.running_median(xvar[in_plot],yvar[in_plot],avg=False,return_bincount=True,nbins=20)
+        x, y = x[bincount > nbin_min], y[bincount > nbin_min]
+        ax[i].plot(x,y, **medopts)
+
+    plt.tight_layout()
+    plt.savefig(outname,dpi=dpi)
     plt.close()

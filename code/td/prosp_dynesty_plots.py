@@ -241,12 +241,6 @@ def add_sfh_plot(eout,fig,ax_loc=None,
     ax_inset.xaxis.set_major_formatter(FormatStrFormatter('%2.2g'))
     ax_inset.yaxis.set_major_formatter(FormatStrFormatter('%2.2g'))
 
-def return_sedplot_vars(res, eout, nufnu=True, ergs_s_cm=False):
-
-    '''
-    if nufnu == True: return in units of nu * fnu. Else, return maggies.
-    '''
-
 def sed_figure(outname = None,
                colors = ['#1974D2'], sresults = None, eout = None,
                labels = ['spectrum (50th percentile)'],
@@ -453,6 +447,7 @@ def make_all_plots(filebase=None,
     res['logwt'] = np.log(res['weights'])+res['logz'][-1]
     res['logl'] = res['lnlikelihood']
     res['samples'] = res['chain']
+    res['nlive'] = res['run_params']['nested_nlive_init']
     font_kwargs = {'fontsize': fs}
 
     # Plot a summary of the run.

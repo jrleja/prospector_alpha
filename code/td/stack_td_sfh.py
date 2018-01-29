@@ -45,7 +45,6 @@ def collate_data(runname, filename=None, regenerate=False, **opts):
     this takes awhile, so this data is saved to disk.
     """
 
-
     # if it's already made, load it and give it back
     # else, start with the making!
     if os.path.isfile(filename) and regenerate == False:

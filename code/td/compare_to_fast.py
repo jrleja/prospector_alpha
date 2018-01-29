@@ -98,7 +98,7 @@ def collate_data(runname, runname_fast, filename=None, regenerate=False, calc_dm
     ### define output containers
     parlabels = [r'log(M$_{\mathrm{stellar}}$/M$_{\odot}$)', 'SFR [M$_{\odot}$/yr]',
                  r'$\tau_{\mathrm{diffuse}}$', r'log(sSFR) [yr$^-1$]',
-                 r"t$_{\mathrm{half-mass}}$ [Gyr]", r'log(Z/Z$_{\odot}$)', r'Q$_{\mathrm{PAH}}$',
+                 r"t$_{\mathrm{avg}}$ [Gyr]", r"t$_{\mathrm{half-mass}}$ [Gyr]", r'log(Z/Z$_{\odot}$)', r'Q$_{\mathrm{PAH}}$',
                  r'f$_{\mathrm{AGN}}$', 'dust index', r'f$_{\mathrm{AGN,MIR}}$']
     fnames = ['stellar_mass','sfr_100','dust2','ssfr_100','avg_age','half_time'] # take for fastmimic too
     pnames = fnames+['massmet_2', 'duste_qpah', 'fagn', 'dust_index', 'fmir'] # already calculated in Prospector
@@ -281,6 +281,7 @@ def collate_data(runname, runname_fast, filename=None, regenerate=False, calc_dm
         sfr_ratio = sfr_ratio_for_fast(10**(fast['ltau'][f_idx]-9),10**(fast['lage'][f_idx]-9))
         outfast['sfr_100'] += [(10**fast['lsfr'][f_idx][0])*sfr_ratio]
         outfast['half_time'] += [prosp_dutils.exp_decl_sfh_half_time(10**fast['lage'][f_idx][0],10**fast['ltau'][f_idx][0])/1e9]
+        outfast['avg_age'] += [prosp_dutils.exp_decl_sfh_avg_age(10**fast['lage'][f_idx][0],10**fast['ltau'][f_idx][0])/1e9]
         outfast['z'] += [fast['z'][f_idx][0]]
         sfr_100_uvir += [uvir['sfr'][u_idx][0]]
         sfr_100_ir += [uvir['sfr_IR'][u_idx][0]]
@@ -344,6 +345,9 @@ def do_all(runname='td_massive', runname_fast='fast_mimic',outfolder=None,**opts
     if len(data['uvir_sfr']) > 4000:
         popts = {'fmt':'o', 'capthick':.05,'elinewidth':.05,'alpha':0.2,'color':'0.3','ms':0.5, 'errorevery': 5000}
 
+    age_distribution(data,outfolder+'age_vs_z.png',popts)
+
+
     # UVJ star-forming sequence
     """
     idx = (data['fast']['uvj'] < 3) # to make it look like Kate's selection
@@ -390,11 +394,10 @@ def do_all(runname='td_massive', runname_fast='fast_mimic',outfolder=None,**opts
 
     # if we have FAST-mimic runs, do a thorough comparison
     # else just do Prospector-FAST
-    data['labels'] = np.array(data['labels'].tolist() + [r'f$_{\mathrm{AGN,MIR}}$']) # hack, remove once this is rerun
     fast_comparison(data['fast'],data['prosp'],data['labels'],data['pnames'],
                     outfolder+'fast_to_palpha_comparison.png',popts)
-    delta_age_versus_delta_mass(data['fast'],data['prosp'],
-                    outfolder+'deltat_deltam_fast_to_palpha.png',popts)
+    deltam_spearman(data['fast'],data['prosp'],
+                    outfolder+'deltam_spearman_fast_to_palpha.png',popts)
     if runname_fast is not None:
         fast_comparison(data['fast'],data['prosp_fast'],data['labels'],data['pnames'],
                         outfolder+'fast_to_fastmimic_comparison.png',popts,plabel='FAST-mimic')
@@ -402,12 +405,12 @@ def do_all(runname='td_massive', runname_fast='fast_mimic',outfolder=None,**opts
                         outfolder+'fast_to_fastmimic_bfit_comparison.png',popts,plabel='FAST-mimic',bfit=True)
         fast_comparison(data['prosp_fast'],data['prosp'],data['labels'],data['pnames'],
                         outfolder+'fastmimic_to_palpha_comparison.png',popts,flabel='FAST-mimic')
-        delta_age_versus_delta_mass(data['fast'],data['prosp_fast'],
-                        outfolder+'deltat_deltam_fast_to_fastmimic.png',popts)
-        delta_age_versus_delta_mass(data['prosp_fast'],data['prosp'],
-                        outfolder+'deltat_deltam_fastmimic_to_palpha.png',popts)        
-        delta_age_versus_delta_mass(data['fast'],data['prosp'],
-                        outfolder+'deltat_deltam_fast_to_palpha.png',popts)  
+        deltam_spearman(data['fast'],data['prosp_fast'],
+                        outfolder+'deltam_spearman_fast_to_fastmimic.png',popts)
+        deltam_spearman(data['prosp_fast'],data['prosp'],
+                        outfolder+'deltam_spearman_fastmimic_to_palpha.png',popts)        
+        deltam_spearman(data['fast'],data['prosp'],
+                        outfolder+'deltam_spearman_fast_to_palpha.png',popts)  
 
     phot_residuals(data,outfolder,popts)
     mass_metallicity_relationship(data, outfolder+'massmet_vs_z.png', popts)
@@ -503,7 +506,7 @@ def fast_comparison(fast,prosp,parlabels,pnames,outname,popts,flabel='FAST',plab
     plt.savefig(outname,dpi=dpi)
     plt.close()
 
-def delta_age_versus_delta_mass(fast,prosp,outname,popts):
+def deltam_spearman(fast,prosp,outname,popts):
 
     # try some y-variables
     if type(fast['half_time']) == type({}):
@@ -516,19 +519,19 @@ def delta_age_versus_delta_mass(fast,prosp,outname,popts):
         mfast = fast['stellar_mass']
     params = [np.log10(prosp['half_time']['q50']/tfast),
               prosp['dust2']['q50'] - dfast]
-    ylabels = [r'log(t$_{\mathrm{Prosp}}$/t$_{\mathrm{FAST}}$)',
+    xlabels = [r'log(t$_{\mathrm{Prosp}}$/t$_{\mathrm{FAST}}$)',
                r'$\tau_{\mathrm{diffuse,Prosp}}-\tau_{\mathrm{diffuse,FAST}}$']
-    ylims = [(-2.5,2.5),
+    xlims = [(-2.7,2.7),
              (-2,2)]
-    xlim = (-1.5,1.5)
+    ylim = (-1.5,1.5)
 
     if 'massmet_2' in prosp.keys():
         params.append(prosp['massmet_2']['q50'])
-        ylabels.append(r'log(Z$_{\mathrm{Prosp}}$/Z$_{\odot}$)')
-        ylims.append((-2,2))
+        xlabels.append(r'log(Z$_{\mathrm{Prosp}}$/Z$_{\odot}$)')
+        xlims.append((-2,0.3))
 
     # plot geometry
-    ysize = 2.666666
+    ysize = 2.75
     fig, ax = plt.subplots(1, len(params), figsize = (ysize*len(params),ysize+0.2))
     ax = ax.ravel()
     medopts = {'marker':' ','alpha':0.95,'color':'red','ms': 7,'mec':'k','zorder':5}
@@ -537,20 +540,20 @@ def delta_age_versus_delta_mass(fast,prosp,outname,popts):
     delta_mass = prosp['stellar_mass']['q50'] - mfast
 
     for i, par in enumerate(params):
-        ax[i].errorbar(delta_mass,par,**popts)
-        ax[i].set_xlabel(r'log(M$_{\mathrm{Prosp}}$/M$_{\mathrm{FAST}}$)')
-        ax[i].set_ylabel(ylabels[i])
+        ax[i].errorbar(par,delta_mass,**popts)
+        ax[i].set_ylabel(r'log(M$_{\mathrm{Prosp}}$/M$_{\mathrm{FAST}}$)')
+        ax[i].set_xlabel(xlabels[i])
 
-        ax[i].set_xlim(xlim)
-        ax[i].set_ylim(ylims[i])
-        ax[i].text(0.02,0.9,r'$\rho_{\mathrm{S}}$='+'{:1.2f}'.format(spearmanr(delta_mass,par)[0]),transform=ax[i].transAxes)
+        ax[i].set_xlim(xlims[i])
+        ax[i].set_ylim(ylim)
+        ax[i].text(0.02,0.05,r'$\rho_{\mathrm{S}}$='+'{:1.2f}'.format(spearmanr(delta_mass,par)[0]),transform=ax[i].transAxes)
 
         ax[i].axhline(0, linestyle='--', color='k',lw=1,zorder=10)
         ax[i].axvline(0, linestyle='--', color='k',lw=1,zorder=10)
 
         # running median
-        in_plot = (delta_mass > xlim[0]) & (delta_mass < xlim[1])
-        x, y, bincount = prosp_dutils.running_median(delta_mass[in_plot],par[in_plot],avg=True,return_bincount=True,nbins=20)
+        in_plot = (delta_mass > ylim[0]) & (delta_mass < ylim[1])
+        x, y, bincount = prosp_dutils.running_median(par[in_plot],delta_mass[in_plot],avg=False,return_bincount=True,nbins=20)
         x, y = x[bincount > nbin_min], y[bincount > nbin_min]
         ax[i].plot(x,y, **medopts)
 
@@ -701,7 +704,7 @@ def mass_metallicity_relationship(data,outname,popts):
     fig, axes = plt.subplots(2, 3, figsize = (9,6))
     fig.subplots_adjust(wspace=0.0,hspace=0.0)
     axes = np.ravel(axes)
-    xlim = (9,11.5)
+    xlim = (9,11.49)
     ylim = (-2,0.5)
 
     # redshift bins + colors
@@ -736,28 +739,121 @@ def mass_metallicity_relationship(data,outname,popts):
         # z=0 relationship
         lw = 1.5
         color = '0.5'
-        axes[i+1].plot(massmet[:,0], massmet[:,1], color=color, lw=lw, linestyle='--', zorder=-1, label='Gallazzi et al. 2005')
-        axes[i+1].plot(massmet[:,0],massmet[:,2], color=color, lw=lw, zorder=-1)
-        axes[i+1].plot(massmet[:,0],massmet[:,3], color=color, lw=lw, zorder=-1)
+        axes[i+1].plot(massmet[:,0], massmet[:,1], color=color, lw=lw, zorder=-1, label='Gallazzi+05')
+        axes[i+1].plot(massmet[:,0],massmet[:,2], color=color, lw=lw, linestyle='--', zorder=-1)
+        axes[i+1].plot(massmet[:,0],massmet[:,3], color=color, lw=lw, linestyle='--', zorder=-1)
         if i == 0:
-            axes[0].plot(massmet[:,0], massmet[:,1], color=color, lw=lw, linestyle='--', zorder=-1, label='Gallazzi et al. 2005')
-            axes[0].plot(massmet[:,0],massmet[:,2], color=color, lw=lw, zorder=-1)
-            axes[0].plot(massmet[:,0],massmet[:,3], color=color, lw=lw, zorder=-1)
+            axes[0].plot(massmet[:,0], massmet[:,1], color=color, lw=lw, zorder=-1, label='Gallazzi+05')
+            axes[0].plot(massmet[:,0],massmet[:,2], color=color, lw=lw, linestyle='--', zorder=1)
+            axes[0].plot(massmet[:,0],massmet[:,3], color=color, lw=lw, linestyle='--', zorder=1)
 
 
         # running median
-        nbin_min = 5
+        zlabel = "{0:.1f}".format(zbins[i])+'<z<'+"{0:.1f}".format(zbins[i+1])
         x, y, bincount = prosp_dutils.running_median(xm,yz,avg=False,return_bincount=True)
         x, y = x[bincount > nbin_min], y[bincount > nbin_min]
-        axes[i+1].plot(x, y, color=cmap(i),lw=3,alpha=0.95,label="{0:.1f}".format(zbins[i])+'<z<'+"{0:.1f}".format(zbins[i+1]))
-        axes[0].plot(x, y, color=cmap(i),lw=3,alpha=0.95,label="{0:.1f}".format(zbins[i])+'<z<'+"{0:.1f}".format(zbins[i+1]))
+        axes[i+1].plot(x, y, color=cmap(i),lw=3,label=zlabel)
+        axes[0].plot(x, y, color=cmap(i),lw=3,label=zlabel)
+
+        # redshift label
+        axes[i+1].text(11.45,-1.93,zlabel,ha='right', fontsize=9)
 
     for a in axes:
         a.set_xlim(xlim)
         a.set_ylim(ylim)
 
     axes[0].legend(loc=4, prop={'size':8},
-                   scatterpoints=1,fancybox=True)
+                   scatterpoints=1,fancybox=True,ncol=2)
+
+    plt.savefig(outname,dpi=dpi)
+    plt.close()
+
+def age_distribution(data,outname,popts):
+    
+    # plot information
+    fig, axes = plt.subplots(2, 3, figsize = (9,6))
+    fig.subplots_adjust(wspace=0.0,hspace=0.0)
+    axes = np.ravel(axes)
+    xlim = (9,11.49)
+    ylim = (0.1,13)
+    ylabel = '<stellar age>/Gyr'
+
+    # redshift bins + colors
+    zbins = np.linspace(0.5,3,6)
+    nbins = len(zbins)-1
+    cmap = prosp_dutils.get_cmap(nbins,cmap='plasma')
+
+    # z=0 mass-age
+    age = np.loadtxt(os.getenv('APPS')+'/prospector_alpha/data/gallazzi_05_age.txt')
+    age[:,1:] = 10**age[:, 1:]/1e9
+    for i in range(nbins):
+
+        # the main show
+        idx = (data['fast']['z'] > zbins[i]) & (data['fast']['z'] <= zbins[i+1])
+        xm, xm_up, xm_down = [data['prosp']['stellar_mass'][q][idx] for q in ['q50','q84','q16']]
+        ya, ya_up, ya_down = [data['prosp']['avg_age'][q][idx] for q in ['q50','q84','q16']]
+        xerr = prosp_dutils.asym_errors(xm, xm_up, xm_down)
+        yerr = prosp_dutils.asym_errors(ya, ya_up, ya_down)
+        axes[i+1].errorbar(xm,ya,yerr=yerr,xerr=xerr,**popts)
+
+        # scales
+        axes[i+1].set_yscale('log',subsy=([3]))
+        axes[i+1].yaxis.set_minor_formatter(FormatStrFormatter('%2.4g'))
+        axes[i+1].yaxis.set_major_formatter(FormatStrFormatter('%2.4g'))
+        axes[i+1].tick_params('both', pad=3.5, size=3.5, width=1.0, which='both')
+
+
+        # labels
+        if i > 1:
+            axes[i+1].set_xlabel('log(M/M$_{\odot}$)')
+        else:
+            for tl in axes[i+1].get_xticklabels():tl.set_visible(False)
+        if i == 2:
+            axes[i+1].set_ylabel(ylabel)
+            axes[0].set_ylabel(ylabel)
+            for tl in axes[0].get_xticklabels():tl.set_visible(False)
+        else:
+            plt.setp(axes[i+1].get_yminorticklabels(), visible=False)
+            for tl in axes[i+1].get_yticklabels():tl.set_visible(False)
+
+        # z=0 relationship
+        lw = 1.5
+        color = '0.5'
+        axes[i+1].plot(age[:,0], age[:,1], color=color, lw=lw, zorder=-1, label='Gallazzi+05')
+        axes[i+1].plot(age[:,0],age[:,2], color=color, lw=lw, linestyle='--', zorder=-1)
+        axes[i+1].plot(age[:,0],age[:,3], color=color, lw=lw, linestyle='--', zorder=-1)
+        if i == 0:
+            axes[0].plot(age[:,0], age[:,1], color=color, lw=lw, zorder=1, label='Gallazzi+05')
+            axes[0].plot(age[:,0],age[:,2], color=color, lw=lw, linestyle='--', zorder=-1)
+            axes[0].plot(age[:,0],age[:,3], color=color, lw=lw, linestyle='--',  zorder=-1)
+
+        # running median
+        x, y, bincount = prosp_dutils.running_median(xm,ya,avg=False,return_bincount=True)
+        x, y = x[bincount > nbin_min], y[bincount > nbin_min]
+        zlabel = "{0:.1f}".format(zbins[i])+'<z<'+"{0:.1f}".format(zbins[i+1])
+        axes[i+1].plot(x, y, color=cmap(i),lw=lw+1,label=zlabel,zorder=5)
+        axes[0].plot(x, y, color=cmap(i),lw=lw+1,label=zlabel,zorder=5)
+
+        # max tuniv, redshift label
+        tuniv = WMAP9.age(zbins[i]).value
+        delta = 1.12
+        if i == 4:
+            delta = 1.33
+        axes[i+1].text(9.02,tuniv*delta,'max t$_{\mathrm{univ}}$',ha='left', fontsize=7.5,color='red')
+        axes[i+1].axhline(tuniv,linestyle=':',color='red',lw=1,zorder=-1,alpha=0.9)
+        axes[i+1].text(11.45,0.11,zlabel,ha='right', fontsize=9)
+
+    for a in axes:
+        a.set_xlim(xlim)
+        a.set_ylim(ylim)
+
+    axes[0].set_yscale('log',subsy=([3]))
+    axes[0].yaxis.set_minor_formatter(FormatStrFormatter('%2.4g'))
+    axes[0].yaxis.set_major_formatter(FormatStrFormatter('%2.4g'))
+    axes[0].tick_params('both', pad=3.5, size=3.5, width=1.0, which='both')
+
+    axes[0].legend(loc=4, prop={'size':7.5},
+                   scatterpoints=1,fancybox=True,ncol=2)
 
     plt.savefig(outname,dpi=dpi)
     plt.close()
@@ -905,7 +1001,7 @@ def deltam_with_redshift(fast, prosp, z, outname, filename=None):
         hickle.dump(out,open(filename, "w"))
 
     plt.tight_layout()
-    plt.savefig(outname+'.png',dpi=dpi)
+    plt.savefig(outname,dpi=dpi)
     plt.close()
 
 
@@ -1028,7 +1124,7 @@ def uvir_comparison(data, outname, popts, model_uvir = False, ssfr=False, filena
 
     ax[1].axhline(0, linestyle='--', color='red', lw=2,zorder=-1)
     ax[1].set_xlabel('log('+prosp_label+')')
-    ax[1].set_ylabel(r'log('+prosp_label+'/'+uvir_label+')')
+    ax[1].set_ylabel(r'log(SFR$_{\mathrm{Prosp}}$/SFR$_{\mathrm{UV+IR,mod}}$)')
     ax[1].legend(prop={'size':8}, scatterpoints=1,fancybox=True)
     ax[1].set_ylim(-1.5,1.5)
 

@@ -432,7 +432,6 @@ def charlot_and_fall_extinction(lam,dust1,dust2,dust1_index,dust2_index, kriek=F
 
     return ext_tot
 
-
 def calc_balmer_dec(tau1, tau2, ind1, ind2,kriek=False):
 
     ha_lam = 6562.801
@@ -447,6 +446,14 @@ def exp_decl_sfh_half_time(tage,tau):
     so a larger half-mass time is an OLDER galaxy
     '''
     return tage-tau*np.log(2./(1+np.exp(-tage/tau)))
+
+def exp_decl_sfh_avg_age(tage,tau):
+    ''' this is done numerically
+    '''
+    t = np.linspace(0,tage,1000)
+    tavg = np.trapz(t*np.exp(-t/tau),x=t) / np.trapz(np.exp(-t/tau),x=t)
+    return tavg
+
 
 def sfh_half_time(x,sfh_params,c):
 

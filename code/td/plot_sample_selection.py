@@ -9,6 +9,7 @@ plt.ioff()
 
 def setup_gridspec():
     """ function written to HIDE THIS UGLY CODE
+    this creates a bunch of axes and plots
     """
     fig = plt.figure(figsize=(10.5,3))
 
@@ -100,7 +101,7 @@ def plot(data, outfolder=None, density_plot=False, verbose=False, reselect_sampl
     mass_options = {
                     'data': data['fast_logmass'],
                     'xlim': (8,11.8),
-                    'ylim': (30,6000),
+                    'ylim': (30,8000),
                     'ylabel': r'N*M$_{\mathrm{stellar}}$',
                     'xlabel': r'log(M$_*$/M$_{\odot}$)',
                     'norm': 1e13, # this is arbitrary, to remove power from matplotlib y-axis
@@ -109,8 +110,8 @@ def plot(data, outfolder=None, density_plot=False, verbose=False, reselect_sampl
 
     sfr_options = {
                     'data': np.log10(np.clip(data['uvir_sfr'],0.001,np.inf)),
-                    'xlim': (-2,5),
-                    'ylim': (30,6000),
+                    'xlim': (-2,4.2),
+                    'ylim': (30,21000),
                     'ylabel': r'N*SFR',
                     'xlabel': r'log(SFR) [M$_{\odot}$/yr]',
                     'norm': 1e4, # this is arbitrary, to remove power from matplotlib y-axis
@@ -169,8 +170,8 @@ def plot(data, outfolder=None, density_plot=False, verbose=False, reselect_sampl
                 a.set_ylim(opt['ylim'])
                 a.set_xlim(opt['xlim'])
                 a.set_yscale('log',nonposy='clip',subsy=([3]))
-                a.yaxis.set_minor_formatter(FormatStrFormatter('%2.4g'))
-                a.yaxis.set_major_formatter(FormatStrFormatter('%2.4g'))
+                a.yaxis.set_minor_formatter(FormatStrFormatter('%2.5g'))
+                a.yaxis.set_major_formatter(FormatStrFormatter('%2.5g'))
             if i > 0:
                 for a in ax[i,:]: 
                     a.set_yticklabels([])
@@ -194,7 +195,8 @@ def plot(data, outfolder=None, density_plot=False, verbose=False, reselect_sampl
             # completeness distribution
             if completeness_plot:
                 axcomp[i].plot(bins_mid, hist_sample / hist_master.astype(float), lw=1.5,color='k')
-                axcomp[i].axhline(0.9,linestyle='--',color='0.5',zorder=-1,alpha=0.8)
+                axcomp[i].axhline(0.9,linestyle='--',color='0.3',zorder=-1,alpha=0.8)
+                axcomp[i].text(opt['xlim'][1]-(opt['xlim'][1]-opt['xlim'][0])*0.01,0.86,r'90% complete',fontsize=8,color='0.3',ha='right',va='top')
                 axcomp[i].set_xlabel(opt['xlabel'])
                 axcomp[i].set_xlim(opt['xlim'])
                 axcomp[i].set_ylim(0.5,1.1)

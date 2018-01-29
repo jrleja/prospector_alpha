@@ -263,7 +263,7 @@ def plot_sfrd(logm_min=9.0,logm_max=11.5,dm=0.01,use_whit12=False,
             }
 
     # Plot1: change in SFRD
-    fig, ax = plt.subplots(1,1, figsize=(5, 5))
+    fig, ax = plt.subplots(1,1, figsize=(4, 4))
     ax.plot(zrange, mf_sfrd, color=red, label='mass (FAST)',**popts)
     ax.plot(zrange, np.log10(sf_sfrd), color=blue, label='UV+IR SFRs', **popts)
     ax.plot(zrange, mf_sfrd_prosp, '--', color=red, label='mass (Prospector)',**popts)
@@ -276,7 +276,7 @@ def plot_sfrd(logm_min=9.0,logm_max=11.5,dm=0.01,use_whit12=False,
     # labels, legends, and add Madau
     ax.set_xlabel('redshift')
     ax.set_ylabel(r'log(SFRD) [M$_{\odot}$ yr$^{-1}$ Mpc$^{-3}$]')
-    ax.plot(zrange, phi_madau, '-', color='green', label='Madau et al. 2015', **popts)
+    ax.plot(zrange, phi_madau, '-', color='green', label='Madau et al. 2014', **popts)
     ax.legend(loc=4, prop={'size':10}, scatterpoints=1,fancybox=True)
 
     plt.tight_layout()
