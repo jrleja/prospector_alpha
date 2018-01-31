@@ -6,6 +6,7 @@ from astropy.cosmology import WMAP9
 import td_huge_params as pfile
 from matplotlib.ticker import MaxNLocator, FormatStrFormatter
 from dynesty.plotting import _quantile as weighted_quantile
+from collections import OrderedDict
 
 plt.ioff()
 
@@ -15,7 +16,7 @@ dpi = 160
 cmap = 'cool'
 minsfr = 0.01
 
-def do_all(runname='td_huge', outfolder=None,**opts):
+def do_all(runname='td_huge', outfolder=None, regenerate=False, regenerate_stack=False, **opts):
 
     if outfolder is None:
         outfolder = os.getenv('APPS') + '/prospector_alpha/plots/'+runname+'/fast_plots/'
@@ -30,13 +31,26 @@ def do_all(runname='td_huge', outfolder=None,**opts):
               'horizontal_bin_colors': ['#45ADA8','#FC913A','#FF4E50'],
               'vertical_bin_colors': ['red','#FC913A','#45ADA8','#323299'],
               'low_mass_cutoff':9.0,          # log(M) where we stop stacking and plotting
+              'ylim_horizontal_sfr': (-0.8,3),
+              'ylim_horizontal_ssfr': (5e-12,4e-9),
+              'ylim_vertical_sfr': (-3,3),
+              'ylim_vertical_ssfr': (1.5e-13,9e-9),
+              'xlim_t': (3e7,9.9e9),
               'show_disp':[0.16,0.84],         # percentile of population distribution to show on plot
               'adjust_sfr': -0.25,             # adjust whitaker SFRs by how much?
               'zbins': [(0.5,1.),(1.,1.5),(1.5,2.),(2.,2.5)]
              }
+    stack_opts['zbin_labels'] = ["{0:.1f}".format(z1)+'<z<'+"{0:.1f}".format(z2) for (z1, z2) in stack_opts['zbins']]
 
-    data = collate_data(runname,filename=outfolder+'data/stacksfh.h5',**opts)
-    stack = stack_sfh(data, **stack_opts)
+    filename = outfolder+'data/single_sfh_stack.h5'
+    if os.path.isfile(filename) and regenerate_stack == False:
+        with open(filename, "r") as f:
+            stack = hickle.load(f)
+    else:
+        data = collate_data(runname,filename=outfolder+'data/stacksfh.h5',regenerate=regenerate,**opts)
+        stack = stack_sfh(data,regenerate_stack=regenerate_stack, **stack_opts)
+        hickle.dump(stack,open(filename, "w"))
+
     plot_stacked_sfh(stack,outfolder, **stack_opts)
 
 
@@ -48,6 +62,7 @@ def collate_data(runname, filename=None, regenerate=False, **opts):
     # if it's already made, load it and give it back
     # else, start with the making!
     if os.path.isfile(filename) and regenerate == False:
+        print 'loading all data'
         with open(filename, "r") as f:
             outdict=hickle.load(f)
 
@@ -142,7 +157,7 @@ def stack_sfh(data, **opts):
             # save individual mass and SFR
             in_bin = (stellar_mass[on_ms] >= stack['hor'][zstr]['mass_bins'][j]) & \
                      (stellar_mass[on_ms] <= stack['hor'][zstr]['mass_bins'][j+1])
-            tdict = {key:[] for key in ['mean','err','errup','errdown']}
+            tdict = {key:[] for key in ['median','err','errup','errdown']}
             tdict['logm'],tdict['logsfr'] = stellar_mass[on_ms][in_bin],logsfr[on_ms][in_bin]
 
             # calculate sSFR chains (fn / sum(tn*fn))
@@ -164,13 +179,13 @@ def stack_sfh(data, **opts):
             # calculate weighted mean for each SFR bin
             for i in range(time_per_bin.shape[0]):
                 frac = [f[:,i] for f in outfrac]
-                mean,errup,errdown = calculate_mean(frac, outweight)
-                tdict['mean'] += [mean]
+                mean,errup,errdown = calculate_median(frac, outweight)
+                tdict['median'] += [mean]
                 tdict['errup'] += [errup]
                 tdict['errdown'] += [errdown]
 
             # save and dump
-            tdict['err'] = prosp_dutils.asym_errors(np.array(tdict['mean']),
+            tdict['err'] = prosp_dutils.asym_errors(np.array(tdict['median']),
                                                     np.array(tdict['errup']),
                                                     np.array(tdict['errdown']))
             stack['hor'][zstr]['bin'+str(j)] = tdict
@@ -180,7 +195,7 @@ def stack_sfh(data, **opts):
 
             # define bin edges, then define members of the bin
             # special definition for first bin so we get quiescent galaxies too (?)
-            tdict = {key:[] for key in ['mean','err','errup','errdown']}
+            tdict = {key:[] for key in ['median','err','errup','errdown']}
             sigup, sigdown = opts['sigma_sf']*2*(j-1.5), opts['sigma_sf']*2*(j-2.5)
             if j != 0 :
                 in_bin = (stellar_mass > opts['low_mass_cutoff']) & \
@@ -207,15 +222,15 @@ def stack_sfh(data, **opts):
                 outfrac += [frac/norm[:,None]]
                 outweight += [weight]
 
-            # calculate weighted mean for each SFR bin
+            # calculate median of sSFR for each SFR bin
             for i in range(time_per_bin.shape[0]):
                 frac = [f[:,i] for f in outfrac]
-                mean,errup,errdown = calculate_mean(frac, outweight)
-                tdict['mean'] += [mean]
+                mean,errup,errdown = calculate_median(frac, outweight)
+                tdict['median'] += [mean]
                 tdict['errup'] += [errup]
                 tdict['errdown'] += [errdown]
 
-            tdict['err'] = prosp_dutils.asym_errors(np.array(tdict['mean']),
+            tdict['err'] = prosp_dutils.asym_errors(np.array(tdict['median']),
                                                      np.array(tdict['errup']),
                                                      np.array(tdict['errdown']))
 
@@ -232,6 +247,7 @@ def plot_stacked_sfh(dat,outfolder,**opts):
 
     # options for points on MS (left-hand side)
     fontsize = 14
+    figsize = (13,8)
     ms_plot_opts = {
                     'alpha':0.5,
                     'mew':0.2,
@@ -251,26 +267,26 @@ def plot_stacked_sfh(dat,outfolder,**opts):
     # options for the stack plots (right-hand side)
     x_stack_offset = 0.03
     stack_plot_opts = {
-                      'alpha':0.7,
+                      'alpha':0.9,
                       'fmt':'o',
                       'mew':0.8,
                       'linestyle':'-',
-                      'ms':8.5,
+                      'ms':10,
                       'lw':1,
                       'markeredgecolor': 'k',
                       'elinewidth':1.75,
-                      'capsize':4,
-                      'capthick':4
+                      'capsize':3,
+                      'capthick':3
                       }
 
     # horizontal stack figure
-    fig, ax = plt.subplots(4,2, figsize=(8,15))
+    fig, ax = plt.subplots(2,4, figsize=figsize)
     for j, (z1,z2) in enumerate(opts['zbins']):
         
         # calculate zavg for bin placement
         zavg = (z1+z2)/2.
         zstr = "{:.2f}".format(zavg)
-        plot_main_sequence(ax[j,0],zavg,**opts)
+        plot_main_sequence(ax[0,j],zavg,**opts)
 
         for i in range(opts['nbins_horizontal']):
             
@@ -278,36 +294,44 @@ def plot_stacked_sfh(dat,outfolder,**opts):
             bdict = dat['hor'][zstr]['bin'+str(i)]
 
             # plot star-forming sequence
-            ax[j,0].plot(bdict['logm'],bdict['logsfr'],
+            ax[0,j].plot(bdict['logm'],bdict['logsfr'],
                          color=opts['horizontal_bin_colors'][i],
                          **ms_plot_opts)
 
             # plot SFH stacks
-            log_mean_t = np.mean(np.log10(dat['hor'][zstr]['agebins']),axis=1)
-            log_mean_t = np.clip(log_mean_t,7.5,np.inf) # nothing lower than ~30 Myr
-            ax[j,1].errorbar(10**(log_mean_t-x_stack_offset*(i-1)),bdict['mean'],
+            log_mean_t = np.log10(np.mean(dat['hor'][zstr]['agebins'],axis=1))
+            ax[1,j].errorbar(10**(log_mean_t-x_stack_offset*(i-1)),bdict['median'],
                              yerr=bdict['err'],
                              color=opts['horizontal_bin_colors'][i],
                              **stack_plot_opts)
 
         # labels and ranges
-        ax[j,0].set_xlabel(r'log(M$_{*}$)',fontsize=fontsize)
-        ax[j,0].set_ylabel(r'log(SFR)',fontsize=fontsize)
-        ax[j,0].set_xlim(dat['hor'][zstr]['mass_bins'].min()-0.5,dat['hor'][zstr]['mass_bins'].max()+0.5)
-        ax[j,0].tick_params('both', pad=3.5, size=3.5, width=1.0, which='both',labelsize=fontsize)
+        ax[0,j].set_xlabel(r'log(M$_{*}$)',fontsize=fontsize)
+        ax[0,j].set_xlim(dat['hor'][zstr]['mass_bins'].min()-0.5,dat['hor'][zstr]['mass_bins'].max()+0.5)
+        ax[0,j].set_ylim(opts['ylim_horizontal_sfr'])
+        ax[0,j].tick_params('both', pad=3.5, size=3.5, width=1.0, which='both',labelsize=fontsize)
 
-        ax[j,1].set_xlim(10**(log_mean_t.min()-0.3),10**(log_mean_t.max()+0.3))
-        ax[j,1].set_xlabel(r'time [yr]',fontsize=fontsize)
-        ax[j,1].set_ylabel(r'SFR$_{\mathrm{bin}}$ / M$_{\mathrm{total}}$ [yr$^{-1}$]',fontsize=fontsize)
-        ax[j,1].text(0.98, 0.92, 'z='+zstr,ha='right',transform=ax[j,1].transAxes,fontsize=fontsize)
+        if j == 0:
+            ax[0,j].set_ylabel(r'log(SFR)',fontsize=fontsize)
+            ax[1,j].set_ylabel(r'SFR$_{\mathrm{bin}}$ / M$_{\mathrm{formed}}$ [yr$^{-1}$]',fontsize=fontsize)
+            ax[0,j].text(0.98, 0.92, opts['zbin_labels'][j],ha='right',transform=ax[0,j].transAxes,fontsize=fontsize)
+        else:
+            ax[0,j].text(0.02, 0.92, opts['zbin_labels'][j],ha='left',transform=ax[0,j].transAxes,fontsize=fontsize)
+            for a in ax[:,j]:
+                for tl in a.get_yticklabels():tl.set_visible(False)
+                plt.setp(a.get_yminorticklabels(), visible=False)
 
-        ax[j,1].set_xscale('log',nonposx='clip')
-        ax[j,1].set_yscale('log',nonposy='clip')
-        ax[j,1].tick_params('both', pad=3.5, size=3.5, width=1.0, which='both',labelsize=fontsize)
+        ax[1,j].set_xlim(opts['xlim_t'])
+        ax[1,j].set_ylim(opts['ylim_horizontal_ssfr'])
+        ax[1,j].set_xlabel(r'time [yr]',fontsize=fontsize)
+
+        ax[1,j].set_xscale('log',nonposx='clip')
+        ax[1,j].set_yscale('log',nonposy='clip')
+        ax[1,j].tick_params('both', pad=3.5, size=3.5, width=1.0, which='both',labelsize=fontsize)
 
         # plot mass ranges 
         # must happen after ylim is determined
-        ylim = ax[j,0].get_ylim()
+        ylim = ax[0,j].get_ylim()
         for i in xrange(opts['nbins_horizontal']):
             idx = 'massbin'+str(i)
             if i == 0:
@@ -319,26 +343,28 @@ def plot_stacked_sfh(dat,outfolder,**opts):
             else:
                 dhighbin = -0.017*size
 
-            ax[j,0].plot(np.repeat(dat['hor'][zstr]['mass_bins'][i]+dlowbin,2),ylim,
+            ax[0,j].plot(np.repeat(dat['hor'][zstr]['mass_bins'][i]+dlowbin,2),ylim,
                        color=opts['horizontal_bin_colors'][i],
                        **ms_line_plot_opts)
-            ax[j,0].plot(np.repeat(dat['hor'][zstr]['mass_bins'][i+1]+dhighbin,2),ylim,
+            ax[0,j].plot(np.repeat(dat['hor'][zstr]['mass_bins'][i+1]+dhighbin,2),ylim,
                        color=opts['horizontal_bin_colors'][i],
                        **ms_line_plot_opts)
-            ax[j,0].set_ylim(ylim)
+            ax[0,j].set_ylim(ylim)
 
-    plt.tight_layout()
+    plt.tight_layout(w_pad=0.0)
+    fig.subplots_adjust(wspace=0.0)
     plt.savefig(outname_ms_horizontal,dpi=150)
     plt.close()
 
 
     # vertical stack figure
-    fig, ax = plt.subplots(4,2, figsize=(8,15))
+    fig, ax = plt.subplots(2,4, figsize=figsize)
 
     # plot main sequence position and stacks
     for j, (z1,z2) in enumerate(opts['zbins']):
 
         # calculate zavg for bin placement
+        labels = ['quiescent','below MS','on MS','above MS']
         zavg = (z1+z2)/2.
         zstr = "{:.2f}".format(zavg)
 
@@ -346,14 +372,13 @@ def plot_stacked_sfh(dat,outfolder,**opts):
 
             # plot star-forming sequence
             bdict = dat['vert'][zstr]['bin'+str(i)]
-            ax[j,0].plot(bdict['logm'],bdict['logsfr'],
+            ax[0,j].plot(bdict['logm'],bdict['logsfr'],
                        color=opts['vertical_bin_colors'][i],
                        **ms_plot_opts)
 
             # plot SFH stacks
-            log_mean_t = np.mean(np.log10(dat['vert'][zstr]['agebins']),axis=1)
-            log_mean_t = np.clip(log_mean_t,7.5,np.inf) # nothing lower than ~30 Myr
-            ax[j,1].errorbar(10**(log_mean_t-x_stack_offset*(i-1)),bdict['mean'],
+            log_mean_t = np.log10(np.mean(dat['vert'][zstr]['agebins'],axis=1))
+            ax[1,j].errorbar(10**(log_mean_t-x_stack_offset*(i-1)),bdict['median'],
                              yerr=bdict['err'],
                              color=opts['vertical_bin_colors'][i],
                              **stack_plot_opts)
@@ -367,23 +392,20 @@ def plot_stacked_sfh(dat,outfolder,**opts):
                 maxsfr = np.max([maxsfr,bdict['logsfr'].max()])
 
         # labels and ranges
-        ax[j,0].set_xlabel(r'log(M$_{*}$)',fontsize=fontsize)
-        ax[j,0].set_ylabel(r'log(SFR)',fontsize=fontsize)
         xlim = (minmass-0.6,maxmass+0.3)
-        #ylim = (minsfr-0.3,maxsfr+0.5)
-        ax[j,0].set_xlim(xlim)
-        ax[j,0].tick_params('both', pad=3.5, size=3.5, width=1.0, which='both',labelsize=fontsize)
+        ax[0,j].set_xlim(xlim)
+        ax[0,j].set_ylim(opts['ylim_vertical_sfr'])
+        ax[0,j].tick_params('both', pad=3.5, size=3.5, width=1.0, which='both',labelsize=fontsize)
+        ax[0,j].set_xlabel(r'log(M$_{*}$)',fontsize=fontsize)
 
-        ax[j,1].set_xlim(10**(log_mean_t.min()-0.3),10**(log_mean_t.max()+0.3))
-        ax[j,1].set_xlabel(r'time [yr]',fontsize=fontsize)
-        ax[j,1].set_ylabel(r'SFR$_{\mathrm{bin}}$ / M$_{\mathrm{tot}}$ [yr$^{-1}$]',fontsize=fontsize)
-        ax[j,1].set_xscale('log',nonposx='clip')
-        ax[j,1].set_yscale('log',nonposy='clip')
-        ax[j,1].tick_params('both', pad=3.5, size=3.5, width=1.0, which='both',labelsize=fontsize)
-        ax[j,1].text(0.98, 0.92, 'z='+zstr,ha='right',transform=ax[j,1].transAxes,fontsize=fontsize)
+        ax[1,j].set_xlim(opts['xlim_t'])
+        ax[1,j].set_ylim(opts['ylim_vertical_ssfr'])
+        ax[1,j].tick_params('both', pad=3.5, size=3.5, width=1.0, which='both',labelsize=fontsize)
+        ax[1,j].set_xscale('log',nonposx='clip')
+        ax[1,j].set_yscale('log',nonposy='clip')
+        ax[1,j].set_xlabel(r'time [yr]',fontsize=fontsize)
 
-        # plot mass ranges + labels
-        labels = ['quiescent','<2$\sigma$ MS','on MS','>2$\sigma$ MS']
+        # plot mass ranges
         xr = np.linspace(xlim[0],xlim[1],50)
         yr = sfr_ms(zavg,xr,**opts)
         idx = 1
@@ -403,23 +425,40 @@ def plot_stacked_sfh(dat,outfolder,**opts):
 
             # no bottom line for the bottom one
             # adjust label for bottom one
-            ytext = yr[idx]+(sigup+sigdown)/2.+0.25
-            if i == 0:
-                ytext = yr[idx]+sigup+0.1
-            else:
-                ax[j,0].plot(xr,yr+sigdown+dlowbin,
+            if i != 0:
+                ax[0,j].plot(xr,yr+sigdown+dlowbin,
                              color=opts['vertical_bin_colors'][i],
+                             label = labels[i],
                              **ms_line_plot_opts)
 
             # no top line for the top one
             if i != opts['nbins_vertical']-1:
-                ax[j,0].plot(xr,yr+sigup+dhighbin,
+                ax[0,j].plot(xr,yr+sigup+dhighbin,
                            color=opts['vertical_bin_colors'][i],
+                           label = labels[i],
                            **ms_line_plot_opts)
 
-            ax[j,0].text(xr[idx],ytext,labels[i],color=opts['vertical_bin_colors'][i], rotation=24)
+        
+        if j == 0:
+            ax[0,j].set_ylabel(r'log(SFR)',fontsize=fontsize)
+            ax[1,j].set_ylabel(r'median SFR$_{\mathrm{bin}}$ / M$_{\mathrm{tot}}$ [yr$^{-1}$]',fontsize=fontsize)
+            ax[0,j].text(0.98, 0.92, opts['zbin_labels'][j],ha='right',transform=ax[0,j].transAxes,fontsize=fontsize)
 
-    plt.tight_layout()
+            handles, labels = ax[0,j].get_legend_handles_labels()
+            by_label = OrderedDict(zip(labels, handles))
+            ax[0,j].legend(by_label.values(), by_label.keys(),
+                           loc=2, prop={'size':9},
+                           scatterpoints=1,fancybox=True,ncol=1)
+        else:
+            ax[0,j].text(0.02, 0.92, opts['zbin_labels'][j],ha='left',transform=ax[0,j].transAxes,fontsize=fontsize)
+            for a in ax[:,j]:
+                for tl in a.get_yticklabels():tl.set_visible(False)
+                plt.setp(a.get_yminorticklabels(), visible=False)
+
+
+
+    plt.tight_layout(w_pad=0.0)
+    fig.subplots_adjust(wspace=0.0)
     plt.savefig(outname_ms_vertical,dpi=150)
     plt.close()
 
@@ -468,15 +507,15 @@ def sfr_ms(z,logm,adjust_sfr=0.0,**opts):
 
     return log_sfr
 
-def calculate_mean(pdf, weight):
-    """given list of N PDFs, calculate mean(PDF) for each item
-    then return the MEDIAN of the mean, and the +/- 1 sigma errors
+def calculate_median(pdf, weight):
+    """given list of N PDFs, calculate median(PDF) for each item
+    then return the MEDIAN of the median, and the +/- 1 sigma errors
     """
     nobj = len(pdf)
-    mean_array = []
-    for i,(f,w) in enumerate(zip(pdf,weight)): mean_array += [np.average(f, weights=w)]
-    mean, errup, errdown = np.percentile(mean_array, [50,84,16])
-    return mean, errup, errdown
+    median_array = []
+    for i,(f,w) in enumerate(zip(pdf,weight)): median_array += [weighted_quantile(f, np.array([0.5]), weights=w)]
+    median, errup, errdown = np.percentile(median_array, [50,84,16])
+    return median, errup, errdown
 
 
 

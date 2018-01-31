@@ -10,17 +10,20 @@ import copy
 from scipy.stats import spearmanr, mode
 from stack_td_sfh import sfr_ms
 import td_huge_params as pfile
+from astropy.io import ascii
+from astropy.table import Table
 
 plt.ioff()
 
 red = '#FF3D0D'
 dpi = 160
+cmap = ['#0202d6','#31A9B8','#FF9100','#FF420E']
 
 minlogssfr = -15
 minssfr = 10**minlogssfr
 minsfr = 0.0001
 
-nbin_min = 5
+nbin_min = 10
 
 def sfr_ratio_for_fast(tau,tage):
     """ get ratio of instantaneous SFR to 100 Myr SFR
@@ -282,7 +285,7 @@ def collate_data(runname, runname_fast, filename=None, regenerate=False, calc_dm
         outfast['sfr_100'] += [(10**fast['lsfr'][f_idx][0])*sfr_ratio]
         outfast['half_time'] += [prosp_dutils.exp_decl_sfh_half_time(10**fast['lage'][f_idx][0],10**fast['ltau'][f_idx][0])/1e9]
         outfast['avg_age'] += [prosp_dutils.exp_decl_sfh_avg_age(10**fast['lage'][f_idx][0],10**fast['ltau'][f_idx][0])/1e9]
-        outfast['z'] += [fast['z'][f_idx][0]]
+        outfast['z'] += [float(model.params['zred'])]
         sfr_100_uvir += [uvir['sfr'][u_idx][0]]
         sfr_100_ir += [uvir['sfr_IR'][u_idx][0]]
         sfr_100_uv += [uvir['sfr_UV'][u_idx][0]]
@@ -330,6 +333,7 @@ def do_all(runname='td_massive', runname_fast='fast_mimic',outfolder=None,**opts
 
     if outfolder is None:
         outfolder = os.getenv('APPS') + '/prospector_alpha/plots/'+runname+'/fast_plots/'
+        outtable = os.getenv('APPS') + '/prospector_alpha/plots/'+runname+'/fast_plots/tables/'
         if not os.path.isdir(outfolder):
             os.makedirs(outfolder)
             os.makedirs(outfolder+'data/')
@@ -345,59 +349,38 @@ def do_all(runname='td_massive', runname_fast='fast_mimic',outfolder=None,**opts
     if len(data['uvir_sfr']) > 4000:
         popts = {'fmt':'o', 'capthick':.05,'elinewidth':.05,'alpha':0.2,'color':'0.3','ms':0.5, 'errorevery': 5000}
 
-    age_distribution(data,outfolder+'age_vs_z.png',popts)
+    uvir_comparison(data,outfolder+'ssfr_uvir_comparison', popts, filename=outfolder+'data/ssfrcomp.h5', ssfr=True)
+    deltam_with_redshift(data['fast'], data['prosp'], data['fast']['z'], outfolder+'deltam_vs_z.png', filename=outfolder+'data/masscomp.h5')
+    mass_met_age_z(data, outfolder,outtable, popts)
 
-
-    # UVJ star-forming sequence
-    """
-    idx = (data['fast']['uvj'] < 3) # to make it look like Kate's selection
-    star_forming_sequence(np.log10(data['prosp']['sfr_100']['q50'][idx]),
-                          data['prosp']['stellar_mass']['q50'][idx],
-                          data['fast']['z'][idx],
-                          outfolder+'uvj_starforming.png',popts,
-                          xlabel='[Prospector]', ylabel='[Prospector]',priors=True,ssfr_min=-np.inf)
-    idx = (data['fast']['uvj'] == 3) # to make it look like Kate's selection
-    star_forming_sequence(np.log10(data['prosp']['sfr_100']['q50'][idx]),
-                          data['prosp']['stellar_mass']['q50'][idx],
-                          data['fast']['z'][idx],
-                          outfolder+'uvj_quiescent.png',popts,
-                          xlabel='[Prospector]', ylabel='[Prospector]',priors=True,ssfr_min=-np.inf)
-    """
-    # star-forming sequence
+    # star-forming sequence.
     idx = (data['uvir_sfr'] > 0) & (data['fast']['uvj_prosp'] < 3) # to make it look like Kate's selection
-    star_forming_sequence(np.log10(data['uvir_sfr'][idx]),
-                          data['fast']['stellar_mass'][idx],
-                          data['fast']['z'][idx],
+    zred = data['fast']['z']
+    uvir_sfr, prosp_sfr = np.log10(data['uvir_sfr']), np.log10(data['prosp']['sfr_100']['q50'])
+    fast_mass, prosp_mass = data['fast']['stellar_mass'], data['prosp']['stellar_mass']['q50']
+
+    star_forming_sequence(uvir_sfr[idx], fast_mass[idx], zred[idx],
                           outfolder+'star_forming_sequence_uvir.png',popts,
                           xlabel='[FAST]', ylabel='[UV+IR]')
 
-    star_forming_sequence(np.log10(data['prosp']['sfr_100']['q50'][idx]),
-                          data['fast']['stellar_mass'][idx],
-                          data['fast']['z'][idx],
-                          outfolder+'star_forming_sequence_prospector.png',popts,
+    star_forming_sequence(prosp_sfr[idx], fast_mass[idx], zred[idx],
+                          outfolder+'star_forming_sequence_avg_allgals_prospector.png',popts,
                           xlabel='[FAST]', ylabel='[Prospector]',outfile=outfolder+'data/sfrcomp.h5',
-                          correct_prosp=np.log10(data['uvir_sfr'])[idx],correct_prosp_mass=data['prosp']['stellar_mass']['q50'][idx])
+                          correct_prosp=uvir_sfr[idx],correct_prosp_mass=prosp_mass[idx])
 
-    star_forming_sequence(np.log10(data['prosp']['sfr_100']['q50'][idx]),
-                          data['prosp']['stellar_mass']['q50'][idx],
-                          data['fast']['z'][idx],
-                          outfolder+'star_forming_sequence_pure_prospector.png',popts,
-                          xlabel='[Prospector]', ylabel='[Prospector]',priors=True,correct_prosp=np.log10(data['uvir_sfr'])[idx])
+    star_forming_sequence(prosp_sfr, fast_mass, zred,
+                          outfolder+'star_forming_sequence_prospector.png',popts,avg=True,
+                          xlabel='[FAST]', ylabel='[Prospector]',outfile=outfolder+'data/sfrcomp_avg.h5',
+                          correct_prosp=uvir_sfr,correct_prosp_mass=prosp_mass)
 
-    idx = (data['fast']['uvj_prosp'] == 3) # only quiescent
-    star_forming_sequence(np.log10(data['prosp']['sfr_100']['q50'][idx]),
-                          data['prosp']['stellar_mass']['q50'][idx],
-                          data['fast']['z'][idx],
-                          outfolder+'star_forming_sequence_quiescent_prospector.png',popts,
-                          xlabel='[Prospector]', ylabel='quiescent ',priors=True)
-
-
+    print 1/0
     # if we have FAST-mimic runs, do a thorough comparison
     # else just do Prospector-FAST
     fast_comparison(data['fast'],data['prosp'],data['labels'],data['pnames'],
                     outfolder+'fast_to_palpha_comparison.png',popts)
     deltam_spearman(data['fast'],data['prosp'],
                     outfolder+'deltam_spearman_fast_to_palpha.png',popts)
+
     if runname_fast is not None:
         fast_comparison(data['fast'],data['prosp_fast'],data['labels'],data['pnames'],
                         outfolder+'fast_to_fastmimic_comparison.png',popts,plabel='FAST-mimic')
@@ -413,25 +396,22 @@ def do_all(runname='td_massive', runname_fast='fast_mimic',outfolder=None,**opts
                         outfolder+'deltam_spearman_fast_to_palpha.png',popts)  
 
     phot_residuals(data,outfolder,popts)
-    mass_metallicity_relationship(data, outfolder+'massmet_vs_z.png', popts)
-    deltam_with_redshift(data['fast'], data['prosp'], data['fast']['z'], outfolder+'deltam_vs_z.png', filename=outfolder+'data/masscomp.h5')
     prospector_versus_z(data,outfolder+'prospector_versus_z.png',popts)
     sfr_mass_density_comparison(data,outfolder=outfolder)
 
     # full UV+IR comparison
-    uvir_comparison(data,outfolder+'sfr_uvir_comparison', popts, ssfr=False)
-    uvir_comparison(data,outfolder+'sfr_uvir_comparison_model',  popts, model_uvir = True, ssfr=False)
-    uvir_comparison(data,outfolder+'sfr_uvir_truelir_comparison_model',  popts, model_uvir = 'true_LIR', ssfr=False)
-    uvir_comparison(data,outfolder+'ssfr_uvir_comparison', popts, filename=outfolder+'data/ssfrcomp.h5', ssfr=True)
-    uvir_comparison(data,outfolder+'ssfr_uvir_comparison_model',  popts, model_uvir = True, ssfr=True)
-    uvir_comparison(data,outfolder+'ssfr_uvir_truelir_comparison_model',  popts, model_uvir = 'true_LIR', ssfr=True)
+    #uvir_comparison(data,outfolder+'sfr_uvir_comparison', popts, ssfr=False)
+    #uvir_comparison(data,outfolder+'sfr_uvir_comparison_model',  popts, model_uvir = True, ssfr=False)
+    #uvir_comparison(data,outfolder+'sfr_uvir_truelir_comparison_model',  popts, model_uvir = 'true_LIR', ssfr=False)
+    #uvir_comparison(data,outfolder+'ssfr_uvir_comparison_model',  popts, model_uvir = True, ssfr=True)
+    #uvir_comparison(data,outfolder+'ssfr_uvir_truelir_comparison_model',  popts, model_uvir = 'true_LIR', ssfr=True)
 
 def fast_comparison(fast,prosp,parlabels,pnames,outname,popts,flabel='FAST',plabel='Prospector',bfit=False):
     
     fig, axes = plt.subplots(2, 2, figsize = (6,6))
     axes = np.ravel(axes)
 
-    for i,par in enumerate(['stellar_mass','sfr_100','dust2','half_time']):
+    for i,par in enumerate(['stellar_mass','sfr_100','dust2','avg_age']):
 
         ### clip SFRs
         if par[:3] == 'sfr':
@@ -469,7 +449,7 @@ def fast_comparison(fast,prosp,parlabels,pnames,outname,popts,flabel='FAST',plab
             good = np.isfinite(xfast) & np.isfinite(yprosp)
 
         ## log axes & range
-        if par[:3] == 'sfr' or par == 'half_time': 
+        if par[:3] == 'sfr' or par == 'avg_age': 
             axes[i] = prosp_dutils.equalize_axes(axes[i], np.log10(xfast), np.log10(yprosp), dynrange=0.1, line_of_equality=True, log_in_linear=True)
             off,scat = prosp_dutils.offset_and_scatter(np.log10(xfast[good]),np.log10(yprosp[good]),biweight=True)  
             axes[i].set_xscale('log',nonposx='clip',subsx=([1]))
@@ -509,19 +489,19 @@ def fast_comparison(fast,prosp,parlabels,pnames,outname,popts,flabel='FAST',plab
 def deltam_spearman(fast,prosp,outname,popts):
 
     # try some y-variables
-    if type(fast['half_time']) == type({}):
+    if type(fast['avg_age']) == type({}):
         mfast = fast['stellar_mass']['q50']
-        tfast = fast['half_time']['q50']
+        tfast = fast['avg_age']['q50']
         dfast = fast['dust2']['q50']
     else:
-        tfast = fast['half_time']
+        tfast = fast['avg_age']
         dfast = fast['dust2']
         mfast = fast['stellar_mass']
-    params = [np.log10(prosp['half_time']['q50']/tfast),
+    params = [np.log10(prosp['avg_age']['q50']/tfast),
               prosp['dust2']['q50'] - dfast]
     xlabels = [r'log(t$_{\mathrm{Prosp}}$/t$_{\mathrm{FAST}}$)',
                r'$\tau_{\mathrm{diffuse,Prosp}}-\tau_{\mathrm{diffuse,FAST}}$']
-    xlims = [(-2.7,2.7),
+    xlims = [(-3,3),
              (-2,2)]
     ylim = (-1.5,1.5)
 
@@ -532,7 +512,7 @@ def deltam_spearman(fast,prosp,outname,popts):
 
     # plot geometry
     ysize = 2.75
-    fig, ax = plt.subplots(1, len(params), figsize = (ysize*len(params),ysize+0.2))
+    fig, ax = plt.subplots(1, len(params), figsize = (ysize*len(params)+0.1,ysize))
     ax = ax.ravel()
     medopts = {'marker':' ','alpha':0.95,'color':'red','ms': 7,'mec':'k','zorder':5}
 
@@ -566,7 +546,7 @@ def prospector_versus_z(data,outname,popts):
     fig, axes = plt.subplots(2, 3, figsize = (10,6.66))
     axes = np.ravel(axes)
 
-    toplot = ['fagn','sfr_100','ssfr_100','half_time','massmet_2','dust2']
+    toplot = ['fagn','sfr_100','ssfr_100','avg_age','massmet_2','dust2']
     for i,par in enumerate(toplot):
         zred = data['fast']['z']
         yprosp, yprosp_up, yprosp_down = data['prosp'][par]['q50'], data['prosp'][par]['q84'], data['prosp'][par]['q16']
@@ -588,7 +568,7 @@ def prospector_versus_z(data,outname,popts):
         axes[i].set_ylabel('Prospector ' + data['labels'][data['pnames'] == par][0])
 
         # add tuniv
-        if par == 'half_time':
+        if par == 'avg_age':
             n = 50
             zred = np.linspace(zred.min(),zred.max(),n)
             tuniv = WMAP9.age(zred).value
@@ -698,195 +678,182 @@ def phot_residuals(data,outfolder,popts_orig):
     plt.savefig(outfolder+'residual_restframe.png',dpi=dpi)
     plt.close()
 
-def mass_metallicity_relationship(data,outname,popts):
+def mass_met_age_z(data,outfolder,outtable,popts):
     
     # plot information
-    fig, axes = plt.subplots(2, 3, figsize = (9,6))
-    fig.subplots_adjust(wspace=0.0,hspace=0.0)
-    axes = np.ravel(axes)
-    xlim = (9,11.49)
-    ylim = (-2,0.5)
-
-    # redshift bins + colors
-    zbins = np.linspace(0.5,3,6)
-    nbins = len(zbins)-1
-    cmap = prosp_dutils.get_cmap(nbins,cmap='plasma')
-
-    # z=0 mass-met
-    massmet = np.loadtxt(os.getenv('APPS')+'/prospector_alpha/data/gallazzi_05_massmet.txt')
-    for i in range(nbins):
-
-        # the main show
-        idx = (data['fast']['z'] > zbins[i]) & (data['fast']['z'] <= zbins[i+1])
-        xm, xm_up, xm_down = [data['prosp']['stellar_mass'][q][idx] for q in ['q50','q84','q16']]
-        yz, yz_up, yz_down = [data['prosp']['massmet_2'][q][idx] for q in ['q50','q84','q16']]
-        xerr = prosp_dutils.asym_errors(xm, xm_up, xm_down)
-        yerr = prosp_dutils.asym_errors(yz, yz_up, yz_down)
-        axes[i+1].errorbar(xm,yz,yerr=yerr,xerr=xerr,**popts)
-
-        # labels
-        if i > 1:
-            axes[i+1].set_xlabel('log(M/M$_{\odot}$)')
-        else:
-            for tl in axes[i+1].get_xticklabels():tl.set_visible(False)
-        if i == 2:
-            axes[i+1].set_ylabel('log(Z/Z$_{\odot}$)')
-            axes[0].set_ylabel('log(Z/Z$_{\odot}$)')
-            for tl in axes[0].get_xticklabels():tl.set_visible(False)
-        else:
-            for tl in axes[i+1].get_yticklabels():tl.set_visible(False)
-
-        # z=0 relationship
-        lw = 1.5
-        color = '0.5'
-        axes[i+1].plot(massmet[:,0], massmet[:,1], color=color, lw=lw, zorder=-1, label='Gallazzi+05')
-        axes[i+1].plot(massmet[:,0],massmet[:,2], color=color, lw=lw, linestyle='--', zorder=-1)
-        axes[i+1].plot(massmet[:,0],massmet[:,3], color=color, lw=lw, linestyle='--', zorder=-1)
-        if i == 0:
-            axes[0].plot(massmet[:,0], massmet[:,1], color=color, lw=lw, zorder=-1, label='Gallazzi+05')
-            axes[0].plot(massmet[:,0],massmet[:,2], color=color, lw=lw, linestyle='--', zorder=1)
-            axes[0].plot(massmet[:,0],massmet[:,3], color=color, lw=lw, linestyle='--', zorder=1)
-
-
-        # running median
-        zlabel = "{0:.1f}".format(zbins[i])+'<z<'+"{0:.1f}".format(zbins[i+1])
-        x, y, bincount = prosp_dutils.running_median(xm,yz,avg=False,return_bincount=True)
-        x, y = x[bincount > nbin_min], y[bincount > nbin_min]
-        axes[i+1].plot(x, y, color=cmap(i),lw=3,label=zlabel)
-        axes[0].plot(x, y, color=cmap(i),lw=3,label=zlabel)
-
-        # redshift label
-        axes[i+1].text(11.45,-1.93,zlabel,ha='right', fontsize=9)
-
-    for a in axes:
-        a.set_xlim(xlim)
-        a.set_ylim(ylim)
-
-    axes[0].legend(loc=4, prop={'size':8},
-                   scatterpoints=1,fancybox=True,ncol=2)
-
-    plt.savefig(outname,dpi=dpi)
-    plt.close()
-
-def age_distribution(data,outname,popts):
+    fs, lw, ms = 12, 3, 5.5
+    metopts = {
+               'xlim': (9,11.49),
+               'ylim': (-1.98,0.5),
+               'sdss': np.loadtxt(os.getenv('APPS')+'/prospector_alpha/data/gallazzi_05_massmet.txt'),
+               'nmassbins': 10,
+               'xtitle': 'log(M/M$_{\odot}$)',
+               'ytitle': 'log(Z/Z$_{\odot}$)',
+               'xpar': data['prosp']['stellar_mass'],
+               'ypar': data['prosp']['massmet_2'],
+               'outname': outfolder+'massmet_vs_z.png',
+               'table_out': outtable+'massmet.dat',
+               'xt': 0.98, 'yt': 0.05, 'ha': 'right',
+               'legend_loc': 4, 'legend_ncol': 1
+               }
     
-    # plot information
-    fig, axes = plt.subplots(2, 3, figsize = (9,6))
-    fig.subplots_adjust(wspace=0.0,hspace=0.0)
-    axes = np.ravel(axes)
-    xlim = (9,11.49)
-    ylim = (0.1,13)
-    ylabel = '<stellar age>/Gyr'
+    ageopts = {
+               'xlim': (9,11.49),
+               'ylim': (0.2,13),
+               'sdss': np.loadtxt(os.getenv('APPS')+'/prospector_alpha/data/gallazzi_05_age.txt'),
+               'nmassbins': 10,
+               'xtitle': 'log(M/M$_{\odot}$)',
+               'ytitle': '<stellar age>/Gyr',
+               'xpar': data['prosp']['stellar_mass'],
+               'ypar': data['prosp']['avg_age'],
+               'outname': outfolder+'age_vs_z.png',
+               'table_out': outtable+'massage.dat',
+               'xt': 0.98, 'yt': 0.05, 'ha': 'right',
+               'legend_loc': 4, 'legend_ncol': 1
+               }
+    ageopts['sdss'][:,1:] = 10**ageopts['sdss'][:,1:]/1e9
 
     # redshift bins + colors
-    zbins = np.linspace(0.5,3,6)
+    zbins = np.linspace(0.5,2.5,5)
     nbins = len(zbins)-1
-    cmap = prosp_dutils.get_cmap(nbins,cmap='plasma')
+    zlabels = ["{0:.1f}".format(zbins[i])+'<z<'+"{0:.1f}".format(zbins[i+1]) for i in range(nbins)]
 
-    # z=0 mass-age
-    age = np.loadtxt(os.getenv('APPS')+'/prospector_alpha/data/gallazzi_05_age.txt')
-    age[:,1:] = 10**age[:, 1:]/1e9
-    for i in range(nbins):
+    # loop over options
+    for opt in [metopts,ageopts]:
 
-        # the main show
-        idx = (data['fast']['z'] > zbins[i]) & (data['fast']['z'] <= zbins[i+1])
-        xm, xm_up, xm_down = [data['prosp']['stellar_mass'][q][idx] for q in ['q50','q84','q16']]
-        ya, ya_up, ya_down = [data['prosp']['avg_age'][q][idx] for q in ['q50','q84','q16']]
-        xerr = prosp_dutils.asym_errors(xm, xm_up, xm_down)
-        yerr = prosp_dutils.asym_errors(ya, ya_up, ya_down)
-        axes[i+1].errorbar(xm,ya,yerr=yerr,xerr=xerr,**popts)
+        # plot geometry
+        fig, axes = plt.subplots(2, 2, figsize = (10.35,6))
+        fig.subplots_adjust(right=0.985,left=0.5,hspace=0.0,wspace=0.0)
+        bigax = fig.add_axes([0.09, 0.25, 0.31, 0.5])
+        axes = np.ravel(axes)
 
-        # scales
-        axes[i+1].set_yscale('log',subsy=([3]))
-        axes[i+1].yaxis.set_minor_formatter(FormatStrFormatter('%2.4g'))
-        axes[i+1].yaxis.set_major_formatter(FormatStrFormatter('%2.4g'))
-        axes[i+1].tick_params('both', pad=3.5, size=3.5, width=1.0, which='both')
+        # massbins
+        massbins = np.linspace(opt['xlim'][0],opt['xlim'][1],opt['nmassbins']+1)
+        q84_t, q50_t, q16_t, x_t = [[] for i in range(4)]
+        for i in range(nbins):
+
+            # the main show
+            idx = (data['fast']['z'] > zbins[i]) & (data['fast']['z'] <= zbins[i+1])
+            xm, xm_up, xm_down = [opt['xpar'][q][idx] for q in ['q50','q84','q16']]
+            yz, yz_up, yz_down = [opt['ypar'][q][idx] for q in ['q50','q84','q16']]
+            xerr = prosp_dutils.asym_errors(xm, xm_up, xm_down)
+            yerr = prosp_dutils.asym_errors(yz, yz_up, yz_down)
+            axes[i].errorbar(xm,yz,yerr=yerr,xerr=xerr,**popts)
+
+            # z=0 relationship
+            lw_z0, color = 1.5, '0.5'
+            axes[i].plot(opt['sdss'][:,0], opt['sdss'][:,1], color=color, lw=lw_z0, zorder=-1, label='Gallazzi+05')
+            axes[i].plot(opt['sdss'][:,0],opt['sdss'][:,2], color=color, lw=lw_z0, linestyle='--', zorder=-1)
+            axes[i].plot(opt['sdss'][:,0],opt['sdss'][:,3], color=color, lw=lw_z0, linestyle='--', zorder=-1)
+            if i == 0:
+                bigax.plot(opt['sdss'][:,0], opt['sdss'][:,1], color=color, lw=lw_z0, zorder=-1, label='Gallazzi+05')
+                bigax.plot(opt['sdss'][:,0],opt['sdss'][:,2], color=color, lw=lw_z0, linestyle='--', zorder=1)
+                bigax.plot(opt['sdss'][:,0],opt['sdss'][:,3], color=color, lw=lw_z0, linestyle='--', zorder=1)
 
 
-        # labels
-        if i > 1:
-            axes[i+1].set_xlabel('log(M/M$_{\odot}$)')
-        else:
-            for tl in axes[i+1].get_xticklabels():tl.set_visible(False)
-        if i == 2:
-            axes[i+1].set_ylabel(ylabel)
-            axes[0].set_ylabel(ylabel)
-            for tl in axes[0].get_xticklabels():tl.set_visible(False)
-        else:
-            plt.setp(axes[i+1].get_yminorticklabels(), visible=False)
-            for tl in axes[i+1].get_yticklabels():tl.set_visible(False)
+            # running median
+            weights = ((xm_up-xm_down)/2.)**(-2)
+            x, y, bincount = prosp_dutils.running_median(xm,yz,avg=False,return_bincount=True,weights=weights,bins=massbins)
+            x, y = x[bincount > nbin_min], y[bincount > nbin_min]
+            yerr = prosp_dutils.asym_errors(y[:,0], y[:,1], y[:,2])
+            q84_t += yerr[0].tolist()
+            q16_t += yerr[1].tolist()
+            q50_t += y[:,0].tolist()
+            x_t += x.tolist()
+            axes[i].errorbar(x, y[:,0], yerr=yerr, color=cmap[i],marker='o',lw=lw,label=zlabels[i],zorder=5,ms=ms)
+            bigax.plot(x, y[:,0], color=cmap[i],marker='o',lw=lw,label=zlabels[i],zorder=5,ms=ms*1.5)
 
-        # z=0 relationship
-        lw = 1.5
-        color = '0.5'
-        axes[i+1].plot(age[:,0], age[:,1], color=color, lw=lw, zorder=-1, label='Gallazzi+05')
-        axes[i+1].plot(age[:,0],age[:,2], color=color, lw=lw, linestyle='--', zorder=-1)
-        axes[i+1].plot(age[:,0],age[:,3], color=color, lw=lw, linestyle='--', zorder=-1)
-        if i == 0:
-            axes[0].plot(age[:,0], age[:,1], color=color, lw=lw, zorder=1, label='Gallazzi+05')
-            axes[0].plot(age[:,0],age[:,2], color=color, lw=lw, linestyle='--', zorder=-1)
-            axes[0].plot(age[:,0],age[:,3], color=color, lw=lw, linestyle='--',  zorder=-1)
+            # redshift label
+            axes[i].text(opt['xt'],opt['yt'],zlabels[i],ha=opt['ha'], fontsize=fs,transform=axes[i].transAxes)
 
-        # running median
-        x, y, bincount = prosp_dutils.running_median(xm,ya,avg=False,return_bincount=True)
-        x, y = x[bincount > nbin_min], y[bincount > nbin_min]
-        zlabel = "{0:.1f}".format(zbins[i])+'<z<'+"{0:.1f}".format(zbins[i+1])
-        axes[i+1].plot(x, y, color=cmap(i),lw=lw+1,label=zlabel,zorder=5)
-        axes[0].plot(x, y, color=cmap(i),lw=lw+1,label=zlabel,zorder=5)
+            # max tuniv label
+            if 'age' in opt['ytitle']:
+                tuniv = WMAP9.age(zbins[i]).value
+                axes[i].text(9.02,tuniv*1.11,'max t$_{\mathrm{univ}}$',ha='left', fontsize=7.5,color='red')
+                axes[i].axhline(tuniv,linestyle=':',color='red',lw=1,zorder=-1,alpha=0.9)
+                
+                # scales
+                subsy, tickfs = ([]), 0.0
+                if (i % 2 == 0):
+                    subsy, tickfs = (1,3,6), fs
+                axes[i].set_yscale('log', subsy=subsy)
+                axes[i].yaxis.set_minor_formatter(FormatStrFormatter('%2.4g'))
+                axes[i].yaxis.set_major_formatter(FormatStrFormatter('%2.4g'))
+                for tl in axes[i].get_yticklabels():tl.set_visible(False)
+                axes[i].tick_params('both', pad=3.5, labelsize=tickfs,size=3.5, width=1.0, which='both')
 
-        # max tuniv, redshift label
-        tuniv = WMAP9.age(zbins[i]).value
-        delta = 1.12
-        if i == 4:
-            delta = 1.33
-        axes[i+1].text(9.02,tuniv*delta,'max t$_{\mathrm{univ}}$',ha='left', fontsize=7.5,color='red')
-        axes[i+1].axhline(tuniv,linestyle=':',color='red',lw=1,zorder=-1,alpha=0.9)
-        axes[i+1].text(11.45,0.11,zlabel,ha='right', fontsize=9)
+            # labels
+            if i > 1:
+                axes[i].set_xlabel(opt['xtitle'],fontsize=fs)
+                bigax.set_xlabel(opt['xtitle'],fontsize=fs*1.3)
+                for tl in axes[i].get_xticklabels():tl.set_fontsize(fs)
+                for tl in bigax.get_xticklabels():tl.set_fontsize(fs*1.3)
+            else:
+                for tl in axes[i].get_xticklabels():tl.set_visible(False)
+            if (i % 2 == 0):
+                axes[i].set_ylabel(opt['ytitle'],fontsize=fs)
+                bigax.set_ylabel('median '+ opt['ytitle'],fontsize=fs*1.3)
+                for tl in axes[i].get_yticklabels():tl.set_fontsize(fs)
+                for tl in bigax.get_yticklabels():tl.set_fontsize(fs*1.3)
+            else:
+                for tl in axes[i].get_yticklabels():tl.set_visible(False)
 
-    for a in axes:
-        a.set_xlim(xlim)
-        a.set_ylim(ylim)
+        # legends, scales, limits
+        for a in [bigax]+axes.tolist():
+            a.set_xlim(opt['xlim'])
+            a.set_ylim(opt['ylim'])
 
-    axes[0].set_yscale('log',subsy=([3]))
-    axes[0].yaxis.set_minor_formatter(FormatStrFormatter('%2.4g'))
-    axes[0].yaxis.set_major_formatter(FormatStrFormatter('%2.4g'))
-    axes[0].tick_params('both', pad=3.5, size=3.5, width=1.0, which='both')
+        if 'age' in opt['ytitle']:
+            bigax.set_yscale('log', subsy=(1,3,6))
+            bigax.yaxis.set_minor_formatter(FormatStrFormatter('%2.4g'))
+            bigax.yaxis.set_major_formatter(FormatStrFormatter('%2.4g'))
+            for tl in bigax.get_yticklabels():tl.set_visible(False)
+            bigax.tick_params('both', pad=3.5, labelsize=fs*1.3,size=3.5, width=1.0, which='both')
 
-    axes[0].legend(loc=4, prop={'size':7.5},
-                   scatterpoints=1,fancybox=True,ncol=2)
+        bigax.legend(loc=opt['legend_loc'], prop={'size':fs*0.9},
+                       scatterpoints=1,fancybox=True,ncol=opt['legend_ncol'])
 
-    plt.savefig(outname,dpi=dpi)
-    plt.close()
+        # save the table
+        zlabs = []
+        for n in range(nbins): zlabs += [zlabels[n]]*opt['nmassbins']
+        odat = Table([zlabs, np.array(x_t), np.array(q50_t),np.array(q84_t),np.array(q16_t)], 
+                      names=['z','log(M/M$_{\odot}$', 'median', '84$^{th}$ percentile', '16$^{th}$ percentile'])
+        formats = {name: '%1.2f' for name in odat.columns.keys()}
+        formats['z'] = str
+        ascii.write(odat, opt['table_out'], format='aastex',overwrite=True,formats=formats)
+
+        plt.savefig(opt['outname'],dpi=dpi)
+        plt.close()
 
 def star_forming_sequence(sfr,mass,zred,outname,popts,xlabel=None,ylabel=None,outfile=None,priors=False,
-                          correct_prosp=None,correct_prosp_mass=None, ssfr_min = -np.inf):
+                          correct_prosp=None,correct_prosp_mass=None, ssfr_min = -np.inf, avg=False):
     """ Plot star-forming sequence for whatever SFR + mass combination is input
-    impossible to replicate the Whitaker+14 work without pre-selection with UVJ cuts
-    we don't have UVJ cuts (THOUGH WE CAN GET THEM IF DESIRED)
     instead, use a sSFR cut
     """
 
-    # set redshift binning + figsize
-    zbins = np.linspace(0.5,2.5,5)
+    # Figure geometry and options
     fig, ax = plt.subplots(2,2,figsize=(6,6))
     ax = np.ravel(ax)
     medopts = {'marker':' ','alpha':0.85,'color':'red','zorder':5,'lw':1.5}
     corrected_opts = {'marker':' ','alpha':0.85,'color':'orange','zorder':5,'lw':1.5}
-    
-    # min, max for data + model
-    logm_min, logm_max = 8.5, 11.5
-    logsfr_min, logsfr_max = -4,3.3
+    xlim = (8.5, 11.5)
+    ylim = (-2,3.3)
+
+    # mass and redshift bins
+    zbins = np.linspace(0.6,2.4,5)
+    mbins = np.linspace(xlim[0],xlim[1],12)
+
+    # Prospector prior
     ssfr_max = -8 # from Prospector physics
-    mbins = np.linspace(logm_min,logm_max,14)
     prior_opts = {'linestyle':'--','color':'k','zorder':5,'lw':1.5}
 
-    # whitaker+14 information
+    # Whitaker+14 SFR-M relationship
     zwhit = np.array([0.75, 1.25, 1.75, 2.25])
-    logm_whit = np.linspace(logm_min,logm_max,50)
+    logm_whit = np.linspace(xlim[0],xlim[1],50)
     whitopts = {'color':'blue','alpha':0.85,'lw':1.5,'zorder':5}
 
     # let's go!
-    mass_save, sfr_save, sfr_corrected_save, z_save = [], [], [], []
+    mass_save, sfr_save, sfr_corrected_save, sfr_ratio_save = [], [], [], [] 
     for i in range(len(zbins)-1):
 
         # the data
@@ -896,28 +863,40 @@ def star_forming_sequence(sfr,mass,zred,outname,popts,xlabel=None,ylabel=None,ou
                  (np.log10(10**sfr/10**mass) > ssfr_min)
         ax[i].errorbar(mass[in_bin], sfr[in_bin], **popts)
 
-        # the data-driven relationship
-        x, y, bincount = prosp_dutils.running_median(mass[in_bin], 10**sfr[in_bin],bins=mbins,avg=True,return_bincount=True)
+        # calculate the running median
+        x, y, bincount = prosp_dutils.running_median(mass[in_bin], 10**sfr[in_bin],
+                                                     bins=mbins,avg=avg,return_bincount=True)
         ax[i].errorbar(x, np.log10(y), **medopts)
-        mass_save += x.tolist()
-        sfr_save.append(y.tolist())
-        z_save += np.repeat(zwhit[i],len(x)).tolist()
 
-        # correct for Prospector sSFR ceiling
+        # save information, including ratio if we have UV+IR sfrs
+        mass_save += x.tolist()
+        sfr_save += [y.tolist()]
+
+        # Do we try to correct for Prospector sSFR ceiling?
+        # Also here we store the RATIO of SFRs
         if correct_prosp is not None:
-            # if our mass vector is not Prospector mass, find it in keywords
+
+            # store the ratio
+            xr, yr, bincount = prosp_dutils.running_median(mass[in_bin], 10**correct_prosp[in_bin],
+                                               bins=mbins,avg=avg,return_bincount=True)
+            sfr_ratio_save += [(y/yr).tolist()]
+
+            # make sure we're using Prospector mass to calculate sSFR
             if correct_prosp_mass is None:
                 pmass = mass[in_bin]
             else:
                 pmass = correct_prosp_mass[in_bin]
 
-            # take anything within 0.3 dex of the prior limit
+            # replace anything with sSFR within 0.3 dex of the prior edge
+            # with UV+IR SFR
             idx_atlimit = (sfr[in_bin] - pmass) > ssfr_max-0.3
             sfr_new, sfr_corr = sfr[in_bin], correct_prosp[in_bin]
             sfr_new[idx_atlimit] = sfr_corr[idx_atlimit]
-            x, y, bincount = prosp_dutils.running_median(mass[in_bin], 10**sfr_new,bins=mbins,avg=True,return_bincount=True)
+
+            # recalculate running median for sSFR
+            x, y, bincount = prosp_dutils.running_median(mass[in_bin], 10**sfr_new,bins=mbins,avg=avg,return_bincount=True)
             ax[i].errorbar(x, np.log10(y), **corrected_opts)
-            sfr_corrected_save.append(y.tolist())
+            sfr_corrected_save += [y.tolist()]
 
         # the old model
         sfr_whit = sfr_ms(zwhit[i],logm_whit)
@@ -926,19 +905,19 @@ def star_forming_sequence(sfr,mass,zred,outname,popts,xlabel=None,ylabel=None,ou
         # the labels
         ax[i].set_xlabel(r'log(M/M$_{\odot}$) ' + xlabel)
         ax[i].set_ylabel(r'log(SFR/M$_{\odot}$ yr$^{-1}$) ' + ylabel)
-        ax[i].text(0.02, 0.93, "{0:.1f}".format(zbins[i])+'<z<'+"{0:.1f}".format(zbins[i+1]),transform=ax[i].transAxes)
+        ax[i].text(0.02, 0.93, "{0:.1f}".format(np.round(zbins[i],1))+'<z<'+"{0:.1f}".format(zbins[i+1]),transform=ax[i].transAxes)
 
         # the ranges
-        ax[i].set_xlim(logm_min,logm_max)
-        ax[i].set_ylim(logsfr_min,logsfr_max)
+        ax[i].set_xlim(xlim)
+        ax[i].set_ylim(ylim)
 
         # the guiderails
         if np.isfinite(ssfr_min):
-            ax[i].plot([logm_min,logm_max],[ssfr_min+logm_min,ssfr_min+logm_max],**prior_opts)
+            ax[i].plot([xlim[0],xlim[1]],[ssfr_min+xlim[0],ssfr_min+xlim[1]],**prior_opts)
             ax[i].text(9.5,ssfr_min+9.6,'sSFR cut',rotation=30,fontsize=8)
         if priors:
-            ax[i].text(logm_min+0.3,ssfr_max+logm_min+1.5,'Prospector prior',rotation=30,fontsize=8)
-            ax[i].plot([logm_min,logm_max],[ssfr_max+logm_min,ssfr_max+logm_max],**prior_opts)
+            ax[i].text(xlim[0]+0.3,ssfr_max+xlim[0]+1.5,'Prospector prior',rotation=30,fontsize=8)
+            ax[i].plot([xlim[0],xlim[1]],[ssfr_max+xlim[0],ssfr_max+xlim[1]],**prior_opts)
 
     ax[0].text(0.02,0.87,'Whitaker+14',color=whitopts['color'],transform=ax[0].transAxes)
     # flip the geometry
@@ -950,9 +929,9 @@ def star_forming_sequence(sfr,mass,zred,outname,popts,xlabel=None,ylabel=None,ou
 
     # save
     if outfile is not None:
-        out = {'mass':x,'sfr':np.dstack((sfr_save)).squeeze(),'sfr_corr':None,'z':zwhit}
+        out = {'mass':x,'sfr':np.array(sfr_save).T,'sfr_corr':None,'z':zwhit, 'sfr_ratio': np.array(sfr_ratio_save).T}
         if correct_prosp is not None:
-            out['sfr_corr'] = np.dstack((sfr_corrected_save)).squeeze()
+            out['sfr_corr'] = np.array(sfr_corrected_save).T
         hickle.dump(out,open(outfile, "w"))
 
     plt.tight_layout()
@@ -963,19 +942,24 @@ def deltam_with_redshift(fast, prosp, z, outname, filename=None):
 
     # plot
     fig, ax = plt.subplots(1, 1, figsize = (3.5,3.5))
+    lw = 2
 
     # define quantities
     par = 'stellar_mass'
     mfast = fast[par]
-    mprosp = prosp[par]['q50']
+    mprosp, mprosp_up, mprosp_down = prosp[par]['q50'], prosp[par]['q84'], prosp[par]['q16']
     if type(mfast) == dict:
         mfast = mfast['q50']
     delta_m = mprosp-mfast
 
-    # binning
-    zbins = np.linspace(0.5,3,6)
+    # mass binning
+    m_shift = 0.025
+    nmassbins, xlim = 10, (8.8,11.5)
+    massbins = np.linspace(xlim[0],xlim[1],nmassbins+1)
+
+    # redshift binning
+    zbins = np.linspace(0.5,2.5,5)
     nbins = len(zbins)-1
-    cmap = prosp_dutils.get_cmap(nbins,cmap='plasma')
     xmed, ymed, zmed = [], [], []
     for i in range(nbins):
         inbin = (z > zbins[i]) & (z <= zbins[i+1])
@@ -983,27 +967,35 @@ def deltam_with_redshift(fast, prosp, z, outname, filename=None):
             continue
         x,y = mfast[inbin], delta_m[inbin]
 
-        x, y, bincount = prosp_dutils.running_median(x,y,avg=False,return_bincount=True)
-        x, y = x[bincount > nbin_min], y[bincount > nbin_min]
-        ax.plot(x, y, 'o-', color=cmap(i),lw=2,alpha=0.95,label="{0:.1f}".format(zbins[i])+'<z<'+"{0:.1f}".format(zbins[i+1]))
-        xmed += x.tolist()
-        ymed += y.tolist()
-        zmed += [(zbins[i]+zbins[i+1])/2.]*len(y)
+        # implement a floor for mass error: a handful of runs have borked
+        # and have errors @ 1e-5 dex!
+        mass_errs = np.clip((mprosp_up[inbin]-mprosp_down[inbin])/2., 0.05, np.inf)
+        weights = mass_errs**(-2)
 
-    ax.axhline(0, linestyle='--', color='red', lw=2,zorder=-1)
+        # calculate weighted running median
+        x, y, bincount = prosp_dutils.running_median(x,y,avg=False,return_bincount=True,weights=weights,bins=massbins)
+        x, y = x[bincount > nbin_min], y[bincount > nbin_min]
+        yerr = prosp_dutils.asym_errors(y[:,0], y[:,1], y[:,2])
+
+        ax.errorbar(x-m_shift*(i-1.5), y[:,0], yerr=yerr, marker='o', linestyle='-', color=cmap[i],lw=lw,
+                    label="{0:.1f}".format(zbins[i])+'<z<'+"{0:.1f}".format(zbins[i+1]), alpha=0.7,elinewidth=lw*0.5,capthick=lw*0.5)
+        ymed += [y[:,0].tolist()]
+        zmed += [(zbins[i]+zbins[i+1])/2.]
+
+    ax.axhline(0, linestyle='--', color='0.4', lw=2,zorder=-1)
     ax.set_xlabel(r'log(M$_{\mathrm{FAST}}$/M$_{\odot}$)')
     ax.set_ylabel(r'log(M$_{\mathrm{Prosp}}$/M$_{\mathrm{FAST}}$)')
-    ax.legend(prop={'size':8}, scatterpoints=1,fancybox=True)
+    ax.legend(prop={'size':8}, scatterpoints=1,fancybox=True,loc=4)
+    ax.set_xlim(xlim)
     ax.set_ylim(-0.5,0.5)
 
     if filename is not None:
-        out = {'fast_mass': xmed, 'log_mprosp_mfast': ymed, 'z': zmed}
+        out = {'fast_mass': (massbins[1:]+massbins[:-1])/2., 'log_mprosp_mfast': np.array(ymed).T, 'z': np.array(zmed)}
         hickle.dump(out,open(filename, "w"))
 
     plt.tight_layout()
-    plt.savefig(outname,dpi=dpi)
+    plt.savefig(outname,dpi=200)
     plt.close()
-
 
 def uvir_comparison(data, outname, popts, model_uvir = False, ssfr=False, filename=None):
     """ plot sSFR_prosp versus sSFR_UVIR against a variety of variables
@@ -1079,8 +1071,10 @@ def uvir_comparison(data, outname, popts, model_uvir = False, ssfr=False, filena
     no_min = (uvir != minssfr) & (prosp != minssfr)
 
     # plot geometry
-    fig, ax = plt.subplots(1, 2, figsize = (8,4))
+    fig, ax = plt.subplots(1, 2, figsize = (7,3.5))
     ax = np.ravel(ax)
+    lw = 2 
+
 
     # sSFR_prosp versus sSFR_uvir
     ax[0].errorbar(uvir, prosp, xerr=uvir_err, yerr=prosp_err, **popts)
@@ -1100,9 +1094,10 @@ def uvir_comparison(data, outname, popts, model_uvir = False, ssfr=False, filena
     ax[0].plot([min,max],[min,max],'--', color='red', zorder=2)
 
     # sSFR_prosp versus (SFR_prosp / SFR_uvir) in redshift bins
-    zbins = np.linspace(0.5,3,6)
+    ssfr_shift = 0.04
+    zbins = np.linspace(0.5,2.5,5)
     nbins = len(zbins)-1
-    cmap = prosp_dutils.get_cmap(nbins,cmap='plasma')
+
     xmed, ymed, zmed = [], [], []
     for i in range(nbins):
         inbin = (data['fast']['z'][good] > zbins[i]) & (data['fast']['z'][good] <= zbins[i+1])
@@ -1110,23 +1105,30 @@ def uvir_comparison(data, outname, popts, model_uvir = False, ssfr=False, filena
             continue
         
         if ssfr == True:
-            bins = np.linspace(-11,-8,6)
+            bins = np.linspace(-12,-8,8)
         else:
             bins = None
+        
+        # minimum error of 0.1 dex in sSFRs, maximum error 1 dex
+        #ssfr_err = np.clip((np.log10(prosp_up)-np.log10(prosp_down))[inbin]/2., 0.1, 0.3)
+        #weights = ssfr_err**(-2.)
+        weights = np.ones(inbin.sum(),dtype=float)
 
         x,y = np.log10(uvir[inbin]), ratio[inbin]
-        x, y, bincount = prosp_dutils.running_median(x,y,avg=False,return_bincount=True, bins=bins)
+        x, y, bincount = prosp_dutils.running_median(x,y,avg=False,return_bincount=True, bins=bins,weights=weights)
         x, y = x[bincount > nbin_min], y[bincount > nbin_min]
-        ax[1].plot(x, y, 'o-', color=cmap(i),lw=2,alpha=0.95,label="{0:.1f}".format(zbins[i])+'<z<'+"{0:.1f}".format(zbins[i+1]))
+        yerr = prosp_dutils.asym_errors(y[:,0], y[:,1], y[:,2])
+        ax[1].errorbar(x+(ssfr_shift*(i-1.5)), y[:,0], yerr=yerr, marker='o', color=cmap[i],lw=lw,alpha=0.6,
+                       label="{0:.1f}".format(zbins[i])+'<z<'+"{0:.1f}".format(zbins[i+1]),elinewidth=lw*0.5,capthick=lw*0.5)
         xmed += x.tolist()
-        ymed += y.tolist()
+        ymed += y[:,0].tolist()
         zmed += [(zbins[i]+zbins[i+1])/2.]*len(y)
 
-    ax[1].axhline(0, linestyle='--', color='red', lw=2,zorder=-1)
+    ax[1].axhline(0, linestyle='--', color='0.5', lw=lw,zorder=-1)
     ax[1].set_xlabel('log('+prosp_label+')')
     ax[1].set_ylabel(r'log(SFR$_{\mathrm{Prosp}}$/SFR$_{\mathrm{UV+IR,mod}}$)')
     ax[1].legend(prop={'size':8}, scatterpoints=1,fancybox=True)
-    ax[1].set_ylim(-1.5,1.5)
+    ax[1].set_ylim(-2,2)
 
     plt.tight_layout()
     plt.savefig(outname+'.png',dpi=dpi)

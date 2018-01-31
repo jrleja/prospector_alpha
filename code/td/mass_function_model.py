@@ -3,19 +3,25 @@ from scipy.integrate import simps
 from astropy.cosmology import WMAP9
 import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d, interp2d, RectBivariateSpline
-import hickle
+import hickle, os
 
 
 dloc = '/Users/joel/code/python/prospector_alpha/plots/td_huge/fast_plots/data/masscomp.h5'
 with open(dloc, "r") as f:
     mcorr = hickle.load(f)
-mass_fnc = interp2d(mcorr['fast_mass'], mcorr['z'], mcorr['log_mprosp_mfast'], kind='linear')
+mass_fnc = RectBivariateSpline(mcorr['fast_mass'], mcorr['z'], mcorr['log_mprosp_mfast'],kx=1,ky=1)
 
 dloc = '/Users/joel/code/python/prospector_alpha/plots/td_huge/fast_plots/data/sfrcomp.h5'
 with open(dloc, "r") as f:
     sfrcorr = hickle.load(f)
-# sfr_fnc = RectBivariateSpline(sfrcorr['mass'], sfrcorr['z'], sfrcorr['sfr'],kx=1,ky=1)
 sfr_fnc = RectBivariateSpline(sfrcorr['mass'], sfrcorr['z'], sfrcorr['sfr_corr'],kx=1,ky=1)
+
+dloc = '/Users/joel/code/python/prospector_alpha/plots/td_huge/fast_plots/data/sfrcomp_avg.h5'
+with open(dloc, "r") as f:
+    sfrcorr_avg = hickle.load(f)
+sfr_fnc_avg = RectBivariateSpline(sfrcorr_avg['mass'], sfrcorr_avg['z'], sfrcorr_avg['sfr_corr'],kx=1,ky=1)
+
+# sfr_fnc = RectBivariateSpline(sfrcorr['mass'], sfrcorr['z'], sfrcorr['sfr_corr'],kx=1,ky=1)
 
 def sf_fraction(z,logm):
     """this returns the fraction of star-forming galaxies as a function of 
@@ -112,7 +118,7 @@ def mf_parameters(z,sf=False,qu=False):
     return spars
 
 def sfrd(z,logm_min=9, logm_max=13, dm=0.01, use_whit12=False, 
-         apply_pcorrections=False,**kwargs):
+         apply_pcorrections=False,use_avg=False,**kwargs):
     """ calculates SFRD from analytic star-forming mass function
     plus the Whitaker+14 star-forming sequence
     """
@@ -123,17 +129,24 @@ def sfrd(z,logm_min=9, logm_max=13, dm=0.01, use_whit12=False,
 
     # first, get the star-forming sequence
     # also apply corrections to SFR if necessary
-    if apply_pcorrections:
-        sfr = sfr_fnc(logm,z).squeeze()
-    elif use_whit12:
+    if use_whit12:
         sfr = sfr_ms12(z,logm)
     else:
         sfr = sfr_ms(z,logm)
 
+    if apply_pcorrections:
+        if use_avg:
+            sfr = sfr_fnc_avg(logm,z).squeeze()
+        else:
+            sfr = sfr_fnc(logm,z).squeeze()
+
     # multiply n(M) by SFR(M) to get SFR / Mpc^-3 / dex
-    starforming_numdens = mf_phi(mf_parameters(z,sf=True),logm)
-    starforming_function = sfr * starforming_numdens
-    # starforming_function = sfr_fnc(logm,z) * mf_phi(mf_parameters(z,sf=True),logm)
+    if use_avg:
+        starforming_numdens = mf_phi(mf_parameters(z),logm)
+        starforming_function = sfr * starforming_numdens
+    else:
+        starforming_numdens = mf_phi(mf_parameters(z,sf=True),logm)
+        starforming_function = sfr * starforming_numdens
 
     # integrate over stellar mass to get SFRD
     sfrd = simps(starforming_function,dx=dm)
@@ -229,20 +242,21 @@ def zfourge_param_rhostar(z, massloss_correction=False, apply_pcorrections=False
 
     return np.log10(rhodot)
 
-def plot_sfrd(logm_min=9.0,logm_max=11.5,dm=0.01,use_whit12=False,
-              massloss_correction=False):
+def plot_sfrd(logm_min=9.0,logm_max=12,dm=0.01,use_whit12=False,
+              massloss_correction=True):
     """ compare SFRD from mass function(z) versus observed SFR
     """
 
     # generate z-array + numerical options
-    dz = 0.1 # for stability...
-    zrange = np.arange(0.5, 2.5, dz)
+    dz = 0.1
+    zrange = np.arange(0.75, 2.25, dz)
     opts = {
             'logm_min': logm_min,
             'logm_max': logm_max,
             'dm': dm,
             'use_whit12': use_whit12,
-            'massloss_correction': massloss_correction
+            'massloss_correction': massloss_correction,
+            'use_avg': True
            }
 
     # calculate both
@@ -256,29 +270,39 @@ def plot_sfrd(logm_min=9.0,logm_max=11.5,dm=0.01,use_whit12=False,
         # mf_sfrd_prosp += [drho_dt(z,apply_pcorrections=True,dz=dz, **opts)]
 
     # plot options
-    red, blue = '#FF3D0D', '#1C86EE'
+    old_color, new_color = '0.3','#FF3D0D'
+    mass_linestyle, sfr_linestyle = '-', '--'
+    ylim = (-1.6,-1)
+    xlim = (0.3, 2.7)
     popts = {
              'linewidth': 3,
              'alpha': 0.9
             }
 
     # Plot1: change in SFRD
-    fig, ax = plt.subplots(1,1, figsize=(4, 4))
-    ax.plot(zrange, mf_sfrd, color=red, label='mass (FAST)',**popts)
-    ax.plot(zrange, np.log10(sf_sfrd), color=blue, label='UV+IR SFRs', **popts)
-    ax.plot(zrange, mf_sfrd_prosp, '--', color=red, label='mass (Prospector)',**popts)
-    ax.plot(zrange, np.log10(sf_sfrd_prosp), '--', color=blue, label='Prospector SFRs', **popts)
+    fig, ax = plt.subplots(1,1, figsize=(4.4, 4))
+    ax.plot(zrange, mf_sfrd, mass_linestyle, color=old_color, label='estimated from mass',**popts)
+    ax.plot(zrange, mf_sfrd_prosp, mass_linestyle, color=new_color, label='mass (Prospector)',**popts)
+    ax.plot(zrange, np.log10(sf_sfrd), sfr_linestyle, color=old_color, label='estimated from SFR', **popts)
+    ax.plot(zrange, np.log10(sf_sfrd_prosp), sfr_linestyle, color=new_color, label='SFR (Prospector)', **popts)
 
     # Madau+15
-    phi_madau = 0.015*(1+zrange)**2.7 / (1+((1+zrange)/2.9)**5.6)
+    zrange_madau = np.arange(xlim[0], xlim[1], dz)
+    phi_madau = 0.015*(1+zrange_madau)**2.7 / (1+((1+zrange_madau)/2.9)**5.6)
     phi_madau = np.log10(phi_madau) - 0.24 # salpeter correction
 
     # labels, legends, and add Madau
     ax.set_xlabel('redshift')
     ax.set_ylabel(r'log(SFRD) [M$_{\odot}$ yr$^{-1}$ Mpc$^{-3}$]')
-    ax.plot(zrange, phi_madau, '-', color='green', label='Madau et al. 2014', **popts)
+    ax.plot(zrange_madau, phi_madau, ':', color='purple', label='Madau+14', zorder=-1,**popts)
     ax.legend(loc=4, prop={'size':10}, scatterpoints=1,fancybox=True)
 
+    # limits
+    ax.set_xlim(xlim)
+    ax.set_ylim(ylim)
+
+    outname = '/Users/joel/code/python/prospector_alpha/plots/td_huge/fast_plots/madau_plot.png'
     plt.tight_layout()
-    plt.savefig('/Users/joel/code/python/prospector_alpha/plots/td_huge/fast_plots/madau_plot.png',dpi=150)
+    plt.savefig(outname,dpi=200)
     plt.close()
+    os.system('open '+outname)

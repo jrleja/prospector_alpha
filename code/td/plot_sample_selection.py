@@ -81,6 +81,20 @@ def do_all(runname='td_huge',outfolder=None,regenerate=False,**opts):
     # plot
     plot(data, outfolder=outfolder,**opts)
 
+def mass_completeness(ztarget):
+    """red line from Fig 2 in Tomczak+14
+    """
+    zred = np.array([0.50,0.725,0.95,1.2,1.4,1.65,1.85,2.1,2.3,2.55])
+    mcomp = np.array([8.1,8.5,8.8,8.9,9.05,9.15,9.25,9.35,9.45,9.5])  
+    return np.interp(ztarget, zred, mcomp)
+
+def sfr_completeness(ztarget):
+    """ ripped from Whitaker+14, Fig 1
+    """
+    zred = np.array([0.75,1.25,1.75,2.25])
+    logsfr = np.array([0.55,1.1,1.15,1.6])
+    return np.interp(ztarget, zred, logsfr)
+
 def plot(data, outfolder=None, density_plot=False, verbose=False, reselect_sample=True, completeness_plot=True):
     """density_plot: bool
         include (x*N) where x is the parameter of interest
@@ -105,17 +119,21 @@ def plot(data, outfolder=None, density_plot=False, verbose=False, reselect_sampl
                     'ylabel': r'N*M$_{\mathrm{stellar}}$',
                     'xlabel': r'log(M$_*$/M$_{\odot}$)',
                     'norm': 1e13, # this is arbitrary, to remove power from matplotlib y-axis
-                    'name': 'rhomass_selection'+basename+'.png'
+                    'name': 'rhomass_selection'+basename+'.png',
+                    'complete': mass_completeness,
+                    'ahead_width': 0.1, 'ahead_length': 6,'tshift':0.1,'t_ha':'left'
                    }
 
     sfr_options = {
                     'data': np.log10(np.clip(data['uvir_sfr'],0.001,np.inf)),
-                    'xlim': (-2,4.2),
+                    'xlim': (-1.99,4.2),
                     'ylim': (30,21000),
                     'ylabel': r'N*SFR',
                     'xlabel': r'log(SFR) [M$_{\odot}$/yr]',
                     'norm': 1e4, # this is arbitrary, to remove power from matplotlib y-axis
-                    'name': 'rhosfr_selection'+basename+'.png'
+                    'name': 'rhosfr_selection'+basename+'.png',
+                    'complete': sfr_completeness,
+                    'ahead_width': 0.15, 'ahead_length': 9,'tshift':-0.09,'t_ha':'right'
                    }
 
     ### plot choices
@@ -161,6 +179,12 @@ def plot(data, outfolder=None, density_plot=False, verbose=False, reselect_sampl
             hist_sample, bins = np.histogram(sample_dat,bins=bins,density=False)
             bins_mid = (bins[1:]+bins[:-1])/2.
 
+            # extend in either direction
+            dbins = bins[1]-bins[0]
+            bins_mid = np.array([bins_mid[0]-dbins] + bins_mid.tolist() + [bins_mid[-1]+dbins])
+            hist_master = np.array([0.0]+hist_master.tolist()+[0.0])
+            hist_sample = np.array([0.0]+hist_sample.tolist()+[0.0])
+
             # distribution
             ax[i,0].plot(bins_mid,hist_master,color='0.4', **histopts)
             ax[i,0].plot(bins_mid,hist_sample,color='red', **histopts)
@@ -181,32 +205,42 @@ def plot(data, outfolder=None, density_plot=False, verbose=False, reselect_sampl
             rhofrac = (10**sample_dat).sum() / (10**master_dat).sum()
             ax[i,0].text(0.98, 0.9,'{:1.1f} < z < {:1.1f}'.format(zbin[0],zbin[1]), transform=ax[i,0].transAxes,ha='right',**fontopts)
 
+            # completeness limits
+            comp = opt['complete']((zbin[0]+zbin[1])/2.)
+            length_in_dex = np.log10(opt['ylim'][1]/opt['ylim'][0])*0.1
+            ax[i,0].arrow(comp, opt['ylim'][0], 0.0, 10**(np.log10(opt['ylim'][0])+length_in_dex)-opt['ylim'][0],
+                          head_width=opt['ahead_width'], head_length=opt['ahead_length'], width=opt['ahead_width']/5.,
+                          length_includes_head=True,color='black')
+            if i == 0:
+                ax[i,0].text(comp+opt['tshift'],opt['ylim'][0]+3,'depth limit\nof data',fontsize=8,
+                             ha=opt['t_ha'],ma='center') 
+
             # density distribution
             if density_plot:
                 ax[i,1].plot(bins_mid,hist_master*10**bins_mid/opt['norm'],color='0.4', **histopts)
                 ax[i,1].plot(bins_mid,hist_sample*10**bins_mid/opt['norm'],color='red', **histopts)
                 ax[i,1].set_ylabel(opt['ylabel'])
-                ax[i,1].text(0.01, 0.925,r'$\rho_{\mathrm{sample}}/\rho_{\mathrm{total}}$='+'{:1.2f}'.format(rhofrac),
+                ax[i,1].text(0.01, 0.925,r'$\rho_{\mathrm{sample}}/\rho_{\mathrm{3DHST}}$='+'{:1.2f}'.format(rhofrac),
                              transform=ax[i,1].transAxes,ha='left',**fontopts)
             else:
-                ax[i,0].text(0.98, 0.82,r'$\rho_{\mathrm{sample}}/\rho_{\mathrm{total}}$='+'{:1.2f}'.format(rhofrac),
+                ax[i,0].text(0.98, 0.82,r'$\rho_{\mathrm{sample}}/\rho_{\mathrm{3DHST}}$='+'{:1.2f}'.format(rhofrac),
                              transform=ax[i,0].transAxes,ha='right',**fontopts)
 
             # completeness distribution
             if completeness_plot:
                 axcomp[i].plot(bins_mid, hist_sample / hist_master.astype(float), lw=1.5,color='k')
                 axcomp[i].axhline(0.9,linestyle='--',color='0.3',zorder=-1,alpha=0.8)
-                axcomp[i].text(opt['xlim'][1]-(opt['xlim'][1]-opt['xlim'][0])*0.01,0.86,r'90% complete',fontsize=8,color='0.3',ha='right',va='top')
+                axcomp[i].text(opt['xlim'][1]-(opt['xlim'][1]-opt['xlim'][0])*0.01,0.86,r'90% of survey',fontsize=8,color='0.3',ha='right',va='top')
                 axcomp[i].set_xlabel(opt['xlabel'])
                 axcomp[i].set_xlim(opt['xlim'])
                 axcomp[i].set_ylim(0.5,1.1)
-                
+
                 # y-labels
                 if i > 0:
                     axcomp[i].set_yticklabels([])
                     plt.setp(axcomp[i].get_yminorticklabels(), visible=False)
                 else: 
-                    axcomp[i].set_ylabel('completeness')
+                    axcomp[i].set_ylabel('fraction of\ngalaxies fit')
 
                 # turn off xticks in above plot
                 for a in ax[i,:]: a.set_xticklabels([])

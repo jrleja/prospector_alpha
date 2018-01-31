@@ -4,6 +4,7 @@ from prospect.models import model_setup
 from scipy.interpolate import interp1d
 from scipy.integrate import simps
 from astropy import constants
+from dynesty.plotting import _quantile as wquant
 
 def return_lir(lam,spec,z=None):
     """ returns IR luminosity (8-1000 microns) in erg/s
@@ -107,9 +108,26 @@ def running_median(x,y,nbins=10,avg=False,weights=None,bins=None,return_bincount
         
     idx  = np.digitize(x,bins,right=True)
 
-    if avg == False:
-        running_median = np.array([np.median(y[idx-1==k]) for k in range(nbins)])
-    else:
+    # median
+    if not avg:
+
+        if weights is None:
+            running_median = np.array([np.median(y[idx-1==k]) for k in range(nbins)])
+        else:
+            running_median = []
+            for k in range(nbins): 
+                index = (idx-1==k)
+                if index.sum() == 0:
+                    running_median += [[0.0,0.0,0.0]]
+                elif index.sum() == 1:
+                    running_median += [[y[index][0],y[index][0],y[index][0]]]
+                else:
+                    weight = weights[index] / weights[index].sum()
+                    running_median += [wquant(y[index],np.array([0.5, 0.84, 0.16]),weights=weight)]
+            running_median = np.array(running_median)
+
+    # average
+    if avg: 
         running_median= []
         for k in range(nbins): # for loop because we can't pass an empty array to np.average!
             if (idx-1==k).sum() == 0:

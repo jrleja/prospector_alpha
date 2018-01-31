@@ -2,35 +2,32 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os, hickle, td_io, copy
 from prospector_io import load_prospector_data
-from prosp_dutils import generate_basenames, asym_errors
+from prosp_dutils import generate_basenames, asym_errors, get_cmap
 from matplotlib.ticker import MaxNLocator, FormatStrFormatter
 from dynesty.plotting import _quantile as weighted_quantile
-from stack_td_sfh import sfr_ms
 from astropy.io import ascii
 
 plt.ioff()
 
 popts = {'fmt':'o', 'capthick':1.5,'elinewidth':1.5,'ms':9,'alpha':0.8,'color':'0.3'}
 red = '#FF3D0D'
-dpi = 160
+dpi = 210
 cmap = 'cool'
 minsfr = 0.01
 filename =  os.getenv('APPS') + '/prospector_alpha/plots/td_huge/fast_plots/data/agn.h5'
 
 opts = {
-          'sigma_ms':0.3,                  # scatter in the star-forming sequence, in dex
           'xlim': (9, 11.5),               # x-limit
-          'ylim': (0.02,0.53),              # y-limit
+          'ylim': (0.00,0.53),              # y-limit
           'fmir_grid': 10**np.linspace(np.log10(1e-4),np.log10(1),500),
-          'nmassbins': 5,                  # number of mass bins
-          'xshift': 0.05,                  # x-shift between SFR bins
-          'sfr_colors': ['#45ADA8','#FC913A','#FF4E50'],
-          'sfr_labels': ['above MS', 'on MS', 'below MS'],
-          'adjust_sfr': -0.2,              # adjust whitaker SFRs by how much in dex?
+          'xshift': 0.02,                  # x-shift between mass bins
+          'nmassbins': 8,                  # number of mass bins
           'zbins': [(0.5,1.),(1.,1.5),(1.5,2.),(2.,2.5)],
+          'colors': ['#0202d6','#31A9B8','#FF9100','#FF420E'],
+          'color': '0.2',
           'use_fagn': False,               # otherwise we use fmir
-          'tenth_percentile': False,        # use f_X > 0.1 as the criteria
-          'one_sigma': False               # use f_X-sigma > 0.1 as the criteria
+          'tenth_percentile': True,        # use f_X > 0.1 as the criteria
+          'one_sigma': True               # use f_X-sigma > 0.1 as the criteria
          }
 opts['massbins'] = np.linspace(opts['xlim'][0],opts['xlim'][1],opts['nmassbins']+1)
 opts['zbin_labels'] = ["{0:.1f}".format(z1)+'<z<'+"{0:.1f}".format(z2) for (z1, z2) in opts['zbins']]
@@ -149,8 +146,7 @@ def stack_agn_bins(data,**opts):
 
     # generate output containers
     fmt =      {label:[] for label in ['q50_stack','q84_stack','q16_stack','median_logwidth','median','scatter']}
-    sfr_dict = {label:copy.deepcopy(fmt) for label in opts['sfr_labels']}
-    out =      {label:copy.deepcopy(sfr_dict) for label in opts['zbin_labels']}
+    out =      {label:copy.deepcopy(fmt) for label in opts['zbin_labels']}
 
     parstring = 'fmir'
     if opts['use_fagn']:
@@ -165,7 +161,6 @@ def stack_agn_bins(data,**opts):
 
         # pull out critical quantities
         sm = np.log10(data['stellar_mass']['q50'])[idx]
-        sfr = np.log10(data['sfr_100']['q50'])[idx]
         fmir = np.array(data[parstring]['q50'])[idx]
         fmir_up = np.array(data[parstring]['q84'])[idx]
         fmir_down = np.array(data[parstring]['q16'])[idx]
@@ -173,63 +168,51 @@ def stack_agn_bins(data,**opts):
         weights = np.array(data['weights'])[idx]
         logwidths = (np.log10(data[parstring]['q84'])[idx] - np.log10(data[parstring]['q16'])[idx])/2.
 
-        # loop over SFR bins
-        # use Whitaker+14 SFR adjusted downwards for now (not that bad?)
-        # assume sigma = 0.3, take within 1 sigma of MS
-        sfr_expected = sfr_ms((z1 + z2)/2.,sm,adjust_sfr=opts['adjust_sfr'])
-        for j, sfrlabel in enumerate(opts['sfr_labels']):
+        # loop over massbins
+        for k in range(len(opts['massbins'])-1):
 
-            # choose indexes
-            if j == 0:
-                idx_bin = ((sfr_expected+opts['sigma_ms']) < sfr)
-            if j == 1:
-                idx_bin = ((sfr_expected-opts['sigma_ms']) < sfr) & ((sfr_expected+opts['sigma_ms']) > sfr)
-            if j == 2:
-                idx_bin = ((sfr_expected-opts['sigma_ms']) > sfr)
+            idx = (sm > opts['massbins'][k]) & (sm <= opts['massbins'][k+1])
+            n_in_bin = idx.sum()
 
-            # pick out fmir chains + weights
-            fmir_pdfs = pdfs[idx_bin].squeeze()
-            fmir_weights = weights[idx_bin]/weights[idx_bin].sum(axis=1)[:,None]
-            fmir_logwidths = logwidths[idx_bin]
-            fmir_values = fmir[idx_bin]
+            # if we want to go with the tenth percentile criteria...
+            if opts['tenth_percentile']:
 
-            # finally, loop over massbins
-            for k in range(len(opts['massbins'])-1):
+                if opts['one_sigma']:
 
-                idx = (sm[idx_bin] > opts['massbins'][k]) & (sm[idx_bin] <= opts['massbins'][k+1])
-                n_in_bin = idx.sum()
-
-                # if we want to go with the tenth percentile criteria...
-                if opts['tenth_percentile']:
-
-                    if opts['one_sigma']:
-                        out[zlabel][sfrlabel]['q50_stack'] += [((fmir_down[idx_bin])[idx] > 0.1).sum() / float(idx.sum())]
-                    else:
-                        fmir_perc = []
-                        for n in range(100):
-                            
-                            # draw randomly
-                            draw = np.random.uniform(size=n_in_bin)
-                            cumsum = np.cumsum(fmir_weights[idx],axis=1)
-                            rand_idx = np.abs(cumsum - draw[:,None]).argmin(axis=1)
-                            chain = (fmir_pdfs[idx])[np.arange(n_in_bin),rand_idx]
-
-                            fmir_perc += [(chain > 0.1).sum() / float(n_in_bin)]
-
-                            print n
-                        mid, up, down = np.percentile(fmir_perc,[50,84,16])
-                        out[zlabel][sfrlabel]['q50_stack'] += [mid]
-                        out[zlabel][sfrlabel]['q84_stack'] += [up]
-                        out[zlabel][sfrlabel]['q16_stack'] += [down]
+                    # bootstrap errors
+                    ngal, ndraw = idx.sum(), 1000
+                    idx_draw = np.random.randint(ngal, size=(ngal,ndraw))
+                    onesig = ((fmir_down[idx])[idx_draw] > 0.1).sum(axis=0) / float(ngal)
+                    mid, up, down = np.percentile(onesig,[50,84,16])
+                    out[zlabel]['q50_stack'] += [mid]
+                    out[zlabel]['q84_stack'] += [up]
+                    out[zlabel]['q16_stack'] += [down]
                 else:
+                    fmir_perc = []
+                    for n in range(100):
+                        
+                        # draw randomly
+                        draw = np.random.uniform(size=n_in_bin)
+                        cumsum = np.cumsum(weights[idx],axis=1)
+                        rand_idx = np.abs(cumsum - draw[:,None]).argmin(axis=1)
+                        chain = (pdfs[idx])[np.arange(n_in_bin),rand_idx]
 
-                    # estimate mean + scatter
-                    out[zlabel][sfrlabel]['q50_stack'] += [np.median(fmir_values[idx])]
-                    out[zlabel][sfrlabel]['q84_stack'] += [np.percentile(fmir_values[idx],[84])[0]]
-                    out[zlabel][sfrlabel]['q16_stack'] += [np.percentile(fmir_values[idx],[16])[0]]
+                        fmir_perc += [(chain > 0.1).sum() / float(n_in_bin)]
 
-                # now estimate typical measurement error
-                out[zlabel][sfrlabel]['median_logwidth'] += [np.median(fmir_logwidths[idx])]
+                        print n
+                    mid, up, down = np.percentile(fmir_perc,[50,84,16])
+                    out[zlabel]['q50_stack'] += [mid]
+                    out[zlabel]['q84_stack'] += [up]
+                    out[zlabel]['q16_stack'] += [down]
+            else:
+
+                # estimate mean + scatter
+                out[zlabel]['q50_stack'] += [np.median(fmir[idx])]
+                out[zlabel]['q84_stack'] += [np.percentile(fmir[idx],[84])[0]]
+                out[zlabel]['q16_stack'] += [np.percentile(fmir[idx],[16])[0]]
+
+            # now estimate typical measurement error
+            out[zlabel]['median_logwidth'] += [np.median(logwidths[idx])]
 
     return out
 
@@ -238,8 +221,7 @@ def agn_plots(plot,outname,opts):
     """
 
     # plot information
-    fig, axes = plt.subplots(2, 2, figsize = (5,5))
-    axes = np.ravel(axes)
+    fig, ax = plt.subplots(1, 1, figsize = (4,3.5))
     mbins = (opts['massbins'][1:] + opts['massbins'][:-1])/2.
 
     # labels (yeah sorry about this logic, whoever happens to read this)
@@ -258,52 +240,35 @@ def agn_plots(plot,outname,opts):
         ylabel = 'median '+ylabel
 
     for i, zlabel in enumerate(opts['zbin_labels']):
-        print zlabel
-        for j, sfrlabel in enumerate(opts['sfr_labels']):
-            print sfrlabel
+        ymeasure = np.array(plot[zlabel]['q50_stack'])
+        #if opts['one_sigma']:
+        #    yerror = None
+        #else:
+        yerror = asym_errors(ymeasure, np.array(plot[zlabel]['q84_stack']), np.array(plot[zlabel]['q16_stack']))
+        ax.errorbar(mbins+(i-1)*opts['xshift'],ymeasure,color=opts['colors'][i],yerr=yerror,
+                        label=zlabel,fmt='o',ms=5,linestyle='-',lw=1.5,alpha=0.9,elinewidth=1.5)
 
-            ymeasure = np.array(plot[zlabel][sfrlabel]['q50_stack'])
-            if opts['one_sigma']:
-                yerror = None
-            else:
-                yerror = asym_errors(ymeasure, np.array(plot[zlabel][sfrlabel]['q84_stack']), np.array(plot[zlabel][sfrlabel]['q16_stack']))
-            axes[i].errorbar(mbins+(j-1)*opts['xshift'],ymeasure,color=opts['sfr_colors'][j],yerr=yerror,
-                            label=opts['sfr_labels'][j],fmt='o',ms=3,linestyle='-')
+        if yerror is not None:            
+            distr_scatter = (np.log10(plot[zlabel]['q84_stack']) - np.log10(plot[zlabel]['q16_stack']))/2.
+            typical_err = np.array(plot[zlabel]['median_logwidth'])
+            error_ratio = typical_err/distr_scatter
+            for k, m in enumerate(mbins): print '\t M=' + "{0:.2f}".format(m) + '  ' + "{0:.2f}".format(error_ratio[k])
 
-            if yerror is not None:            
-                distr_scatter = (np.log10(plot[zlabel][sfrlabel]['q84_stack']) - np.log10(plot[zlabel][sfrlabel]['q16_stack']))/2.
-                typical_err = np.array(plot[zlabel][sfrlabel]['median_logwidth'])
-                error_ratio = typical_err/distr_scatter
-                for k, m in enumerate(mbins): print '\t M=' + "{0:.2f}".format(m) + '  ' + "{0:.2f}".format(error_ratio[k])
+    # scale
+    #ax.set_yscale('log',nonposy='clip',subsy=([3]))
+    ax.yaxis.set_minor_formatter(FormatStrFormatter('%2.4g'))
+    ax.yaxis.set_major_formatter(FormatStrFormatter('%2.4g'))
 
-        # scale
-        #axes[i].set_yscale('log',nonposy='clip',subsy=([3]))
-        axes[i].yaxis.set_minor_formatter(FormatStrFormatter('%2.4g'))
-        axes[i].yaxis.set_major_formatter(FormatStrFormatter('%2.4g'))
+    # labels
+    ax.set_xlabel('log(M/M$_{\odot}$)')
+    ax.set_ylabel(ylabel)
 
-        # labels
-        if i > 1:
-            axes[i].set_xlabel('log(M/M$_{\odot}$)')
-        else:
-            for tl in axes[i].get_xticklabels():tl.set_visible(False)
-            plt.setp(axes[i].get_xminorticklabels(), visible=False)
-        if (i == 2) or (i == 0):
-            axes[i].set_ylabel(ylabel)
-        else:
-            for tl in axes[i].get_yticklabels():tl.set_visible(False)
-            plt.setp(axes[i].get_yminorticklabels(), visible=False)
+    ax.set_xlim(opts['xlim'])
+    ax.set_ylim(opts['ylim'])
 
-        # text
-        axes[i].text(0.96,0.92,zlabel,transform=axes[i].transAxes,ha='right')
-
-    for a in axes:
-        a.set_xlim(opts['xlim'])
-        a.set_ylim(opts['ylim'])
-
-    axes[0].legend(loc=2, prop={'size':8},
+    ax.legend(loc=2, prop={'size':8},
                    scatterpoints=1,fancybox=True)
-    plt.tight_layout(h_pad=-0.1,w_pad=-0.1)
-    fig.subplots_adjust(wspace=0.0,hspace=0.0)
+    plt.tight_layout()
     plt.savefig(outname,dpi=dpi)
     plt.close()
 

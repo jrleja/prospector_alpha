@@ -151,8 +151,11 @@ def do_all(runname='td_huge', outfolder=None,**opts):
     plot_rankorder_correlations(data, outfolder+'deltasfr_spearman.png')
 
 def plot_uvir_comparison(data, outfolder):
+    """ Prospector internal UVIR SFR versus Kate's UVIR SFR
+    calculated from observed MIPS magnitude and true LUV
+    """
 
-    fig, ax = plt.subplots(1, 1, figsize = (4.5,4.5)) # Prospector UVIR SFR versus Kate's UVIR SFR
+    fig, ax = plt.subplots(1, 1, figsize = (4.5,4.5))
 
     #### Plot Prospector UV+IR SFR versus the observed UV+IR SFR
     good = data['sfr_uvir_obs'] > 0
@@ -164,6 +167,7 @@ def plot_uvir_comparison(data, outfolder):
     ax.plot([min, max], [min, max], '--', color='0.4',zorder=-1)
     ax.axis([min,max,min,max])
 
+    # labels and scales
     ax.set_xlabel('SFR$_{\mathrm{UV+IR,classic}}$')
     ax.set_ylabel('SFR$_{\mathrm{UV+IR,Prospector}}$')
 
@@ -176,9 +180,14 @@ def plot_uvir_comparison(data, outfolder):
     ax.yaxis.set_minor_formatter(FormatStrFormatter('%2.4g'))
     ax.yaxis.set_major_formatter(FormatStrFormatter('%2.4g'))
 
+    # offset and scatter
+    offset,scatter = prosp_dutils.offset_and_scatter(np.log10(xdat),np.log10(ydat),biweight=True)
+    ax.text(0.01,0.94, 'biweight scatter='+"{:.2f}".format(scatter) +' dex',transform=ax.transAxes)
+    ax.text(0.01,0.88, 'offset='+"{:.2f}".format(offset) +' dex',transform=ax.transAxes)
+
     # save and exit
-    plt.savefig(outfolder+'prosp_uvir_to_obs_uvir.png',dpi=dpi)
     plt.tight_layout()
+    plt.savefig(outfolder+'prosp_uvir_to_obs_uvir.png',dpi=dpi)
     plt.close()
 
 def plot_heating_sources(data, outfolder, color_by_fagn=False, color_by_logzsol=True, old_stars_only=False):
@@ -258,12 +267,11 @@ def plot_rankorder_correlations(data, outname):
 
     # define variables of interest
     xvars = [data['old_star_heating_fraction']['q50'], data['agn_heating_fraction']['q50'],
-             data['logzsol']['q50'],np.log10(data['fagn']['q50']),np.log10(data['avg_age']['q50']),
-             ]
+             data['logzsol']['q50']]#, data['dust2']['q50'], data['dust_index']['q50'] ]
     xlabels = [r'(L$_{\mathrm{IR}}$+L$_{\mathrm{UV}}$)$_{\mathrm{old\/stars}}$/(L$_{\mathrm{IR}}$+L$_{\mathrm{UV}}$)$_{\mathrm{total}}$',
                r'(L$_{\mathrm{IR}}$+L$_{\mathrm{UV}}$)$_{\mathrm{AGN}}$/(L$_{\mathrm{IR}}$+L$_{\mathrm{UV}}$)$_{\mathrm{total}}$',
-               r'log(Z/Z$_{\odot}$)']
-    xlim = [(-0.02,1.02),(-0.02,1.02),(-2,0.2)]
+               r'log(Z/Z$_{\odot}$)']#, 'dust2', 'dustindex']
+    xlim = [(-0.02,1.02),(-0.02,1.02),(-2,0.2)]#,(0,3.1),(-2.3,0.5)]
     yvar = np.log10(data['sfr_prosp']['q50'] / data['sfr_uvir_obs'])
     ylim = (-3.0, 3.0)
     idx = data['sfr_uvir_obs'] > 0
