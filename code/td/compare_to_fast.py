@@ -12,6 +12,7 @@ from stack_td_sfh import sfr_ms
 import td_huge_params as pfile
 from astropy.io import ascii
 from astropy.table import Table
+from matplotlib.ticker import MaxNLocator
 
 plt.ioff()
 
@@ -349,10 +350,6 @@ def do_all(runname='td_massive', runname_fast='fast_mimic',outfolder=None,**opts
     if len(data['uvir_sfr']) > 4000:
         popts = {'fmt':'o', 'capthick':.05,'elinewidth':.05,'alpha':0.2,'color':'0.3','ms':0.5, 'errorevery': 5000}
 
-    uvir_comparison(data,outfolder+'ssfr_uvir_comparison', popts, filename=outfolder+'data/ssfrcomp.h5', ssfr=True)
-    deltam_with_redshift(data['fast'], data['prosp'], data['fast']['z'], outfolder+'deltam_vs_z.png', filename=outfolder+'data/masscomp.h5')
-    mass_met_age_z(data, outfolder,outtable, popts)
-
     # star-forming sequence.
     idx = (data['uvir_sfr'] > 0) & (data['fast']['uvj_prosp'] < 3) # to make it look like Kate's selection
     zred = data['fast']['z']
@@ -364,16 +361,21 @@ def do_all(runname='td_massive', runname_fast='fast_mimic',outfolder=None,**opts
                           xlabel='[FAST]', ylabel='[UV+IR]')
 
     star_forming_sequence(prosp_sfr[idx], fast_mass[idx], zred[idx],
-                          outfolder+'star_forming_sequence_avg_allgals_prospector.png',popts,
-                          xlabel='[FAST]', ylabel='[Prospector]',outfile=outfolder+'data/sfrcomp.h5',
-                          correct_prosp=uvir_sfr[idx],correct_prosp_mass=prosp_mass[idx])
+                          outfolder+'star_forming_sequence_prospector.png',popts,
+                          xlabel='[FAST]', ylabel='[Prospector]')
 
     star_forming_sequence(prosp_sfr, fast_mass, zred,
-                          outfolder+'star_forming_sequence_prospector.png',popts,avg=True,
-                          xlabel='[FAST]', ylabel='[Prospector]',outfile=outfolder+'data/sfrcomp_avg.h5',
-                          correct_prosp=uvir_sfr,correct_prosp_mass=prosp_mass)
+                          outfolder+'star_forming_sequence_allgals_prospector.png',popts,
+                          xlabel='[FAST]', ylabel='[Prospector]',outfile=outfolder+'data/sfrcomp.h5')
 
-    print 1/0
+    star_forming_sequence(np.log10(data['prosp']['model_uvir_sfr']['q50']), fast_mass, zred,
+                          outfolder+'star_forming_sequence_uvir_allgals_prospector.png',popts,
+                          xlabel='[FAST]', ylabel='[UV+IR,model]',outfile=outfolder+'data/sfrcomp_uvir.h5')
+
+    uvir_comparison(data,outfolder+'ssfr_uvir_comparison', popts, filename=outfolder+'data/ssfrcomp.h5', ssfr=True)
+    deltam_with_redshift(data['fast'], data['prosp'], data['fast']['z'], outfolder+'deltam_vs_z.png', filename=outfolder+'data/masscomp.h5')
+    mass_met_age_z(data, outfolder,outtable, popts)
+
     # if we have FAST-mimic runs, do a thorough comparison
     # else just do Prospector-FAST
     fast_comparison(data['fast'],data['prosp'],data['labels'],data['pnames'],
@@ -826,22 +828,31 @@ def mass_met_age_z(data,outfolder,outtable,popts):
         plt.close()
 
 def star_forming_sequence(sfr,mass,zred,outname,popts,xlabel=None,ylabel=None,outfile=None,priors=False,
-                          correct_prosp=None,correct_prosp_mass=None, ssfr_min = -np.inf, avg=False):
-    """ Plot star-forming sequence for whatever SFR + mass combination is input
-    instead, use a sSFR cut
+                          plt_whit=False):
+    """ Plot <SFR(M)> for input mass, SFR
     """
 
-    # Figure geometry and options
-    fig, ax = plt.subplots(2,2,figsize=(6,6))
+    # Figure geometry
+    fig, ax = plt.subplots(2, 2, figsize = (10.35,6))
+    fig.subplots_adjust(right=0.985,left=0.5,hspace=0.0,wspace=0.0)
+    bigax = fig.add_axes([0.09, 0.25, 0.31, 0.5])
     ax = np.ravel(ax)
-    medopts = {'marker':' ','alpha':0.85,'color':'red','zorder':5,'lw':1.5}
+
+    # colors and limits
+    medopts = {'marker':' ','alpha':0.85,'zorder':5,'lw':3}
     corrected_opts = {'marker':' ','alpha':0.85,'color':'orange','zorder':5,'lw':1.5}
+    fs, lw, ms = 12, 3, 5.5
     xlim = (8.5, 11.5)
-    ylim = (-2,3.3)
+    ylim = (0.01,900)
+    xtitle = r'log(M/M$_{\odot}$) ' + xlabel
+    ytitle = r'SFR/M$_{\odot}$ yr$^{-1}$ ' + ylabel
 
     # mass and redshift bins
-    zbins = np.linspace(0.6,2.4,5)
+    nbins = 4
+    zbins = np.linspace(0.5,2.5,nbins+1)
+    zlabels = ["{0:.1f}".format(zbins[i])+'<z<'+"{0:.1f}".format(zbins[i+1]) for i in range(nbins)]
     mbins = np.linspace(xlim[0],xlim[1],12)
+    sfr = 10**sfr
 
     # Prospector prior
     ssfr_max = -8 # from Prospector physics
@@ -853,88 +864,86 @@ def star_forming_sequence(sfr,mass,zred,outname,popts,xlabel=None,ylabel=None,ou
     whitopts = {'color':'blue','alpha':0.85,'lw':1.5,'zorder':5}
 
     # let's go!
-    mass_save, sfr_save, sfr_corrected_save, sfr_ratio_save = [], [], [], [] 
+    mass_save, sfr_save, sfr_ratio_save = [], [], [], [] 
     for i in range(len(zbins)-1):
 
         # the data
         in_bin = (zred > zbins[i]) & \
                  (zred <= zbins[i+1]) & \
-                 (np.isfinite(sfr)) & \
-                 (np.log10(10**sfr/10**mass) > ssfr_min)
+                 (np.isfinite(sfr))
         ax[i].errorbar(mass[in_bin], sfr[in_bin], **popts)
 
-        # calculate the running median
-        x, y, bincount = prosp_dutils.running_median(mass[in_bin], 10**sfr[in_bin],
-                                                     bins=mbins,avg=avg,return_bincount=True)
-        ax[i].errorbar(x, np.log10(y), **medopts)
+        # calculate and plot running average
+        x, y = prosp_dutils.running_median(mass[in_bin], sfr[in_bin], bins=mbins,avg=True)
+        ax[i].errorbar(x, y, color=cmap[i],**medopts)
+        bigax.errorbar(x, y, color=cmap[i], label=zlabels[i], ms=ms, **medopts)
+
+        # scales
+        subsy, tickfs = ([]), 0.0
+        if (i % 2 == 0):
+            subsy, tickfs = ([1]), fs
+        ax[i].set_yscale('log', subsy=subsy)
+        ax[i].yaxis.set_minor_formatter(FormatStrFormatter('%2.4g'))
+        ax[i].yaxis.set_major_formatter(FormatStrFormatter('%2.4g'))
+        for tl in ax[i].get_yticklabels():tl.set_visible(False)
+        ax[i].tick_params('both', pad=3.5, labelsize=tickfs,size=3.5, width=1.0, which='both')
+
+        # labels
+        if i > 1:
+            ax[i].set_xlabel(xtitle,fontsize=fs)
+            bigax.set_xlabel(xtitle,fontsize=fs*1.3)
+            for tl in ax[i].get_xticklabels():tl.set_fontsize(fs)
+            ax[i].xaxis.set_major_locator(MaxNLocator(3))
+        else:
+            for tl in ax[i].get_xticklabels():tl.set_visible(False)
+        if (i % 2 == 0):
+            ax[i].set_ylabel(ytitle,fontsize=fs)
+            bigax.set_ylabel(ytitle,fontsize=fs*1.3)
+            for tl in ax[i].get_yticklabels():tl.set_fontsize(fs)
+        else:
+            for tl in ax[i].get_yticklabels():tl.set_visible(False)
+
+        # the old model
+        if plt_whit:
+            sfr_whit = 10**sfr_ms(zwhit[i],logm_whit)
+            ax[i].plot(logm_whit, sfr_whit, **whitopts)
+
+        # zlabel
+        ax[i].text(0.98, 0.05, zlabels[i],transform=ax[i].transAxes,zorder=1,ha='right')
+
+        # show prior?
+        if priors:
+            ax[i].text(xlim[0]+0.3,ssfr_max+xlim[0]+1.5,'Prospector prior',rotation=30,fontsize=8)
+            ax[i].plot([xlim[0],xlim[1]],[ssfr_max+xlim[0],ssfr_max+xlim[1]],**prior_opts)
 
         # save information, including ratio if we have UV+IR sfrs
         mass_save += x.tolist()
         sfr_save += [y.tolist()]
 
-        # Do we try to correct for Prospector sSFR ceiling?
-        # Also here we store the RATIO of SFRs
-        if correct_prosp is not None:
+    # limits
+    for a in ax.tolist()+[bigax]:
+        a.set_xlim(xlim)
+        a.set_ylim(ylim)
+    
+    # change bigax to logscale
+    bigax.set_yscale('log', subsy=([1,4]))
+    bigax.yaxis.set_minor_formatter(FormatStrFormatter('%2.4g'))
+    bigax.yaxis.set_major_formatter(FormatStrFormatter('%2.4g'))
+    for tl in bigax.get_yticklabels():tl.set_visible(False)
+    bigax.tick_params('both', pad=3.5, labelsize=fs*1.3,size=3.5, width=1.0, which='both')
 
-            # store the ratio
-            xr, yr, bincount = prosp_dutils.running_median(mass[in_bin], 10**correct_prosp[in_bin],
-                                               bins=mbins,avg=avg,return_bincount=True)
-            sfr_ratio_save += [(y/yr).tolist()]
+    # add legend
+    bigax.legend(loc=4, prop={'size':fs*0.9},
+                   scatterpoints=1,fancybox=True,ncol=2)
 
-            # make sure we're using Prospector mass to calculate sSFR
-            if correct_prosp_mass is None:
-                pmass = mass[in_bin]
-            else:
-                pmass = correct_prosp_mass[in_bin]
+    if plt_whit:
+        ax[0].text(0.02,0.87,'Whitaker+14',color=whitopts['color'],transform=ax[0].transAxes)
 
-            # replace anything with sSFR within 0.3 dex of the prior edge
-            # with UV+IR SFR
-            idx_atlimit = (sfr[in_bin] - pmass) > ssfr_max-0.3
-            sfr_new, sfr_corr = sfr[in_bin], correct_prosp[in_bin]
-            sfr_new[idx_atlimit] = sfr_corr[idx_atlimit]
-
-            # recalculate running median for sSFR
-            x, y, bincount = prosp_dutils.running_median(mass[in_bin], 10**sfr_new,bins=mbins,avg=avg,return_bincount=True)
-            ax[i].errorbar(x, np.log10(y), **corrected_opts)
-            sfr_corrected_save += [y.tolist()]
-
-        # the old model
-        sfr_whit = sfr_ms(zwhit[i],logm_whit)
-        ax[i].plot(logm_whit, sfr_whit, **whitopts)
-
-        # the labels
-        ax[i].set_xlabel(r'log(M/M$_{\odot}$) ' + xlabel)
-        ax[i].set_ylabel(r'log(SFR/M$_{\odot}$ yr$^{-1}$) ' + ylabel)
-        ax[i].text(0.02, 0.93, "{0:.1f}".format(np.round(zbins[i],1))+'<z<'+"{0:.1f}".format(zbins[i+1]),transform=ax[i].transAxes)
-
-        # the ranges
-        ax[i].set_xlim(xlim)
-        ax[i].set_ylim(ylim)
-
-        # the guiderails
-        if np.isfinite(ssfr_min):
-            ax[i].plot([xlim[0],xlim[1]],[ssfr_min+xlim[0],ssfr_min+xlim[1]],**prior_opts)
-            ax[i].text(9.5,ssfr_min+9.6,'sSFR cut',rotation=30,fontsize=8)
-        if priors:
-            ax[i].text(xlim[0]+0.3,ssfr_max+xlim[0]+1.5,'Prospector prior',rotation=30,fontsize=8)
-            ax[i].plot([xlim[0],xlim[1]],[ssfr_max+xlim[0],ssfr_max+xlim[1]],**prior_opts)
-
-    ax[0].text(0.02,0.87,'Whitaker+14',color=whitopts['color'],transform=ax[0].transAxes)
-    # flip the geometry
-    if correct_prosp is not None:
-        ax[0].text(0.02,0.81,'<data>(corr)',color=corrected_opts['color'],transform=ax[0].transAxes)
-        ax[0].text(0.02,0.75,'<data>',color=medopts['color'],transform=ax[0].transAxes)
-    else:
-        ax[0].text(0.02,0.81,'<data>',color=medopts['color'],transform=ax[0].transAxes)
-
-    # save
+    # save data
     if outfile is not None:
-        out = {'mass':x,'sfr':np.array(sfr_save).T,'sfr_corr':None,'z':zwhit, 'sfr_ratio': np.array(sfr_ratio_save).T}
-        if correct_prosp is not None:
-            out['sfr_corr'] = np.array(sfr_corrected_save).T
+        out = {'mass':x,'sfr':np.array(sfr_save).T,'z':zwhit, 'sfr_ratio': np.array(sfr_ratio_save).T}
         hickle.dump(out,open(outfile, "w"))
 
-    plt.tight_layout()
     plt.savefig(outname,dpi=150)
     plt.close()
 

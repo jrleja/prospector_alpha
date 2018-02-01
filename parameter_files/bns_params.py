@@ -20,27 +20,20 @@ jansky_mks = 1e-26
 run_params = {'verbose':True,
               'debug': False,
               'outfile': os.getenv('APPS')+'/prospector_alpha/results/edo/bns',
-              'nofork': True,
-              # Optimizer params
-              'ftol':0.5e-5, 
-              'maxfev':5000,
-              # MCMC params
-              'nwalkers':620,
-              'nburn':[150,200,200], 
-              'niter': 10000,
-              'interval': 0.2,
-              # Convergence parameters
-              'convergence_check_interval': 50,
-              'convergence_chunks': 325,
-              'convergence_kl_threshold': 0.016,
-              'convergence_stable_points_criteria': 8, 
-              'convergence_nhist': 50,
+              # dynesty params
+              'nested_bound': 'multi', # bounding method
+              'nested_sample': 'rwalk', # sampling method
+              'nested_walks': 50, # MC walks
+              'nested_nlive_batch': 200, # size of live point "batches"
+              'nested_nlive_init': 200, # number of initial live points
+              'nested_weight_kwargs': {'pfrac': 1.0}, # weight posterior over evidence by 100%
+              'nested_dlogz_init': 0.01,
               # Model info
               'zcontinuous': 2,
               'compute_vega_mags': False,
               'initial_disp':0.1,
               'interp_type': 'logarithmic',
-              'agelims': [0.0,8.0,8.5,9.0,9.5,9.75,9.95,10.04,10.1],
+              'agelims': [0.0,8.0,8.5,9.0,9.5,9.75,10.0,10.1],
               # Data info
               'objname':'galaxy',
               }
@@ -49,25 +42,6 @@ run_params['outfile'] = run_params['outfile']+'_'+run_params['objname']
 ############
 # OBS
 #############
-ftrans = {
-          'GALEX FUV': 'galex_FUV', 
-          'GALEX NUV': 'galex_NUV', 
-          'PS1 g': 'PS1.g', 
-          'PS1 r': 'PS1.r', 
-          'PS1 i': 'PS1.i', 
-          'PS1 z': 'PS1.z', 
-          'PS1 y': 'PS1.y', 
-          '2MASS J': 'twomass_J', 
-          '2MASS H': 'twomass_H', 
-          '2MASS K': 'twomass_Ks', 
-          'WISE W1': 'wise_w1', 
-          'WISE W2': 'wise_w2',
-          'WISE W3': 'wise_w3', 
-          'WISE W4': 'wise_w4'
-         }
-
-
-
 def load_obs(**extras):
     """
     let's do this
@@ -75,42 +49,37 @@ def load_obs(**extras):
 
     ### from email
     dat = {
-           'GALEX FUV': (18.86, np.nan), # limit
-           'GALEX NUV': (17.82, 0.09),
-           'PS1 g': (12.80, 0.02),
-           'PS1 r': (12.16, 0.01),
-           'PS1 i': (11.81, 0.01),
-           'PS1 z': (11.57, 0.01),
-           'PS1 y': (11.36, 0.02),
-           '2MASS J': (10.98, 0.02),
-           '2MASS H': (10.82, 0.02),
-           '2MASS K': (11.02, 0.02),
-           'WISE W1': (11.92, 0.01),
-           'WISE W2': (12.59, 0.01),
-           'WISE W3': (13.70, 0.04),
-           'WISE W4': (13.86, 0.19)
+           'sdss_u0': (22.74,0.67),
+           'sdss_g0': (20.99, 0.04),
+           'sdss_r0': (20.16,0.04),
+           'sdss_i0': (19.84,0.04),
+           'sdss_z0': (19.54,0.11),
+           'PS1.g': (21.041, 0.109),
+           'PS1.r': (20.338, 0.037),
+           'PS1.i': (19.974, 0.027),
+           'PS1.z': (19.709, 0.059),
+           'PS1.y': (19.614, 0.136),
+           'wise_w4': (20.118, 0.165)
           }
 
     ### load fluxes, convert from AB magnitudes to maggies
-    flux = 10**((-2./5)*np.array([dat[key][0] for key in dat.keys()]))
+    filters = dat.keys()
+    flux = 10**((-2./5)*np.array([dat[key][0] for key in filters]))
 
     # convert uncertainty to maggies
-    unc = np.array([dat[key][1] for key in dat.keys()])*flux/1.086
+    unc = np.array([dat[key][1] for key in filters])*flux/1.086
     
     # do 3sigma floor properly
     idx = np.isnan(unc)
     unc[idx] = flux[idx]/3.
     flux[idx] = 0.0
 
-    # create filter names
-    fnames = [ftrans[f] for f in dat.keys()]
-
     ### implement 5% error floor
     unc = np.clip(unc, flux*0.05, np.inf)
 
     ### build output dictionary
     obs = {}
-    obs['filters'] = observate.load_filters(fnames)
+    obs['filters'] = observate.load_filters(filters)
     obs['wave_effective'] = np.array([filt.wave_effective for filt in obs['filters']])
     obs['phot_mask'] = np.ones_like(flux,dtype=bool)
     obs['maggies'] = flux
@@ -120,9 +89,7 @@ def load_obs(**extras):
 
     '''
     import matplotlib.pyplot as plt
-    uvot = np.array(['UVOT' in f for f in fnames],dtype=bool)
-    plt.errorbar(obs['wave_effective'][~uvot],obs['maggies'][~uvot],yerr=obs['maggies_unc'][~uvot],fmt='o',ms=5,linestyle=' ',color='black')
-    plt.errorbar(obs['wave_effective'][uvot],obs['maggies'][uvot],yerr=obs['maggies_unc'][uvot],fmt='o',ms=5,linestyle=' ',color='red')
+    plt.errorbar(obs['wave_effective'],obs['maggies'],yerr=obs['maggies_unc'],fmt='o',ms=5,linestyle=' ',color='red')
     plt.xscale('log')
     plt.yscale('log')
     plt.xlabel('log(wavelength)')
@@ -147,10 +114,50 @@ def tie_gas_logz(logzsol=None, **extras):
 def to_dust1(dust1_fraction=None, dust1=None, dust2=None, **extras):
     return dust1_fraction*dust2
 
-def transform_zfraction_to_sfrfraction(sfr_fraction=None, z_fraction=None, **extras):
-    sfr_fraction[0] = 1-z_fraction[0]
-    for i in xrange(1,sfr_fraction.shape[0]): sfr_fraction[i] =  np.prod(z_fraction[:i])*(1-z_fraction[i])
+def zfrac_to_sfrac(z_fraction=None, **extras):
+    """This transforms from latent, independent `z` variables to sfr
+    fractions. The transformation is such that sfr fractions are drawn from a
+    Dirichlet prior.  See Betancourt et al. 2010
+    """
+    sfr_fraction = np.zeros(len(z_fraction) + 1)
+    sfr_fraction[0] = 1.0 - z_fraction[0]
+    for i in range(1, len(z_fraction)):
+        sfr_fraction[i] = np.prod(z_fraction[:i]) * (1.0 - z_fraction[i])
+    sfr_fraction[-1] = 1 - np.sum(sfr_fraction[:-1])
+
     return sfr_fraction
+
+def zfrac_to_masses(logmass=None, z_fraction=None, agebins=None, **extras):
+    """This transforms from latent, independent `z` variables to sfr fractions
+    and then to bin mass fractions. The transformation is such that sfr
+    fractions are drawn from a Dirichlet prior.  See Betancourt et al. 2010
+    :returns masses:
+        The stellar mass formed in each age bin.
+    """
+    # sfr fractions (e.g. Leja 2017)
+    sfr_fraction = zfrac_to_sfrac(z_fraction)
+    # convert to mass fractions
+    time_per_bin = np.diff(10**agebins, axis=-1)[:,0]
+    sfr_fraction *= np.array(time_per_bin)
+    sfr_fraction /= sfr_fraction.sum()
+    masses = 10**logmass * sfr_fraction
+
+    return masses
+
+def masses_to_zfrac(mass=None, agebins=None, **extras):
+    """The inverse of zfrac_to_masses, for setting mock parameters based on
+    real bin masses.
+    """
+    total_mass = mass.sum()
+    time_per_bin = np.diff(10**agebins, axis=-1)[:,0]
+    sfr_fraction = mass / time_per_bin
+    sfr_fraction /= sfr_fraction.sum()
+    z_fraction = np.zeros(len(sfr_fraction) - 1)
+    z_fraction[0] = 1 - sfr_fraction[0]
+    for i in range(1, len(z_fraction)):
+        z_fraction[i] = 1.0 - sfr_fraction[i] / np.prod(z_fraction[:i])
+
+    return total_mass, z_fraction
 
 #############
 # MODEL_PARAMS
@@ -161,7 +168,7 @@ model_params = []
 ###### BASIC PARAMETERS ##########
 model_params.append({'name': 'zred', 'N': 1,
                         'isfree': False,
-                        'init': 0.00973,
+                        'init': 0.109,
                         'units': '',
                         'prior': priors.TopHat(mini=0.0, maxi=4.0)})
 
@@ -225,13 +232,6 @@ model_params.append({'name': 'agebins', 'N': 1,
                         'init': [],
                         'units': 'log(yr)',
                         'prior': None})
-
-model_params.append({'name': 'sfr_fraction', 'N': 1,
-                        'isfree': False,
-                        'init': [],
-                        'depends_on': transform_zfraction_to_sfrfraction,
-                        'units': '',
-                        'prior': priors.TopHat(mini=0.0, maxi=1.0)})
 
 model_params.append({'name': 'z_fraction', 'N': 1,
                         'isfree': True,
@@ -308,7 +308,7 @@ model_params.append({'name': 'add_dust_emission', 'N': 1,
                         'prior_args': None})
 
 model_params.append({'name': 'duste_gamma', 'N': 1,
-                        'isfree': True,
+                        'isfree': False,
                         'init': 0.01,
                         'init_disp': 0.4,
                         'disp_floor': 0.3,
@@ -316,7 +316,7 @@ model_params.append({'name': 'duste_gamma', 'N': 1,
                         'prior': priors.TopHat(mini=0.0, maxi=1.0)})
 
 model_params.append({'name': 'duste_umin', 'N': 1,
-                        'isfree': True,
+                        'isfree': False,
                         'init': 1.0,
                         'init_disp': 10.0,
                         'disp_floor': 5.0,
@@ -324,8 +324,8 @@ model_params.append({'name': 'duste_umin', 'N': 1,
                         'prior': priors.TopHat(mini=0.1, maxi=25.0)})
 
 model_params.append({'name': 'duste_qpah', 'N': 1,
-                        'isfree': True,
-                        'init': 3.0,
+                        'isfree': False,
+                        'init': 2.0,
                         'init_disp': 3.0,
                         'disp_floor': 3.0,
                         'units': 'percent',
@@ -374,15 +374,15 @@ model_params.append({'name': 'add_agn_dust', 'N': 1,
                         'prior_args': None})
 
 model_params.append({'name': 'fagn', 'N': 1,
-                        'isfree': True,
-                        'init': 0.05,
+                        'isfree': False,
+                        'init': 0.00,
                         'init_disp': 0.05,
                         'disp_floor': 0.01,
                         'units': '',
                         'prior': priors.LogUniform(mini=1e-5, maxi=3.0)})
 
 model_params.append({'name': 'agn_tau', 'N': 1,
-                        'isfree': True,
+                        'isfree': False,
                         'init': 10.0,
                         'init_disp': 10,
                         'disp_floor': 2,
@@ -409,14 +409,14 @@ model_params.append({'name': 'mass_units', 'N': 1,
 #### resort list of parameters 
 #### so that major ones are fit first
 parnames = [m['name'] for m in model_params]
-fit_order = ['logmass','z_fraction', 'dust2', 'logzsol', 'dust_index', 'dust1_fraction', 'duste_qpah', 'duste_gamma', 'duste_umin']
+fit_order = ['logmass','z_fraction', 'dust2', 'logzsol', 'dust_index', 'dust1_fraction']
 tparams = [model_params[parnames.index(i)] for i in fit_order]
 for param in model_params: 
     if param['name'] not in fit_order:
         tparams.append(param)
 model_params = tparams
         
-class FracSFH(FastStepBasis):
+class NebSFH(FastStepBasis):
     
     @property
     def emline_wavelengths(self):
@@ -443,27 +443,6 @@ class FracSFH(FastStepBasis):
             else:
                 flux[i] = 0.0
         return flux
-
-    def get_galaxy_spectrum(self, **params):
-        self.update(**params)
-
-        #### here's the custom fractional stuff
-        fractions = np.array(self.params['sfr_fraction'])
-        bin_fractions = np.append(fractions,(1-np.sum(fractions)))
-        time_per_bin = []
-        for (t1, t2) in self.params['agebins']: time_per_bin.append(10**t2-10**t1)
-        bin_fractions *= np.array(time_per_bin)
-        bin_fractions /= bin_fractions.sum()
-        
-        mass = bin_fractions*self.params['mass']
-        mtot = self.params['mass'].sum()
-
-        time, sfr, tmax = self.convert_sfh(self.params['agebins'], mass)
-        self.ssp.params["sfh"] = 3 #Hack to avoid rewriting the superclass
-        self.ssp.set_tabular_sfh(time, sfr)
-        wave, spec = self.ssp.get_spectrum(tage=tmax, peraa=False)
-
-        return wave, spec / mtot, self.ssp.stellar_mass / mtot
 
     def get_spectrum(self, outwave=None, filters=None, peraa=False, **params):
         """Get a spectrum and SED for the given params.
@@ -547,10 +526,10 @@ class FracSFH(FastStepBasis):
 
 def load_sps(**extras):
 
-    sps = FracSFH(**extras)
+    sps = NebSFH(**extras)
     return sps
 
-def load_model(agelims=[], **extras):
+def load_model(agelims=[],alpha_sfh=0.2, **extras):
 
     #### CALCULATE TUNIV #####
     n = [p['name'] for p in model_params]
@@ -567,17 +546,16 @@ def load_model(agelims=[], **extras):
     model_params[n.index('agebins')]['init'] = agebins.T
 
     #### FRACTIONAL MASS INITIALIZATION
-    # N-1 bins, last is set by x = 1 - np.sum(sfr_fraction)
     model_params[n.index('z_fraction')]['N'] = ncomp-1
-    tilde_alpha = np.array([ncomp-i for i in xrange(1,ncomp)])
-    model_params[n.index('z_fraction')]['prior'] = priors.Beta(alpha=tilde_alpha, beta=np.ones_like(tilde_alpha),mini=0.0,maxi=1.0)
-    model_params[n.index('z_fraction')]['init'] =  model_params[n.index('z_fraction')]['prior'].sample()
-    model_params[n.index('z_fraction')]['init_disp'] = 0.02
+    if type(alpha_sfh) != type(np.array([])):
+        alpha = np.repeat(alpha_sfh,ncomp-1)
+    else:
+        alpha = alpha_sfh
+    tilde_alpha = np.array([alpha[i-1:].sum() for i in xrange(1,ncomp)])
 
-    model_params[n.index('sfr_fraction')]['N'] = ncomp-1
-    model_params[n.index('sfr_fraction')]['prior'] = priors.TopHat(maxi=np.full(ncomp-1,1.0), mini=np.full(ncomp-1,0.0))
-    model_params[n.index('sfr_fraction')]['init'] =  np.zeros(ncomp-1)+1./ncomp
-    model_params[n.index('sfr_fraction')]['init_disp'] = 0.02
+    model_params[n.index('z_fraction')]['prior'] = priors.Beta(alpha=tilde_alpha, beta=alpha,mini=0.0,maxi=1.0)
+    model_params[n.index('z_fraction')]['init'] =  np.array([(i-1)/float(i) for i in range(ncomp,1,-1)])
+    model_params[n.index('z_fraction')]['init_disp'] = 0.02
 
     #### CREATE MODEL
     model = sedmodel.SedModel(model_params)

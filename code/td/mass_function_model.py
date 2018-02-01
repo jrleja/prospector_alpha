@@ -14,12 +14,12 @@ mass_fnc = RectBivariateSpline(mcorr['fast_mass'], mcorr['z'], mcorr['log_mprosp
 dloc = '/Users/joel/code/python/prospector_alpha/plots/td_huge/fast_plots/data/sfrcomp.h5'
 with open(dloc, "r") as f:
     sfrcorr = hickle.load(f)
-sfr_fnc = RectBivariateSpline(sfrcorr['mass'], sfrcorr['z'], sfrcorr['sfr_corr'],kx=1,ky=1)
+sfr_fnc = RectBivariateSpline(sfrcorr['mass'], sfrcorr['z'], sfrcorr['sfr'],kx=1,ky=1)
 
-dloc = '/Users/joel/code/python/prospector_alpha/plots/td_huge/fast_plots/data/sfrcomp_avg.h5'
+dloc = '/Users/joel/code/python/prospector_alpha/plots/td_huge/fast_plots/data/sfrcomp_uvir.h5'
 with open(dloc, "r") as f:
-    sfrcorr_avg = hickle.load(f)
-sfr_fnc_avg = RectBivariateSpline(sfrcorr_avg['mass'], sfrcorr_avg['z'], sfrcorr_avg['sfr_corr'],kx=1,ky=1)
+    sfrcorr_uvir = hickle.load(f)
+sfr_fnc_uvir = RectBivariateSpline(sfrcorr_uvir['mass'], sfrcorr_uvir['z'], sfrcorr_uvir['sfr'],kx=1,ky=1)
 
 # sfr_fnc = RectBivariateSpline(sfrcorr['mass'], sfrcorr['z'], sfrcorr['sfr_corr'],kx=1,ky=1)
 
@@ -132,26 +132,23 @@ def sfrd(z,logm_min=9, logm_max=13, dm=0.01, use_whit12=False,
     if use_whit12:
         sfr = sfr_ms12(z,logm)
     else:
-        sfr = sfr_ms(z,logm)
+        #sfr = sfr_ms(z,logm)
+        sfr = sfr_fnc_uvir(logm,z).squeeze()
 
     if apply_pcorrections:
-        if use_avg:
-            sfr = sfr_fnc_avg(logm,z).squeeze()
-        else:
-            sfr = sfr_fnc(logm,z).squeeze()
+        sfr = sfr_fnc(logm,z).squeeze()
 
     # multiply n(M) by SFR(M) to get SFR / Mpc^-3 / dex
-    if use_avg:
-        starforming_numdens = mf_phi(mf_parameters(z),logm)
-        starforming_function = sfr * starforming_numdens
-    else:
-        starforming_numdens = mf_phi(mf_parameters(z,sf=True),logm)
-        starforming_function = sfr * starforming_numdens
+    numdens = mf_phi(mf_parameters(z),logm)
+    starforming_function = sfr * numdens
+
+    #starforming_numdens = mf_phi(mf_parameters(z,sf=True),logm)
+    #starforming_function = sfr * starforming_numdens
 
     # integrate over stellar mass to get SFRD
     sfrd = simps(starforming_function,dx=dm)
 
-    # what the hell! interpolation!
+    # plots to investigate interolation
     '''
     if (z > 0.95) & (z < 1.05) & (apply_pcorrections):
 
@@ -272,8 +269,8 @@ def plot_sfrd(logm_min=9.0,logm_max=12,dm=0.01,use_whit12=False,
     # plot options
     old_color, new_color = '0.3','#FF3D0D'
     mass_linestyle, sfr_linestyle = '-', '--'
-    ylim = (-1.6,-1)
-    xlim = (0.3, 2.7)
+    ylim = (-1.6,-0.75)
+    xlim = (0., 2.7)
     popts = {
              'linewidth': 3,
              'alpha': 0.9
@@ -281,10 +278,10 @@ def plot_sfrd(logm_min=9.0,logm_max=12,dm=0.01,use_whit12=False,
 
     # Plot1: change in SFRD
     fig, ax = plt.subplots(1,1, figsize=(4.4, 4))
-    ax.plot(zrange, mf_sfrd, mass_linestyle, color=old_color, label='estimated from mass',**popts)
-    ax.plot(zrange, mf_sfrd_prosp, mass_linestyle, color=new_color, label='mass (Prospector)',**popts)
-    ax.plot(zrange, np.log10(sf_sfrd), sfr_linestyle, color=old_color, label='estimated from SFR', **popts)
-    ax.plot(zrange, np.log10(sf_sfrd_prosp), sfr_linestyle, color=new_color, label='SFR (Prospector)', **popts)
+    ax.plot(zrange, mf_sfrd, mass_linestyle, color=old_color, label='FAST mass',**popts)
+    ax.plot(zrange, mf_sfrd_prosp, mass_linestyle, color=new_color, label='Prospector mass',**popts)
+    ax.plot(zrange, np.log10(sf_sfrd), sfr_linestyle, color=old_color, label='UV+IR SFR', **popts)
+    ax.plot(zrange, np.log10(sf_sfrd_prosp), sfr_linestyle, color=new_color, label='Prospector SFR', **popts)
 
     # Madau+15
     zrange_madau = np.arange(xlim[0], xlim[1], dz)
@@ -294,8 +291,8 @@ def plot_sfrd(logm_min=9.0,logm_max=12,dm=0.01,use_whit12=False,
     # labels, legends, and add Madau
     ax.set_xlabel('redshift')
     ax.set_ylabel(r'log(SFRD) [M$_{\odot}$ yr$^{-1}$ Mpc$^{-3}$]')
-    ax.plot(zrange_madau, phi_madau, ':', color='purple', label='Madau+14', zorder=-1,**popts)
-    ax.legend(loc=4, prop={'size':10}, scatterpoints=1,fancybox=True)
+    ax.plot(zrange_madau, phi_madau, ':', color='purple', label='Madau+14\ncompilation', zorder=-1,**popts)
+    ax.legend(loc=2, prop={'size':8.5}, scatterpoints=1,fancybox=True)
 
     # limits
     ax.set_xlim(xlim)
