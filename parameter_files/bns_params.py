@@ -19,7 +19,7 @@ jansky_mks = 1e-26
 
 run_params = {'verbose':True,
               'debug': False,
-              'outfile': os.getenv('APPS')+'/prospector_alpha/results/edo/bns',
+              'outfile': os.getenv('APPS')+'/prospector_alpha/results/edo/bns_galaxy',
               # dynesty params
               'nested_bound': 'multi', # bounding method
               'nested_sample': 'rwalk', # sampling method
@@ -37,7 +37,6 @@ run_params = {'verbose':True,
               # Data info
               'objname':'galaxy',
               }
-run_params['outfile'] = run_params['outfile']+'_'+run_params['objname']
 
 ############
 # OBS
