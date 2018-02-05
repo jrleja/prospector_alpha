@@ -57,8 +57,13 @@ def collate_data(runname, filename=None, regenerate=False, **opts):
     ### fill them up
     out['names'] =  np.arange(1,11).astype(str)
     for i, name in enumerate(out['names']):
-        res, _, mod, eout = load_prospector_data(None,runname='vis',objname=name)
-        out['weights'] += [eout['weights']]
+        
+        try:
+            res, _, mod, eout = load_prospector_data(None,runname='vis',objname=name)
+            out['weights'] += [eout['weights']]
+        except TypeError:
+            print name +' is not available'
+            continue
 
         # grab all theta chains
         for j,key in enumerate(mod.theta_labels()):

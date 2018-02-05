@@ -545,6 +545,7 @@ def load_model(agelims=[],alpha_sfh=0.2, **extras):
     model_params[n.index('agebins')]['init'] = agebins.T
 
     #### FRACTIONAL MASS INITIALIZATION
+    model_params[n.index('mass')]['N'] = ncomp
     model_params[n.index('z_fraction')]['N'] = ncomp-1
     if type(alpha_sfh) != type(np.array([])):
         alpha = np.repeat(alpha_sfh,ncomp-1)
