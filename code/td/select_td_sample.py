@@ -287,11 +287,11 @@ def build_sample_lyc():
           }
 
     # list of candidates
-    # 3dhst_id,F275W_sig,F336W_sig,F435W_sig,F606W_sig,match_dist,muse_id,z,z_conf,z_type
-    lyc_list = '/Users/joel/code/python/prospector_alpha/data/3dhst/lyc/master_cat.csv'
-    lyc_cands = np.genfromtxt(lyc_list,dtype=[('field','S6'),('id',int),('zred',float)])
+    # 3dhst_id, zred
+    lyc_list = [os.getenv('APPS')+'/prospector_alpha/data/td_lyc/' + s for s in ['goodss.txt','goodsn.txt']]
+    lyc_cands = [np.genfromtxt(l,dtype=[('id',int),('zred',float)],delimiter=',') for l in lyc_list]
 
-    for field in fields:
+    for (cand, field) in zip(lyc_cands,fields):
 
         # load data
         print 'loading '+field
@@ -303,8 +303,7 @@ def build_sample_lyc():
         rf = td_io.load_rf_v41(field)
 
         # match to lyc candidates
-        idx = lyc_cands['field'] == field
-        good = (np.in1d(phot['id'],lyc_cands['id'][idx])) & (np.array(phot['use_phot'],dtype=bool))
+        good = (np.in1d(phot['id'],cand['id'])) & (np.array(phot['use_phot'],dtype=bool))
 
         phot = phot[good]
         fast = fast[good]
@@ -326,8 +325,11 @@ def build_sample_lyc():
 
         # replace z_best with MUSE redshifts
         for i, id in enumerate(phot['id']):
-            match = lyc_cands['id'] == id
-            zbest['z_best'][i] = lyc_cands['zred'][match]
+            match = cand['id'] == id
+            try:
+                zbest['z_best'][i] = cand['zred'][match]
+            except:
+                print 1/0
             print zbest['z_best'][i], id
 
         # save UVJ cut in .dat file

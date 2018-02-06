@@ -371,7 +371,7 @@ def do_all(runname='td_massive', runname_fast='fast_mimic',outfolder=None,**opts
     star_forming_sequence(np.log10(data['prosp']['model_uvir_sfr']['q50']), fast_mass, zred,
                           outfolder+'star_forming_sequence_uvir_allgals_prospector.png',popts,
                           xlabel='[FAST]', ylabel='[UV+IR,model]',outfile=outfolder+'data/sfrcomp_uvir.h5')
-
+    print 1/0
     uvir_comparison(data,outfolder+'ssfr_uvir_comparison', popts, filename=outfolder+'data/ssfrcomp.h5', ssfr=True)
     deltam_with_redshift(data['fast'], data['prosp'], data['fast']['z'], outfolder+'deltam_vs_z.png', filename=outfolder+'data/masscomp.h5')
     mass_met_age_z(data, outfolder,outtable, popts)
@@ -828,7 +828,7 @@ def mass_met_age_z(data,outfolder,outtable,popts):
         plt.close()
 
 def star_forming_sequence(sfr,mass,zred,outname,popts,xlabel=None,ylabel=None,outfile=None,priors=False,
-                          plt_whit=False):
+                          plt_whit=True):
     """ Plot <SFR(M)> for input mass, SFR
     """
 
@@ -861,10 +861,10 @@ def star_forming_sequence(sfr,mass,zred,outname,popts,xlabel=None,ylabel=None,ou
     # Whitaker+14 SFR-M relationship
     zwhit = np.array([0.75, 1.25, 1.75, 2.25])
     logm_whit = np.linspace(xlim[0],xlim[1],50)
-    whitopts = {'color':'blue','alpha':0.85,'lw':1.5,'zorder':5}
+    whitopts = {'color':'purple','alpha':0.85,'lw':1.5,'zorder':5,'linestyle':':'}
 
     # let's go!
-    mass_save, sfr_save, sfr_ratio_save = [], [], [], [] 
+    mass_save, sfr_save, sfr_ratio_save = [], [], [] 
     for i in range(len(zbins)-1):
 
         # the data

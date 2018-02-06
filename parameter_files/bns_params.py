@@ -33,7 +33,7 @@ run_params = {'verbose':True,
               'compute_vega_mags': False,
               'initial_disp':0.1,
               'interp_type': 'logarithmic',
-              'agelims': [0.0,8.0,8.5,9.0,9.5,9.75,10.0,10.1],
+              'agelims': [0.0,8.0,8.5,9.0,9.5,9.75,9.95,10.1],
               # Data info
               'objname':'galaxy',
               }
@@ -220,11 +220,10 @@ model_params.append({'name': 'logmass', 'N': 1,
                         'prior': priors.TopHat(mini=5.0, maxi=13.0)})
 
 model_params.append({'name': 'mass', 'N': 1,
-                        'isfree': False,
-                        'init': 1e10,
-                        'depends_on': transform_logmass_to_mass,
-                        'units': 'Msun',
-                        'prior': priors.TopHat(mini=1e5, maxi=1e13)})
+                     'isfree': False,
+                     'depends_on': zfrac_to_masses,
+                     'init': 1.,
+                     'units': r'M$_\odot$',})
 
 model_params.append({'name': 'agebins', 'N': 1,
                         'isfree': False,
