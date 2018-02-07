@@ -248,7 +248,6 @@ def post_processing(param_name, objname=None, runname = None, overwrite=True, ob
 
     # I/O
     res, powell_results, model, eout = load_prospector_data(obj_outfile,hdf5=True,load_extra_output=True)
-    print 1/0
     if res is None:
         print 'there are no sampling results! returning.'
         return
