@@ -216,7 +216,7 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True, measure_
     return eout
 
 def post_processing(param_name, objname=None, runname = None, overwrite=True, obj_outfile=None,
-                    plot_outfolder=None, plot=False, **kwargs):
+                    plot_outfolder=None, plot=True, **kwargs):
     """Driver. Loads output, runs post-processing routine.
     overwrite=False will return immediately if post-processing file already exists.
     if runname is specified, we can pass in parameter file for run A with outputs at location runname

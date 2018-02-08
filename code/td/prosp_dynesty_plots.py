@@ -418,8 +418,8 @@ def sed_figure(outname = None,
 
 def make_all_plots(filebase=None,
                    outfolder=os.getenv('APPS')+'/prospector_alpha/plots/',
-                   plt_summary=True,
-                   plt_trace=True,
+                   plt_summary=False,
+                   plt_trace=False,
                    plt_corner=True,
                    plt_sed=True):
     """Makes basic dynesty diagnostic plots for a single galaxy.
@@ -488,7 +488,7 @@ def do_all(runname=None,**extras):
     extra arguments go to make_all_plots
     """
 
-    filebase, param_basename, ancilname = prosp_dutils.generate_basenames(runname)
+    filebase, _, _ = prosp_dutils.generate_basenames(runname)
     for jj in range(len(filebase)):
         print 'iteration '+str(jj) 
 

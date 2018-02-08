@@ -36,7 +36,7 @@ run_params = {'verbose':True,
               'compute_vega_mags': False,
               'initial_disp':0.1,
               'interp_type': 'logarithmic',
-              'agelims': [0.0,8.0,8.5,9.0,9.5,9.8,10.0],
+              'agelims': [0.0,7.4772,8.0,8.5,9.0,9.5,9.8,10.0],
               # Data info (phot = .cat, dat = .dat, fast = .fout)
               'datdir':APPS+'/prospector_alpha/data/3dhst/',
               'runname': 'td_lyc',
@@ -122,7 +122,7 @@ def load_obs(objname=None, datdir=None, runname=None, err_floor=0.05, zperr=True
     wavemax = np.array([f.wavelength[f.transmission > (f.transmission.max()*0.1)].max() for f in ofilters]) / (1+zred)
     wavemin = np.array([f.wavelength[f.transmission > (f.transmission.max()*0.1)].min() for f in ofilters]) / (1+zred)
 
-    filtered = [1230, 4979, 5027, 6543, 6583]
+    filtered = [1230]
     for f in filtered: phot_mask[(wavemax > f) & (wavemin < f)] = False
     phot_mask[wavemin < 1200] = False
 
@@ -387,9 +387,8 @@ model_params.append({'name': 'nebemlineinspec', 'N': 1,
                         'prior': None})
 
 model_params.append({'name': 'gas_logz', 'N': 1,
-                        'isfree': False,
+                        'isfree': True,
                         'init': 0.0,
-                        'depends_on': tie_gas_logz,
                         'units': r'log Z/Z_\odot',
                         'prior': priors.TopHat(mini=-2.0, maxi=0.5)})
 
@@ -665,7 +664,7 @@ def load_model(objname=None, datdir=None, runname=None, agelims=[], zred=None, a
     # current scheme: six bins, four spaced equally in logarithmic 
     # space AFTER t=100 Myr + BEFORE tuniv-1 Gyr
     tbinmax = (tuniv-1)*1e9
-    if (tbinmax < 1e9):
+    if tbinmax < 1e9:
         tbinmax = (tuniv-0.25)*1e9
 
     agelims = agelims[:1] + np.linspace(agelims[1],np.log10(tbinmax),len(agelims)-2).tolist() + [np.log10(tuniv*1e9)]

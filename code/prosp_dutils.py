@@ -564,6 +564,20 @@ def generate_basenames(runname,ancilname=None):
             filebase.append(os.getenv('APPS')+'/prospector_alpha/results/'+runname+'/'+ids[jj].split('_')[0]+'/'+ids[jj])
             parm.append(os.getenv('APPS')+"/prospector_alpha/parameter_files/"+parm_basename+'.py') 
 
+    elif runname=='td_lyc_logzfree':
+
+        id_list = os.getenv('APPS')+"/prospector_alpha/data/3dhst/td_lyc.ids"
+        ids = np.loadtxt(id_list, dtype='|S60',delimiter=',')
+        ngals = len(ids)
+
+        parm_basename = runname+"_params"
+        ancilname=None
+
+        for jj in xrange(ngals):
+            filebase.append(os.getenv('APPS')+'/prospector_alpha/results/td_lyc/'+ids[jj]+'_logzfree')
+            parm.append(os.getenv('APPS')+"/prospector_alpha/parameter_files/"+parm_basename+'.py') 
+
+
     elif 'td' in runname:
 
         id_list = os.getenv('APPS')+"/prospector_alpha/data/3dhst/"+runname+".ids"
