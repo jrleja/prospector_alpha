@@ -110,7 +110,13 @@ def load_obs(objname=None, datdir=None, runname=None, err_floor=0.05, zperr=True
     neg = (maggies < 0) & (np.abs(maggies/maggies_unc) > 2)
     phot_mask[neg] = False
 
-    ### also mask anything touching or bluewards of Ly-a
+    ### mask anything touching or bluewards of Ly-a
+    datname = datdir + objname.split('_')[0] + '_' + runname + '.dat'
+    dat = ascii.read(datname)
+    idx = dat['phot_id'] == int(objname.split('_')[-1])
+    zred = float(dat['z_best'][idx])
+    ofilters = observate.load_filters(filters)
+
     wavemax = np.array([f.wavelength[f.transmission > (f.transmission.max()*0.1)].max() for f in ofilters]) / (1+zred)
     wavemin = np.array([f.wavelength[f.transmission > (f.transmission.max()*0.1)].min() for f in ofilters]) / (1+zred)
     filtered = [1230]
@@ -119,7 +125,7 @@ def load_obs(objname=None, datdir=None, runname=None, err_floor=0.05, zperr=True
 
     ### build output dictionary
     obs = {}
-    obs['filters'] = observate.load_filters(filters)
+    obs['filters'] = ofilters
     obs['wave_effective'] = np.array([filt.wave_effective for filt in obs['filters']])
     obs['phot_mask'] = phot_mask
     obs['maggies'] = maggies
