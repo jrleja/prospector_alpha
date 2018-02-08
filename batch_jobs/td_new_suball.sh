@@ -10,6 +10,9 @@
 #SBATCH -p conroy-intel,conroy,shared
 ### memory per cpu, in MB
 #SBATCH --mem-per-cpu=4000
+### output and error logs
+#SBATCH -o td_new_%a.out
+#SBATCH -e td_new_%a.err
 ### Job name
 #SBATCH -J 'td_new'
 IDFILE=$APPS"/prospector_alpha/data/3dhst/td_new.ids"
