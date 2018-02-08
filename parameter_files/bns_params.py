@@ -58,7 +58,7 @@ def load_obs(**extras):
            'PS1.i': (19.866, 0.027),
            'PS1.z': (19.629, 0.059),
            'PS1.y': (19.548, 0.136),
-           'wise_w4': (20.106, 0.165)
+           'wise_w1': (20.106, 0.165)
           }
 
     ### load fluxes, convert from AB magnitudes to maggies
