@@ -350,6 +350,9 @@ def do_all(runname='td_massive', runname_fast='fast_mimic',outfolder=None,**opts
     if len(data['uvir_sfr']) > 4000:
         popts = {'fmt':'o', 'capthick':.05,'elinewidth':.05,'alpha':0.2,'color':'0.3','ms':0.5, 'errorevery': 5000}
 
+    mass_met_age_z(data, outfolder,outtable, popts)
+    print 1/0
+
     # star-forming sequence.
     idx = (data['uvir_sfr'] > 0) & (data['fast']['uvj_prosp'] < 3) # to make it look like Kate's selection
     zred = data['fast']['z']
@@ -366,15 +369,15 @@ def do_all(runname='td_massive', runname_fast='fast_mimic',outfolder=None,**opts
 
     star_forming_sequence(prosp_sfr, fast_mass, zred,
                           outfolder+'star_forming_sequence_allgals_prospector.png',popts,
-                          xlabel='[FAST]', ylabel='[Prospector]',outfile=outfolder+'data/sfrcomp.h5')
+                          xlabel='[FAST]', ylabel='[Prospector]',outfile=outfolder+'data/sfrcomp.h5',
+                          plt_whit=np.log10(data['prosp']['model_uvir_sfr']['q50']))
 
     star_forming_sequence(np.log10(data['prosp']['model_uvir_sfr']['q50']), fast_mass, zred,
                           outfolder+'star_forming_sequence_uvir_allgals_prospector.png',popts,
-                          xlabel='[FAST]', ylabel='[UV+IR,model]',outfile=outfolder+'data/sfrcomp_uvir.h5')
-    print 1/0
+                          xlabel='[FAST]', ylabel=r'[UV+IR$_{\mathrm{model}}$]',outfile=outfolder+'data/sfrcomp_uvir.h5')
+
     uvir_comparison(data,outfolder+'ssfr_uvir_comparison', popts, filename=outfolder+'data/ssfrcomp.h5', ssfr=True)
     deltam_with_redshift(data['fast'], data['prosp'], data['fast']['z'], outfolder+'deltam_vs_z.png', filename=outfolder+'data/masscomp.h5')
-    mass_met_age_z(data, outfolder,outtable, popts)
 
     # if we have FAST-mimic runs, do a thorough comparison
     # else just do Prospector-FAST
@@ -718,7 +721,7 @@ def mass_met_age_z(data,outfolder,outtable,popts):
     # redshift bins + colors
     zbins = np.linspace(0.5,2.5,5)
     nbins = len(zbins)-1
-    zlabels = ["{0:.1f}".format(zbins[i])+'<z<'+"{0:.1f}".format(zbins[i+1]) for i in range(nbins)]
+    zlabels = ['$'+"{0:.1f}".format(zbins[i])+'<z<'+"{0:.1f}".format(zbins[i+1])+'$' for i in range(nbins)]
 
     # loop over options
     for opt in [metopts,ageopts]:
@@ -758,8 +761,8 @@ def mass_met_age_z(data,outfolder,outtable,popts):
             x, y, bincount = prosp_dutils.running_median(xm,yz,avg=False,return_bincount=True,weights=weights,bins=massbins)
             x, y = x[bincount > nbin_min], y[bincount > nbin_min]
             yerr = prosp_dutils.asym_errors(y[:,0], y[:,1], y[:,2])
-            q84_t += yerr[0].tolist()
-            q16_t += yerr[1].tolist()
+            q84_t += y[:,1].tolist()
+            q16_t += y[:,2].tolist()
             q50_t += y[:,0].tolist()
             x_t += x.tolist()
             axes[i].errorbar(x, y[:,0], yerr=yerr, color=cmap[i],marker='o',lw=lw,label=zlabels[i],zorder=5,ms=ms)
@@ -818,8 +821,8 @@ def mass_met_age_z(data,outfolder,outtable,popts):
         # save the table
         zlabs = []
         for n in range(nbins): zlabs += [zlabels[n]]*opt['nmassbins']
-        odat = Table([zlabs, np.array(x_t), np.array(q50_t),np.array(q84_t),np.array(q16_t)], 
-                      names=['z','log(M/M$_{\odot}$', 'median', '84$^{th}$ percentile', '16$^{th}$ percentile'])
+        odat = Table([zlabs, np.array(x_t), np.array(q50_t), np.array(q84_t), np.array(q16_t)], 
+                      names=['z','log(M/M$_{\odot}$)', 'P50', 'P84', 'P16'])
         formats = {name: '%1.2f' for name in odat.columns.keys()}
         formats['z'] = str
         ascii.write(odat, opt['table_out'], format='aastex',overwrite=True,formats=formats)
@@ -903,10 +906,17 @@ def star_forming_sequence(sfr,mass,zred,outname,popts,xlabel=None,ylabel=None,ou
         else:
             for tl in ax[i].get_yticklabels():tl.set_visible(False)
 
-        # the old model
-        if plt_whit:
+        # the Whitaker+14 model
+        # if it's an array, it's UV+IR SFRs. plot it separately.
+        if type(plt_whit) == np.ndarray:
+            x, y = prosp_dutils.running_median(mass[in_bin], 10**plt_whit[in_bin], bins=mbins,avg=True)
+            ax[i].plot(x,y, **whitopts)
+            ax[0].text(0.02,0.93,'UV+IR SFRs',color=whitopts['color'],transform=ax[0].transAxes)
+        elif plt_whit:
             sfr_whit = 10**sfr_ms(zwhit[i],logm_whit)
             ax[i].plot(logm_whit, sfr_whit, **whitopts)
+            ax[0].text(0.02,0.93,'Whitaker+14',color=whitopts['color'],transform=ax[0].transAxes)
+
 
         # zlabel
         ax[i].text(0.98, 0.05, zlabels[i],transform=ax[i].transAxes,zorder=1,ha='right')
@@ -935,9 +945,6 @@ def star_forming_sequence(sfr,mass,zred,outname,popts,xlabel=None,ylabel=None,ou
     # add legend
     bigax.legend(loc=4, prop={'size':fs*0.9},
                    scatterpoints=1,fancybox=True,ncol=2)
-
-    if plt_whit:
-        ax[0].text(0.02,0.87,'Whitaker+14',color=whitopts['color'],transform=ax[0].transAxes)
 
     # save data
     if outfile is not None:

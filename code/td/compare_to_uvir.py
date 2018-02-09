@@ -8,6 +8,8 @@ from matplotlib.ticker import MaxNLocator, FormatStrFormatter
 from dynesty.plotting import _quantile as weighted_quantile
 from fix_ir_sed import mips_to_lir
 from scipy.stats import spearmanr
+from astropy.table import Table
+from astropy.io import ascii
 
 plt.ioff()
 
@@ -147,7 +149,7 @@ def do_all(runname='td_huge', outfolder=None,**opts):
 
     plot_uvir_comparison(data,outfolder)
     plot_heating_sources(data,outfolder)
-    plot_heating_sources(data,outfolder,old_stars_only=True)
+    plot_heating_sources(data,outfolder,old_stars_only=True,outtable=outfolder+'tables/old_stars.dat')
     plot_rankorder_correlations(data, outfolder+'deltasfr_spearman.png')
 
 def plot_uvir_comparison(data, outfolder):
@@ -190,7 +192,7 @@ def plot_uvir_comparison(data, outfolder):
     plt.savefig(outfolder+'prosp_uvir_to_obs_uvir.png',dpi=dpi)
     plt.close()
 
-def plot_heating_sources(data, outfolder, color_by_fagn=False, color_by_logzsol=True, old_stars_only=False):
+def plot_heating_sources(data, outfolder, color_by_fagn=False, color_by_logzsol=True, old_stars_only=False,outtable=None):
 
     fig, ax = plt.subplots(1, 1, figsize = (5,4))
 
@@ -239,11 +241,14 @@ def plot_heating_sources(data, outfolder, color_by_fagn=False, color_by_logzsol=
                    r'(L$_{\mathrm{IR}}$+L$_{\mathrm{UV}}$)$_{\mathrm{AGN}}$/(L$_{\mathrm{IR}}$+L$_{\mathrm{UV}}$)$_{\mathrm{total}}$']
         ax2_outname = 'heating_fraction_vs_ssfr_all.png'
     xvar = np.log10(np.clip(data['ssfr_prosp']['q50'],minssfr,np.inf))
+    
+    # running median
     for i,yvar in enumerate(yvars): 
         ax2[i].errorbar(xvar, yvar, **popts)
-        x, y, bincount = prosp_dutils.running_median(xvar,yvar,avg=False,return_bincount=True,nbins=20)
+        x, y, bincount = prosp_dutils.running_median(xvar,yvar,avg=False,weights=np.ones_like(xvar),return_bincount=True,nbins=20)
         x, y = x[bincount > nbin_min], y[bincount > nbin_min]
-        ax2[i].plot(x,y, **medopts)
+        yerr = prosp_dutils.asym_errors(y[:,0], y[:,1], y[:,2])
+        ax2[i].errorbar(x,y[:,0],yerr=yerr, **medopts)
 
     # labels and limits
     for a in ax2: 
@@ -259,6 +264,15 @@ def plot_heating_sources(data, outfolder, color_by_fagn=False, color_by_logzsol=
     fig2.savefig(outfolder+ax2_outname,dpi=dpi)
     plt.close()
     plt.close()
+
+    # write table
+    if old_stars_only:
+        odat = Table([np.array(x), np.array(y[:,0]), np.array(y[:,1]), y[:,2]], 
+                      names=['log(sSFR/Gyr$^{-1}$)', 'P50', 'P84', 'P16'])
+        formats = {name: '%1.2f' for name in odat.columns.keys()}
+        ascii.write(odat, outtable, format='aastex',overwrite=True, formats=formats)
+
+
 
 def plot_rankorder_correlations(data, outname):
     """delta(sSFR) versus log(Z/Zsun), stellar age, fagn

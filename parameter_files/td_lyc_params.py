@@ -118,6 +118,7 @@ def load_obs(objname=None, datdir=None, runname=None, err_floor=0.05, zperr=True
     zred = float(dat['z_best'][idx])
     ofilters = observate.load_filters(filters)
 
+
     wavemax = np.array([f.wavelength[f.transmission > (f.transmission.max()*0.1)].max() for f in ofilters]) / (1+zred)
     wavemin = np.array([f.wavelength[f.transmission > (f.transmission.max()*0.1)].min() for f in ofilters]) / (1+zred)
 

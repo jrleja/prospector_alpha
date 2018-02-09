@@ -6,6 +6,7 @@ from prosp_dutils import generate_basenames, asym_errors, get_cmap
 from matplotlib.ticker import MaxNLocator, FormatStrFormatter
 from dynesty.plotting import _quantile as weighted_quantile
 from astropy.io import ascii
+from astropy.table import Table
 
 plt.ioff()
 
@@ -32,7 +33,7 @@ opts = {
 opts['massbins'] = np.linspace(opts['xlim'][0],opts['xlim'][1],opts['nmassbins']+1)
 opts['zbin_labels'] = ["{0:.1f}".format(z1)+'<z<'+"{0:.1f}".format(z2) for (z1, z2) in opts['zbins']]
 
-def do_all(runname='td_huge', outfolder=None, data=None, stack=None, regenerate=False, **opts):
+def do_all(runname='td_huge', outfolder=None, data=None, stack=None, regenerate=False):
 
     if outfolder is None:
         outfolder = os.getenv('APPS') + '/prospector_alpha/plots/'+runname+'/fast_plots/'
@@ -42,8 +43,10 @@ def do_all(runname='td_huge', outfolder=None, data=None, stack=None, regenerate=
 
     if data is None:
         data = collate_data(runname,filename=outfolder+'data/agn.h5',regenerate=regenerate,**opts)
+        return data
     if stack is None:
         stack = stack_agn_bins(data, **opts)
+        return stack
 
     outname = 'agn_strength'
     if opts['tenth_percentile']:
@@ -51,7 +54,26 @@ def do_all(runname='td_huge', outfolder=None, data=None, stack=None, regenerate=
         if opts['one_sigma']:
             outname += '_1sig'
 
+    agn_table(stack, outfolder+'tables/'+outname+'.dat')
     agn_plots(stack, outfolder+outname+'.png', opts)
+
+def agn_table(stack, outtable):
+
+    # generate outputs
+    zlabels, q84, q50, q16, mass = [[] for i in range(5)]
+    for label in opts['zbin_labels']:
+        zlabels += ['$'+label+'$']*opts['nmassbins']
+        q16 += stack[label]['q16_stack']
+        q50 += stack[label]['q50_stack']
+        q84 += stack[label]['q84_stack']
+        mass += ((opts['massbins'][1:]+opts['massbins'][:-1])/2.).tolist()
+
+    # save the table
+    odat = Table([zlabels, np.array(mass), np.array(q50), np.array(q84), np.array(q16)], 
+                  names=['z','log(M/M$_{\odot}$)', 'P50', 'P84', 'P16'])
+    formats = {name: '%1.2f' for name in odat.columns.keys()}
+    formats['z'] = str
+    ascii.write(odat, outtable, format='aastex',overwrite=True, formats=formats)
 
 def collate_data(runname, filename=filename, regenerate=False, **opts):
     """ pull out all of the necessary information from the individual data files

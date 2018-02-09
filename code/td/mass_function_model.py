@@ -148,7 +148,7 @@ def sfrd(z,logm_min=9, logm_max=13, dm=0.01, use_whit12=False,
     # integrate over stellar mass to get SFRD
     sfrd = simps(starforming_function,dx=dm)
 
-    # plots to investigate interolation
+    # plots to investigate interpolation
     '''
     if (z > 0.95) & (z < 1.05) & (apply_pcorrections):
 
@@ -239,7 +239,7 @@ def zfourge_param_rhostar(z, massloss_correction=False, apply_pcorrections=False
 
     return np.log10(rhodot)
 
-def plot_sfrd(logm_min=9.0,logm_max=12,dm=0.01,use_whit12=False,
+def plot_sfrd(logm_min=9.,logm_max=12,dm=0.01,use_whit12=False,
               massloss_correction=True):
     """ compare SFRD from mass function(z) versus observed SFR
     """
