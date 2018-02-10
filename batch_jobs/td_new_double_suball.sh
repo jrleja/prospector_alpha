@@ -13,8 +13,8 @@
 ### Job name
 #SBATCH -J 'td'
 ### output and error logs
-#SBATCH -o td_huge_%a.out
-#SBATCH -e td_huge_%a.err
+#SBATCH -o td_new_%a.out
+#SBATCH -e td_new_%a.err
 IDFILE=$APPS"/prospector_alpha/data/3dhst/td_new.ids"
 #x=`expr $SLURM_ARRAY_TASK_ID + 9999`
 x=$SLURM_ARRAY_TASK_ID
@@ -28,10 +28,10 @@ FIELD2=${OBJID2%_*}
 srun -n 1 --exclusive --mpi=pmi2 python $APPS/prospector/scripts/prospector_dynesty.py \
 --param_file="$APPS"/prospector_alpha/parameter_files/td_new_params.py \
 --objname="$OBJID1" \
---outfile="$APPS"/prospector_alpha/results/td_huge/"$FIELD1"/"$OBJID1" &
+--outfile="$APPS"/prospector_alpha/results/td_new/"$FIELD1"/"$OBJID1" &
 
 srun -n 1 --exclusive --mpi=pmi2 python $APPS/prospector/scripts/prospector_dynesty.py \
 --param_file="$APPS"/prospector_alpha/parameter_files/td_new_params.py \
 --objname="$OBJID2" \
---outfile="$APPS"/prospector_alpha/results/td_huge/"$FIELD2"/"$OBJID2" &
+--outfile="$APPS"/prospector_alpha/results/td_new/"$FIELD2"/"$OBJID2" &
 wait
