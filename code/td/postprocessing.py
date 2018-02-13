@@ -272,7 +272,7 @@ def post_processing(param_name, objname=None, runname = None, overwrite=True, ob
     hickle.dump(extra_output,open(extra_filename, "w"))
 
     # make standard plots
-    if plot is not False:
+    if plot:
         prosp_dynesty_plots.make_all_plots(filebase=obj_outfile,outfolder=plot_outfolder)
 
 
@@ -297,6 +297,7 @@ if __name__ == "__main__":
     parser.add_argument('--overwrite',type=str2bool)
     parser.add_argument('--shorten_spec',type=str2bool)
     parser.add_argument('--runname', type=str)
+    parser.add_argument('--plot',type=str2bool)
 
     args = vars(parser.parse_args())
     kwargs = {}

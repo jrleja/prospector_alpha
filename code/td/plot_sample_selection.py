@@ -82,10 +82,15 @@ def do_all(runname='td_huge',outfolder=None,regenerate=False,**opts):
     plot(data, outfolder=outfolder,**opts)
 
 def mass_completeness(ztarget):
-    """red line from Fig 2 in Tomczak+14
+    """ from CANDELS-Wide to CANDELS-deep
     """
-    zred = np.array([0.50,0.725,0.95,1.2,1.4,1.65,1.85,2.1,2.3,2.55])
-    mcomp = np.array([8.1,8.5,8.8,8.9,9.05,9.15,9.25,9.35,9.45,9.5])  
+    # red line from Fig 2 in Tomczak+14
+    #zred = np.array([0.50,0.725,0.95,1.2,1.4,1.65,1.85,2.1,2.3,2.55])
+    #mcomp = np.array([8.1,8.5,8.8,8.9,9.05,9.15,9.25,9.35,9.45,9.5])  
+
+    # Tal et al. 2014
+    zred = np.array([0.65,1,1.5,2.1])
+    mcomp = np.array([8.1,8.5,9.1,9.4])
     return np.interp(ztarget, zred, mcomp)
 
 def sfr_completeness(ztarget):
