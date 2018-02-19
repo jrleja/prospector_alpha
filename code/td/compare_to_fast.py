@@ -13,6 +13,7 @@ import td_huge_params as pfile
 from astropy.io import ascii
 from astropy.table import Table
 from matplotlib.ticker import MaxNLocator
+import medians
 
 plt.ioff()
 
@@ -351,7 +352,6 @@ def do_all(runname='td_massive', runname_fast='fast_mimic',outfolder=None,**opts
         popts = {'fmt':'o', 'capthick':.05,'elinewidth':.05,'alpha':0.2,'color':'0.3','ms':0.5, 'errorevery': 5000}
 
     mass_met_age_z(data, outfolder,outtable, popts)
-    print 1/0
 
     # star-forming sequence.
     idx = (data['uvir_sfr'] > 0) & (data['fast']['uvj_prosp'] < 3) # to make it look like Kate's selection
@@ -864,7 +864,7 @@ def star_forming_sequence(sfr,mass,zred,outname,popts,xlabel=None,ylabel=None,ou
     # Whitaker+14 SFR-M relationship
     zwhit = np.array([0.75, 1.25, 1.75, 2.25])
     logm_whit = np.linspace(xlim[0],xlim[1],50)
-    whitopts = {'color':'purple','alpha':0.85,'lw':1.5,'zorder':5,'linestyle':':'}
+    whitopts = {'color':'#6d1eb5','alpha':0.85,'lw':1.5,'zorder':5,'linestyle':'--'}
 
     # let's go!
     mass_save, sfr_save, sfr_ratio_save = [], [], [] 

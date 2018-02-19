@@ -1,27 +1,28 @@
 import numpy as np
-import td_params as pfile
+import td_new_params as pfile
 import matplotlib.pyplot as plt
 from mass_function_model import sfr_ms
 
-def draw_ssfr_from_prior(ndraw=1e4, alpha_sfh=0.2):
+def draw_ssfr_from_prior(ndraw=2e5, alpha_sfh=0.2):
 
-    # let's do it
+    # simulation information
     ndraw = int(ndraw)
-    zred = np.array([0.0, 0.5, 1.5, 2.5]) # where do we measure?
+    zred = np.array([1.5])
     logmass = np.array([10.])
     smass_factor = 0.8 # add in a not-unreasonable stellar mass <--> total mass conversion
     minssfr, maxssfr = 1e-14, 1e-7
 
-    # figure stuff
-    fig, axes = plt.subplots(2,2, figsize=(7, 7))
+    # figure information
+    fig, ax = plt.subplots(1,1, figsize=(3.4, 3.4))
     fig.subplots_adjust(hspace=0.0, wspace=0.0)
-    axes = np.ravel(axes)
     fs = 10
+    colors = ['red', 'black']
+    labels = ['new SFH prior', 'old SFH prior']
+    
+    for i, alpha_sfh in enumerate([0.2,1.0]):    
 
-    for i, z in enumerate(zred):
-        
         # new redshift, new model
-        model = pfile.load_model(zred=z, alpha_sfh=alpha_sfh, **pfile.run_params)
+        model = pfile.load_model(zred=zred, alpha_sfh=alpha_sfh, **pfile.run_params)
         prior = model._config_dict['z_fraction']['prior']
         agebins = model.params['agebins']
 
@@ -31,31 +32,20 @@ def draw_ssfr_from_prior(ndraw=1e4, alpha_sfh=0.2):
 
         # convert to sSFR
         time_per_bin = np.diff(10**agebins, axis=-1)[:,0]
-        ssfr = np.log10(np.clip(mass[0:2,:].sum(axis=0) / time_per_bin[0:2].sum() / 10**logmass,minssfr,maxssfr))
+        ssfr = np.log10(np.clip(mass[0,:] / time_per_bin[0] / 10**logmass,minssfr/10,maxssfr))
 
         # histogram
-        axes[i].hist(ssfr,bins=50,histtype="step",color='k',normed=True)
-        axes[i].set_xlim(-14,-7)
-        axes[i].set_ylim(0,1)
+        ax.hist(ssfr,bins=30,histtype='step',color=colors[i],normed=True,label=labels[i],
+                lw=1.5,range=(np.log10(minssfr),np.log10(maxssfr)))
+    
+    ax.set_xlim(-14,-7)
+    ax.set_ylim(0,1)
+    ax.set_xlabel('instantaneous log(sSFR/yr)')
+    ax.set_ylabel('normalized probability')
+    ax.legend(loc=2, prop={'size':10}, scatterpoints=1,fancybox=True)
 
-        if i > 1:
-            axes[i].set_xlabel('sSFR (100 Myr)')
-        else:
-            axes[i].set_xticks([])
-
-        if (i % 2) == 1:
-            axes[i].set_yticks([])
-
-        axes[i].text(0.02,0.94,'z = '+"{:.1f}".format(z), transform=axes[i].transAxes, fontsize=fs)
-        axes[i].text(0.02,0.88,'<SFR>='+"{:.1f}".format(ssfr.mean()), transform=axes[i].transAxes, fontsize=fs)
-
-        # add sSFR(main sequence)
-        try:
-            ssfr_ms = sfr_ms(z,logmass) / (10**logmass * smass_factor)
-            axes[i].axvline(np.log10(ssfr_ms),linestyle='--', color='red',lw=1.5,alpha=0.8,zorder=5)
-            prob = (ssfr > np.log10(ssfr_ms)).sum() / float(ssfr.shape[0])
-            axes[i].text(0.02,0.82,'ln(p(SFR>=MS))='+"{:.2f}".format(np.log(prob)), transform=axes[i].transAxes, fontsize=fs)
-        except ZeroDivisionError:
-            pass
+    # add sSFR(main sequence)
+    plt.tight_layout()
+    plt.savefig('/Users/joel/my_papers/td_sfrd/figures/sfh_prior.png',dpi=190)    
     plt.show()
     print 1/0

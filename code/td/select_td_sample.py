@@ -250,7 +250,7 @@ def build_sample(sample=None):
                     delimiter=' ', format='commented_header',overwrite=True)
 
     ascii.write([out['ids']], output=id_str_out, Writer=ascii.NoHeader,overwrite=True)
-    print 1/0
+
 def load_master_sample():
     """builds a 'master' sample with a very simple photometric cut
     this can be used for comparison to subsamples of this sample
