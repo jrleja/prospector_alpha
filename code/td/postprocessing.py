@@ -73,7 +73,7 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True, measure_
         eout['thetas'][p] = {'q50': q50, 'q16': q16, 'q84': q84}
 
     # extras
-    extra_parnames = ['avg_age','half_time','sfr_100','ssfr_100','stellar_mass','lir','luv','lmir','lbol','luv_young','lir_young']
+    extra_parnames = ['avg_age','half_time','sfr_100','ssfr_100','ssfr_30','sfr_30','stellar_mass','lir','luv','lmir','lbol','luv_young','lir_young']
     if 'fagn' in parnames:
         extra_parnames += ['l_agn', 'fmir', 'luv_agn', 'lir_agn']
     for p in extra_parnames: eout['extras'][p] = deepcopy(fmt)
@@ -128,6 +128,8 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True, measure_
         eout['extras']['half_time']['chain'][jj] = prosp_dutils.halfmass_assembly_time(sfh_params)
         eout['extras']['sfr_100']['chain'][jj] = prosp_dutils.calculate_sfr(sfh_params, 0.1,  minsfr=-np.inf, maxsfr=np.inf)
         eout['extras']['ssfr_100']['chain'][jj] = eout['extras']['sfr_100']['chain'][jj].squeeze() / eout['extras']['stellar_mass']['chain'][jj].squeeze()
+        eout['extras']['sfr_30']['chain'][jj] = prosp_dutils.calculate_sfr(sfh_params, 0.03,  minsfr=-np.inf, maxsfr=np.inf)
+        eout['extras']['ssfr_30']['chain'][jj] = eout['extras']['sfr_30']['chain'][jj].squeeze() / eout['extras']['stellar_mass']['chain'][jj].squeeze()
 
         # calculate AGN parameters if necessary
         if 'fagn' in parnames:
@@ -235,7 +237,7 @@ def post_processing(param_name, objname=None, runname = None, overwrite=True, ob
             obj_outfile = "/".join(run_outfile.split('/')[:-2]) + '/' + runname + '/' + objname
 
         # account for unique td_huge storage situation
-        if runname == 'td_huge':
+        if runname == 'td_huge' | runname == 'td_new':
             field = obj_outfile.split('/')[-1].split('_')[0]
             obj_outfile = "/".join(obj_outfile.split('/')[:-1])+'/'+field+'/'+obj_outfile.split('/')[-1]  
 

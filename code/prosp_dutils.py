@@ -465,13 +465,67 @@ def exp_decl_sfh_half_time(tage,tau):
     '''
     return tage-tau*np.log(2./(1+np.exp(-tage/tau)))
 
+def g05_prior(size=1000):
+
+    from prosp_dutils import exp_decl_sfh_avg_age_with_burst as avg_age
+
+    # random tage
+    tmin, tmax = 1, 13.5
+    tage = (tmax - tmin) * np.random.random_sample(size) + tmin
+
+    # random tau
+    gmin, gmax = 0.0, 1
+    gamma = (gmax-gmin) * np.random.random_sample(size) + gmin
+    tau = 1./gamma
+
+    # random burst amplitude (Mburst / Mnotburst)
+    amin, amax = 0.03,4
+    aburst = (amax-amin) * np.random.random_sample(size) + amin
+
+    # random burst duration
+    #dtburst_min, dtburst_max = 0.03,0.3
+    # dtburst = (dtburst_max-dtburst_min) * np.random.random_sample(size) + dtburst_min
+
+    # each 2 Gyr has a 10% chance of a burst happening
+    # so assume a random burst happened in the last 20 gyr
+    # if burst > tage, then it does NOT happen
+    tburst = np.random.random_sample(size)*20
+
+    tavg = np.array([avg_age(tage[i],tau[i],aburst[i],tburst[i]) for i in range(size)])
+
+    return tavg
+
+def exp_decl_sfh_avg_age_with_burst(tage,tau,Aburst,tburst):
+    """ this is done numerically
+    assume bursts are instantaneous
+    and that ONLY ONE burst can happen
+    these assumptions are incorrect!
+    """
+
+    # set up SFR(t) for declining SFH
+    t = np.linspace(0,tage,1000)
+    delta_t = t[1]-t[0]
+    sfr_t = np.exp(-t/tau)
+    mass = np.trapz(sfr_t,x=t)
+
+    # add in burst, renormalize
+    if tburst < tage:
+        mformed = mass*Aburst
+        mass += mformed
+        idx = np.abs(t-tburst).argmin()
+        sfr_t[idx] += (mformed/delta_t)
+
+    # numerical calculation of tavg
+    tavg = np.trapz(t*sfr_t,x=t) / mass
+    return tavg
+
+
 def exp_decl_sfh_avg_age(tage,tau):
     ''' this is done numerically
     '''
     t = np.linspace(0,tage,1000)
     tavg = np.trapz(t*np.exp(-t/tau),x=t) / np.trapz(np.exp(-t/tau),x=t)
-    return tavg
-
+    return tage-tavg
 
 def sfh_half_time(x,sfh_params,c):
 
