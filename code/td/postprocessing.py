@@ -237,7 +237,7 @@ def post_processing(param_name, objname=None, runname = None, overwrite=True, ob
             obj_outfile = "/".join(run_outfile.split('/')[:-2]) + '/' + runname + '/' + objname
 
         # account for unique td_huge storage situation
-        if runname == 'td_huge' | runname == 'td_new':
+        if (runname == 'td_huge') | (runname == 'td_new'):
             field = obj_outfile.split('/')[-1].split('_')[0]
             obj_outfile = "/".join(obj_outfile.split('/')[:-1])+'/'+field+'/'+obj_outfile.split('/')[-1]  
 
