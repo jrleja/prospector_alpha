@@ -15,7 +15,7 @@ plt.ioff()
 
 popts = {'fmt':'o', 'capthick':1.5,'elinewidth':1.5,'ms':9,'alpha':0.8,'color':'0.3'}
 red = '#FF3D0D'
-dpi = 160 # plot resolution
+dpi = 200 # plot resolution
 cmap = 'cool'
 minsfr, minssfr = 0.01, 1e-13
 ms, s = 0.5, 1 # symbol sizes
@@ -44,7 +44,7 @@ def collate_data(runname, filename=None, regenerate=False, nobj=None, **opts):
     qvals = ['q50','q84','q16']
     for par in ['sfr_uvir_truelir_prosp', 'sfr_uvir_lirfrommips_prosp', 'sfr_prosp', 'ssfr_prosp','avg_age', \
                 'logzsol', 'fagn','agn_heating_fraction','old_star_heating_fraction', 'young_star_heating_fraction',
-                'dust2', 'dust_index']:
+                'dust2', 'dust_index','sfr_prosp_30', 'ssfr_prosp_30']:
         out[par] = {}
         for q in qvals: out[par][q] = []
     for par in ['sfr_uvir_obs','objname']: out[par] = []
@@ -68,13 +68,19 @@ def collate_data(runname, filename=None, regenerate=False, nobj=None, **opts):
         try:
             res, _, model, prosp = load_prospector_data(name)
         except:
-            print name.split('/')[-1]+' failed to load. skipping.'
+            #print name.split('/')[-1]+' failed to load. skipping.'
             continue
-        if prosp is None:
+        if (prosp == None) or (res == None):
+            continue
+
+        if 'sfr_30' not in prosp['extras'].keys():
+            print name.split('/')[-1] + ' extra output must be deleted'
             continue
 
         out['objname'] += [name.split('/')[-1]]
-        print 'loaded ' + out['objname'][-1]
+        #print 'loaded ' + out['objname'][-1]
+        if i % 1000 == 0:
+            print float(i)/len(basenames)
 
         # Variable model parameters
 
@@ -86,6 +92,8 @@ def collate_data(runname, filename=None, regenerate=False, nobj=None, **opts):
             out['dust_index'][q] += [prosp['thetas']['dust_index'][q]]
             out['sfr_prosp'][q] += [prosp['extras']['sfr_100'][q]]
             out['ssfr_prosp'][q] += [prosp['extras']['ssfr_100'][q]]
+            out['sfr_prosp_30'][q] += [prosp['extras']['sfr_30'][q]]
+            out['ssfr_prosp_30'][q] += [prosp['extras']['ssfr_30'][q]]
             out['avg_age'][q] += [prosp['extras']['avg_age'][q]]
 
         # observed UV+IR SFRs
@@ -150,7 +158,8 @@ def do_all(runname='td_huge', outfolder=None,**opts):
     plot_uvir_comparison(data,outfolder)
     plot_heating_sources(data,outfolder)
     plot_heating_sources(data,outfolder,old_stars_only=True,outtable=outfolder+'tables/old_stars.dat')
-    plot_rankorder_correlations(data, outfolder+'deltasfr_spearman.png')
+    plot_spearmanr(data, outfolder+'deltasfr_spearman.png')
+    plot_spearmanr_vs_ssfr(data, outfolder+'spearmanr_vs_ssfr.png')
 
 def plot_uvir_comparison(data, outfolder):
     """ Prospector internal UVIR SFR versus Kate's UVIR SFR
@@ -199,7 +208,7 @@ def plot_heating_sources(data, outfolder, color_by_fagn=False, color_by_logzsol=
     # first plot SFR ratio versus heating by young stars
     # grab quantities
     x = data['young_star_heating_fraction']['q50']
-    y = data['sfr_prosp']['q50'] / data['sfr_uvir_truelir_prosp']['q50']
+    y = data['sfr_prosp_30']['q50'] / data['sfr_uvir_truelir_prosp']['q50']
 
     # add colored points and colorbar
     ax.axis([0,1,0,1.2])
@@ -212,7 +221,7 @@ def plot_heating_sources(data, outfolder, color_by_fagn=False, color_by_logzsol=
         colorlabel = r'log(Z/Z$_{\odot}$)'
         ax1_outstring = '_logzsol'
     else:
-        colorvar = np.log10(np.clip(data['ssfr_prosp']['q50'],minssfr,np.inf))
+        colorvar = np.log10(np.clip(data['ssfr_prosp_30']['q50'],minssfr,np.inf))
         colorlabel = r'log(sSFR$_{\mathrm{SED}}$)'
         ax1_outstring = '_ssfr'
 
@@ -240,21 +249,24 @@ def plot_heating_sources(data, outfolder, color_by_fagn=False, color_by_logzsol=
                    r'(L$_{\mathrm{IR}}$+L$_{\mathrm{UV}}$)$_{\mathrm{old\/stars}}$/(L$_{\mathrm{IR}}$+L$_{\mathrm{UV}}$)$_{\mathrm{total}}$',
                    r'(L$_{\mathrm{IR}}$+L$_{\mathrm{UV}}$)$_{\mathrm{AGN}}$/(L$_{\mathrm{IR}}$+L$_{\mathrm{UV}}$)$_{\mathrm{total}}$']
         ax2_outname = 'heating_fraction_vs_ssfr_all.png'
-    xvar = np.log10(np.clip(data['ssfr_prosp']['q50'],minssfr,np.inf))
+    xvar = np.log10(data['ssfr_prosp_30']['q50'])
     
     # running median
+    xlim, nbins = (-13,-7.9), 20
+    bins = np.linspace(xlim[0],xlim[1],nbins)
     for i,yvar in enumerate(yvars): 
         ax2[i].errorbar(xvar, yvar, **popts)
-        x, y, bincount = prosp_dutils.running_median(xvar,yvar,avg=False,weights=np.ones_like(xvar),return_bincount=True,nbins=20)
+        x, y, bincount = prosp_dutils.running_median(xvar,yvar,avg=False,weights=np.ones_like(xvar),return_bincount=True,bins=bins)
         x, y = x[bincount > nbin_min], y[bincount > nbin_min]
         yerr = prosp_dutils.asym_errors(y[:,0], y[:,1], y[:,2])
         ax2[i].errorbar(x,y[:,0],yerr=yerr, **medopts)
 
     # labels and limits
-    for a in ax2: 
+    for i, a in enumerate(ax2): 
         a.set_xlabel('log(sSFR$_{\mathrm{Prosp}}$)')
         a.set_ylim(0,1)
         a.set_ylabel(ylabels[i])
+        a.set_xlim(-13,-7.9)
 
     # clean up
     fig.tight_layout()
@@ -272,9 +284,7 @@ def plot_heating_sources(data, outfolder, color_by_fagn=False, color_by_logzsol=
         formats = {name: '%1.2f' for name in odat.columns.keys()}
         ascii.write(odat, outtable, format='aastex',overwrite=True, formats=formats)
 
-
-
-def plot_rankorder_correlations(data, outname):
+def plot_spearmanr(data, outname):
     """delta(sSFR) versus log(Z/Zsun), stellar age, fagn
     more interpreted: AGN heating, young star heating, old star heating etc
     """
@@ -282,13 +292,12 @@ def plot_rankorder_correlations(data, outname):
     # define variables of interest
     xvars = [data['old_star_heating_fraction']['q50'], data['agn_heating_fraction']['q50'],
              data['logzsol']['q50']]#, data['dust2']['q50'], data['dust_index']['q50'] ]
-    xlabels = [r'(L$_{\mathrm{IR}}$+L$_{\mathrm{UV}}$)$_{\mathrm{old\/stars}}$/(L$_{\mathrm{IR}}$+L$_{\mathrm{UV}}$)$_{\mathrm{total}}$',
-               r'(L$_{\mathrm{IR}}$+L$_{\mathrm{UV}}$)$_{\mathrm{AGN}}$/(L$_{\mathrm{IR}}$+L$_{\mathrm{UV}}$)$_{\mathrm{total}}$',
+    xlabels = [r'(L$_{\mathrm{UV+IR}})_{\mathrm{old\/stars}}$/(L$_{\mathrm{UV+IR}})_{\mathrm{total}}$',
+               r'(L$_{\mathrm{UV+IR}})_{\mathrm{AGN}}$/(L$_{\mathrm{UV+IR}})_{\mathrm{total}}$',
                r'log(Z/Z$_{\odot}$)']#, 'dust2', 'dustindex']
     xlim = [(-0.02,1.02),(-0.02,1.02),(-2,0.2)]#,(0,3.1),(-2.3,0.5)]
-    yvar = np.log10(data['sfr_prosp']['q50'] / data['sfr_uvir_obs'])
+    yvar = np.log10(data['sfr_prosp_30']['q50'] / data['sfr_uvir_lirfrommips_prosp']['q50'])
     ylim = (-3.0, 3.0)
-    idx = data['sfr_uvir_obs'] > 0
 
     # plot geometry
     fig, ax = plt.subplots(1, 3, figsize = (9,3))
@@ -296,24 +305,65 @@ def plot_rankorder_correlations(data, outname):
 
     for i, (xvar,xlabel) in enumerate(zip(xvars,xlabels)):
 
-        ax[i].errorbar(xvar[idx],yvar[idx],**popts)
+        ax[i].errorbar(xvar,yvar,**popts)
         ax[i].set_xlabel(xlabel)
         ax[i].set_ylabel(r'log(SFR$_{\mathrm{Prosp}}$/SFR$_{\mathrm{UV+IR}}$)')
 
         ax[i].set_xlim(xlim[i])
         ax[i].set_ylim(ylim)
 
-        rho_spear = spearmanr(xvar[idx],yvar[idx])[0]
+        rho_spear = spearmanr(xvar,yvar)[0]
         ax[i].text(0.02,0.92,r'$\rho_{\mathrm{S}}$='+'{:1.2f}'.format(rho_spear),transform=ax[i].transAxes)
 
         ax[i].axhline(0, linestyle='--', color='k',lw=1,zorder=10)
 
         # running median
-        in_plot = (yvar > ylim[0]) & (yvar < ylim[1]) & idx
+        in_plot = (yvar > ylim[0]) & (yvar < ylim[1])
         x, y, bincount = prosp_dutils.running_median(xvar[in_plot],yvar[in_plot],avg=False,return_bincount=True,nbins=20)
         x, y = x[bincount > nbin_min], y[bincount > nbin_min]
         ax[i].plot(x,y, **medopts)
 
+    plt.tight_layout()
+    plt.savefig(outname,dpi=dpi)
+    plt.close()
+
+
+def plot_spearmanr_vs_ssfr(data, outname):
+    """sSFR versus Spearman R for multiple variables
+    """
+
+    # define variables of interest
+    vars = [data['old_star_heating_fraction']['q50'], data['agn_heating_fraction']['q50'],
+            data['logzsol']['q50']]#, data['dust2']['q50'], data['dust_index']['q50'] ]
+    labels = [r'(L$_{\mathrm{UV+IR}})_{\mathrm{old\/stars}}$/(L$_{\mathrm{UV+IR}})_{\mathrm{total}}$',
+              r'(L$_{\mathrm{UV+IR}})_{\mathrm{AGN}}$/(L$_{\mathrm{UV+IR}})_{\mathrm{total}}$',
+              r'log(Z/Z$_{\odot}$)']#, 'dust2', 'dustindex']
+    delta_sfr = np.log10(data['sfr_prosp_30']['q50'] / data['sfr_uvir_lirfrommips_prosp']['q50'])
+    ssfr = np.log10(data['ssfr_prosp_30']['q50'])
+
+    # set up ssfr bins
+    nbins = 4
+    ssfr_bins = np.linspace(-11,-8,nbins+1)
+    ssfr_bin_mid = (ssfr_bins[1:] + ssfr_bins[:-1])/2.
+
+    # plot geometry
+    fig, ax = plt.subplots(1, 1, figsize = (4,4))
+    colors = ['#0202d6','#31A9B8','#FF9100','#FF420E']
+
+    # begin!
+    for i, (var, lab) in enumerate(zip(vars,labels)):
+        rho_spear = []
+        for j in range(nbins):
+            idx = (ssfr > ssfr_bins[j]) & (ssfr <= ssfr_bins[j+1])
+            rho_spear += [spearmanr(var[idx],ssfr[idx])[0]]
+        ax.plot(ssfr_bin_mid,rho_spear, label=lab,color=colors[i],lw=2)
+    
+    ax.set_xlabel('log(sSFR/yr$^{-1}$)')
+    ax.set_ylabel(r'Correlation with $\Delta$SFR')
+
+    ax.axhline(0, linestyle='--', color='k',lw=1,zorder=10)
+    ax.legend(loc=2, prop={'size':10},
+              scatterpoints=1,fancybox=True)
     plt.tight_layout()
     plt.savefig(outname,dpi=dpi)
     plt.close()

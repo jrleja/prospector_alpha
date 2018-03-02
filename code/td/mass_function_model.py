@@ -6,17 +6,17 @@ from scipy.interpolate import interp1d, interp2d, RectBivariateSpline
 import hickle, os
 
 
-dloc = '/Users/joel/code/python/prospector_alpha/plots/td_huge/fast_plots/data/masscomp.h5'
+dloc = '/Users/joel/code/python/prospector_alpha/plots/td_new/fast_plots/data/masscomp.h5'
 with open(dloc, "r") as f:
     mcorr = hickle.load(f)
 mass_fnc = RectBivariateSpline(mcorr['fast_mass'], mcorr['z'], mcorr['log_mprosp_mfast'],kx=1,ky=1)
 
-dloc = '/Users/joel/code/python/prospector_alpha/plots/td_huge/fast_plots/data/sfrcomp.h5'
+dloc = '/Users/joel/code/python/prospector_alpha/plots/td_new/fast_plots/data/sfrcomp.h5'
 with open(dloc, "r") as f:
     sfrcorr = hickle.load(f)
 sfr_fnc = RectBivariateSpline(sfrcorr['mass'], sfrcorr['z'], sfrcorr['sfr'],kx=1,ky=1)
 
-dloc = '/Users/joel/code/python/prospector_alpha/plots/td_huge/fast_plots/data/sfrcomp_uvir.h5'
+dloc = '/Users/joel/code/python/prospector_alpha/plots/td_new/fast_plots/data/sfrcomp_uvir.h5'
 with open(dloc, "r") as f:
     sfrcorr_uvir = hickle.load(f)
 sfr_fnc_uvir = RectBivariateSpline(sfrcorr_uvir['mass'], sfrcorr_uvir['z'], sfrcorr_uvir['sfr'],kx=1,ky=1)
@@ -298,7 +298,7 @@ def plot_sfrd(logm_min=9.,logm_max=12,dm=0.01,use_whit12=False,
     ax.set_xlim(xlim)
     ax.set_ylim(ylim)
 
-    outname = '/Users/joel/code/python/prospector_alpha/plots/td_huge/fast_plots/madau_plot.png'
+    outname = '/Users/joel/code/python/prospector_alpha/plots/td_new/fast_plots/madau_plot.png'
     plt.tight_layout()
     plt.savefig(outname,dpi=200)
     plt.close()

@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from select_td_sample import load_master_sample
-import os, hickle
+import os, hickle, prosp_dutils
 from matplotlib.ticker import FormatStrFormatter
 import matplotlib.gridspec as gridspec
 
@@ -60,7 +60,7 @@ def select_huge_supp(dat):
                    (dat['zbest'] >= 0.5) & (dat['zbest'] <= 2.5))
     return idx
 
-def do_all(runname='td_huge',outfolder=None,regenerate=False,**opts):
+def do_all(runname='td_new',outfolder=None,regenerate=False,**opts):
     """compare sample selection to parent 3D-HST sample
     this is defined as (parent = phot_flag == 1)
     """
@@ -233,7 +233,23 @@ def plot(data, outfolder=None, density_plot=False, verbose=False, reselect_sampl
 
             # completeness distribution
             if completeness_plot:
-                axcomp[i].plot(bins_mid, hist_sample / hist_master.astype(float), lw=1.5,color='k')
+
+                # do the running average over hist_master, hist_sample
+                # but resplit them into much more fine bins (every bin needs at least 1 galaxy) 
+                fine_hist_master, bins = np.histogram(master_dat,bins=150,density=False)
+                fine_hist_sample, bins = np.histogram(sample_dat,bins=bins,density=False)
+                fine_bins_mid = (bins[1:]+bins[:-1])/2.
+
+                comp = fine_hist_sample/fine_hist_master.astype(float)
+                N = 11
+                fbins = fine_bins_mid[5:-5] # must chop off the edges for convolution
+                comp = np.convolve(comp, np.ones((N,))/N, mode='valid')
+                
+                # now calculate 90% completeness
+                print 'zred={0}, mass completeness={1}'.format((zbin[0]+zbin[1])/2.,fbins[np.abs(comp - 0.9) < 0.01].min())
+
+                # now plot   
+                axcomp[i].plot(fbins, comp, lw=1.5,color='k')
                 axcomp[i].axhline(0.9,linestyle='--',color='0.3',zorder=-1,alpha=0.8)
                 axcomp[i].text(opt['xlim'][1]-(opt['xlim'][1]-opt['xlim'][0])*0.01,0.86,r'90% of survey',fontsize=8,color='0.3',ha='right',va='top')
                 axcomp[i].set_xlabel(opt['xlabel'])

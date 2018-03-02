@@ -9,10 +9,10 @@ from fix_ir_sed import mips_to_lir
 import copy
 from scipy.stats import spearmanr, mode
 from stack_td_sfh import sfr_ms
-import td_huge_params as pfile
 from astropy.io import ascii
 from astropy.table import Table
 from matplotlib.ticker import MaxNLocator
+from scipy.optimize import curve_fit
 
 plt.ioff()
 
@@ -26,15 +26,15 @@ minsfr = 0.0001
 
 nbin_min = 10
 
-def sfr_ratio_for_fast(tau,tage):
-    """ get ratio of instantaneous SFR to 100 Myr SFR
+def sfr_ratio_for_fast(tau,tage,t2=0.1):
+    """ get ratio of instantaneous SFR to t2 Gyr SFR
     """
     tau, tage = float(tau), float(tage)
     norm = tau*(1-np.exp(-tage/tau))
     sfr_inst = np.exp(-tage/tau)/norm
-    sfr_100myr = integrate_exp_tau(tage-0.1,tage,tau,tage) / (0.1/tage)
+    sfr_avg = integrate_exp_tau(tage-t2,tage,tau,tage) / (t2/tage)
 
-    return sfr_100myr/sfr_inst
+    return sfr_avg/sfr_inst
 
 def integrate_exp_tau(t1,t2,tau,tage):
     """ integrate exponentially declining function
@@ -91,16 +91,21 @@ def collate_data(runname, runname_fast, filename=None, filename_grid=None, regen
     if os.path.isfile(filename) and regenerate == False:
         with open(filename, "r") as f:
             outdict = hickle.load(f)
-        with open(filename_grid, "r") as f:
-            outg = hickle.load(f)
+        try:
+            with open(filename_grid, "r") as f:
+                outg = hickle.load(f)
+        except:
+            outg = None
         return outdict, outg
 
     ### define output containers
     parlabels = [r'log(M$_{\mathrm{stellar}}$/M$_{\odot}$)', 'SFR [M$_{\odot}$/yr]',
                  r'$\tau_{\mathrm{diffuse}}$', r'log(sSFR) [yr$^-1$]',
-                 r"t$_{\mathrm{avg}}$ [Gyr]", r"t$_{\mathrm{half-mass}}$ [Gyr]", r'log(Z/Z$_{\odot}$)', r'Q$_{\mathrm{PAH}}$',
+                 r"t$_{\mathrm{avg}}$ [Gyr]", r"t$_{\mathrm{half-mass}}$ [Gyr]",
+                  'SFR [M$_{\odot}$/yr] (30)', r'log(sSFR) [yr$^-1$] (30)',
+                 r'log(Z/Z$_{\odot}$)', r'Q$_{\mathrm{PAH}}$',
                  r'f$_{\mathrm{AGN}}$', 'dust index', r'f$_{\mathrm{AGN,MIR}}$']
-    fnames = ['stellar_mass','sfr_100','dust2','ssfr_100','avg_age','half_time'] # take for fastmimic too
+    fnames = ['stellar_mass','sfr_100','dust2','ssfr_100','avg_age','half_time', 'sfr_30','ssfr_30'] # take for fastmimic too
     pnames = fnames+['massmet_2', 'duste_qpah', 'fagn', 'dust_index', 'fmir'] # already calculated in Prospector
     enames = ['model_uvir_sfr', 'model_uvir_ssfr', 'sfr_ratio','model_uvir_truelir_sfr', 'model_uvir_truelir_ssfr', 'sfr_ratio_truelir'] # must calculate here
 
@@ -109,21 +114,27 @@ def collate_data(runname, runname_fast, filename=None, filename_grid=None, regen
     phot_chi, phot_percentile, phot_obslam, phot_restlam, phot_fname = [], [], [], [], []
     outfast['z'] = []
     outfast['uvj'], outfast['uvj_prosp'], outfast['uvj_dust_prosp'], outfast['uv'], outfast['vj'] = [], [], [], [], []
+    logpar = ['stellar_mass', 'ssfr_30', 'ssfr_100']
 
     ### define grids
-    ngrid = 40
+    ngrid_ssfr, ngrid_fast, ngrid_sfr = 100, 40, 40
     delssfr_lim = (-3,1)
     ssfr_lim = (-11,-8)
-    delm_lim = (-1.2,1.2)    # minimum age is 15 Myr = log(-1.82/Gyr), maximum is tuniv(z=0.5) = 8.65
+    delm_lim = (-1.,1.)    # minimum age is 15 Myr = log(-1.82/Gyr), maximum is tuniv(z=0.5) = 8.65
     logm_lim = (8.5,12.)
+    logsfr_lim = (-2.5,3)
     outg = {}
     outg['grids'] = {
                     'ssfr_delssfr': [],
                     'logm_delm': [],
-                    'logm': np.linspace(logm_lim[0],logm_lim[1],ngrid+1),
-                    'delm': np.linspace(delm_lim[0],delm_lim[1],ngrid+1),
-                    'ssfr': np.linspace(ssfr_lim[0],ssfr_lim[1],ngrid+1),
-                    'delssfr': np.linspace(delssfr_lim[0],delssfr_lim[1],ngrid+1)
+                    'logm_logsfr': [],
+                    'logm_loguvirsfr': [],
+                    'logsfr': np.linspace(logsfr_lim[0],logsfr_lim[1],ngrid_sfr+1),
+                    'logm': np.linspace(logm_lim[0],logm_lim[1],ngrid_sfr+1),
+                    'logm_fast': np.linspace(logm_lim[0],logm_lim[1],ngrid_fast+1),
+                    'delm': np.linspace(delm_lim[0],delm_lim[1],ngrid_fast+1),
+                    'ssfr': np.linspace(ssfr_lim[0],ssfr_lim[1],ngrid_ssfr+1),
+                    'delssfr': np.linspace(delssfr_lim[0],delssfr_lim[1],ngrid_ssfr+1)
                    }
 
     for i,par in enumerate(pnames+enames):
@@ -179,15 +190,15 @@ def collate_data(runname, runname_fast, filename=None, filename_grid=None, regen
 
         # prospector first
         for par in pnames:
-            if par in prosp['thetas'].keys():
-                loc = 'thetas'
-            elif par in prosp['extras'].keys():
+            loc = 'thetas'
+            if par in prosp['extras'].keys():
                 loc = 'extras'
-            else:
-                continue
             for q in ['q16','q50','q84']:
-                x = prosp[loc][par][q]
-                if par == 'stellar_mass' or par == 'ssfr_100':
+                try:
+                    x = prosp[loc][par][q]
+                except:
+                    x = -99
+                if par in logpar:
                     x = np.log10(x)
                 outprosp[par][q].append(x)
         
@@ -204,12 +215,12 @@ def collate_data(runname, runname_fast, filename=None, filename_grid=None, regen
             outprosp['model_uvir_truelir_sfr'][q] += [weighted_quantile(uvir_truelir_chain, np.array([float(q[1:])/100.]),weights=prosp['weights'])[0]]
             outprosp['model_uvir_truelir_ssfr'][q] += [weighted_quantile(uvir_truelir_chain/prosp['extras']['stellar_mass']['chain'], 
                                                                np.array([float(q[1:])/100.]),weights=prosp['weights'])[0]]
-            outprosp['sfr_ratio_truelir'][q] += [weighted_quantile(np.log10(prosp['extras']['sfr_100']['chain']/uvir_truelir_chain), 
+            outprosp['sfr_ratio_truelir'][q] += [weighted_quantile(np.log10(prosp['extras']['sfr_30']['chain']/uvir_truelir_chain), 
                                                          np.array([float(q[1:])/100.]),weights=prosp['weights'])[0]]
             outprosp['model_uvir_sfr'][q] += [weighted_quantile(uvir_chain, np.array([float(q[1:])/100.]),weights=prosp['weights'])[0]]
             outprosp['model_uvir_ssfr'][q] += [weighted_quantile(uvir_chain/prosp['extras']['stellar_mass']['chain'], 
                                                                np.array([float(q[1:])/100.]),weights=prosp['weights'])[0]]
-            outprosp['sfr_ratio'][q] += [weighted_quantile(np.log10(prosp['extras']['sfr_100']['chain']/uvir_chain), 
+            outprosp['sfr_ratio'][q] += [weighted_quantile(np.log10(prosp['extras']['sfr_30']['chain']/uvir_chain), 
                                                          np.array([float(q[1:])/100.]),weights=prosp['weights'])[0]]
 
         # prospector-fast
@@ -227,7 +238,7 @@ def collate_data(runname, runname_fast, filename=None, filename_grid=None, regen
                 # fill up quantiles
                 for q in ['q16','q50','q84']:
                     x = prosp_fast[loc][par][q]
-                    if par == 'stellar_mass' or par == 'ssfr_100':
+                    if par in logpar:
                         x = np.log10(x)
                     try:
                         outprosp_fast[par][q].append(x)
@@ -242,7 +253,7 @@ def collate_data(runname, runname_fast, filename=None, filename_grid=None, regen
                     x = fres['chain'][amax,idx]
                 else:
                     x = prosp_fast[loc][par]['chain'][0]
-                if par == 'stellar_mass' or par == 'ssfr_100':
+                if par in logpar:
                     x = np.log10(x)
                 try:
                     outprosp_fast['bfit'][par].append(x)
@@ -281,6 +292,8 @@ def collate_data(runname, runname_fast, filename=None, filename_grid=None, regen
         outfast['dust2'] += [prosp_dutils.av_to_dust2(fast['Av'][f_idx][0])]
         sfr_ratio = sfr_ratio_for_fast(10**(fast['ltau'][f_idx]-9),10**(fast['lage'][f_idx]-9))
         outfast['sfr_100'] += [(10**fast['lsfr'][f_idx][0])*sfr_ratio]
+        sfr_ratio = sfr_ratio_for_fast(10**(fast['ltau'][f_idx]-9),10**(fast['lage'][f_idx]-9),t2=0.03)
+        outfast['sfr_30'] += [(10**fast['lsfr'][f_idx][0])*sfr_ratio]
         outfast['half_time'] += [prosp_dutils.exp_decl_sfh_half_time(10**fast['lage'][f_idx][0],10**fast['ltau'][f_idx][0])/1e9]
 
         outfast['avg_age'] += [prosp_dutils.exp_decl_sfh_avg_age(10**fast['lage'][f_idx][0],10**fast['ltau'][f_idx][0])/1e9]
@@ -297,17 +310,35 @@ def collate_data(runname, runname_fast, filename=None, filename_grid=None, regen
         phot_restlam += (res['obs']['wave_effective'][mask]/1e4/(1+outfast['z'][-1])).tolist()
         phot_fname += [str(fname) for fname in np.array(res['obs']['filternames'])[mask]]
 
-        # grid
-        logm = np.repeat(outfast['stellar_mass'][-1],prosp['extras']['stellar_mass']['chain'].shape[0])
-        delm = np.log10(prosp['extras']['stellar_mass']['chain']/10**outfast['stellar_mass'][-1])
-        ssfr = np.log10(prosp['extras']['ssfr_100']['chain'])
-        delssfr = np.log10(prosp['extras']['sfr_100']['chain']/uvir_chain)
-        g1,_,_ = np.histogram2d(logm,delm, normed=True,weights=prosp['weights'],
-                                bins=[outg['grids']['logm'],outg['grids']['delm']])
+        # grid calculations
+        # these are clipped to the edges in the Y-direction (otherwise they're counted as NaNs!)
+        # add in 0.1 dex Gaussian error to FAST masses for smoothing purposes
+        # ^ only do this if we're inside the mass boundaries to begin with, else galaxies below the mass limit
+        # dominate!
+        fsm, nchain = outfast['stellar_mass'][-1], prosp['extras']['stellar_mass']['chain'].shape[0]
+        if fsm < outg['grids']['logm_fast'][0]:
+            logm_fast = np.repeat(fsm,nchain)
+        else:
+            logm_fast = np.random.normal(loc=fsm, scale=0.1, size=nchain)
+        logm = np.log10(prosp['extras']['stellar_mass']['chain'])
+        delm = np.clip(np.log10(prosp['extras']['stellar_mass']['chain']/10**logm_fast),delm_lim[0],delm_lim[1])
+        ssfr = np.log10(prosp['extras']['ssfr_30']['chain'])
+        delssfr = np.clip(np.log10(prosp['extras']['sfr_30']['chain']/uvir_chain),delssfr_lim[0],delssfr_lim[1])
+        logsfr = np.clip(np.log10(prosp['extras']['sfr_30']['chain']),logsfr_lim[0],logsfr_lim[1])
+        logsfr_p_uvir = np.clip(np.log10(uvir_chain),logsfr_lim[0],logsfr_lim[1])
+        g1,_,_ = np.histogram2d(logm_fast,delm, normed=True,weights=prosp['weights'],
+                                bins=[outg['grids']['logm_fast'],outg['grids']['delm']])
         g2,_,_ = np.histogram2d(ssfr,delssfr,normed=True,weights=prosp['weights'], 
                                 bins=[outg['grids']['ssfr'],outg['grids']['delssfr']])
+        g3,_,_ = np.histogram2d(logm,logsfr,normed=True,weights=prosp['weights'], 
+                                bins=[outg['grids']['logm'],outg['grids']['logsfr']])
+        g4,_,_ = np.histogram2d(logm,logsfr_p_uvir,normed=True,weights=prosp['weights'], 
+                                bins=[outg['grids']['logm'],outg['grids']['logsfr']])
+
         outg['grids']['logm_delm'] += [g1]
         outg['grids']['ssfr_delssfr'] += [g2]
+        outg['grids']['logm_logsfr'] += [g3]
+        outg['grids']['logm_loguvirsfr'] += [g4]
 
     ### turn everything into numpy arrays
     for k1 in outprosp.keys():
@@ -369,17 +400,20 @@ def do_all(runname='td_massive', runname_fast='fast_mimic',outfolder=None,**opts
     if len(data['uvir_sfr']) > 4000:
         popts = {'fmt':'o', 'capthick':.05,'elinewidth':.05,'alpha':0.2,'color':'0.3','ms':0.5, 'errorevery': 5000}
 
-    dm_dsfr_grid(data, datag, outfolder, outtable)
-    deltam_with_redshift(data['fast'], data['prosp'], data['fast']['z'], outfolder+'deltam_vs_z.png', filename=outfolder+'data/masscomp.h5')
+    sfr_m_grid(data, datag, outfolder)
     print 1/0
-    mass_met_age_z(data, outfolder, outtable, popts)
+    dm_dsfr_grid(data, datag, outfolder, outtable)
+
+    deltam_with_redshift(data['fast'], data['prosp'], data['fast']['z'], outfolder+'deltam_vs_z.png', filename=outfolder+'data/masscomp.h5')
+
+    mass_met_age_z(data, outfolder, outtable, popts) # this is now deprecated
     deltam_spearman(data['fast'],data['prosp'],
                     outfolder+'deltam_spearman_fast_to_palpha.png',popts)
 
     # star-forming sequence.
     idx = (data['uvir_sfr'] > 0) & (data['fast']['uvj_prosp'] < 3) # to make it look like Kate's selection
     zred = data['fast']['z']
-    uvir_sfr, prosp_sfr = np.log10(data['uvir_sfr']), np.log10(data['prosp']['sfr_100']['q50'])
+    uvir_sfr, prosp_sfr = np.log10(data['uvir_sfr']), np.log10(data['prosp']['sfr_30']['q50'])
     fast_mass, prosp_mass = data['fast']['stellar_mass'], data['prosp']['stellar_mass']['q50']
 
     star_forming_sequence(uvir_sfr[idx], fast_mass[idx], zred[idx],
@@ -431,12 +465,63 @@ def do_all(runname='td_massive', runname_fast='fast_mimic',outfolder=None,**opts
     #uvir_comparison(data,outfolder+'ssfr_uvir_comparison_model',  popts, model_uvir = True, ssfr=True)
     #uvir_comparison(data,outfolder+'ssfr_uvir_truelir_comparison_model',  popts, model_uvir = 'true_LIR', ssfr=True)
 
+def sfr_ratio(data):
+    """quick hack to investigate sfr(100) / sfr(30)
+    conclusion: sfr(30) is what we should be using everywhere!
+    """
+
+    nsafe = 5700
+    ssfr30 = np.log10(data['prosp']['ssfr_30']['q50'][:nsafe])
+    ssfr100 = data['prosp']['ssfr_100']['q50'][:nsafe]
+    ssfruvir = np.log10(data['prosp']['model_uvir_ssfr']['q50'][:nsafe])
+
+    # ssfr(30) versus ssfr(100)
+    fig, ax = plt.subplots(1,4, figsize=(15, 4))
+    minmax = (-11,-8)
+
+    x, y = prosp_dutils.running_median(ssfr100,ssfr30,nbins=10)
+    ax[0].plot(x,y,color=red,lw=4,zorder=5)
+    ax[0].plot(ssfr100,ssfr30,'o',ms=2,alpha=0.7,color='0.3')
+    ax[0].set_xlabel('ssfr [100 Myr]')
+    ax[0].set_ylabel('ssfr [30 Myr]')
+
+    # ssfr UVIR versus ssfr(100)
+    x, y = prosp_dutils.running_median(ssfr100,ssfruvir,nbins=10)
+    ax[1].plot(x,y,color=red,lw=4,zorder=5)
+    ax[1].plot(ssfr100,ssfruvir,'o',ms=2,alpha=0.7,color='0.3')
+    ax[1].set_xlabel('ssfr [100 Myr]')
+    ax[1].set_ylabel('ssfr [UVIR]')
+
+    # ssfr UVIR versus ssfr(30)
+    x, y = prosp_dutils.running_median(ssfr30,ssfruvir,nbins=10)
+    ax[2].plot(x,y,color=red,lw=4,zorder=5)
+    ax[2].plot(ssfr30,ssfruvir,'o',ms=2,alpha=0.7,color='0.3')
+    ax[2].set_xlabel('ssfr [30 Myr]')
+    ax[2].set_ylabel('ssfr [UVIR]')
+
+    # ssfr UVIR versus ratio
+    x, y = prosp_dutils.running_median(ssfruvir,ssfr30-ssfr100,nbins=10)
+    ax[3].plot(x,y,color=red,lw=4,zorder=5)
+    ax[3].plot(ssfruvir,ssfr30-ssfr100,'o',ms=2,alpha=0.7,color='0.3')
+    ax[3].set_xlabel('ssfr [UVIR]')
+    ax[3].set_ylabel('log(ssfr30/ssfr100)')
+
+    for a in ax[:3]:
+        a.set_xlim(minmax)
+        a.set_ylim(minmax)
+        a.plot(minmax,minmax,linestyle='--',color='blue',zorder=3)
+    ax[3].set_xlim(minmax)
+    ax[3].set_ylim(-2,2)
+
+    plt.tight_layout()
+    plt.show()
+
 def fast_comparison(fast,prosp,parlabels,pnames,outname,popts,flabel='FAST',plabel='Prospector',bfit=False):
     
     fig, axes = plt.subplots(2, 2, figsize = (6,6))
     axes = np.ravel(axes)
 
-    for i,par in enumerate(['stellar_mass','sfr_100','dust2','avg_age']):
+    for i,par in enumerate(['stellar_mass','sfr_30','dust2','avg_age']):
 
         ### clip SFRs
         if par[:3] == 'sfr':
@@ -511,42 +596,193 @@ def fast_comparison(fast,prosp,parlabels,pnames,outname,popts,flabel='FAST',plab
     plt.savefig(outname,dpi=dpi)
     plt.close()
 
+def sfr_m_grid(data,datag,outfolder):
+    """plots the AVERAGE of the CONDITIONAL PDF for star formation rate(M) for ALL GALAXIES
+    """
+
+    # plot information
+    fs, tick_fs, lw, ms = 11, 9.5, 3, 3.8
+    mcomplete = np.array([8.82,9.27,9.67,9.86])
+    #mcomplete = np.array([8.82,9.27,9.5,9.5])
+
+    opt = {
+               'xlim': (8.5,11.5),
+               'ylim': (-2,3),
+               'xtitle': 'log(M$_{\mathrm{FAST}}$/M$_{\odot}$)',
+               'ytitle': 'log(SFR) [M$_{\odot}$/yr]',
+               'ytitle2': r'$\sigma$ [dex]',
+               'xpar': data['fast']['stellar_mass'],
+               'ypar1': data['prosp']['sfr_30'],
+               'ypar2': data['prosp']['model_uvir_sfr'],
+               'grid1': datag['grids']['logm_logsfr'],
+               'grid2': datag['grids']['logm_loguvirsfr'],
+               'xbins': datag['grids']['logm'],
+               'ybins': datag['grids']['logsfr'],
+               'outname': outfolder+'conditional_sfr_m.png',
+               'xt': 0.98, 'yt': 0.05, 'ha': 'right',
+               'dens_power': 0.5
+               }
+    uvir_color = '#dd1c77'
+
+    # redshift bins + colors
+    zbins = np.linspace(0.5,2.5,5)
+    nbins = len(zbins)-1
+    zlabels = ['$'+"{0:.1f}".format(zbins[i])+'<z<'+"{0:.1f}".format(zbins[i+1])+'$' for i in range(nbins)]
+
+    # plot geometry
+    fig, a1 = plt.subplots(2, 2, figsize = (10.5,6.5))
+    fig.subplots_adjust(right=0.985,left=0.54,hspace=0.0,wspace=0.0)
+    a1 = np.ravel(a1)
+    bigax = fig.add_axes([0.11, 0.25, 0.31, 0.47])
+
+    # grid information
+    ngrid = opt['xbins'].shape[0]
+    dx, dy = opt['xbins'][1] - opt['xbins'][0], opt['ybins'][1] - opt['ybins'][0]
+    xmid = (opt['xbins'][:-1] + opt['xbins'][1:])*0.5
+    ymid = (opt['ybins'][:-1] + opt['ybins'][1:])*0.5
+
+    for i in range(nbins):
+
+        # conditional PDF in our redshift bin
+        idx = (data['fast']['z'] > zbins[i]) & (data['fast']['z'] <= zbins[i+1])
+        grid1 = sum(np.nan_to_num(opt['grid1'][idx,:,:]))
+        grid2 = sum(np.nan_to_num(opt['grid2'][idx,:,:]))
+
+        # conditional PDF
+        xidx = (opt['xbins']+dx > opt['xlim'][0]) & (opt['xbins']-dx <= opt['xlim'][1])
+        yidx = (opt['ybins']+dy > opt['ylim'][0]) & (opt['ybins']-dy <= opt['ylim'][1])
+        plotgrid1 = grid1[xidx[1:] & xidx[:-1], :]
+        plotgrid2 = grid2[xidx[1:] & xidx[:-1], :]
+
+        # plot the PDF
+        X, Y = np.meshgrid(opt['xbins'][xidx], opt['ybins'][yidx])
+        a1[i].pcolormesh(X, Y, (plotgrid1[:,yidx[1:] & yidx[:-1]].T)**opt['dens_power'], cmap='Greys',label=zlabels[i])
+
+        # calculate percentiles of the conditional PDF
+        # and errors
+        ngrid = grid1.shape[0]
+        errs_1 = (opt['ypar1']['q84'][idx] - opt['ypar1']['q16'][idx])/2.
+        errs_2 = (opt['ypar2']['q84'][idx] - opt['ypar2']['q16'][idx])/2.
+        q50_1, q84_1, q16_1, err_1, q50_2, q84_2, q16_2, err_2, avg_1, avg_2 = [np.empty(ngrid) for j in range(10)] 
+        for j in range(ngrid):
+            q50_1[j], q84_1[j], q16_1[j] = weighted_quantile(ymid, np.array([0.5, 0.84, 0.16]), weights=grid1[j,:])
+            q50_2[j], q84_2[j], q16_2[j] = weighted_quantile(ymid, np.array([0.5, 0.84, 0.16]), weights=grid2[j,:])
+
+            avg_1[j], avg_2[j] = np.nan, np.nan
+            if grid1[j,:].sum() > 0:
+                avg_1[j] = np.log10(np.average(10**ymid, weights=grid1[j,:]))
+            if grid2[j,:].sum() > 0:
+                avg_2[j] = np.log10(np.average(10**ymid, weights=grid2[j,:]))
+
+            in_grid = (opt['xpar'][idx] > opt['xbins'][j]) & (opt['xpar'][idx] <= opt['xbins'][j+1])
+            err_1[j] = np.median(errs_1[in_grid])
+            err_2[j] = np.median(errs_2[in_grid])
+
+        # plot percentiles
+        a1[i].plot(xmid, avg_1, color=cmap[i], lw=2, linestyle='-', zorder=6,label='Prospector')
+        bigax.plot(xmid, avg_1, color=cmap[i], lw=3.0, linestyle='-', zorder=6,label=zlabels[i])
+        a1[i].plot(xmid, avg_2, color=uvir_color, lw=2, linestyle='-.', zorder=6,label='UV+IR')
+
+        # redshift label
+        a1[i].text(opt['xt'],opt['yt'],zlabels[i],ha=opt['ha'],fontsize=fs,transform=a1[i].transAxes)
+
+        # fit above the mass-completeness limit
+        def fit_eqn(logm,a1,a2,b):
+            idx = (logm > 10.2)
+            logsfr = a1*(logm-10.2)+b
+            logsfr[idx] = a2*(logm[idx]-10.2)+b
+            return 10**logsfr
+
+        # for z=2-2.5
+        def fit_eqn_fixedslope(logm,a2,b):
+            idx = (logm > 10.2)
+            logsfr = 1.2*(logm-10.2)+b
+            logsfr[idx] = a2*(logm[idx]-10.2)+b
+            return 10**logsfr
+        eqn = fit_eqn
+        if i == 3:
+            eqn = fit_eqn_fixedslope
+
+
+        idx_cmp = (xmid > mcomplete[i])
+        xf, yf = np.meshgrid(xmid[idx_cmp],ymid)
+        xf, yf, weights = xf.flatten(), 10**yf.flatten(), grid1[idx_cmp,:].T.flatten()
+        gidx = weights > 0
+        popts, pcov = curve_fit(eqn,xf[gidx],yf[gidx],sigma=1./weights[gidx])
+        a1[i].plot(xmid,np.log10(eqn(xmid,*popts)),lw=2,color='k')
+        print popts
+
+        # labels
+        if i > 1:
+            a1[i].set_xlabel(opt['xtitle'],fontsize=fs)
+            bigax.set_xlabel(opt['xtitle'],fontsize=fs*1.3)
+            for tl in a1[i].get_xticklabels():tl.set_fontsize(fs)
+            for tl in bigax.get_xticklabels():tl.set_fontsize(fs*1.3)
+            a1[i].xaxis.set_major_locator(MaxNLocator(4))
+            bigax.xaxis.set_major_locator(MaxNLocator(4))
+        else:
+            for tl in a1[i].get_xticklabels():tl.set_visible(False)
+        if (i % 2 == 0):
+            a1[i].set_ylabel(opt['ytitle'],fontsize=fs)
+            bigax.set_ylabel(opt['ytitle'],fontsize=fs*1.3)
+            for tl in a1[i].get_yticklabels():tl.set_fontsize(fs)
+            for tl in bigax.get_yticklabels():tl.set_fontsize(fs*1.3)
+        else:
+            for tl in a1[i].get_yticklabels():tl.set_visible(False)
+
+    # labels, limits
+    for a in a1.tolist()+[bigax]: 
+        a.set_xlim(opt['xlim'])
+        a.set_ylim(opt['ylim'])
+
+    # turn off the bottom y-label
+    a1[0].legend(loc=2,prop={'size':fs*0.9}, scatterpoints=1,fancybox=True)
+
+    # finish off bigax plotting and labels
+    bigax.axhline(0, linestyle='-.', color='0.1', lw=2,zorder=10)
+    bigax.legend(loc=2, prop={'size':fs*0.9}, scatterpoints=1,fancybox=True,ncol=1)
+
+    plt.savefig(opt['outname'],dpi=dpi)
+    plt.close()
+
 def dm_dsfr_grid(data,datag,outfolder,outtable):
 
     # plot information
     fs, tick_fs, lw, ms = 11, 9.5, 3, 3.8
     dmopts = {
                'xlim': (8.5,11.5),
-               'ylim': (-1,1),
+               'ylim': (-0.7,0.7),
                'xtitle': 'log(M$_{\mathrm{FAST}}$/M$_{\odot}$)',
                'ytitle': 'log(M$_{\mathrm{Prosp}}$/M$_{\mathrm{FAST}}$)',
                'ytitle2': r'$\sigma$ [dex]',
                'xpar': data['fast']['stellar_mass'],
                'ypar': {q: data['prosp']['stellar_mass'][q] - data['fast']['stellar_mass'] for q in ['q50','q84','q16']},
                'grid': datag['grids']['logm_delm'],
-               'xbins': datag['grids']['logm'],
+               'xbins': datag['grids']['logm_fast'],
                'ybins': datag['grids']['delm'],
                'outname': outfolder+'conditional_dm_v_z.png',
                'table_out': outtable+'conditional_dm.dat',
-               'xt': 0.98, 'yt': 0.05, 'ha': 'right',
-               'legend_loc': 4, 'legend_ncol': 1
+               'xt': 0.97, 'yt': 0.04, 'ha': 'right',
+               'legend_loc': 4, 'legend_ncol': 1,
+               'dens_power': 1., 'xticks': [9,10,11]
                }
 
     dsfropts = {
-               'xlim': (-11,-8),
+               'xlim': (-10.8,-8),
                'ylim': (-2,0.999),
                'xtitle': 'log(sSFR$_{\mathrm{Prosp}}$/yr$^{-1}$)',
                'ytitle': 'log(SFR$_{\mathrm{Prosp}}$/SFR$_{\mathrm{UV+IR}}$)',
                'ytitle2': r'$\sigma$ [dex]',
-               'xpar': data['prosp']['ssfr_100']['q50'],
+               'xpar': data['prosp']['ssfr_30']['q50'],
                'ypar': data['prosp']['sfr_ratio'],
                'grid': datag['grids']['ssfr_delssfr'],
                'xbins': datag['grids']['ssfr'],
                'ybins': datag['grids']['delssfr'],
                'outname': outfolder+'conditional_dsfr_vs_z.png',
                'table_out': outtable+'conditional_dsfr.dat',
-               'xt': 0.98, 'yt': 0.05, 'ha': 'right',
-               'legend_loc': 4, 'legend_ncol': 1
+               'xt': 0.97, 'yt': 0.04, 'ha': 'right',
+               'legend_loc': 4, 'legend_ncol': 1,
+               'dens_power': 0.5, 'xticks': [-11,-10,-9,-8]
                }
 
     # redshift bins + colors
@@ -580,7 +816,7 @@ def dm_dsfr_grid(data,datag,outfolder,outtable):
             yidx = (opt['ybins']+dy > opt['ylim'][0]) & (opt['ybins']-dy <= opt['ylim'][1])
             plotgrid = grid[xidx[1:] & xidx[:-1], :]
             X, Y = np.meshgrid(opt['xbins'][xidx], opt['ybins'][yidx])
-            a1[i].pcolormesh(X, Y, np.sqrt(plotgrid[:,yidx[1:] & yidx[:-1]].T), cmap='Greys',label=zlabels[i])
+            a1[i].pcolormesh(X, Y, (plotgrid[:,yidx[1:] & yidx[:-1]].T)**opt['dens_power'], cmap='Greys',label=zlabels[i])
 
             # calculate percentiles of the conditional PDF
             # and errors
@@ -591,6 +827,9 @@ def dm_dsfr_grid(data,datag,outfolder,outtable):
                 q50[j], q84[j], q16[j] = weighted_quantile(ymid, np.array([0.5, 0.84, 0.16]), weights=grid[j,:])
                 in_grid = (opt['xpar'][idx] > opt['xbins'][j]) & (opt['xpar'][idx] <= opt['xbins'][j+1])
                 err[j] = np.median(errs[in_grid])
+                median[j] = np.median(opt['ypar']['q50'][idx][in_grid])
+                mdown[j] = np.median(opt['ypar']['q84'][idx][in_grid])
+                mup[j] = np.median(opt['ypar']['q16'][idx][in_grid])
 
             # plot percentiles
             a1[i].plot(xmid, q50, color=cmap[i], lw=2, linestyle='-', zorder=6,label='Prospector')
@@ -608,13 +847,13 @@ def dm_dsfr_grid(data,datag,outfolder,outtable):
                 bigax.set_xlabel(opt['xtitle'],fontsize=fs*1.3)
                 for tl in a1[i].get_xticklabels():tl.set_fontsize(fs)
                 for tl in bigax.get_xticklabels():tl.set_fontsize(fs*1.3)
-                a1[i].xaxis.set_major_locator(MaxNLocator(5))
-                bigax.xaxis.set_major_locator(MaxNLocator(5))
+                a1[i].xaxis.set_ticks(opt['xticks'])
+                bigax.xaxis.set_ticks(opt['xticks'])
             else:
                 for tl in a1[i].get_xticklabels():tl.set_visible(False)
             if (i % 2 == 0):
                 a1[i].set_ylabel(opt['ytitle'],fontsize=fs)
-                bigax.set_ylabel('median '+ opt['ytitle'],fontsize=fs*1.3)
+                bigax.set_ylabel(opt['ytitle'],fontsize=fs*1.3)
                 for tl in a1[i].get_yticklabels():tl.set_fontsize(fs)
                 for tl in bigax.get_yticklabels():tl.set_fontsize(fs*1.3)
             else:
@@ -624,7 +863,10 @@ def dm_dsfr_grid(data,datag,outfolder,outtable):
         for a in a1.tolist()+[bigax]: 
             a.set_xlim(opt['xlim'])
             a.set_ylim(opt['ylim'])
-        
+
+        # turn off the bottom xtick label, ytick label
+        a1[0].yaxis.get_major_ticks()[0].label1.set_visible(False)
+
         # finish off bigax plotting and labels
         bigax.axhline(0, linestyle='-.', color='0.1', lw=2,zorder=10)
         bigax.legend(loc=opt['legend_loc'], prop={'size':fs*0.9},
@@ -693,7 +935,7 @@ def prospector_versus_z(data,outname,popts):
     fig, axes = plt.subplots(2, 3, figsize = (10,6.66))
     axes = np.ravel(axes)
 
-    toplot = ['fagn','sfr_100','ssfr_100','avg_age','massmet_2','dust2']
+    toplot = ['fagn','sfr_30','ssfr_30','avg_age','massmet_2','dust2']
     for i,par in enumerate(toplot):
         zred = data['fast']['z']
         yprosp, yprosp_up, yprosp_down = data['prosp'][par]['q50'], data['prosp'][par]['q84'], data['prosp'][par]['q16']
@@ -701,7 +943,7 @@ def prospector_versus_z(data,outname,popts):
         ### clip SFRs
         if par[:3] == 'sfr':
             minimum = minsfr
-        elif par == 'ssfr_100':
+        elif par == 'ssfr_30':
             minimum = minlogssfr
         else:
             minimum = -np.inf
@@ -723,7 +965,7 @@ def prospector_versus_z(data,outname,popts):
             axes[i].text(zred[n/2]*1.1,tuniv[n/2]*1.1, r't$_{\mathrm{univ}}$',rotation=-50,color=red,weight='bold')
 
         # logscale
-        if par == 'sfr_100' or par == 'fagn':
+        if par == 'sfr_30' or par == 'fagn':
             axes[i].set_yscale('log',nonposx='clip',subsy=([3]))
             axes[i].yaxis.set_minor_formatter(FormatStrFormatter('%2.4g'))
             axes[i].yaxis.set_major_formatter(FormatStrFormatter('%2.4g'))
@@ -826,7 +1068,9 @@ def phot_residuals(data,outfolder,popts_orig):
     plt.close()
 
 def mass_met_age_z(data,outfolder,outtable,popts):
-    
+    """this is now replaced by conditionals! 2/26/18
+    """
+
     # plot information
     fs, lw, ms = 12, 3, 5.5
     metopts = {
@@ -909,7 +1153,6 @@ def mass_met_age_z(data,outfolder,outtable,popts):
                 bigax.plot(opt['sdss'][:,0], opt['sdss'][:,1], color=color, lw=lw_z0, zorder=-1, label='Gallazzi+05')
                 bigax.plot(opt['sdss'][:,0],opt['sdss'][:,2], color=color, lw=lw_z0, linestyle='--', zorder=1)
                 bigax.plot(opt['sdss'][:,0],opt['sdss'][:,3], color=color, lw=lw_z0, linestyle='--', zorder=1)
-
 
             # running median
             weights = ((xm_up-xm_down)/2.)**(-2)
@@ -1179,10 +1422,10 @@ def uvir_comparison(data, outname, popts, model_uvir = False, ssfr=False, filena
 
     # load up Prospector data
     if ssfr:
-        prosp, prosp_up, prosp_down = [np.clip(10**data['prosp']['ssfr_100'][q][good],minssfr,np.inf) for q in ['q50','q84','q16']]
+        prosp, prosp_up, prosp_down = [np.clip(10**data['prosp']['ssfr_30'][q][good],minssfr,np.inf) for q in ['q50','q84','q16']]
         prosp_label = 'sSFR$_{\mathrm{Prosp}}$'
     else:
-        prosp, prosp_up, prosp_down = [np.clip(data['prosp']['sfr_100'][q][good],minsfr,np.inf) for q in ['q50','q84','q16']]
+        prosp, prosp_up, prosp_down = [np.clip(data['prosp']['sfr_30'][q][good],minsfr,np.inf) for q in ['q50','q84','q16']]
         prosp_label = 'SFR$_{\mathrm{Prosp}}$'
     prosp_err = prosp_dutils.asym_errors(prosp, prosp_up, prosp_down, log=False)
 
@@ -1355,7 +1598,7 @@ def sfr_mass_density_comparison(data, outfolder=None):
 
     sfr_options = {
                    'xdata': np.log10(np.clip(data['uvir_sfr'],0.001,np.inf)),
-                   'ydata': np.log10(np.clip(data['prosp']['sfr_100']['q50'],0.001,np.inf)),
+                   'ydata': np.log10(np.clip(data['prosp']['sfr_30']['q50'],0.001,np.inf)),
                    'min': -3,
                    'max': 5,
                    'ylabel': r'N*SFR',

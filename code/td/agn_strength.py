@@ -15,7 +15,6 @@ red = '#FF3D0D'
 dpi = 210
 cmap = 'cool'
 minsfr = 0.01
-filename =  os.getenv('APPS') + '/prospector_alpha/plots/td_huge/fast_plots/data/agn.h5'
 
 opts = {
           'xlim': (9, 11.5),               # x-limit
@@ -75,7 +74,7 @@ def agn_table(stack, outtable):
     formats['z'] = str
     ascii.write(odat, outtable, format='aastex',overwrite=True, formats=formats)
 
-def collate_data(runname, filename=filename, regenerate=False, **opts):
+def collate_data(runname, filename=None, regenerate=False, **opts):
     """ pull out all of the necessary information from the individual data files
     this takes awhile, so this data is saved to disk.
     """
@@ -221,7 +220,6 @@ def stack_agn_bins(data,**opts):
 
                         fmir_perc += [(chain > 0.1).sum() / float(n_in_bin)]
 
-                        print n
                     mid, up, down = np.percentile(fmir_perc,[50,84,16])
                     out[zlabel]['q50_stack'] += [mid]
                     out[zlabel]['q84_stack'] += [up]

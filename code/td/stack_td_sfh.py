@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import os, hickle, td_io, prosp_dutils, copy
 from prospector_io import load_prospector_data
 from astropy.cosmology import WMAP9
-import td_huge_params as pfile
+import td_new_params as pfile
 from matplotlib.ticker import MaxNLocator, FormatStrFormatter
 from dynesty.plotting import _quantile as weighted_quantile
 from collections import OrderedDict
@@ -30,12 +30,12 @@ def do_all(runname='td_huge', outfolder=None, regenerate=False, regenerate_stack
               'nbins_vertical':4,              # number of bins in vertical stack
               'horizontal_bin_colors': ['#45ADA8','#FC913A','#FF4E50'],
               'vertical_bin_colors': ['red','#FC913A','#45ADA8','#323299'],
-              'low_mass_cutoff':9.0,          # log(M) where we stop stacking and plotting
+              'low_mass_cutoff':9.5,          # log(M) where we stop stacking and plotting
               'ylim_horizontal_sfr': (-0.8,3),
-              'ylim_horizontal_ssfr': (5e-12,4e-9),
+              'ylim_horizontal_ssfr': (0.5e-12,4e-9),
               'ylim_vertical_sfr': (-3,3),
-              'ylim_vertical_ssfr': (1.5e-13,9e-9),
-              'xlim_t': (3e7,9.9e9),
+              'ylim_vertical_ssfr': (0.8e-13,5e-9),
+              'xlim_t': (3e6,9.9e9),
               'show_disp':[0.16,0.84],         # percentile of population distribution to show on plot
               'adjust_sfr': -0.25,             # adjust whitaker SFRs by how much?
               'zbins': [(0.5,1.),(1.,1.5),(1.5,2.),(2.,2.5)]
@@ -69,7 +69,7 @@ def collate_data(runname, filename=None, regenerate=False, **opts):
         return outdict
 
     # define output containers
-    outvar = ['stellar_mass','sfr_100','half_time']
+    outvar = ['stellar_mass','sfr_30', 'sfr_100','half_time']
     outdict = {q: {f: [] for f in ['q50','q84','q16']} for q in outvar}
     for f in ['objname','agebins', 'weights', 'z_fraction', 'zred']: outdict[f] = [] 
 
@@ -103,7 +103,11 @@ def collate_data(runname, filename=None, regenerate=False, **opts):
 
         # extra variables
         for v in outvar:
-            for f in ['q50','q84','q16']: outdict[v][f] += [prosp['extras'][v][f]]
+            for f in ['q50','q84','q16']: 
+                try:
+                    outdict[v][f] += [prosp['extras'][v][f]]
+                except KeyError:
+                    outdict[v][f] += [prosp['extras']['sfr_100'][f]]
 
     # dump files and return
     hickle.dump(outdict,open(filename, "w"))
@@ -139,7 +143,7 @@ def stack_sfh(data, **opts):
         # calculate SFR(MS) for each galaxy
         # perhaps should calculate at z_gal for accuracy?
         stellar_mass = np.log10(data['stellar_mass']['q50'])[zidx]
-        logsfr = np.log10(data['sfr_100']['q50'])[zidx]
+        logsfr = np.log10(data['sfr_30']['q50'])[zidx]
         logsfr_ms = sfr_ms(zavg,stellar_mass,**opts)
         on_ms = (stellar_mass > opts['low_mass_cutoff']) & \
                 (np.abs(logsfr - logsfr_ms) < opts['sigma_sf'])
@@ -306,7 +310,7 @@ def plot_stacked_sfh(dat,outfolder,**opts):
                              **stack_plot_opts)
 
         # labels and ranges
-        ax[0,j].set_xlabel(r'log(M$_{*}$)',fontsize=fontsize)
+        ax[0,j].set_xlabel(r'log(M$_{*}$/M$_{\odot}$)',fontsize=fontsize)
         ax[0,j].set_xlim(dat['hor'][zstr]['mass_bins'].min()-0.5,dat['hor'][zstr]['mass_bins'].max()+0.5)
         ax[0,j].set_ylim(opts['ylim_horizontal_sfr'])
         ax[0,j].tick_params('both', pad=3.5, size=3.5, width=1.0, which='both',labelsize=fontsize)
@@ -396,7 +400,7 @@ def plot_stacked_sfh(dat,outfolder,**opts):
         ax[0,j].set_xlim(xlim)
         ax[0,j].set_ylim(opts['ylim_vertical_sfr'])
         ax[0,j].tick_params('both', pad=3.5, size=3.5, width=1.0, which='both',labelsize=fontsize)
-        ax[0,j].set_xlabel(r'log(M$_{*}$)',fontsize=fontsize)
+        ax[0,j].set_xlabel(r'log(M$_{*}$/M$_{\odot}$)',fontsize=fontsize)
 
         ax[1,j].set_xlim(opts['xlim_t'])
         ax[1,j].set_ylim(opts['ylim_vertical_ssfr'])
@@ -440,8 +444,8 @@ def plot_stacked_sfh(dat,outfolder,**opts):
 
         
         if j == 0:
-            ax[0,j].set_ylabel(r'log(SFR)',fontsize=fontsize)
-            ax[1,j].set_ylabel(r'median SFR$_{\mathrm{bin}}$ / M$_{\mathrm{tot}}$ [yr$^{-1}$]',fontsize=fontsize)
+            ax[0,j].set_ylabel(r'log(SFR M$_{\odot}$ yr$^{-1}$)',fontsize=fontsize)
+            ax[1,j].set_ylabel(r'median SFR(t)/M$_{\mathrm{tot}}$ [yr$^{-1}$]',fontsize=fontsize)
             ax[0,j].text(0.98, 0.92, opts['zbin_labels'][j],ha='right',transform=ax[0,j].transAxes,fontsize=fontsize)
 
             handles, labels = ax[0,j].get_legend_handles_labels()
