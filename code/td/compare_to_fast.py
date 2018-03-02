@@ -679,9 +679,9 @@ def sfr_m_grid(data,datag,outfolder):
             err_2[j] = np.median(errs_2[in_grid])
 
         # plot percentiles
-        a1[i].plot(xmid, avg_1, color=cmap[i], lw=2, linestyle='-', zorder=6,label='Prospector')
-        bigax.plot(xmid, avg_1, color=cmap[i], lw=3.0, linestyle='-', zorder=6,label=zlabels[i])
-        a1[i].plot(xmid, avg_2, color=uvir_color, lw=2, linestyle='-.', zorder=6,label='UV+IR')
+        #a1[i].plot(xmid, avg_1, color=cmap[i], lw=2, linestyle='-', zorder=6,label='Prospector')
+        #bigax.plot(xmid, avg_1, color=cmap[i], lw=3.0, linestyle='-', zorder=6,label=zlabels[i])
+        #a1[i].plot(xmid, avg_2, color=uvir_color, lw=2, linestyle='-.', zorder=6,label='UV+IR')
 
         # redshift label
         a1[i].text(opt['xt'],opt['yt'],zlabels[i],ha=opt['ha'],fontsize=fs,transform=a1[i].transAxes)
@@ -703,14 +703,16 @@ def sfr_m_grid(data,datag,outfolder):
         if i == 3:
             eqn = fit_eqn_fixedslope
 
+        for i, (lab, col, grd) in enumerate(zip(['Prospector','UV+IR'],[cmap[i],uvir_color],[grid1,grid2])):
+            idx_cmp = (xmid > mcomplete[i])
+            xf, yf = np.meshgrid(xmid[idx_cmp],ymid)
+            xf, yf, weights = xf.flatten(), 10**yf.flatten(), grd[idx_cmp,:].T.flatten()
+            gidx = weights > 0
+            popts, pcov = curve_fit(eqn,xf[gidx],yf[gidx],sigma=1./weights[gidx])
+            a1[i].plot(xmid,np.log10(eqn(xmid,*popts)),lw=2,color=col,label=lab)
 
-        idx_cmp = (xmid > mcomplete[i])
-        xf, yf = np.meshgrid(xmid[idx_cmp],ymid)
-        xf, yf, weights = xf.flatten(), 10**yf.flatten(), grid1[idx_cmp,:].T.flatten()
-        gidx = weights > 0
-        popts, pcov = curve_fit(eqn,xf[gidx],yf[gidx],sigma=1./weights[gidx])
-        a1[i].plot(xmid,np.log10(eqn(xmid,*popts)),lw=2,color='k')
-        print popts
+            if i == 0:
+                bigax.plot(xmid, np.log10(eqn(xmid,*popts)), color=cmap[i], lw=3.0, linestyle='-', zorder=6,label=zlabels[i])
 
         # labels
         if i > 1:
