@@ -66,6 +66,17 @@ def select_new(phot=None,fast=None,zbest=None,gris=None,**extras):
                    (zbest['z_best'] >= 0.5) & (zbest['z_best'] <= 2.5))
     return idx
 
+def select_new_supp(phot=None,fast=None,zbest=None,gris=None,**extras):
+
+    from plot_sample_selection import mass_completeness
+
+    idx_old = select_new(phot=phot,fast=fast,zbest=zbest,gris=gris,**extras)[0]
+    idx = np.where((phot['use_phot'] == 1) & \
+                   (mass_completeness(zbest['z_best']) < fast['lmass']) & \
+                   (zbest['z_best'] >= 0.5) & (zbest['z_best'] <= 2.5))[0]
+    idx_supp = idx[~np.in1d(idx,idx_old)]
+    return idx_supp
+
 def td_cut(out):
     """ select galaxies spaced evenly in z, mass, sSFR
     """
@@ -128,6 +139,12 @@ new_sample = {
              'runname': 'td_new',
              'rm_zp_offsets': True,
               }
+
+new_supp_sample = {
+                    'selection_function': select_new_supp,
+                    'runname': 'td_new',
+                    'rm_zp_offsets': True,
+                    }
 
 huge_sample = {
              'selection_function': select_huge,
@@ -383,7 +400,7 @@ def build_sample_lyc():
     ascii.write([out['ids']], output=id_str_out, Writer=ascii.NoHeader,overwrite=True)
 
 def build_sample_dynamics(sample=dynamic_sample,print_match=True):
-    """finds Rachel's galaxies in the threedhst catalogs
+    """finds Rachel's galaxies in the 3dhst catalogs
     matches on distance < 3 arcseconds and logM < 0.4 dex
     this will FAIL if we have two identical IDs in UDS/COSMOS... unlikely but if used
     in the future as a template for multi-field runs, beware!!!
@@ -393,6 +410,9 @@ def build_sample_dynamics(sample=dynamic_sample,print_match=True):
     bez = load_rachel_sample()
     matching_radius = 3 # in arcseconds
     matching_mass = 0.4 # in dex
+
+    # note: converting to physical sizes, not comoving. I assume matches Rachel's catalog
+    arcsec_size = bez['Re']*WMAP9.arcsec_per_kpc_proper(bez['z']).value
 
     # output formatting
     fields = ['COSMOS','UDS']
@@ -410,19 +430,16 @@ def build_sample_dynamics(sample=dynamic_sample,print_match=True):
         mips = td_io.load_mips_data(field)
         gris = td_io.load_grism_dat(field,process=True)
         morph = td_io.load_morphology(field,'F160W')
-
-        # note: converting to physical sizes, not comoving. I assume matches Rachel's catalog
-        arcsec_size = bez['Re']*WMAP9.arcsec_per_kpc_proper(bez['z']).value
+        rf = td_io.load_rf_v41(field)
 
         # match
         match, bezmatch_flag, dist = [], [], []
         threed_cat = coords.SkyCoord(ra=phot['ra']*u.degree, 
-                                 dec=phot['dec']*u.degree)
+                                     dec=phot['dec']*u.degree)
         for i in range(len(bez)):
             bzcat = coords.SkyCoord(ra=bez['RAdeg'][i]*u.deg,dec=bez['DEdeg'][i]*u.deg)  
             close_mass = np.where((np.abs(fast['lmass']-bez[i]['logM']) < matching_mass) & \
-                         (fast['z'] < 2.0) & \
-                         (phot['use_phot'] == 1))[0]
+                                  (phot['use_phot'] == 1))[0]
                          
             idx, d2d, d3d = bzcat.match_to_catalog_sky(threed_cat[close_mass])
             if d2d.value*3600 < matching_radius:
@@ -431,9 +448,11 @@ def build_sample_dynamics(sample=dynamic_sample,print_match=True):
                 dist.append(d2d.value[0]*3600)
             else:
                 bezmatch_flag.append(False)
+
         print '{0} galaxies matched in {1}'.format(len(match),field)
         if len(match) == 0:
             continue
+
         # full match
         bezmatch_flag = np.array(bezmatch_flag,dtype=bool)
         phot = phot[match]
@@ -442,13 +461,13 @@ def build_sample_dynamics(sample=dynamic_sample,print_match=True):
         mips = mips[match]
         morph = morph[match]
         gris = gris[match]
+        rf = rf[match]
 
         # print out relevant parameters for visual inspection
-        if print_match:
-            for kk,cat in enumerate(bez[bezmatch_flag]):
-                print 'dM:{0},\t dz:{1},\t dr:{2},\t dist:{3}'.format(\
-                      fast[kk]['lmass']-bez[kk]['logM'], fast[kk]['z']-bez[kk]['z'], morph[kk]['re']-arcsec_size[kk],dist[kk])
-        
+        for kk in range(bezmatch_flag.sum()):   
+            print 'dM:{0},\t dz:{1},\t dr:{2},\t dist:{3}'.format(\
+                   fast[kk]['lmass']-bez[bezmatch_flag][kk]['logM'], fast[kk]['z']-bez[bezmatch_flag][kk]['z'], morph[kk]['re']-arcsec_size[kk],dist[kk])
+
         # assemble ancillary data
         phot['f_MIPS_24um'] = mips['f24tot']
         phot['e_MIPS_24um'] = mips['ef24tot']
@@ -460,6 +479,9 @@ def build_sample_dynamics(sample=dynamic_sample,print_match=True):
             elif name == 'z':
                 zbest['z_sfr'] = mips[name]
         for name in gris.dtype.names: zbest[name] = gris[name]
+
+        # save UVJ cut in .dat file
+        zbest['uvj'] = calc_uvj_flag(rf)
 
         # rename bands in photometric catalogs
         for column in phot.colnames:

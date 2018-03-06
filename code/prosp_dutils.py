@@ -99,29 +99,6 @@ def asym_errors(center, up, down, log=False):
 
     return errarray
 
-def running_median_insort(seq, window_size):
-    """Contributed by Peter Otten"""
-    from collections import deque
-    from bisect import insort, bisect_left
-    from itertools import islice
-
-    seq = iter(seq)
-    d = deque()
-    s = []
-    result = []
-    for item in islice(seq, window_size):
-        d.append(item)
-        insort(s, item)
-        result.append(s[len(d)//2])
-    m = window_size // 2
-    for item in seq:
-        old = d.popleft()
-        d.append(item)
-        del s[bisect_left(s, old)]
-        insort(s, item)
-        result.append(s[m])
-    return result
-
 def running_median(x,y,nbins=10,avg=False,weights=None,bins=None,return_bincount=False):
 
     if bins is None:

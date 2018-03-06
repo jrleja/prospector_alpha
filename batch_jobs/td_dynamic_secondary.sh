@@ -7,9 +7,9 @@
 ### Requested computing time in minutes
 #SBATCH -t 960
 ### Partition or queue name
-#SBATCH -p conroy,serial_requeue
+#SBATCH -p conroy,shared,serial_requeue,conroy-intel
 ### memory per cpu, in MB
-#SBATCH --mem-per-cpu=6500
+#SBATCH --mem-per-cpu=4000
 ### Job name
 #SBATCH -J '3d_ha_sec'
 ### output and error logs
@@ -21,6 +21,9 @@
 IDFILE=$APPS"/prospector_alpha/data/3dhst/td_dynamic.ids"
 OBJID=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$IDFILE")
 
-python $APPS/prospector_alpha/code/extra_output.py \
+python $APPS/prospector_alpha/code/td/postprocessing.py \
 $APPS/prospector_alpha/parameter_files/td_dynamic_params.py \
---outname="$APPS"/prospector_alpha/results/td_dynamic/"$OBJID"
+--objname="$OBJID" \
+--overwrite=True \
+--plot=True \
+--shorten_spec=True

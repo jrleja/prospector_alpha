@@ -330,9 +330,9 @@ def collate_data(runname, runname_fast, filename=None, filename_grid=None, regen
                                 bins=[outg['grids']['logm_fast'],outg['grids']['delm']])
         g2,_,_ = np.histogram2d(ssfr,delssfr,normed=True,weights=prosp['weights'], 
                                 bins=[outg['grids']['ssfr'],outg['grids']['delssfr']])
-        g3,_,_ = np.histogram2d(logm,logsfr,normed=True,weights=prosp['weights'], 
+        g3,_,_ = np.histogram2d(logm_fast,logsfr,normed=True,weights=prosp['weights'], 
                                 bins=[outg['grids']['logm'],outg['grids']['logsfr']])
-        g4,_,_ = np.histogram2d(logm,logsfr_p_uvir,normed=True,weights=prosp['weights'], 
+        g4,_,_ = np.histogram2d(logm_fast,logsfr_p_uvir,normed=True,weights=prosp['weights'], 
                                 bins=[outg['grids']['logm'],outg['grids']['logsfr']])
 
         outg['grids']['logm_delm'] += [g1]
@@ -400,8 +400,9 @@ def do_all(runname='td_massive', runname_fast='fast_mimic',outfolder=None,**opts
     if len(data['uvir_sfr']) > 4000:
         popts = {'fmt':'o', 'capthick':.05,'elinewidth':.05,'alpha':0.2,'color':'0.3','ms':0.5, 'errorevery': 5000}
 
-    sfr_m_grid(data, datag, outfolder)
-    print 1/0
+    sfr_m_grid(data, datag, outfolder+'conditional_sfr_m.png',outfile=outfolder+'data/conditional_sfr_fit.h5')
+    sfr_m_grid(data, datag, outfolder+'conditional_sfr_m_nofix.png',fix=False,outfile=outfolder+'data/conditional_sfr_fit_nofix.h5')
+
     dm_dsfr_grid(data, datag, outfolder, outtable)
 
     deltam_with_redshift(data['fast'], data['prosp'], data['fast']['z'], outfolder+'deltam_vs_z.png', filename=outfolder+'data/masscomp.h5')
@@ -596,7 +597,7 @@ def fast_comparison(fast,prosp,parlabels,pnames,outname,popts,flabel='FAST',plab
     plt.savefig(outname,dpi=dpi)
     plt.close()
 
-def sfr_m_grid(data,datag,outfolder):
+def sfr_m_grid(data,datag,outname,fix=True,outfile=None):
     """plots the AVERAGE of the CONDITIONAL PDF for star formation rate(M) for ALL GALAXIES
     """
 
@@ -618,7 +619,6 @@ def sfr_m_grid(data,datag,outfolder):
                'grid2': datag['grids']['logm_loguvirsfr'],
                'xbins': datag['grids']['logm'],
                'ybins': datag['grids']['logsfr'],
-               'outname': outfolder+'conditional_sfr_m.png',
                'xt': 0.98, 'yt': 0.05, 'ha': 'right',
                'dens_power': 0.5
                }
@@ -630,9 +630,9 @@ def sfr_m_grid(data,datag,outfolder):
     zlabels = ['$'+"{0:.1f}".format(zbins[i])+'<z<'+"{0:.1f}".format(zbins[i+1])+'$' for i in range(nbins)]
 
     # plot geometry
-    fig, a1 = plt.subplots(2, 2, figsize = (10.5,6.5))
+    fig, ax = plt.subplots(2, 2, figsize = (10.5,6.5))
     fig.subplots_adjust(right=0.985,left=0.54,hspace=0.0,wspace=0.0)
-    a1 = np.ravel(a1)
+    ax = np.ravel(ax)
     bigax = fig.add_axes([0.11, 0.25, 0.31, 0.47])
 
     # grid information
@@ -640,6 +640,9 @@ def sfr_m_grid(data,datag,outfolder):
     dx, dy = opt['xbins'][1] - opt['xbins'][0], opt['ybins'][1] - opt['ybins'][0]
     xmid = (opt['xbins'][:-1] + opt['xbins'][1:])*0.5
     ymid = (opt['ybins'][:-1] + opt['ybins'][1:])*0.5
+
+    # out variables
+    a1, a2, b, a1_uvir, a2_uvir, b_uvir = [], [], [], [], [], []
 
     for i in range(nbins):
 
@@ -656,7 +659,7 @@ def sfr_m_grid(data,datag,outfolder):
 
         # plot the PDF
         X, Y = np.meshgrid(opt['xbins'][xidx], opt['ybins'][yidx])
-        a1[i].pcolormesh(X, Y, (plotgrid1[:,yidx[1:] & yidx[:-1]].T)**opt['dens_power'], cmap='Greys',label=zlabels[i])
+        ax[i].pcolormesh(X, Y, (plotgrid1[:,yidx[1:] & yidx[:-1]].T)**opt['dens_power'], cmap='Greys',label=zlabels[i])
 
         # calculate percentiles of the conditional PDF
         # and errors
@@ -679,73 +682,92 @@ def sfr_m_grid(data,datag,outfolder):
             err_2[j] = np.median(errs_2[in_grid])
 
         # plot percentiles
-        #a1[i].plot(xmid, avg_1, color=cmap[i], lw=2, linestyle='-', zorder=6,label='Prospector')
+        #ax[i].plot(xmid, avg_1, color=cmap[i], lw=2, linestyle='-', zorder=6,label='Prospector')
         #bigax.plot(xmid, avg_1, color=cmap[i], lw=3.0, linestyle='-', zorder=6,label=zlabels[i])
-        #a1[i].plot(xmid, avg_2, color=uvir_color, lw=2, linestyle='-.', zorder=6,label='UV+IR')
-
-        # redshift label
-        a1[i].text(opt['xt'],opt['yt'],zlabels[i],ha=opt['ha'],fontsize=fs,transform=a1[i].transAxes)
+        #ax[i].plot(xmid, avg_2, color=uvir_color, lw=2, linestyle='-.', zorder=6,label='UV+IR')
 
         # fit above the mass-completeness limit
-        def fit_eqn(logm,a1,a2,b):
+        def fit_eqn(logm,b,a1,a2):
             idx = (logm > 10.2)
-            logsfr = a1*(logm-10.2)+b
-            logsfr[idx] = a2*(logm[idx]-10.2)+b
+            logsfr = a2*(logm-10.2)+b
+            logsfr[idx] = a1*(logm[idx]-10.2)+b
             return 10**logsfr
 
         # for z=2-2.5
-        def fit_eqn_fixedslope(logm,a2,b):
+        def fit_eqn_fixedslope(logm,b,a1):
             idx = (logm > 10.2)
-            logsfr = 1.2*(logm-10.2)+b
-            logsfr[idx] = a2*(logm[idx]-10.2)+b
+            logsfr = 0.87*(logm-10.2)+b
+            logsfr[idx] = a1*(logm[idx]-10.2)+b
             return 10**logsfr
         eqn = fit_eqn
-        if i == 3:
+        if (i == 3) & (fix):
             eqn = fit_eqn_fixedslope
+            a2.append(0.87)
 
-        for i, (lab, col, grd) in enumerate(zip(['Prospector','UV+IR'],[cmap[i],uvir_color],[grid1,grid2])):
+        for n, (lab, col, grd,sty) in enumerate(zip(['Prospector','UV+IR'],[cmap[i],uvir_color],[grid1,grid2],['-','-.'])):
             idx_cmp = (xmid > mcomplete[i])
             xf, yf = np.meshgrid(xmid[idx_cmp],ymid)
             xf, yf, weights = xf.flatten(), 10**yf.flatten(), grd[idx_cmp,:].T.flatten()
             gidx = weights > 0
             popts, pcov = curve_fit(eqn,xf[gidx],yf[gidx],sigma=1./weights[gidx])
-            a1[i].plot(xmid,np.log10(eqn(xmid,*popts)),lw=2,color=col,label=lab)
+            ax[i].plot(xmid,np.log10(eqn(xmid,*popts)),lw=2,color=col,label=lab,linestyle=sty)
 
-            if i == 0:
-                bigax.plot(xmid, np.log10(eqn(xmid,*popts)), color=cmap[i], lw=3.0, linestyle='-', zorder=6,label=zlabels[i])
+            if n == 0:
+                bigax.plot(xmid, np.log10(eqn(xmid,*popts)), color=col, lw=3.0, label=zlabels[i])
+                a1 += [popts[1]]
+                b += [popts[0]]
+                try:
+                    a2 += [popts[2]]
+                except:
+                    a2 += [a2[-1]]
+            else:
+                a1_uvir += [popts[1]]
+                b_uvir += [popts[0]]
+                try:
+                    a2_uvir += [popts[2]]
+                except:
+                    a2_uvir += [a2[-1]]
+
+        # redshift label
+        ax[i].text(opt['xt'],opt['yt'],zlabels[i],ha=opt['ha'],fontsize=fs,transform=ax[i].transAxes)
 
         # labels
         if i > 1:
-            a1[i].set_xlabel(opt['xtitle'],fontsize=fs)
+            ax[i].set_xlabel(opt['xtitle'],fontsize=fs)
             bigax.set_xlabel(opt['xtitle'],fontsize=fs*1.3)
-            for tl in a1[i].get_xticklabels():tl.set_fontsize(fs)
+            for tl in ax[i].get_xticklabels():tl.set_fontsize(fs)
             for tl in bigax.get_xticklabels():tl.set_fontsize(fs*1.3)
-            a1[i].xaxis.set_major_locator(MaxNLocator(4))
+            ax[i].xaxis.set_major_locator(MaxNLocator(4))
             bigax.xaxis.set_major_locator(MaxNLocator(4))
         else:
-            for tl in a1[i].get_xticklabels():tl.set_visible(False)
+            for tl in ax[i].get_xticklabels():tl.set_visible(False)
         if (i % 2 == 0):
-            a1[i].set_ylabel(opt['ytitle'],fontsize=fs)
+            ax[i].set_ylabel(opt['ytitle'],fontsize=fs)
             bigax.set_ylabel(opt['ytitle'],fontsize=fs*1.3)
-            for tl in a1[i].get_yticklabels():tl.set_fontsize(fs)
+            for tl in ax[i].get_yticklabels():tl.set_fontsize(fs)
             for tl in bigax.get_yticklabels():tl.set_fontsize(fs*1.3)
         else:
-            for tl in a1[i].get_yticklabels():tl.set_visible(False)
+            for tl in ax[i].get_yticklabels():tl.set_visible(False)
 
     # labels, limits
-    for a in a1.tolist()+[bigax]: 
+    for a in ax.tolist()+[bigax]: 
         a.set_xlim(opt['xlim'])
         a.set_ylim(opt['ylim'])
 
     # turn off the bottom y-label
-    a1[0].legend(loc=2,prop={'size':fs*0.9}, scatterpoints=1,fancybox=True)
+    ax[0].legend(loc=2,prop={'size':fs*0.9}, scatterpoints=1,fancybox=True)
 
     # finish off bigax plotting and labels
     bigax.axhline(0, linestyle='-.', color='0.1', lw=2,zorder=10)
     bigax.legend(loc=2, prop={'size':fs*0.9}, scatterpoints=1,fancybox=True,ncol=1)
 
-    plt.savefig(opt['outname'],dpi=dpi)
+    plt.savefig(outname,dpi=dpi)
     plt.close()
+
+    # save
+    if outfile is not None:
+        out = {'a1': a1, 'a2': a2, 'b': b, 'a1_uvir': a1_uvir,'a2_uvir': a2_uvir, 'b_uvir': b_uvir}
+        hickle.dump(out,open(outfile, "w"))
 
 def dm_dsfr_grid(data,datag,outfolder,outtable):
 
@@ -1267,7 +1289,7 @@ def star_forming_sequence(sfr,mass,zred,outname,popts,xlabel=None,ylabel=None,ou
     whitopts = {'color':'#dd1c77','alpha':0.85,'lw':1.5,'zorder':5,'linestyle':'-.'}
 
     # let's go!
-    mass_save, sfr_save, sfr_ratio_save = [], [], [] 
+    mass_save, sfr_save = [], []
     for i in range(len(zbins)-1):
 
         # the data
@@ -1309,8 +1331,8 @@ def star_forming_sequence(sfr,mass,zred,outname,popts,xlabel=None,ylabel=None,ou
         # the Whitaker+14 model
         # if it's an array, it's UV+IR SFRs. plot it separately.
         if type(plt_whit) == np.ndarray:
-            x, y = prosp_dutils.running_median(mass[in_bin], 10**plt_whit[in_bin], bins=mbins,avg=True)
-            ax[i].plot(x,y, **whitopts)
+            nx, ny = prosp_dutils.running_median(mass[in_bin], 10**plt_whit[in_bin], bins=mbins,avg=True)
+            ax[i].plot(nx,ny, **whitopts)
             ax[0].text(0.02,0.93,'UV+IR SFRs',color=whitopts['color'],transform=ax[0].transAxes)
         elif plt_whit:
             sfr_whit = 10**sfr_ms(zwhit[i],logm_whit)
@@ -1326,7 +1348,7 @@ def star_forming_sequence(sfr,mass,zred,outname,popts,xlabel=None,ylabel=None,ou
             ax[i].text(xlim[0]+0.3,ssfr_max+xlim[0]+1.5,'Prospector prior',rotation=30,fontsize=8)
             ax[i].plot([xlim[0],xlim[1]],[ssfr_max+xlim[0],ssfr_max+xlim[1]],**prior_opts)
 
-        # save information, including ratio if we have UV+IR sfrs
+        # save masses and star formation rates
         mass_save += x.tolist()
         sfr_save += [y.tolist()]
 
@@ -1348,7 +1370,7 @@ def star_forming_sequence(sfr,mass,zred,outname,popts,xlabel=None,ylabel=None,ou
 
     # save data
     if outfile is not None:
-        out = {'mass':x,'sfr':np.array(sfr_save).T,'z':zwhit, 'sfr_ratio': np.array(sfr_ratio_save).T}
+        out = {'mass':x,'sfr':np.array(sfr_save).T,'z':zwhit}
         hickle.dump(out,open(outfile, "w"))
 
     plt.savefig(outname,dpi=150)
