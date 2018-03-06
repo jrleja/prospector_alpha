@@ -71,8 +71,13 @@ def select_new_supp(phot=None,fast=None,zbest=None,gris=None,**extras):
     from plot_sample_selection import mass_completeness
 
     idx_old = select_new(phot=phot,fast=fast,zbest=zbest,gris=gris,**extras)[0]
+
+    zarr = np.array([0.75,1.25,1.75,2.25])
+    x = np.subtract.outer(zbest['z_best'], zarr)
+    z_rounded = zarr[np.argmin(abs(x), axis=1)]
+
     idx = np.where((phot['use_phot'] == 1) & \
-                   (mass_completeness(zbest['z_best']) < fast['lmass']) & \
+                   (fast['lmass'] > mass_completeness(z_rounded)) & \
                    (zbest['z_best'] >= 0.5) & (zbest['z_best'] <= 2.5))[0]
     idx_supp = idx[~np.in1d(idx,idx_old)]
     return idx_supp
@@ -142,7 +147,7 @@ new_sample = {
 
 new_supp_sample = {
                     'selection_function': select_new_supp,
-                    'runname': 'td_new',
+                    'runname': 'td_new_supp',
                     'rm_zp_offsets': True,
                     }
 
@@ -154,7 +159,7 @@ huge_sample = {
 
 huge_supp_sample = {
                     'selection_function': select_huge_supp,
-                    'runname': 'td_huge',
+                    'runname': 'td_huge_supp',
                     'rm_zp_offsets': True,
                     }
 

@@ -604,7 +604,7 @@ def sfr_m_grid(data,datag,outname,fix=True,outfile=None):
     # plot information
     fs, tick_fs, lw, ms = 11, 9.5, 3, 3.8
     mcomplete = np.array([8.82,9.27,9.67,9.86])
-    #mcomplete = np.array([8.82,9.27,9.5,9.5])
+    #mcomplete_new = np.array([8.45,8.96,9.29,9.45])
 
     opt = {
                'xlim': (8.5,11.5),

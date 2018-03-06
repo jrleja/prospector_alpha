@@ -48,17 +48,26 @@ def load_master(filename=None,regenerate=False,sids=None):
 
     return outdict
 
-def select_huge(dat):
-    idx = np.where(((dat['z_best_u68'] - dat['z_best_l68'])/2. < 0.1) & \
-                   (dat['f_F160W'] / dat['e_F160W'] > 10) & \
-                   (dat['zbest'] - dat['fast_z'] < 0.01)) # this SHOULDN'T matter but some of the FAST z's are not zbest!
-    return idx
-
 def select_huge_supp(dat):
     idx = np.where(((dat['z_best_u68'] - dat['z_best_l68'])/2. < 0.25) & \
                    (dat['f_F160W'] / dat['e_F160W'] > 10) & \
                    (dat['zbest'] >= 0.5) & (dat['zbest'] <= 2.5))
     return idx
+
+def select_new_supp(dat):
+
+    from plot_sample_selection import mass_completeness
+
+    idx_old = select_huge_supp(dat)[0]
+
+    zarr = np.array([0.75,1.25,1.75,2.25])
+    x = np.subtract.outer(dat['zbest'], zarr)
+    z_rounded = zarr[np.argmin(abs(x), axis=1)]
+
+    idx = np.where((dat['fast_logmass'] > mass_completeness(z_rounded)) & \
+                   (dat['zbest'] >= 0.5) & (dat['zbest'] <= 2.5))[0]
+    idx_add = idx[~np.in1d(idx,idx_old)]
+    return np.concatenate((idx_old,idx_add))
 
 def do_all(runname='td_new',outfolder=None,regenerate=False,**opts):
     """compare sample selection to parent 3D-HST sample
@@ -161,7 +170,7 @@ def plot(data, outfolder=None, density_plot=False, verbose=False, reselect_sampl
             # define sample
             if reselect_sample:
                 #sample_idx = select_huge(data)
-                sample_idx = select_huge_supp(data)
+                sample_idx = select_new_supp(data)
             else:
                 sample_idx = [data['sidx']]
 
@@ -246,7 +255,7 @@ def plot(data, outfolder=None, density_plot=False, verbose=False, reselect_sampl
                 comp = np.convolve(comp, np.ones((N,))/N, mode='valid')
                 
                 # now calculate 90% completeness
-                print 'zred={0}, mass completeness={1}'.format((zbin[0]+zbin[1])/2.,fbins[np.abs(comp - 0.9) < 0.01].min())
+                print 'zred={0}, mass completeness={1}'.format((zbin[0]+zbin[1])/2.,np.interp(0.9,comp,fbins))
 
                 # now plot   
                 axcomp[i].plot(fbins, comp, lw=1.5,color='k')
