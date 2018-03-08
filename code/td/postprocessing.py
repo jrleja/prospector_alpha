@@ -73,7 +73,8 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True, measure_
         eout['thetas'][p] = {'q50': q50, 'q16': q16, 'q84': q84}
 
     # extras
-    extra_parnames = ['avg_age','half_time','sfr_100','ssfr_100','ssfr_30','sfr_30','stellar_mass','lir','luv','lmir','lbol','luv_young','lir_young']
+    extra_parnames = ['avg_age','lwa_rband','lwa_lbol','half_time','sfr_100','ssfr_100','ssfr_30','sfr_30',\
+                      'stellar_mass','lir','luv','lmir','lbol','luv_young','lir_young']
     if 'fagn' in parnames:
         extra_parnames += ['l_agn', 'fmir', 'luv_agn', 'lir_agn']
     for p in extra_parnames: eout['extras'][p] = deepcopy(fmt)
@@ -124,7 +125,6 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True, measure_
         sfh_params = prosp_dutils.find_sfh_params(res['model'],thetas,res['obs'],sps,sm=sm)
         eout['extras']['stellar_mass']['chain'][jj] = sfh_params['mass']
         eout['sfh']['sfh'][jj,:] = prosp_dutils.return_full_sfh(eout['sfh']['t'], sfh_params)
-        eout['extras']['avg_age']['chain'][jj] = prosp_dutils.massweighted_age(sfh_params)
         eout['extras']['half_time']['chain'][jj] = prosp_dutils.halfmass_assembly_time(sfh_params)
         eout['extras']['sfr_100']['chain'][jj] = prosp_dutils.calculate_sfr(sfh_params, 0.1,  minsfr=-np.inf, maxsfr=np.inf)
         eout['extras']['ssfr_100']['chain'][jj] = eout['extras']['sfr_100']['chain'][jj].squeeze() / eout['extras']['stellar_mass']['chain'][jj].squeeze()
@@ -170,6 +170,11 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True, measure_
         out = prosp_dutils.measure_restframe_properties(sps, model = nodep_model, thetas = nagn_thetas, measure_ir = True, measure_luv = True)
         eout['extras']['luv_young']['chain'][jj] = out['luv']
         eout['extras']['lir_young']['chain'][jj] = out['lir']
+
+        # ages
+        eout['extras']['avg_age']['chain'][jj], eout['extras']['lwa_lbol']['chain'][jj], \
+        eout['extras']['lwa_rband']['chain'][jj] = prosp_dutils.all_ages(thetas,res['model'],sps)
+
 
         '''
         # rohan special

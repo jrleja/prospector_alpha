@@ -528,16 +528,49 @@ def exp_decl_sfh_avg_age(tage,tau):
     return tage-tavg
 
 def sfh_half_time(x,sfh_params,c):
+    """wrapper for use with halfmass assembly time
+    """
 
-    '''
-    wrapper for use with halfmass assembly time
-    '''
     # check for nonparametric
     if sfh_params['sf_start'].shape[0] == 0:
         sf_start = 0.0
     else:
         sf_start = sfh_params['sf_start']
     return integrate_sfh(sf_start,x,sfh_params)-c
+
+def all_ages(theta,mod,sps):
+    """calculates light-weighted (L_bol and r-band) ages and mass-weighted ages
+    all in Gyr
+    """
+    # zred=0
+    zsave = mod.params['zred']
+    mod.params['zred'] = 0.0
+
+    # no dust
+    ndust_thetas = copy.copy(theta)
+    for par in ['dust1','dust1_fraction','dust2']:
+        if par in mod.theta_labels():
+            ndust_thetas[mod.theta_index[par]] = 0.0
+
+    # fake obs
+    fake_obs = {'maggies': None, 'phot_mask': None, 'wavelength': None,  'filters': []}
+
+    # Lbol light-weighted and mass-weighted ages
+    sps.ssp.params['compute_light_ages'] = True
+    spec, mags, sm = mod.mean_model(ndust_thetas, fake_obs, sps=sps)
+    lwa_lbol = sps.ssp.log_lbol
+    mwa = sps.ssp.stellar_mass
+
+    # and this gets us the r-band light weighted age
+    # this must come after the model call above, which sets tabular SFH etc
+    _, _, tmax = sps.convert_sfh(sps.params['agebins'], sps.params['mass'])
+    lwa_rband = sps.ssp.get_mags(bands=['SDSS_r'],tage=tmax)[0]
+
+    # restore defaults and return
+    mod.params['zred'] = zsave
+    sps.ssp.params['compute_light_ages'] = False
+
+    return mwa, lwa_lbol, lwa_rband
 
 def massweighted_age(sfh_params):
     """calculate mass-weighted age.

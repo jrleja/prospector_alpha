@@ -312,9 +312,8 @@ def collate_data(runname, runname_fast, filename=None, filename_grid=None, regen
 
         # grid calculations
         # these are clipped to the edges in the Y-direction (otherwise they're counted as NaNs!)
-        # add in 0.1 dex Gaussian error to FAST masses for smoothing purposes
-        # ^ only do this if we're inside the mass boundaries to begin with, else galaxies below the mass limit
-        # dominate!
+        # add in 0.1 dex Gaussian error to FAST masses for smoothing purposes. only do this if we're 
+        # inside the mass boundaries to begin with, else galaxies below the mass limit dominate!
         fsm, nchain = outfast['stellar_mass'][-1], prosp['extras']['stellar_mass']['chain'].shape[0]
         if fsm < outg['grids']['logm_fast'][0]:
             logm_fast = np.repeat(fsm,nchain)

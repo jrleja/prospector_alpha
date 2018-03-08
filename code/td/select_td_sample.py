@@ -79,7 +79,7 @@ def select_new_supp(phot=None,fast=None,zbest=None,gris=None,**extras):
     idx = np.where((phot['use_phot'] == 1) & \
                    (fast['lmass'] > mass_completeness(z_rounded)) & \
                    (zbest['z_best'] >= 0.5) & (zbest['z_best'] <= 2.5))[0]
-    idx_supp = idx[~np.in1d(idx,idx_old)]
+    idx_supp = np.unique(np.concatenate((idx,idx_old)))
     return idx_supp
 
 def td_cut(out):
@@ -140,7 +140,7 @@ def td_cut(out):
     return out
 
 new_sample = {
-             'selection_function': select_new,
+             'selection_function': select_new_supp,
              'runname': 'td_new',
              'rm_zp_offsets': True,
               }
