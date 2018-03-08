@@ -65,7 +65,7 @@ def to_dust1(dust1_fraction=None, dust1=None, dust2=None, **extras):
 
 def tie_gas_logz(logzsol=None, **extras):
     return logzsol
-    
+
 #############
 # MODEL_PARAMS
 #############
@@ -321,7 +321,7 @@ for param in model_params:
 model_params = tparams
 
 ###### Redefine SPS ######
-class NebSFH(FastStepBasis):
+class NebSFH(CSPSpecBasis):
     
     @property
     def emline_wavelengths(self):
