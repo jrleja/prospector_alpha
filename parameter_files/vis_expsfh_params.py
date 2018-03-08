@@ -59,6 +59,13 @@ def transform_logmass_to_mass(mass=None, logmass=None, **extras):
 
 def transform_logtau_to_tau(tau=None, logtau=None, **extras):
     return 10**logtau
+
+def to_dust1(dust1_fraction=None, dust1=None, dust2=None, **extras):
+    return dust1_fraction*dust2
+
+def tie_gas_logz(logzsol=None, **extras):
+    return logzsol
+    
 #############
 # MODEL_PARAMS
 #############
