@@ -50,11 +50,11 @@ def find_filters(key):
     # here we go
     filters = []
     if key >= 1:
-        filters += ['sdss_r']
+        filters += ['sdss_r0']
     if key >= 2:
-        filters += ['sdss_g']
+        filters += ['sdss_g0']
     if key >= 3:
-        filters += ['sdss_u','sdss_i','sdss_z']
+        filters += ['sdss_u0','sdss_i0','sdss_z0']
     if key >= 4:
         filters += ['twomass_J','twomass_H','twomass_Ks']
     if key >= 5:
@@ -68,7 +68,7 @@ def find_filters(key):
     if key >= 9:
         filters += ['herschel_spire_250','herschel_spire_350','herschel_spire_500']
     if key == 10:
-        filters = ['galex_FUV','galex_NUV','sdss_u','sdss_g','sdss_r','sdss_i','sdss_z','twomass_J','twomass_H','twomass_Ks','wise_w3']
+        filters = ['galex_FUV','galex_NUV','sdss_u0','sdss_g0','sdss_r0','sdss_i0','sdss_z0','twomass_J','twomass_H','twomass_Ks','wise_w3']
     return filters
 
 def load_obs(filter_key=1, **extras):
