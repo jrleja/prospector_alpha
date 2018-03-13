@@ -602,7 +602,7 @@ def sfr_m_grid(data,datag,outname,fix=True,outfile=None):
 
     # plot information
     fs, tick_fs, lw, ms = 11, 9.5, 3, 3.8
-    mcomplete = np.array([8.82,9.27,9.67,9.86])
+    #mcomplete = np.array([8.3,8.88,9.67,9.86])
     #mcomplete_new = np.array([8.45,8.96,9.29,9.45])
 
     opt = {
@@ -627,12 +627,14 @@ def sfr_m_grid(data,datag,outname,fix=True,outfile=None):
     zbins = np.linspace(0.5,2.5,5)
     nbins = len(zbins)-1
     zlabels = ['$'+"{0:.1f}".format(zbins[i])+'<z<'+"{0:.1f}".format(zbins[i+1])+'$' for i in range(nbins)]
+    from plot_sample_selection import mass_completeness
+    mcomplete = mass_completeness((zbins[1:]+zbins[:-1])/2.)
 
     # plot geometry
     fig, ax = plt.subplots(2, 2, figsize = (10.5,6.5))
-    fig.subplots_adjust(right=0.985,left=0.54,hspace=0.0,wspace=0.0)
+    fig.subplots_adjust(right=0.985,left=0.49,hspace=0.065,wspace=0.065,top=0.95,bottom=0.1)
     ax = np.ravel(ax)
-    bigax = fig.add_axes([0.11, 0.25, 0.31, 0.47])
+    bigax = fig.add_axes([0.09, 0.275, 0.31, 0.5])
 
     # grid information
     ngrid = opt['xbins'].shape[0]
@@ -816,11 +818,10 @@ def dm_dsfr_grid(data,datag,outfolder,outtable):
     # loop over options
     for opt in [dmopts,dsfropts]:
 
-        # plot geometry
         fig, a1 = plt.subplots(2, 2, figsize = (10.5,6.5))
-        fig.subplots_adjust(right=0.985,left=0.54,hspace=0.0,wspace=0.0)
+        fig.subplots_adjust(right=0.985,left=0.49,hspace=0.065,wspace=0.065,top=0.95,bottom=0.1)
         a1 = np.ravel(a1)
-        bigax = fig.add_axes([0.11, 0.25, 0.31, 0.47])
+        bigax = fig.add_axes([0.09, 0.275, 0.31, 0.5])
 
         # grid information
         ngrid = opt['xbins'].shape[0]
@@ -1140,10 +1141,10 @@ def mass_met_age_z(data,outfolder,outtable,popts):
     for opt in [metopts,ageopts]:
 
         # plot geometry
-        fig, axes = plt.subplots(2, 2, figsize = (10.35,6))
-        fig.subplots_adjust(right=0.985,left=0.5,hspace=0.0,wspace=0.0)
-        bigax = fig.add_axes([0.09, 0.25, 0.31, 0.5])
+        fig, axes = plt.subplots(2, 2, figsize = (10.5,6.5))
+        fig.subplots_adjust(right=0.985,left=0.49,hspace=0.065,wspace=0.065,top=0.95,bottom=0.1)
         axes = np.ravel(axes)
+        bigax = fig.add_axes([0.09, 0.275, 0.31, 0.5])
 
         # massbins
         massbins = np.linspace(opt['xlim'][0],opt['xlim'][1],opt['nmassbins']+1)

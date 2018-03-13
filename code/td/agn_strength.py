@@ -18,7 +18,7 @@ minsfr = 0.01
 
 opts = {
           'xlim': (9, 11.5),               # x-limit
-          'ylim': (0.00,0.53),              # y-limit
+          'ylim': (0.00,0.3),              # y-limit
           'fmir_grid': 10**np.linspace(np.log10(1e-4),np.log10(1),500),
           'xshift': 0.02,                  # x-shift between mass bins
           'nmassbins': 8,                  # number of mass bins
@@ -32,7 +32,7 @@ opts = {
 opts['massbins'] = np.linspace(opts['xlim'][0],opts['xlim'][1],opts['nmassbins']+1)
 opts['zbin_labels'] = ["{0:.1f}".format(z1)+'<z<'+"{0:.1f}".format(z2) for (z1, z2) in opts['zbins']]
 
-def do_all(runname='td_huge', outfolder=None, data=None, stack=None, regenerate=False):
+def do_all(runname='td_new', outfolder=None, data=None, stack=None, regenerate=False):
 
     if outfolder is None:
         outfolder = os.getenv('APPS') + '/prospector_alpha/plots/'+runname+'/fast_plots/'
@@ -46,6 +46,11 @@ def do_all(runname='td_huge', outfolder=None, data=None, stack=None, regenerate=
     if stack is None:
         stack = stack_agn_bins(data, **opts)
         return stack
+
+    # print some information
+    z1, z2, m1, m2 = 0.5, 1.0, 10.4, 10.6
+    idx = (np.array(data['zred']) > 0.5) & (np.array(data['zred']) < 1) & (np.log10(data['stellar_mass']['q50']) > m1) & (np.log10(data['stellar_mass']['q50']) < m2)
+    print np.median((np.log10(data['fmir']['q84']) - np.log10(data['fmir']['q16']))[idx])
 
     outname = 'agn_strength'
     if opts['tenth_percentile']:

@@ -21,7 +21,7 @@ jansky_mks = 1e-26
 APPS = os.getenv('APPS')
 run_params = {'verbose':True,
               'debug': False,
-              'outfile': APPS+'/prospector_alpha/results/td_new/AEGIS_3',
+              'outfile': APPS+'/prospector_alpha/results/td_new/AEGIS_13',
               'nofork': True,
               # dynesty params
               'nested_bound': 'multi', # bounding method
@@ -40,7 +40,7 @@ run_params = {'verbose':True,
               # Data info (phot = .cat, dat = .dat, fast = .fout)
               'datdir':APPS+'/prospector_alpha/data/3dhst/',
               'runname': 'td_new',
-              'objname':'AEGIS_3'
+              'objname':'AEGIS_13'
               }
 ############
 # OBS

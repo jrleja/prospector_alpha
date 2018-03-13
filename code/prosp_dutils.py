@@ -563,7 +563,10 @@ def all_ages(theta,mod,sps):
 
     # and this gets us the r-band light weighted age
     # this must come after the model call above, which sets tabular SFH etc
-    _, _, tmax = sps.convert_sfh(sps.params['agebins'], sps.params['mass'])
+    if hasattr(sps,'convert_sfh'):
+        _, _, tmax = sps.convert_sfh(sps.params['agebins'], sps.params['mass'])
+    else:
+        tmax = sps.ssp.params['tage']
     lwa_rband = sps.ssp.get_mags(bands=['SDSS_r'],tage=tmax)[0]
 
     # restore defaults and return

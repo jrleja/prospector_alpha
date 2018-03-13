@@ -16,15 +16,15 @@ def setup_gridspec():
     left, top = 0.08,0.98 # margins
 
     sedax, resax = [], []
-    axwid, axheight, delx = 0.21, 0.8, 0.0
+    axwid, axheight, delx = 0.21, 0.8, 0.012
 
-    left = [left, left+axwid, left+axwid*2, left+axwid*3]
+    left = [left, left+axwid+delx, left+(axwid+delx)*2, left+(axwid+delx)*3]
     right = [left[0]+axwid, left[1]+axwid, left[2]+axwid, left[3]+axwid]
     top = np.repeat(top,4)
     bot = np.repeat(top-axheight,4)
     for i in xrange(4):
         gs = gridspec.GridSpec(2,1, height_ratios=[2,1])
-        gs.update(left=left[i],right=right[i],bottom=bot[i],top=top[i],hspace=0)
+        gs.update(left=left[i],right=right[i],bottom=bot[i],top=top[i],hspace=delx*5.5)
         ax_sed, ax_res = plt.Subplot(fig, gs[0]), plt.Subplot(fig, gs[1])
         fig.add_subplot(ax_sed)
         fig.add_subplot(ax_res)
@@ -55,8 +55,6 @@ def select_huge_supp(dat):
     return idx
 
 def select_new_supp(dat):
-
-    from plot_sample_selection import mass_completeness
 
     idx_old = select_huge_supp(dat)[0]
 
@@ -135,6 +133,7 @@ def plot(data, outfolder=None, density_plot=False, verbose=False, reselect_sampl
                     'norm': 1e13, # this is arbitrary, to remove power from matplotlib y-axis
                     'name': 'rhomass_selection'+basename+'.png',
                     'complete': mass_completeness,
+                    'limtext':'depth limit\nof data',
                     'ahead_width': 0.1, 'ahead_length': 6,'tshift':0.1,'t_ha':'left'
                    }
 
@@ -147,6 +146,7 @@ def plot(data, outfolder=None, density_plot=False, verbose=False, reselect_sampl
                     'norm': 1e4, # this is arbitrary, to remove power from matplotlib y-axis
                     'name': 'rhosfr_selection'+basename+'.png',
                     'complete': sfr_completeness,
+                    'limtext':'3$\sigma$ MIPS\ndetection limit',
                     'ahead_width': 0.15, 'ahead_length': 9,'tshift':-0.09,'t_ha':'right'
                    }
 
@@ -226,7 +226,7 @@ def plot(data, outfolder=None, density_plot=False, verbose=False, reselect_sampl
                           head_width=opt['ahead_width'], head_length=opt['ahead_length'], width=opt['ahead_width']/5.,
                           length_includes_head=True,color='black')
             if i == 0:
-                ax[i,0].text(comp+opt['tshift'],opt['ylim'][0]+3,'depth limit\nof data',fontsize=8,
+                ax[i,0].text(comp+opt['tshift'],opt['ylim'][0]+3,opt['limtext'],fontsize=8,
                              ha=opt['t_ha'],ma='center') 
 
             # density distribution
@@ -260,10 +260,11 @@ def plot(data, outfolder=None, density_plot=False, verbose=False, reselect_sampl
                 # now plot   
                 axcomp[i].plot(fbins, comp, lw=1.5,color='k')
                 axcomp[i].axhline(0.9,linestyle='--',color='0.3',zorder=-1,alpha=0.8)
+                axcomp[i].axhline(1.0,linestyle=':',color='k',zorder=-1,alpha=0.8)
                 axcomp[i].text(opt['xlim'][1]-(opt['xlim'][1]-opt['xlim'][0])*0.01,0.86,r'90% of survey',fontsize=8,color='0.3',ha='right',va='top')
                 axcomp[i].set_xlabel(opt['xlabel'])
                 axcomp[i].set_xlim(opt['xlim'])
-                axcomp[i].set_ylim(0.5,1.1)
+                axcomp[i].set_ylim(0.5,1.05)
 
                 # y-labels
                 if i > 0:

@@ -1,7 +1,7 @@
 import numpy as np
 import os
 from prospect.models import priors, sedmodel
-from prospect.sources import CSPBasis
+from prospect.sources import CSPSpecBasis
 from sedpy import observate
 from astropy.cosmology import WMAP9
 from td_io import load_zp_offsets
@@ -15,7 +15,7 @@ APPS = os.getenv('APPS')
 
 run_params = {'verbose':True,
               'debug': False,
-              'outfile': APPS+'/prospector_alpha/results/fast_mimic/AEGIS_531',
+              'outfile': APPS+'/prospector_alpha/results/fast_mimic/AEGIS_13',
               'nofork': True,
               # Optimizer params
               'ftol':0.5e-5, 
@@ -39,7 +39,7 @@ run_params = {'verbose':True,
               # Data info (phot = .cat, dat = .dat, fast = .fout)
               'datdir':APPS+'/prospector_alpha/data/3dhst/',
               'runname': 'fast_mimic',
-              'objname':'AEGIS_531'
+              'objname':'AEGIS_13'
               }
 
 ############
@@ -54,7 +54,7 @@ def load_obs(objname=None, datdir=None, err_floor=0.05, zperr=True, **extras):
     '''
 
     ### open file, load data
-    photname = datdir + objname.split('_')[0] + '_td_massive.cat'
+    photname = datdir + objname.split('_')[0] + '_td_new.cat'
     with open(photname, 'r') as f:
         hdr = f.readline().split()
     dtype = np.dtype([(hdr[1],'S20')] + [(n, np.float) for n in hdr[2:]])
@@ -270,7 +270,7 @@ for param in model_params:
 model_params = tparams
 
 def load_sps(**extras):
-    sps = CSPBasis(**extras)
+    sps = CSPSpecBasis(**extras)
     return sps
 
 def load_model(objname=None, datdir=None, agelims=[], **extras):
@@ -284,7 +284,7 @@ def load_model(objname=None, datdir=None, agelims=[], **extras):
     dat = np.loadtxt(datname, comments = '#', delimiter=' ',
                      dtype = dtype)
     '''
-    fastname = datdir + objname.split('_')[0] + '_td_massive.fout'
+    fastname = datdir + objname.split('_')[0] + '_td_new.fout'
 
     with open(fastname, 'r') as f:
         hdr = f.readline().split()
