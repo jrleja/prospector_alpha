@@ -970,7 +970,6 @@ def integrate_delayed_tau(t1,t2,sfh):
     return (np.exp(-t1/sfh['tau'])*(1+t1/sfh['tau']) - \
            np.exp(-t2/sfh['tau'])*(1+t2/sfh['tau']))*sfh['tau']**2
 
-
 def integrate_linramp(t1,t2,sfh):
 
     # integration constant: SFR(sf_trunc-sf_start)

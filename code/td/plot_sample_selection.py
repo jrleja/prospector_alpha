@@ -83,8 +83,8 @@ def do_all(runname='td_new',outfolder=None,regenerate=False,**opts):
     sids = np.genfromtxt('/Users/joel/code/python/prospector_alpha/data/3dhst/'+runname+'.ids',
                          dtype=[('objnames', '|S40')])['objnames'].tolist()
     data = load_master(filename=outfolder+'data/master.hickle',regenerate=regenerate,sids=sids)
-
     for key in data: data[key] = np.array(data[key])
+
     # plot
     plot(data, outfolder=outfolder,**opts)
 
@@ -169,7 +169,7 @@ def plot(data, outfolder=None, density_plot=False, verbose=False, reselect_sampl
 
             # define sample
             if reselect_sample:
-                #sample_idx = select_huge(data)
+                #sample_idx = select_huge_supp(data)
                 sample_idx = select_new_supp(data)
             else:
                 sample_idx = [data['sidx']]

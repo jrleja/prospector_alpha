@@ -629,7 +629,7 @@ def sfr_m_grid(data,datag,outname,fix=True,outfile=None):
     zlabels = ['$'+"{0:.1f}".format(zbins[i])+'<z<'+"{0:.1f}".format(zbins[i+1])+'$' for i in range(nbins)]
     from plot_sample_selection import mass_completeness
     mcomplete = mass_completeness((zbins[1:]+zbins[:-1])/2.)
-
+    print mcomplete
     # plot geometry
     fig, ax = plt.subplots(2, 2, figsize = (10.5,6.5))
     fig.subplots_adjust(right=0.985,left=0.49,hspace=0.065,wspace=0.065,top=0.95,bottom=0.1)

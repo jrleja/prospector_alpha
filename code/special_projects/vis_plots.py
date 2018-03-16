@@ -4,7 +4,7 @@ import os, hickle, td_io, prosp_dutils
 from prospector_io import load_prospector_data
 from scipy.ndimage import gaussian_filter as norm_kde
 from matplotlib.ticker import FormatStrFormatter
-import vis_params
+import vis_params, vis_expsfh_params
 from sedpy.observate import load_filters
 from dynesty.plotting import _quantile as quantile
 from matplotlib.ticker import MaxNLocator
@@ -59,7 +59,7 @@ def collate_data(runname, filename=None, regenerate=False, **opts):
     for i, name in enumerate(out['names']):
         
         try:
-            res, _, mod, eout = load_prospector_data(None,runname='vis',objname=name)
+            res, _, mod, eout = load_prospector_data(None,runname=runname,objname=name)
             out['weights'] += [eout['weights']]
         except TypeError:
             print name +' is not available'
@@ -89,6 +89,7 @@ def collate_data(runname, filename=None, regenerate=False, **opts):
         # grab data
         if i == 0:
             sps = vis_params.load_sps(**vis_params.run_params)
+        mod = vis_params.load_model(**vis_params.run_params)
         mod.params.update(res['obs']['true_params'])
         mod.params['nebemlineinspec'] = np.atleast_1d(True)
         res['obs']['true_spec'], _, _ = mod.mean_model(mod.theta, res['obs'], sps=sps)
@@ -140,10 +141,13 @@ def do_all(runname='vis', outfolder=None,**opts):
     data = collate_data(runname,filename=outfolder+'data/dat.h5',**opts)
     for i in range(len(data['filters'])): data['filters'][i] = load_filters(data['filters'][i])
 
-    data['mod'] = vis_params.load_model(**vis_params.run_params)
-    plot_addfilts(data,outfolder)
+    if runname == 'vis':
+        data['mod'] = vis_params.load_model(**vis_params.run_params)
+    else:
+        data['mod'] = vis_expsfh_params.load_model(**vis_expsfh_params.run_params)
+    plot_addfilts(data,outfolder,runname)
 
-def plot_addfilts(data,outfolder):
+def plot_addfilts(data,outfolder,runname):
 
     # loop over fits
     names_to_loop = ['1']+data['names'][:-1].tolist()
@@ -182,7 +186,7 @@ def plot_addfilts(data,outfolder):
                     max = plot_pdf(a,samp,data['weights'][idx])
                 if (p == 'ssfr_100') & (i == 0):
                     ssfr_prior = samp
-                plot_prior(a,data['mod'],p,max,ssfr_prior=ssfr_prior)
+                plot_prior(a,data['mod'],p,max,runname,ssfr_prior=ssfr_prior)
                 a.axvline(data['truths'][p], linestyle='-', color=colors['truth'],lw=lw,zorder=1)
                 a.set_xlabel(trans[p],fontsize=fs_global-1)
 
@@ -227,7 +231,7 @@ def make_fig(posterior=True,phot=None):
     dely = 0.037
     if phot is not None:
         fnames = [f.name for f in phot]
-        sdss = ['sdss_u','sdss_g','sdss_r','sdss_i','sdss_z']
+        sdss = ['sdss_u','sdss_g','sdss_r','sdss_i','sdss_z','sdss_u0','sdss_g0','sdss_r0','sdss_i0','sdss_z0']
         match = ''.join([f[-1] if f in fnames else '' for f in sdss])
         if len(match) > 0:
             fig.text(xt,yt, 'optical: SDSS '+r'${0}$'.format("".join(match)),
@@ -360,34 +364,42 @@ def plot_pdf(ax,samples,weights):
 
     return y0.max()
 
-def plot_prior(ax,mod,par,max,nsamp=100000,ssfr_prior=None):
+def plot_prior(ax,mod,par,max,runname,nsamp=100000,ssfr_prior=None):
     """plot prior by using information from Prospector prior object
     """
     
     # for some of these we custom sample a prior
     # for most, we use the built-in Prospector prior object
     parsamp = None
-    if (par == 'ssfr_100') | (par == 'mean_age'):
+    if (par == 'ssfr_100'):
+        prior = ssfr_prior
+    elif (par == 'mean_age'):
 
+        if runname == 'vis':
 
-        # grab zfraction prior, sample
-        logmass = 1 # doesn't matter, but needs definition
-        zprior = mod._config_dict['z_fraction']['prior']
-        agebins = mod.params['agebins']
-        mass = np.zeros(shape=(agebins.shape[0],nsamp))
+            # grab zfraction prior, sample
+            logmass = 1 # doesn't matter, but needs definition
+            zprior = mod._config_dict['z_fraction']['prior']
+            agebins = mod.params['agebins']
+            mass = np.zeros(shape=(agebins.shape[0],nsamp))
 
-        # convert to mass in bins
-        for n in range(nsamp): mass[:,n] = vis_params.zfrac_to_masses(logmass=logmass, z_fraction=zprior.sample(), agebins=agebins)
+            # convert to mass in bins
+            for n in range(nsamp): mass[:,n] = vis_params.zfrac_to_masses(logmass=logmass, z_fraction=zprior.sample(), agebins=agebins)
 
-        # final conversion
-        # convert to sSFR or mean age
-        time_per_bin = 10**agebins[0,1] - 10**agebins[0,0]
-        age_in_bin = np.sum(10**agebins,axis=-1)/2.
-        if par == 'ssfr_100':
-            # prior = np.log10(mass[0,:]/time_per_bin/mass.sum(axis=0))
-            prior = ssfr_prior
-        elif par == 'mean_age':
+            # final conversion
+            # convert to sSFR or mean age
+            time_per_bin = 10**agebins[0,1] - 10**agebins[0,0]
+            age_in_bin = np.sum(10**agebins,axis=-1)/2.
             prior = ((age_in_bin[:,None] * mass).mean(axis=0) / mass.mean(axis=0))/1e9
+
+        elif runname == 'vis_expsfh':
+
+            tage_prior = mod._config_dict['tage']['prior']
+            logtau_prior = mod._config_dict['logtau']['prior']
+
+            tage_samp = tage_prior.distribution.rvs(size=nsamp,*tage_prior.args,loc=tage_prior.loc,scale=tage_prior.scale)
+            tau_samp = 10**logtau_prior.distribution.rvs(size=nsamp,*logtau_prior.args,loc=logtau_prior.loc,scale=logtau_prior.scale)
+            prior = np.array([prosp_dutils.exp_decl_sfh_avg_age(ta,tau) for (ta,tau) in zip(tage_samp,tau_samp)])
 
     elif par == 'dust1_fraction':
 

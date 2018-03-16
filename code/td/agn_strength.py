@@ -48,9 +48,9 @@ def do_all(runname='td_new', outfolder=None, data=None, stack=None, regenerate=F
         return stack
 
     # print some information
-    z1, z2, m1, m2 = 0.5, 1.0, 10.4, 10.6
-    idx = (np.array(data['zred']) > 0.5) & (np.array(data['zred']) < 1) & (np.log10(data['stellar_mass']['q50']) > m1) & (np.log10(data['stellar_mass']['q50']) < m2)
-    print np.median((np.log10(data['fmir']['q84']) - np.log10(data['fmir']['q16']))[idx])
+    #z1, z2, m1, m2 = 0.5, 2.5, 10.9, 11.1
+    #idx = (np.array(data['zred']) > z1) & (np.array(data['zred']) < z2) & (np.log10(data['stellar_mass']['q50']) > m1) & (np.log10(data['stellar_mass']['q50']) < m2)
+    #print np.median((np.log10(data['fmir']['q84']) - np.log10(data['fmir']['q16']))[idx])/2.
 
     outname = 'agn_strength'
     if opts['tenth_percentile']:
