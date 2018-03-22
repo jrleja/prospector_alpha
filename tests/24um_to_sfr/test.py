@@ -6,14 +6,14 @@ from astropy.cosmology import WMAP9
 
 # initialize model
 try:
-    mod2
+    mod
 except NameError:
-    #mod = pfile.load_model(**pfile.run_params)
-    mod2 = pfile.load_model(zred=6,**pfile.run_params)
+    mod = pfile.load_model(**pfile.run_params)
+    #mod2 = pfile.load_model(zred=6,**pfile.run_params)
     sps = pfile.load_sps(**pfile.run_params)
     obs = pfile.load_obs(**pfile.run_params)
-    #_, _, _ = mod.mean_model(mod.initial_theta, obs, sps=sps)
-    _, _, _ = mod2.mean_model(mod2.initial_theta, obs, sps=sps)
+    _, _, _ = mod.mean_model(mod.initial_theta, obs, sps=sps)
+    #_, _, _ = mod2.mean_model(mod2.initial_theta, obs, sps=sps)
 
 def ascii_write(mags,v1,v2,v1_name,v2_name,outname):
 
@@ -90,9 +90,8 @@ def sfr_flux_relationship():
     mags *= flux_conversion
 
     # plot values
-    colors = ['#e31a1c', '#ff7f00','#33a02c','#1f78b4','#6a3d9a']
-    labels = ['A$_V$=1','A$_V$=2','A$_V$=3']
-    labels = ['10$\mu$m','15$\mu$m','18$\mu$m','21$\mu$m','24$\mu$m']
+    colors = ['#e31a1c', '#ff7f00','#33a02c','#1f78b4','#6a3d9a','ochre']
+    labels = ['10$\mu$m','12$\mu$m','15$\mu$m','18$\mu$m','21$\mu$m','24$\mu$m']
     fig, ax = plt.subplots(1,2, figsize=(7, 3.5))
 
     zred_idx = np.abs(zred_grid-2).argmin()
@@ -136,7 +135,7 @@ def sfr_flux_relationship():
     fig, ax = plt.subplots(1,1, figsize=(4, 4))
 
     for j in range(5): ax.plot(zred_grid,np.log10(mags[:,0,j]/mags[:,-1,j]),'o-',color=colors[j],label=labels[j],lw=1.4,ms=2.4)
-    ax.set_ylim(-1,0)
+    ax.set_ylim(-1.5,0)
     ax.legend()
     ax.set_ylabel(r'log(f$_{\nu}$/f$_{\nu,AGN}$)')
     ax.set_xlabel(r'redshift')

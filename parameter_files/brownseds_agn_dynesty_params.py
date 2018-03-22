@@ -47,11 +47,8 @@ run_params = {'verbose':True,
 #############
 
 def translate_filters(bfilters, full_list = False):
-    '''
-    translate filter names to FSPS standard
-    this is ALREADY a mess, clean up soon!
-    suspect there are smarter routines to do this in python-fsps
-    '''
+    """translate filter names to FSPS standard
+    """
 
     # this is necessary for my code
     # to calculate effective wavelength

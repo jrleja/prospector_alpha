@@ -16,6 +16,39 @@ plotopts = {
          'zorder':-2
         } 
 
+def make_master_catalog():
+    """makes master catalog for selecting objects
+    CATALOG 1 (FOR ME): Objname, RA, DEC, PA, box dimensions, expected Br gamma luminosity, recessional velocity, 
+    nearby OH lines + strengths, sSFR, metallicity, (nearby bright stars)?, (non-sidereal tracking?)
+    CATALOG 2 (CSV): Objname, RA, DEC, equinox (J2000), non-sidereal tracking rate
+        -- this is 2' per 10 minutes in direction perpendicular to PA, in [d(RA), d(DEC)]
+    
+    order by brightness, for galaxies with no strong OH lines
+    """
+
+
+def oh_lines(lam,v,dv=500):
+    """ data from Oliva+15 http://adsabs.harvard.edu/abs/2015A%26A...581A..47O
+    return list of lines + strengths for a given lambda (Angstrom), velocity, and velocity width (km/s)
+    strengths are normalized such that strongest line is 10^4
+    """
+
+    dloc = '/Users/joel/data/triplespec/oh_lines/'
+
+    d1 = np.loadtxt(dloc+'table1.dat', comments = '#', delimiter=' ', 
+                    dtype = {'formats':('f16','S40','f16','S40','f16'),'names':('wav1','nam1','wav2','name2','strength')})
+    d2 = np.loadtxt(dloc+'table2.dat', comments = '#', dtype = {'formats':('f16','S40','f16'),'names':('wav','nam','strength')})
+
+    dlam = (dv/3e5)*lam
+
+    w1 = np.abs(d1['wav1']-lam) < dlam
+    w2 = np.abs(d2['wav']-lam) < dlam
+
+    lamlist = d1['wav1'][w1].tolist() + d2['wav'][w2].tolist()
+    strengthlist = d1['strength'][w1].tolist() + d2['strength'][w2].tolist()
+
+    return lamlist, strengthlist
+
 def make_plots(dat,outfolder=None,errs=True):
 
     # set it up
@@ -102,7 +135,7 @@ def make_plots(dat,outfolder=None,errs=True):
     plt.tight_layout()
     fig.savefig(outfolder+'brgamma_halpha.png',dpi=150)
     plt.close()
-    print 1/0
+
 def do_all(runname='brownseds_agn', regenerate=False,errs=True):
     # I/O folder
     outfolder = os.getenv('APPS')+'/prospector_alpha/plots/'+runname+'/bracket_gamma/'
@@ -122,12 +155,12 @@ def get_galaxy_properties(runname='brownseds_agn', regenerate=False, outfolder=N
     filename = outfolder+'bracket_gamma.hickle'
     if os.path.isfile(filename) and regenerate == False:
         with open(filename, "r") as f:
-            outdict=hickle.load(f)
-            return outdict
+            outdict = hickle.load(f)
+        return outdict
 
     # build output dictionary
     outlines = ['Br gamma 21657','Pa alpha 18752','H alpha 6563']
-    outpars = ['stellar_mass', 'ssfr', 'sfr']
+    outpars = ['stellar_mass', 'ssfr', 'sfr','logzsol']
     outdict = {'names':[]}
     ngal, nsamp = 129, 300
     for par in outpars: outdict[par] = np.zeros(shape=(ngal,nsamp))
@@ -187,6 +220,7 @@ def get_galaxy_properties(runname='brownseds_agn', regenerate=False, outfolder=N
 
             # save galaxy parameters
             outdict['stellar_mass'][i,k] = np.log10(mformed * sm)
+            outdict['logzsol'][i,k] = float(eout['quantiles']['sample_chain'][k,eout['quantiles']['parnames'] == 'logzsol'])
             outdict['sfr'][i,k] = float(eout['extras']['flatchain'][k,eout['extras']['parnames'] == 'sfr_100'])
             outdict['ssfr'][i,k] = float(eout['extras']['flatchain'][k,eout['extras']['parnames'] == 'ssfr_100'])
         print i
@@ -195,7 +229,7 @@ def get_galaxy_properties(runname='brownseds_agn', regenerate=False, outfolder=N
     return outdict
 
 def locations():
-    """prints RA, DEC of galax[0]ies in the Brown sample
+    """prints RA, DEC of galaxies in the Brown sample
     """
 
     ### locations
@@ -210,7 +244,7 @@ def locations():
     match=0
     for i, name in enumerate(herschel[1].data['Name']):
 
-        idx = hdulist[1].data['Name'].lower().replace(' ','') == name
+        idx = hdulist[1].data['Name'].lower() .replace(' ','') == name
         if herschel[1].data['pacs70'][i] == 0:
             continue
 

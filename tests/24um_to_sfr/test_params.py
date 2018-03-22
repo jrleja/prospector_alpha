@@ -54,7 +54,7 @@ def load_obs(objname=None, datdir=None, runname=None, err_floor=0.05, zperr=True
     zp_err: inflate the errors by the zeropoint offsets from Skelton+14
     '''
 
-    filters = ['f1000w_miri','f1500w_miri','f1800w_miri','f2100w_miri','mips_24um_aegis']
+    filters = ['f1000w_miri','f1280w_miri','f1500w_miri','f1800w_miri','f2100w_miri','mips_24um_aegis']
     obs = {'maggies': None, 
            'phot_mask': np.ones_like(filters),
            'wavelength': None, 
