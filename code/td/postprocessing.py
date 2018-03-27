@@ -88,7 +88,7 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True, measure_
     eout['obs']['mags'] = np.zeros(shape=(ncalc,len(res['obs']['filters'])))
     eout['obs']['uvj'] = np.zeros(shape=(ncalc,3))
     eout['obs']['lam_obs'] = sps.wavelengths
-    elines = ['H beta 4861', 'H alpha 6563']
+    elines = ['H beta 4861', 'H alpha 6563','Br gamma 21657','Pa alpha 18752']
     eout['obs']['elines'] = {key: {'ew': deepcopy(fmt), 'flux': deepcopy(fmt)} for key in elines}
     eout['obs']['dn4000'] = deepcopy(fmt)
     res['model'].params['nebemlineinspec'] = True
