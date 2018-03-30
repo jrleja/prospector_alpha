@@ -106,23 +106,28 @@ def sky_vector(c1,unit_vector,distance):
 
 def calc_new_position(gcoord,pa,r):
     
+    # sanitize inputs
+    if (pa < 0):
+        pa += 2*np.pi*u.radian
     ra, dec = gcoord.ra.to(u.radian), gcoord.dec.to(u.radian),
 
     # let's do this numerically (what the actual fuck)
-    pa_array = np.linspace(pa-np.pi/4*u.radian,pa+np.pi/4*u.radian,5001)
+    pa_array = np.linspace(pa-np.pi*u.radian,pa+np.pi*u.radian,20001)
 
+    # this is the DISTANCE in the RA direction (NOT the change in RA coordinates)
     dra = np.arcsin(np.sin(pa_array)*np.sin(r))
-    ra_out = dra + ra
+    #ra_out = ra + np.arccos((np.cos(dra) - np.cos(np.pi/2.*u.rad - dec)**2) / (np.sin(np.pi/2.*u.rad-dec)**2))
+    ra_out = dra/np.cos(dec) + ra
 
     ddec = np.arctan(np.cos(pa_array)*np.tan(r))
     dec_out = dec+ddec
 
-    coords = coord.SkyCoord(ra_out, dec_out)
+    coords = coord.SkyCoord(ra_out, dec_out,frame='fk5')
     position_angles = gcoord.position_angle(coords)
     
     idx = np.abs(position_angles - pa).argmin()
-    if (idx == 0) or (idx == len(pa_array)-1):
-        print 1/0
+    #if (idx == 0) or (idx == len(pa_array)-1):
+    #    print 1/0
 
     return coords[idx]
 
@@ -284,7 +289,7 @@ def make_master_catalog(dat,outfolder,remake_catalog=False,norates=True):
         # grab PA, convert to radians
         bidx = box_data['Name'] == name.replace(' ','_')
         phot_pa = float(box_data['phot_pa'][bidx][0])
-        phot_pa_rad = np.pi/180. * phot_pa
+        phot_pa_rad = np.pi/180. * phot_pa * u.radian
 
         # calculate slit PA
         slit_pa = phot_pa - 90
@@ -299,10 +304,6 @@ def make_master_catalog(dat,outfolder,remake_catalog=False,norates=True):
         shortax, longax = aps.min(), aps.max()       
         shortax = 30*u.arcsecond
 
-        # generate unit vector PARALLEL, PERPENDICULAR to PA(catalog)
-        pa_cat_parallel = np.array([np.sin(phot_pa_rad),np.cos(phot_pa_rad)]) # RA, DEC
-        pa_cat_perp = np.array([np.cos(phot_pa_rad),-np.sin(phot_pa_rad)]) # RA, DEC
-
         # how many slits + how much overlap in arcseconds?
         nslit = np.ceil(shortax/slitlength)
         if nslit > 1:
@@ -315,43 +316,33 @@ def make_master_catalog(dat,outfolder,remake_catalog=False,norates=True):
         print '\t{0} slits with an overlap of {1}'.format(nslit,overlap.to(u.arcsecond))
 
         # generate points of interest
-        # ((phot_pa-90)*u.degree).to(u.radian)
-        bot_mid = calc_new_position(galcoords, phot_pa_rad*u.radian,longax.to(u.radian)/100.)
-        #bot_mid2 = sky_vector(galcoords,pa_cat_parallel,longax/2.)
-        bot_left = sky_vector(bot_mid,pa_cat_perp,(shortax/2.-slitlength/2.))
-        x_slits = [sky_vector(bot_left,(-1)*pa_cat_perp,slit_spacing*n) for n in range(nslit)]
+        bot_mid = calc_new_position(galcoords, phot_pa_rad, longax.to(u.radian)/2.)
 
         # to check: create new image with scan regions indicated
-        points = []
-        for slit in x_slits:
-            pclose = [sky_vector(slit,(-1)*pa_cat_perp, slitlength/2.), 
-                      sky_vector(slit,pa_cat_perp, slitlength/2.)]
-            pfar = [sky_vector(pclose[1],(-1)*pa_cat_parallel,longax),
-                    sky_vector(pclose[0],(-1)*pa_cat_parallel,longax)]
-            points += [pfar+pclose]
-
+        pclose = [calc_new_position(bot_mid, phot_pa_rad+np.pi/2.*u.radian,slitlength.to(u.radian)/2.),
+                  calc_new_position(bot_mid, phot_pa_rad-np.pi/2.*u.radian,slitlength.to(u.radian)/2.)]
+        pfar = [calc_new_position(pclose[1], -phot_pa_rad,longax.to(u.radian)),
+                calc_new_position(pclose[0], -phot_pa_rad,longax.to(u.radian))]
+        points = [pfar+pclose]
         sregions = [poly_region(point) for point in points]
         write_ds9(sregions, region_files+name.replace(' ','_')+'.reg')
 
         # non sidereal tracking rate, must be output in RA and DEC (arcseconds/hour)
         # we travel LONGAX in EXPOSURE_TIME, in the -PA_CAT_PARALLEL direction
         # calculate this for one slit, spherical geometry negligible
-        far_point = sky_vector(x_slits[0],(-1)*pa_cat_parallel,longax)
-        rate = [(far_point.ra-x_slits[0].ra)/exposure_time,(far_point.dec-x_slits[0].dec)/exposure_time]
+        # far_point = sky_vector(x_slits[0],(-1)*pa_cat_parallel,longax)
+        # rate = [(far_point.ra-x_slits[0].ra)/exposure_time,(far_point.dec-x_slits[0].dec)/exposure_time]
+        pa_cat_parallel = np.array([np.sin(phot_pa_rad),np.cos(phot_pa_rad)])
         rate = (-1)*pa_cat_parallel*longax/exposure_time
         rate = [x.to(u.arcsecond/u.hour) for x in rate]
 
         # add to lists for output
-        for j in range(nslit):
-            objname_list += [name.replace(' ','_')+'_{0}'.format(j)]
-            ra,dec = x_slits[j].to_string('hmsdms').split(' ')
-            ra_list += [ra.split('h')[0]  + ' ' + ra.split('m')[0].split('h')[-1] + ' ' + ra.split('m')[-1][:-1]]
-            dec_list += [dec.split('d')[0]  + ' ' + dec.split('m')[0].split('d')[-1] + ' ' + dec.split('m')[-1][:-1]]
-            ra_track_list += [rate[0].value]
-            dec_track_list += [rate[1].value]
-
-        if name == 'NGC 5055':
-            print 1/0
+        objname_list += [name.replace(' ','_')]
+        ra,dec = bot_mid.to_string('hmsdms').split(' ')
+        ra_list += [ra.split('h')[0]  + ' ' + ra.split('m')[0].split('h')[-1] + ' ' + ra.split('m')[-1][:-1]]
+        dec_list += [dec.split('d')[0]  + ' ' + dec.split('m')[0].split('d')[-1] + ' ' + dec.split('m')[-1][:-1]]
+        ra_track_list += [rate[0].value]
+        dec_track_list += [rate[1].value]
 
     # sky
     sky_objname, sky_ra, sky_dec = sky_lists()
