@@ -6,14 +6,14 @@ from astropy.cosmology import WMAP9
 
 # initialize model
 try:
-    mod
+    mod2
 except NameError:
-    mod = pfile.load_model(**pfile.run_params)
-    #mod2 = pfile.load_model(zred=6,**pfile.run_params)
+    #mod = pfile.load_model(**pfile.run_params)
+    mod2 = pfile.load_model(zred=6,**pfile.run_params)
     sps = pfile.load_sps(**pfile.run_params)
     obs = pfile.load_obs(**pfile.run_params)
-    _, _, _ = mod.mean_model(mod.initial_theta, obs, sps=sps)
-    #_, _, _ = mod2.mean_model(mod2.initial_theta, obs, sps=sps)
+    #_, _, _ = mod.mean_model(mod.initial_theta, obs, sps=sps)
+    _, _, _ = mod2.mean_model(mod2.initial_theta, obs, sps=sps)
 
 def ascii_write(mags,v1,v2,v1_name,v2_name,outname):
 
@@ -38,17 +38,22 @@ def starforming_galaxy():
     thetas[mod2.theta_index['dust2']] = prosp_dutils.av_to_dust2(1)
     mod2.params['nebemlineinspec'] = np.array([True])
 
-    zred_grid = np.array([1,2,3])
-    nwave, nred = sps.wavelengths.shape[0], len(zred_grid)
-    spec = np.zeros(shape=(nwave,nred))
+    zred_grid, agn_grid = np.array([1,2,3]), np.array([0.0,0.5])
+    nwave, nred, nagn = sps.wavelengths.shape[0], len(zred_grid), 2
+    spec = np.zeros(shape=(nwave,nred*nagn))
     flux_conversion = 3631*1e-23
 
     colors = ['#e31a1c', '#ff7f00','#33a02c','#1f78b4','#6a3d9a']
-    for i in range(nred):
-        mod2.params['zred'] = zred_grid[i]
-        spec[:,i],_,_ = mod2.mean_model(thetas, obs, sps=sps)
-        idx = sps.wavelengths > 1000
-        plt.plot(np.log10(sps.wavelengths[idx]),np.log10(spec[idx,i]*flux_conversion),label='z={0}'.format(zred_grid[i]),color=colors[i])
+    linestyle = ['-',':']
+    for j in range(nagn):
+        thetas[mod2.theta_index['fagn']] = agn_grid[j]
+        for i in range(nred):
+            mod2.params['zred'] = zred_grid[i]
+            print agn_grid[j]
+            print i+j*nred
+            spec[:,i+j*nred],_,_ = mod2.mean_model(thetas, obs, sps=sps)
+            idx = sps.wavelengths > 1000
+            plt.plot(np.log10(sps.wavelengths[idx]),np.log10(spec[idx,i+j*nred]*flux_conversion),label='z={0}'.format(zred_grid[i]),color=colors[i],linestyle=linestyle[j])
 
     plt.xlabel('log($\lambda_{\mathrm{rest}}$) [$\AA$]')
     plt.ylabel(r'f$_{\nu}$ [cgs]')
@@ -58,7 +63,8 @@ def starforming_galaxy():
     plt.close()
 
     out = np.concatenate((sps.wavelengths[:,None],np.log10(spec)),axis=1)
-    np.savetxt('starforming_sed.dat', out, fmt='%1.4f', header='restframe wavelength, log(z=1 spectrum), log(z=2 spectrum), log(z=3 spectrum)')
+    header = '# restframe wavelength, log(z=1 spectrum), log(z=2 spectrum), log(z=3 spectrum), log(z=1 spectrum+AGN), log(z=2 spectrum+AGN), log(z=3 spectrum+AGN)'
+    np.savetxt('starforming_sed.dat', out, fmt='%1.4f', header=header)
 
 def sfr_flux_relationship():
 

@@ -527,6 +527,13 @@ def exp_decl_sfh_avg_age(tage,tau):
     tavg = np.trapz(t*np.exp(-t/tau),x=t) / np.trapz(np.exp(-t/tau),x=t)
     return tage-tavg
 
+def linexp_decl_sfh_avg_age(tage,tau):
+    ''' this is done numerically
+    '''
+    t = np.linspace(0,tage,1000)
+    tavg = np.trapz((t**2)*np.exp(-t/tau),x=t) / np.trapz(t*np.exp(-t/tau),x=t)
+    return tage-tavg
+
 def sfh_half_time(x,sfh_params,c):
     """wrapper for use with halfmass assembly time
     """

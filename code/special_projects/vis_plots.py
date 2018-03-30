@@ -399,7 +399,7 @@ def plot_prior(ax,mod,par,max,runname,nsamp=100000,ssfr_prior=None):
 
             tage_samp = tage_prior.distribution.rvs(size=nsamp,*tage_prior.args,loc=tage_prior.loc,scale=tage_prior.scale)
             tau_samp = 10**logtau_prior.distribution.rvs(size=nsamp,*logtau_prior.args,loc=logtau_prior.loc,scale=logtau_prior.scale)
-            prior = np.array([prosp_dutils.exp_decl_sfh_avg_age(ta,tau) for (ta,tau) in zip(tage_samp,tau_samp)])
+            prior = np.array([prosp_dutils.linexp_decl_sfh_avg_age(ta,tau) for (ta,tau) in zip(tage_samp,tau_samp)])
 
     elif par == 'dust1_fraction':
 
