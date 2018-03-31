@@ -190,6 +190,12 @@ def make_master_catalog(dat,outfolder,remake_catalog=False,norates=True):
         obsed = ['NGC 3690','NGC 3310', 'NGC 4194', 'NGC 4254', 'NGC 4536', 'NGC 5731', 'IC 4553', 
                  'NGC 6052', 'NGC 5653', 'UGCA 166', 'NGC 2798', 'Mrk 33', 'NGC 3627', 'NGC 4321',
                  'NGC 6090', 'Mrk 1490', 'IRAS 17208-0014']
+        # these were observed with potentially bad PA definitions
+        # check by hand with old version: are they clearly wrong?
+        # NGC 6052 should be fine (50x60 vs 60x50)
+        # Mrk 33 might be fine as well; it's small and the opposite sense may have covered it
+        # can also check to see if there's signal in the observations
+        maybe_bad = ['NGC 6052', 'Mrk 33']
 
         # initialize and start
         xs, ys = xs_start, ys_start
@@ -276,7 +282,7 @@ def make_master_catalog(dat,outfolder,remake_catalog=False,norates=True):
     # equinox: J2000
     # RA_track: arcseconds / second
     # DEC_track: arcseconds / second
-    objname_list, ra_list, dec_list, ra_track_list, dec_track_list = [[] for i in range(5)]
+    objname_list, ra_list, dec_list, ra_track_list, dec_track_list, slit_pa = [[] for i in range(6)]
     for i, name in enumerate(names):
         
         # create coord.SkyCoord object
@@ -286,39 +292,33 @@ def make_master_catalog(dat,outfolder,remake_catalog=False,norates=True):
         dec = str(pdat['DE-'][pidx][0])+str(pdat['DEd'][pidx][0])+'d '+str(pdat['DEm'][pidx][0])+'m '+str(pdat['DEs'][pidx][0])+'s'
         galcoords = coord.SkyCoord(ra, dec, frame='fk5')
 
-        # grab PA, convert to radians
+        # grab PA
         bidx = box_data['Name'] == name.replace(' ','_')
         phot_pa = float(box_data['phot_pa'][bidx][0])
-        phot_pa_rad = np.pi/180. * phot_pa * u.radian
-
-        # calculate slit PA
-        slit_pa = phot_pa - 90
-        if (slit_pa < 0):
-            slit_pa = phot_pa+90
 
         # grab aperture, translate to sky box sizes
-        # largest axis is always parallel to PA (this is true for ~5 cases I've checked by hand)
+        # the given PA describes the position of the FIRST axis
+        # if this is not the LONGEST axis, redefine by adding 90 to PA
+        # this means we'll need to output a list of PAs (put it in the tracking output)
         aperture = box_data['phot_size'][bidx][0]
         ap1, ap2 = aperture.split('_')
         aps = np.array([float(ap1),float(ap2)])/3600.*u.deg # from arcsec to degrees
-        shortax, longax = aps.min(), aps.max()       
+        if aps[0] < aps[1]:
+            phot_pa -= 90
+            if (phot_pa < 0):
+                phot_pa += 360
+            print name
+        shortax, longax = aps.min(), aps.max() 
         shortax = 30*u.arcsecond
+        phot_pa_rad = np.pi/180. * phot_pa * u.radian
 
-        # how many slits + how much overlap in arcseconds?
-        nslit = np.ceil(shortax/slitlength)
-        if nslit > 1:
-            overlap = (shortax % slitlength) / (nslit - 1.)
-            slit_spacing = (shortax - slitlength) / (nslit-1)
-        else:
-            overlap = 0*u.degree
-            slit_spacing = slitlength
-        print name
-        print '\t{0} slits with an overlap of {1}'.format(nslit,overlap.to(u.arcsecond))
-
-        # generate points of interest
+        # generate starting position
+        # check that it has proper distance and PA
         bot_mid = calc_new_position(galcoords, phot_pa_rad, longax.to(u.radian)/2.)
-
-        # to check: create new image with scan regions indicated
+        np.testing.assert_almost_equal(galcoords.separation(bot_mid).to(u.arcsec).value,longax.to(u.arcsec).value/2,decimal=0)
+        np.testing.assert_almost_equal(galcoords.position_angle(bot_mid).to(u.degree).value,phot_pa,decimal=1)
+        """
+        # create .region file with proper scan positions
         pclose = [calc_new_position(bot_mid, phot_pa_rad+np.pi/2.*u.radian,slitlength.to(u.radian)/2.),
                   calc_new_position(bot_mid, phot_pa_rad-np.pi/2.*u.radian,slitlength.to(u.radian)/2.)]
         pfar = [calc_new_position(pclose[1], -phot_pa_rad,longax.to(u.radian)),
@@ -326,15 +326,26 @@ def make_master_catalog(dat,outfolder,remake_catalog=False,norates=True):
         points = [pfar+pclose]
         sregions = [poly_region(point) for point in points]
         write_ds9(sregions, region_files+name.replace(' ','_')+'.reg')
-
+        """
         # non sidereal tracking rate, must be output in RA and DEC (arcseconds/hour)
         # we travel LONGAX in EXPOSURE_TIME, in the -PA_CAT_PARALLEL direction
         # calculate this for one slit, spherical geometry negligible
         # far_point = sky_vector(x_slits[0],(-1)*pa_cat_parallel,longax)
         # rate = [(far_point.ra-x_slits[0].ra)/exposure_time,(far_point.dec-x_slits[0].dec)/exposure_time]
         pa_cat_parallel = np.array([np.sin(phot_pa_rad),np.cos(phot_pa_rad)])
-        rate = (-1)*pa_cat_parallel*longax/exposure_time
+        dist = (-1)*pa_cat_parallel*longax
+        rate = dist/exposure_time
         rate = [x.to(u.arcsecond/u.hour) for x in rate]
+
+        # create .region file with proper scan positions
+        pclose = [calc_new_position(bot_mid, phot_pa_rad+np.pi/2.*u.radian,slitlength.to(u.radian)/2.),
+                  calc_new_position(bot_mid, phot_pa_rad-np.pi/2.*u.radian,slitlength.to(u.radian)/2.)]
+        pfar = [coord.SkyCoord(pclose[1].ra+dist[0]/np.cos(pclose[0].dec.to(u.rad)),pclose[1].dec+dist[1]),
+                coord.SkyCoord(pclose[0].ra+dist[0]/np.cos(pclose[0].dec.to(u.rad)),pclose[0].dec+dist[1])]
+        points = [pfar+pclose]
+        sregions = [poly_region(point) for point in points]
+        write_ds9(sregions, region_files+name.replace(' ','_')+'.reg')
+
 
         # add to lists for output
         objname_list += [name.replace(' ','_')]
@@ -343,6 +354,7 @@ def make_master_catalog(dat,outfolder,remake_catalog=False,norates=True):
         dec_list += [dec.split('d')[0]  + ' ' + dec.split('m')[0].split('d')[-1] + ' ' + dec.split('m')[-1][:-1]]
         ra_track_list += [rate[0].value]
         dec_track_list += [rate[1].value]
+        slit_pa += [phot_pa-90]
 
     # sky
     sky_objname, sky_ra, sky_dec = sky_lists()
@@ -375,8 +387,8 @@ def make_master_catalog(dat,outfolder,remake_catalog=False,norates=True):
         outloc = outfolder+'target_list.csv'
         with open(outloc, 'w') as f:
             for i in range(len(objname_list)):
-                f.write(objname_list[i]+','+ra_list[i]+','+dec_list[i]+',J2000,{:.2f},{:.2f}'.format(
-                        ra_track_list[i],dec_track_list[i]))
+                f.write(objname_list[i]+','+ra_list[i]+','+dec_list[i]+',J2000,{:.2f},{:.2f},{:.1f}'.format(
+                        ra_track_list[i],dec_track_list[i],slit_pa[i]))
                 f.write('\n')
 
             # write marla objects
@@ -387,11 +399,11 @@ def make_master_catalog(dat,outfolder,remake_catalog=False,norates=True):
                 ra, dec = mcoords[i].to_string('hmsdms').split(' ')
                 ra_str = ra.split('h')[0]  + ' ' + ra.split('m')[0].split('h')[-1] + ' ' + ra.split('m')[-1][:-1]
                 dec_str = dec.split('d')[0]  + ' ' + dec.split('m')[0].split('d')[-1] + ' ' + dec.split('m')[-1][:-1]
-                f.write(mnames[i]+','+ra_str+','+dec_str+',J2000,0.0,0.0')
+                f.write(mnames[i]+','+ra_str+','+dec_str+',J2000,0.0,0.0,0.0')
                 f.write('\n')    
                    
             for i in range(len(sky_objname)):
-                f.write(sky_objname[i].replace(' ','_')+'_sky,'+sky_ra[i]+','+sky_dec[i]+',J2000,0,0')
+                f.write(sky_objname[i].replace(' ','_')+'_sky,'+sky_ra[i]+','+sky_dec[i]+',J2000,0,0,0')
                 f.write('\n')
 
 def sky_lists():
@@ -401,19 +413,19 @@ def sky_lists():
                'UGC 08696', 'NGC 5992','UGC 08335 NW','IC 0691','NGC 2798','CGCG 049-057','IC 0883','NGC 3773',
                'NGC 2798','NGC 4631', 'NGC 5713','NGC 5194','NGC 4321','NGC 5055','NGC 3627','NGC 3351','NGC 4088',
                'NGC 3521','NGC 3049', 'NGC 5953', 'NGC 2388','NGC 5256','NGC 4826','NGC 5257','IC 0860',
-               'NGC 4569','NGC 4670','NGC 3938','NGC 3079']
+               'NGC 4569','NGC 4670','NGC 3938','NGC 3079','NGC 4385','NGC 6240','NGC 4559','NGC 5258']
     ra = ['11 28 08.484','9 33 55.309','11 38 40.451','11 51 33.252','10 49 07.986', '11 52 37.432', '15 37 15.438', '14 39 10.461', '13 15 28.182',
                '12 15 14.875', '17 23 27.374', '9 00 34.228', '16 11 47.564','14 19 41.461','11 42 12.003', '10 16 32.266','10 32 32.765',
                 '13 44 35.440', '15 44 30.270','13 15 28.238','11 26 40.704','9 17 14.413', '15 13 12.813', '13 20 38.710', '11 38 19.983',
                 '9 17 23.532', '12 42 19.984','14 40 17.889','13 29 29.540','12 23 08.371','13 16 01.884','11 20 01.888','10 44 10.322','12 05 15.515',
                 '11 06 2.342','9 54 56.896','15 34 35.440','7 29 01.122','13 38 21.793','12 56 36.661','13 39 43.696','13 15 07.441',
-                '12 36 39.144','12 45 08.361','11 52 36.498','10 01 25.471']
+                '12 36 39.144','12 45 08.361','11 52 36.498','10 01 25.471','12 25 37.081','16 53 02.566','12 35 46.870','13 40 03.454']
     dec = ['+58 33 19.101', '+55 14 37.616','+57 51 00.489','-2 23 56.088','+52 18 33.347', '-2 26 28.869', '+55 15 51.308', '+36 47 03.112','+62 06 29.627',
                 '+5 47 03.598', '-0 16 30.916', '+39 03 21.140', '+52 28 42.638','+49 12 28.036','+0 22 00.197', '+45 20 46.299','+54 26 09.373',
                 '+55 55 02.501', '+41 05 33.818','+62 06 33.191', '+59 07 48.174','+42 01 16.876', '+7 15 28.045', '+34 09 36.047', '+12 06 49.807',
                 '+42 02 20.191', '+32 29 46.809', '-0 18 46.472','+47 13 46.870','+15 47 06.804','+41 57 57.059','+13 00 19.842','+11 40 24.295','+50 32 53.076',
                 '-0 05 04.918','+9 15 34.584','+15 10 08.991','+33 49 39.794','+48 15 27.673','+21 45 03.135','+0 51 13.157','+24 38 28.736',
-                '+13 11 30.781','+27 07 05.086','+44 09 18.894','+55 40 36.241']
+                '+13 11 30.781','+27 07 05.086','+44 09 18.894','+55 40 36.241','+0 33 16.739','+2 24 59.332','+27 57 52.155','+0 50 52.450']
 
     return objname, ra, dec
 
