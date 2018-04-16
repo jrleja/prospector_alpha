@@ -232,7 +232,7 @@ def make_fig(posterior=True,phot=None):
     if phot is not None:
         fnames = [f.name for f in phot]
         sdss = ['sdss_u','sdss_g','sdss_r','sdss_i','sdss_z','sdss_u0','sdss_g0','sdss_r0','sdss_i0','sdss_z0']
-        match = ''.join([f[-1] if f in fnames else '' for f in sdss])
+        match = ''.join([f.split('_')[1][0] if f in fnames else '' for f in sdss])
         if len(match) > 0:
             fig.text(xt,yt, 'optical: SDSS '+r'${0}$'.format("".join(match)),
                      fontsize=fs_global+3,color='green')

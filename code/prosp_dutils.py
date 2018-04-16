@@ -944,8 +944,8 @@ def calculate_sfr(sfh_params, timescale, tcalc = None,
     if tcalc is None:
         tcalc = tage
 
-    sfr=integrate_sfh(tcalc-timescale, tcalc, sfh_params) * \
-                      sfh_params['mformed'].sum()/(timescale*1e9)
+    sfr = integrate_sfh(tcalc-timescale, tcalc, sfh_params) * \
+                        sfh_params['mformed'].sum()/(timescale*1e9)
 
     if minsfr is None:
         minsfr = sfh_params['mformed'].sum() / (tage*1e9*10000)
@@ -995,12 +995,9 @@ def integrate_linramp(t1,t2,sfh):
     return intsfr
 
 def integrate_sfh(t1,t2,sfh_params):
-    
-    '''
-    integrate an SFH from t1 to t2
-    sfh = dictionary of SFH parameters
-    returns FRACTION OF TOTAL MASS FORMED in given time inteval
-    '''
+    """ integrate star formation history from t1 to t2
+    returns fraction of *total* (not stellar) mass formed in time inteval
+    """
 
     # copy so we don't overwrite values
     sfh = sfh_params.copy()

@@ -126,12 +126,10 @@ def calc_new_position(gcoord,pa,r):
     position_angles = gcoord.position_angle(coords)
     
     idx = np.abs(position_angles - pa).argmin()
-    #if (idx == 0) or (idx == len(pa_array)-1):
-    #    print 1/0
 
     return coords[idx]
 
-def make_master_catalog(dat,outfolder,remake_catalog=False,norates=True):
+def make_master_catalog(dat,outfolder,remake_catalog=False,norates=True,maximum_ap=np.inf):
     """makes master catalog for selecting objects
 
     CATALOG 1 (FOR ME): Objname, RA, DEC, PA, box dimensions, expected Br gamma flux + EW, recessional velocity, RGB,
@@ -170,7 +168,7 @@ def make_master_catalog(dat,outfolder,remake_catalog=False,norates=True):
     area = []
     for name in names:
         p1, p2 = box_data['phot_size'][box_data['Name']==name.replace(' ','_')][0].split('_')
-        longax = np.max([int(p1),int(p2)])
+        longax = np.clip(np.max([int(p1),int(p2)]),-np.inf,maximum_ap)
         area += [30*longax]
     sb = brg_flux/np.array(area)
     nidx = sb.argsort()[::-1]
@@ -187,15 +185,9 @@ def make_master_catalog(dat,outfolder,remake_catalog=False,norates=True):
         dx_box = 0.005
 
         # already observed
-        obsed = ['NGC 3690','NGC 3310', 'NGC 4194', 'NGC 4254', 'NGC 4536', 'NGC 5731', 'IC 4553', 
-                 'NGC 6052', 'NGC 5653', 'UGCA 166', 'NGC 2798', 'Mrk 33', 'NGC 3627', 'NGC 4321',
-                 'NGC 6090', 'Mrk 1490', 'IRAS 17208-0014']
-        # these were observed with potentially bad PA definitions
-        # check by hand with old version: are they clearly wrong?
-        # NGC 6052 should be fine (50x60 vs 60x50)
-        # Mrk 33 might be fine as well; it's small and the opposite sense may have covered it
-        # can also check to see if there's signal in the observations
-        maybe_bad = ['NGC 6052', 'Mrk 33']
+        obsed = ['NGC 3690','NGC 3310', 'NGC 4194', 'NGC 4536', 'Mrk 33', 'NGC 6090', 'Mrk 1490', 'UGCA 166',
+                 'NGC_2388','NGC_2798','Mrk_1450','NGC_5194','NGC_5055','NGC_5256','UGC_08696','NGC_4088','IC_4553',
+                 'NGC_6052']
 
         # initialize and start
         xs, ys = xs_start, ys_start
@@ -218,7 +210,7 @@ def make_master_catalog(dat,outfolder,remake_catalog=False,norates=True):
             # PA, box dimensions
             bidx = box_data['Name'] == name.replace(' ','_')
             phot_pa = box_data['phot_pa'][bidx][0]
-            aperture = box_data['phot_size'][bidx][0].replace('_',"'x")+"'"
+            aperture = box_data['phot_size'][bidx][0].replace('_',"'x")+"''"
 
             # physical properties
             didx = np.array(dat['names']) == name
@@ -282,7 +274,7 @@ def make_master_catalog(dat,outfolder,remake_catalog=False,norates=True):
     # equinox: J2000
     # RA_track: arcseconds / second
     # DEC_track: arcseconds / second
-    objname_list, ra_list, dec_list, ra_track_list, dec_track_list, slit_pa = [[] for i in range(6)]
+    objname_list, ra_list, dec_list, ra_track_list, dec_track_list, slit_pa_list = [[] for i in range(6)]
     for i, name in enumerate(names):
         
         # create coord.SkyCoord object
@@ -309,6 +301,7 @@ def make_master_catalog(dat,outfolder,remake_catalog=False,norates=True):
                 phot_pa += 360
             print name
         shortax, longax = aps.min(), aps.max() 
+        longax = np.clip(longax,-np.inf,maximum_ap*u.arcsec)
         shortax = 30*u.arcsecond
         phot_pa_rad = np.pi/180. * phot_pa * u.radian
 
@@ -317,27 +310,16 @@ def make_master_catalog(dat,outfolder,remake_catalog=False,norates=True):
         bot_mid = calc_new_position(galcoords, phot_pa_rad, longax.to(u.radian)/2.)
         np.testing.assert_almost_equal(galcoords.separation(bot_mid).to(u.arcsec).value,longax.to(u.arcsec).value/2,decimal=0)
         np.testing.assert_almost_equal(galcoords.position_angle(bot_mid).to(u.degree).value,phot_pa,decimal=1)
-        """
-        # create .region file with proper scan positions
-        pclose = [calc_new_position(bot_mid, phot_pa_rad+np.pi/2.*u.radian,slitlength.to(u.radian)/2.),
-                  calc_new_position(bot_mid, phot_pa_rad-np.pi/2.*u.radian,slitlength.to(u.radian)/2.)]
-        pfar = [calc_new_position(pclose[1], -phot_pa_rad,longax.to(u.radian)),
-                calc_new_position(pclose[0], -phot_pa_rad,longax.to(u.radian))]
-        points = [pfar+pclose]
-        sregions = [poly_region(point) for point in points]
-        write_ds9(sregions, region_files+name.replace(' ','_')+'.reg')
-        """
+
         # non sidereal tracking rate, must be output in RA and DEC (arcseconds/hour)
         # we travel LONGAX in EXPOSURE_TIME, in the -PA_CAT_PARALLEL direction
-        # calculate this for one slit, spherical geometry negligible
-        # far_point = sky_vector(x_slits[0],(-1)*pa_cat_parallel,longax)
-        # rate = [(far_point.ra-x_slits[0].ra)/exposure_time,(far_point.dec-x_slits[0].dec)/exposure_time]
         pa_cat_parallel = np.array([np.sin(phot_pa_rad),np.cos(phot_pa_rad)])
         dist = (-1)*pa_cat_parallel*longax
         rate = dist/exposure_time
         rate = [x.to(u.arcsecond/u.hour) for x in rate]
 
         # create .region file with proper scan positions
+        # for testing purposes
         pclose = [calc_new_position(bot_mid, phot_pa_rad+np.pi/2.*u.radian,slitlength.to(u.radian)/2.),
                   calc_new_position(bot_mid, phot_pa_rad-np.pi/2.*u.radian,slitlength.to(u.radian)/2.)]
         pfar = [coord.SkyCoord(pclose[1].ra+dist[0]/np.cos(pclose[0].dec.to(u.rad)),pclose[1].dec+dist[1]),
@@ -346,6 +328,11 @@ def make_master_catalog(dat,outfolder,remake_catalog=False,norates=True):
         sregions = [poly_region(point) for point in points]
         write_ds9(sregions, region_files+name.replace(' ','_')+'.reg')
 
+        # slit pa
+        # we need this
+        slit_pa = phot_pa - 90
+        if (slit_pa < 0):
+            slit_pa += 360
 
         # add to lists for output
         objname_list += [name.replace(' ','_')]
@@ -354,7 +341,7 @@ def make_master_catalog(dat,outfolder,remake_catalog=False,norates=True):
         dec_list += [dec.split('d')[0]  + ' ' + dec.split('m')[0].split('d')[-1] + ' ' + dec.split('m')[-1][:-1]]
         ra_track_list += [rate[0].value]
         dec_track_list += [rate[1].value]
-        slit_pa += [phot_pa-90]
+        slit_pa_list += [slit_pa]
 
     # sky
     sky_objname, sky_ra, sky_dec = sky_lists()
@@ -388,7 +375,7 @@ def make_master_catalog(dat,outfolder,remake_catalog=False,norates=True):
         with open(outloc, 'w') as f:
             for i in range(len(objname_list)):
                 f.write(objname_list[i]+','+ra_list[i]+','+dec_list[i]+',J2000,{:.2f},{:.2f},{:.1f}'.format(
-                        ra_track_list[i],dec_track_list[i],slit_pa[i]))
+                        ra_track_list[i],dec_track_list[i],slit_pa_list[i]))
                 f.write('\n')
 
             # write marla objects

@@ -14,7 +14,7 @@ plt.ioff() # don't pop up a window for each plot
 fs, tick_fs = 28, 22
 obs_color = '#545454'
 
-def subcorner(res, eout, parnames, outname=None, maxprob=False):
+def subcorner(res, eout, parnames, outname=None, maxprob=False, boost=None):
     """ wrapper around dyplot.cornerplot()
     adds in a star formation history and marginalized parameters
     for some key outputs (stellar mass, SFR, sSFR, half-mass time)
@@ -28,6 +28,19 @@ def subcorner(res, eout, parnames, outname=None, maxprob=False):
         truths = res['samples'][eout['sample_idx'][0],:]
     else:
         truths = None 
+
+    # change stellar mass, SFR, total mass, SFH by some boosting factor
+    if boost is not None:
+        # total mass
+        for q in ['q50','q84','q16']: eout['thetas']['massmet_1'][q] = np.log10(10**eout['thetas']['massmet_1'][q]*boost)
+        res['samples'][:,0] = np.log10(10**res['samples'][:,0] * boost)
+
+        # stellar mass, SFR
+        for q in ['q50','q84','q16','chain']:
+            eout['extras']['sfr_100'][q] *= boost 
+            eout['extras']['stellar_mass'][q] *= boost 
+        eout['sfh']['sfh'] *= boost # SFH
+
 
     # create dynesty plot
     # maximum probability solution in red
@@ -421,7 +434,8 @@ def make_all_plots(filebase=None,
                    plt_summary=False,
                    plt_trace=False,
                    plt_corner=True,
-                   plt_sed=True):
+                   plt_sed=True,
+                   **opts):
     """Makes basic dynesty diagnostic plots for a single galaxy.
     """
 
@@ -474,7 +488,7 @@ def make_all_plots(filebase=None,
     # corner plot
     if plt_corner: 
         print 'making CORNER plot'
-        subcorner(res, eout, parnames,outname=outfolder+objname)
+        subcorner(res, eout, parnames,outname=outfolder+objname, **opts)
 
     # sed plot
     if plt_sed:

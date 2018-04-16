@@ -7,15 +7,6 @@ from astropy import units as u
 
 plt.ioff()
 
-plotopts = {
-         'fmt':'o',
-         'ecolor':'k',
-         'capthick':1,
-         'elinewidth':1,
-         'alpha':0.6,
-         'ms':0.0,
-         'zorder':-2
-        } 
 def collate_data(runname, filename=None, regenerate=False, nsamp=100, **opts):
     
     ### if it's already made, load it and give it back
@@ -122,16 +113,37 @@ def do_all(runname='td_dynamic', outfolder=None,**opts):
     data = collate_data(runname,filename=outfolder+'data/dyncomp.h5',**opts)
 
     plot(data,outfolder,**opts)
+    plot(data,outfolder,use_rachel_smass=False,**opts)
 
-def plot(data, outfolder, use_rachel_smass=False,**popts):
+def add_shading(ax,lim,fs):
+
+    # add shading
+    y1 = np.linspace(lim[0],lim[1],200)
+    ax.fill_between(y1, y1, lim[1], facecolor='#e60000', alpha=0.1, interpolate=True,zorder=-5)
+    ax.text(y1[2],y1[2]+0.15,"'forbidden'",rotation=47,weight='semibold',va='bottom',fontsize=fs)
+
+def plot(data, outfolder, use_rachel_smass=True, **popts):
 
     # set it up
     fig, ax = plt.subplots(1,3, figsize=(15, 5))
     fs = 18 # font size
+    fs_weight = None
     ms = 8
-    alpha = 0.9
-    color = '#545454'
+    alpha = 1
+    color = '#827f7f'
     lim = (9.8,11.7)
+    xt, yt, dyt = 0.02, 0.935, 0.065
+
+    # error bar options
+    plotopts = {
+             'fmt':'o',
+             'ecolor':'k',
+             'capthick':1.5,
+             'elinewidth':1.5,
+             'alpha':0.6,
+             'ms':0.0,
+             'zorder':-2
+            } 
 
     # physics
     fidx = 'fast_smass'
@@ -150,38 +162,39 @@ def plot(data, outfolder, use_rachel_smass=False,**popts):
     idx = (data['prosp_smass']['q50'] > 10)
 
     # make plots
-    xplot = data[fidx][idx]
-    yplot = data[didx]['q50'][idx]
-    yplot_err = prosp_dutils.asym_errors(yplot,data[didx]['q84'][idx],data[didx]['q16'][idx])
-    ax[0].errorbar(xplot, yplot, yerr=yplot_err,
+    xplot = data[didx]['q50'][idx]
+    xplot_err = prosp_dutils.asym_errors(xplot,data[didx]['q84'][idx],data[didx]['q16'][idx])
+    yplot = data[fidx][idx]
+    ax[0].errorbar(xplot, yplot, xerr=xplot_err,
                    **plotopts)
     ax[0].plot(xplot, yplot, 'o', linestyle=' ', 
                alpha=alpha, markeredgecolor='k',
                color=color,ms=ms)
     
-    ax[0].set_xlabel(r'log(M$_{\mathrm{FAST}}$/M$_{\odot}$)',fontsize=fs)
-    ax[0].set_ylabel(r'log(M$_{\mathrm{dyn}}$/M$_{\odot}$)',fontsize=fs)
+    ax[0].set_xlabel(r'log(M$_{\mathrm{dynamical}}$/M$_{\odot}$)',fontsize=fs)
+    ax[0].set_ylabel(r'log(M$_{\mathrm{FAST}}$/M$_{\odot}$)',fontsize=fs)
 
     ## line of equality + range
     ax[0].axis((lim[0],lim[1],lim[0],lim[1]))
-    ax[0].plot([lim[0],lim[1]],[lim[0],lim[1]],linestyle='--',color='0.1',alpha=0.8)
+    ax[0].plot([lim[0],lim[1]],[lim[0],lim[1]],linestyle='--',color='0.1',alpha=0.8,zorder=-1)
 
     # offset and scatter
     off,scat = prosp_dutils.offset_and_scatter(xplot,yplot,biweight=True)
-    ax[0].text(0.98,0.11,'offset='+"{:.2f}".format(off)+' dex',fontsize=fs,transform=ax[0].transAxes,ha='right')
-    ax[0].text(0.98,0.055,'scatter='+"{:.2f}".format(scat)+' dex',fontsize=fs,transform=ax[0].transAxes,ha='right')
+    ax[0].text(xt,yt,'mean offset='+"{:.2f}".format(-off)+' dex',fontsize=fs,transform=ax[0].transAxes,weight=fs_weight)
+    ax[0].text(xt,yt-dyt,'scatter='+"{:.2f}".format(scat)+' dex',fontsize=fs,transform=ax[0].transAxes,weight=fs_weight)
+    add_shading(ax[0],lim,fs)
 
     # make plots
-    xplot = data['prosp_smass']['q50'][idx]
-    xplot_err = prosp_dutils.asym_errors(xplot,data['prosp_smass']['q84'][idx],data['prosp_smass']['q16'][idx])
+    yplot = data['prosp_smass']['q50'][idx]
+    yplot_err = prosp_dutils.asym_errors(yplot,data['prosp_smass']['q84'][idx],data['prosp_smass']['q16'][idx])
     ax[1].errorbar(xplot, yplot, xerr=xplot_err, yerr=yplot_err,
                    **plotopts)
     ax[1].plot(xplot, yplot, 'o', linestyle=' ', 
                alpha=alpha, markeredgecolor='k',
                color=color,ms=ms)
     
-    ax[1].set_xlabel(r'log(M$_{\mathrm{Prospector}}$/M$_{\odot}$)',fontsize=fs)
-    ax[1].set_ylabel(r'log(M$_{\mathrm{dyn}}$/M$_{\odot}$)',fontsize=fs)
+    ax[1].set_xlabel(r'log(M$_{\mathrm{dynamical}}$/M$_{\odot}$)',fontsize=fs)
+    ax[1].set_ylabel(r'log(M$_{\mathrm{Prospector}}$/M$_{\odot}$)',fontsize=fs)
 
     ## line of equality + range
     ax[1].axis((lim[0],lim[1],lim[0],lim[1]))
@@ -189,8 +202,9 @@ def plot(data, outfolder, use_rachel_smass=False,**popts):
 
     # offset and scatter
     off,scat = prosp_dutils.offset_and_scatter(xplot,yplot,biweight=True)
-    ax[1].text(0.98,0.11,'offset='+"{:.2f}".format(off)+' dex',fontsize=fs,transform=ax[1].transAxes,ha='right')
-    ax[1].text(0.98,0.055,'scatter='+"{:.2f}".format(scat)+' dex',fontsize=fs,transform=ax[1].transAxes,ha='right')
+    ax[1].text(xt,yt,'mean offset='+"{:.2f}".format(-off)+' dex',fontsize=fs,transform=ax[1].transAxes,weight=fs_weight)
+    ax[1].text(xt,yt-dyt,'scatter='+"{:.2f}".format(scat)+' dex',fontsize=fs,transform=ax[1].transAxes,weight=fs_weight)
+    add_shading(ax[1],lim,fs)
 
     # and the finale
     xplot = data[didx]['q50'][idx] - data[fidx][idx]
@@ -200,8 +214,8 @@ def plot(data, outfolder, use_rachel_smass=False,**popts):
     ax[2].plot(xplot, yplot, 'o', linestyle=' ', 
                alpha=alpha, markeredgecolor='k',
                color=color,ms=ms)
-    ax[2].set_xlabel('log(M$_{\mathrm{dyn}}$/M$_{\mathrm{FAST}}$)',fontsize=fs)
-    ax[2].set_ylabel('log(M$_{\mathrm{Prosp}}$/M$_{\mathrm{FAST}}$)',fontsize=fs)
+    ax[2].set_xlabel('log(M$_{\mathrm{dynamical}}$/M$_{\mathrm{FAST}}$)',fontsize=fs)
+    ax[2].set_ylabel('log(M$_{\mathrm{Prospector}}$/M$_{\mathrm{FAST}}$)',fontsize=fs)
 
     lim = (-0.2,1)
     ax[2].plot([lim[0],lim[1]],[lim[0],lim[1]],linestyle='--',color='0.1',alpha=0.8)
@@ -214,7 +228,25 @@ def plot(data, outfolder, use_rachel_smass=False,**popts):
         a.xaxis.set_tick_params(labelsize=fs)
         a.yaxis.set_tick_params(labelsize=fs)
 
-
     plt.tight_layout()
     plt.savefig(outfolder+'dyn_comp'+smass_str+'.png',dpi=150)
+    plt.close()
+    print 'number of galaxies: {0}'.format(idx.sum())
+
+    simulate_offsets(data['prosp_smass']['q50'][idx], data[fidx][idx], data[didx]['q50'][idx])
     print 1/0
+def simulate_offsets(prosp_mass, fast_mass, dyn_mass):
+
+    nsim = 100000
+    violation_threshold = 0.1 # dex
+
+    offsets = prosp_mass - fast_mass
+    sim_mass = fast_mass[:,None]+ np.random.choice(offsets,(len(fast_mass),nsim))
+    nviolate = (sim_mass > (dyn_mass[:,None]+violation_threshold)).sum(axis=0)
+    nprosp = (prosp_mass > dyn_mass+violation_threshold).sum()
+    odds = int(np.round((nviolate <= nprosp).sum()/float(nsim)*100))
+    print 'number of violations beyond 0.05 dex: {0}'.format(nprosp)
+    print 'this result (or better) happens {0}% of the time'.format(odds)
+    edo, med, eup = np.percentile(nviolate,np.array([16,50,84]))
+    print 'number of violations expected: {0} (+{1}) (-{2})'.format(med,eup-med,med-edo)
+    print ' '

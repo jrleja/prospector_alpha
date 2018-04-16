@@ -16,7 +16,63 @@ dpi = 160
 cmap = 'cool'
 minsfr = 0.01
 
-def do_all(runname='td_huge', outfolder=None, regenerate=False, regenerate_stack=False, **opts):
+def transform_zfraction_to_mfraction(zfraction,time_per_bin):
+    """vectorized, partially ripped from prosp_dutils
+    """
+    
+    sfr_fraction = np.zeros_like(zfraction)
+    sfr_fraction[...,0] = 1-zfraction[...,0]
+    for i in range(1,sfr_fraction.shape[-1]): sfr_fraction[...,i] = np.prod(zfraction[...,:i],axis=-1)*(1-zfraction[...,i])
+    sfr_fraction_full = np.concatenate((sfr_fraction,(1-sfr_fraction.sum(axis=-1))[...,None]),axis=-1)
+
+    mass_fraction = sfr_fraction_full*time_per_bin[:,None,:]
+    mass_fraction /= mass_fraction.sum(axis=-1)[...,None]
+
+    return mass_fraction
+
+def integrate_sfh_vectorized(t1,t2,agebins,zfraction):
+    """ integrate star formation history from t1 to t2
+    returns fraction of *total* (not stellar) mass formed in time inteval
+    AGEBINS is shape (NGAL, NBIN, 2)
+    ZFRACTION is shape (NGAL, NSAMP, NBIN-1)
+    """
+
+    # translate agebins to time bins in correct units
+    linear_bins = 10**agebins/1e9
+    time_per_bin = linear_bins[...,1]-linear_bins[...,0]
+    maxtimes, mintimes = linear_bins[...,1].max(axis=1), linear_bins[...,0].min(axis=1)
+    time_bins = maxtimes[:,None,None] - linear_bins
+
+    # mass fractions
+    mfraction = transform_zfraction_to_mfraction(zfraction,time_per_bin)
+
+    # sanitize time inputs so they are in the bin range.
+    t1 = np.clip(mintimes, t1, maxtimes)
+    t2 = np.clip(maxtimes, mintimes, t2)
+
+    # calculate time-weights for each bin
+    time_above_min = -np.diff(np.clip(time_bins - t1[:,None,None],0,np.inf)).squeeze()
+    time_below_max = np.diff(np.clip(t2[:,None,None]-time_bins,0,np.inf)).squeeze()
+    tweights = np.minimum(time_below_max,time_above_min) / time_per_bin
+
+    # convert to total mass formed
+    mformed = (mfraction * tweights[:,None,:]).sum(axis=-1) / tweights.sum(axis=1)[:,None]
+
+    return mformed
+
+def calculate_sfr(agebins, zfraction, timescale, dt):
+    """ timescale = size of time chunk
+        dt = time before observation
+        returns (FRACTIONAL MASS FORMED IN TIME INTERVAL) / (TIME INTERVAL)
+    """
+
+    linear_bins = 10**agebins/1e9
+    maxtimes = linear_bins[...,1].max(axis=1)
+    sfr = integrate_sfh_vectorized(maxtimes-timescale-dt, maxtimes-dt, agebins,zfraction) / timescale
+
+    return sfr
+
+def do_all(runname='td_new', outfolder=None, regenerate=False, regenerate_stack=False, **opts):
 
     if outfolder is None:
         outfolder = os.getenv('APPS') + '/prospector_alpha/plots/'+runname+'/fast_plots/'
@@ -31,6 +87,7 @@ def do_all(runname='td_huge', outfolder=None, regenerate=False, regenerate_stack
               'horizontal_bin_colors': ['#45ADA8','#FC913A','#FF4E50'],
               'vertical_bin_colors': ['red','#FC913A','#45ADA8','#323299'],
               'low_mass_cutoff':9.5,          # log(M) where we stop stacking and plotting
+              'high_mass_cutoff': 11.5,
               'ylim_horizontal_sfr': (-0.8,3),
               'ylim_horizontal_ssfr': (0.5e-12,4e-9),
               'ylim_vertical_sfr': (-3,3),
@@ -103,11 +160,7 @@ def collate_data(runname, filename=None, regenerate=False, **opts):
 
         # extra variables
         for v in outvar:
-            for f in ['q50','q84','q16']: 
-                try:
-                    outdict[v][f] += [prosp['extras'][v][f]]
-                except KeyError:
-                    outdict[v][f] += [prosp['extras']['sfr_100'][f]]
+            for f in ['q50','q84','q16']: outdict[v][f] += [prosp['extras'][v][f]]
 
     # dump files and return
     hickle.dump(outdict,open(filename, "w"))
@@ -146,6 +199,7 @@ def stack_sfh(data, **opts):
         logsfr = np.log10(data['sfr_30']['q50'])[zidx]
         logsfr_ms = sfr_ms(zavg,stellar_mass,**opts)
         on_ms = (stellar_mass > opts['low_mass_cutoff']) & \
+                (stellar_mass < opts['high_mass_cutoff']) & \
                 (np.abs(logsfr - logsfr_ms) < opts['sigma_sf'])
 
         # save mass ranges and which galaxies are on MS
@@ -161,6 +215,7 @@ def stack_sfh(data, **opts):
             # save individual mass and SFR
             in_bin = (stellar_mass[on_ms] >= stack['hor'][zstr]['mass_bins'][j]) & \
                      (stellar_mass[on_ms] <= stack['hor'][zstr]['mass_bins'][j+1])
+
             tdict = {key:[] for key in ['median','err','errup','errdown']}
             tdict['logm'],tdict['logsfr'] = stellar_mass[on_ms][in_bin],logsfr[on_ms][in_bin]
 
@@ -203,10 +258,12 @@ def stack_sfh(data, **opts):
             sigup, sigdown = opts['sigma_sf']*2*(j-1.5), opts['sigma_sf']*2*(j-2.5)
             if j != 0 :
                 in_bin = (stellar_mass > opts['low_mass_cutoff']) & \
+                         (stellar_mass < opts['high_mass_cutoff']) & \
                          ((logsfr - logsfr_ms) >= sigdown) & \
                          ((logsfr - logsfr_ms) < sigup)
             else:
                 in_bin = (stellar_mass > opts['low_mass_cutoff']) & \
+                         (stellar_mass < opts['high_mass_cutoff']) & \
                          ((logsfr - logsfr_ms) < sigup)
             tdict['logm'],tdict['logsfr'] = stellar_mass[in_bin],logsfr[in_bin]
 
@@ -498,7 +555,7 @@ def sfr_ms(z,logm,adjust_sfr=0.0,**opts):
     # check with redshift
     idx = np.where(zwhit == z[0])[0][0]
     if idx == -1:
-        print 'this is really poorly implemented, fix it'
+        print 'you know this is really poorly implemented, fix it'
         print 1/0
 
     # generate SFR(M) at all redshifts 
@@ -512,13 +569,24 @@ def sfr_ms(z,logm,adjust_sfr=0.0,**opts):
     return log_sfr
 
 def calculate_median(pdf, weight):
-    """given list of N PDFs, calculate median(PDF) for each item
-    then return the MEDIAN of the median, and the +/- 1 sigma errors
+    """given list of N PDFs, sum them
+    and return median + 16th, 84th percentile of sum
+    """
+    ssfrmin, ssfrmax = -13, -8
+    sfrac_arr = 10**np.linspace(ssfrmin,ssfrmax,1001)
+    hist = np.zeros(shape=sfrac_arr.shape[0]-1)
+
+    for i, (f,w) in enumerate(zip(pdf,weight)):
+        g1,_ = np.histogram(np.clip(f,10**ssfrmin,10**ssfrmax), normed=True,weights=w, bins=sfrac_arr)
+        hist += g1
+    median, errup, errdown = weighted_quantile((sfrac_arr[1:]+sfrac_arr[:-1])/2., [0.5,.84,.16],weights=hist)
     """
     nobj = len(pdf)
     median_array = []
+
     for i,(f,w) in enumerate(zip(pdf,weight)): median_array += [weighted_quantile(f, np.array([0.5]), weights=w)]
     median, errup, errdown = np.percentile(median_array, [50,84,16])
+    """
     return median, errup, errdown
 
 

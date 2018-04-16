@@ -1,6 +1,7 @@
 import pickle
 import numpy as np
 import os
+from prospect.io import read_results
 
 #### where do alldata pickle files go?
 outpickle = '/Users/joel/code/magphys/data/pickles'
@@ -44,20 +45,17 @@ def return_agn_str(idx, string=False):
         return sfing, composite, agn
 
 def load_prospector_data(filebase,no_sample_results=False,objname=None,runname=None,hdf5=True,load_extra_output=True):
-
-    '''
-    loads Prospector chains
+    """loads Prospector results
     filebase: string describing the location + objname. automatically finds 
     no_sample_results: only load the Powell results and the model
     objname and runname: if both of these are supplied, don't need to supply filebase
-    hdf5: load HDF5 output
-    '''
-
-    from prospect.io import read_results
+    returns sample results, powell results, model, extra output
+    """
 
     #### shortcut: pass None to filebase and objname + runname keywords
     if (objname is not None) & (runname is not None):
-        filebase = os.getenv('APPS')+'/prospector_alpha/results/'+runname+'/'+runname+'_'+objname
+        filebase = os.getenv('APPS')+'/prospector_alpha/results/'+runname+'/'+objname
+
     mcmc_filename, model_filename, extra_name = create_prosp_filename(filebase)
     if (mcmc_filename) is None:
         return None, None, None, None
@@ -67,7 +65,7 @@ def load_prospector_data(filebase,no_sample_results=False,objname=None,runname=N
 
     extra_output = None
     if load_extra_output:
-        extra_output = load_prospector_extra(filebase,objname=objname,runname=runname)
+        extra_output = load_prospector_extra(filebase)
 
     if no_sample_results:
         model, powell_results = read_results.read_model(model_filename)
@@ -86,13 +84,11 @@ def load_prospector_extra(filebase,objname=None,runname=None):
     import hickle
 
     #### shortcut: pass None to filebase and objname + runname keywords
-    if (objname is not None) & (runname is not None):
-        filebase = os.getenv('APPS')+'/prospector_alpha/results/'+runname+'/'+runname+'_'+objname
     mcmc_filename, model_filename, extra_name = create_prosp_filename(filebase)
-    
+
     try:
         with open(extra_name, "r") as f:
-            extra_output=hickle.load(f)
+            extra_output = hickle.load(f)
     except:
         print 'failed to load ' + extra_name
         return None
@@ -105,6 +101,7 @@ def create_prosp_filename(filebase):
     # with the objname
     folder = "/".join(filebase.split('/')[:-1])
     filename = filebase.split("/")[-1]
+
     files = [f for f in os.listdir(folder) if "_".join(f.split('_')[:-2]) == filename]  
     times = [f.split('_')[-2] for f in files]
 
@@ -724,84 +721,6 @@ def write_spectrum(sample_results,outname='best_fit_spectrum.dat'):
             for lam in sample_results['observables']['lam_obs']: f.write("{:.1f}".format(lam)+' ')
             f.write('\n')
             for spec in sample_results['bfit']['spec']: f.write("{:.3e}".format(spec)+' ')
-
-def write_villar_data():
-    
-    from prosp_dutils import generate_basenames
-
-    # All I need is UV (intrinsic and observed), and mid-IR fluxes, sSFRs, SFRs, Mstars, and tau_V  
-    filebase, parm_basename, ancilname = generate_basenames('villar')
-    ngals = len(filebase)
-    mass, sfr100, ssfr100, tauv, met = [np.zeros(shape=(3,ngals)) for i in xrange(5)]
-    names = []
-    for jj in xrange(ngals):
-        
-        try:
-            extra_output = load_prospector_extra(filebase[jj])
-        except TypeError:
-            print 'galaxy {0} named '.format(jj)+filebase[jj].split('_')[-1]+' failed to load.'
-            print 'not adding this to the output.'
-            continue
-
-        if jj == 0:
-            mass_idx = np.array(extra_output['extras']['parnames']) == 'stellar_mass'
-            tauv_idx = np.array(extra_output['quantiles']['parnames']) == 'dust2'
-            met_idx = np.array(extra_output['quantiles']['parnames']) == 'logzsol'
-            sfr100_idx = extra_output['extras']['parnames'] == 'sfr_100'
-            ssfr100_idx = extra_output['extras']['parnames'] == 'ssfr_100'
-
-        mass[:,jj] = [np.log10(extra_output['extras']['q50'][mass_idx])[0],
-                      np.log10(extra_output['extras']['q84'][mass_idx])[0],
-                      np.log10(extra_output['extras']['q16'][mass_idx])[0]]
-
-        sfr100[:,jj] = [extra_output['extras']['q50'][sfr100_idx],
-                        extra_output['extras']['q84'][sfr100_idx],
-                        extra_output['extras']['q16'][sfr100_idx]]
-        
-        ssfr100[:,jj] = [extra_output['extras']['q50'][ssfr100_idx],
-                         extra_output['extras']['q84'][ssfr100_idx],
-                         extra_output['extras']['q16'][ssfr100_idx]]
-        
-        tauv[:,jj] = [extra_output['quantiles']['q50'][tauv_idx],
-                      extra_output['quantiles']['q84'][tauv_idx],
-                      extra_output['quantiles']['q16'][tauv_idx]]
-
-        met[:,jj] = [extra_output['quantiles']['q50'][met_idx],
-                        extra_output['quantiles']['q84'][met_idx],
-                        extra_output['quantiles']['q16'][met_idx]]
-
-        names.append(filebase[jj].split('_')[-1])
-
-    outmod = os.getenv('APPS')+'/prospector_alpha/data/ashley/ashley_out.dat'
-
-    outdict ={
-              'mass': mass,
-              'sfr100': sfr100,
-              'ssfr100': ssfr100,
-              'tauv': tauv,
-              'logzsol': met,
-             }
-
-    # write out model parameters
-    # logmass is in log(M/Msun), Chabrier IMF
-    # sfr100 is in Msun/yr
-    # ssfr100 is in yr^-1
-    # tauv, tautot are in optical depths
-    # luv, lirs are in LSUN
-    with open(outmod, 'w') as f:
-        
-        ### header ###
-        hdr = '# objname '
-        for key in outdict.keys(): hdr += key+' '+key+'_84th '+key+'_16th '
-        f.write(hdr+'\n')
-
-        ngals_loaded = len(names)
-        for jj in xrange(ngals_loaded):
-            f.write(names[jj]+' ')
-            for key in outdict.keys():
-                fmt = "{:.6e}"
-                f.write(fmt.format(outdict[key][0,jj]) + ' ' + fmt.format(outdict[key][1,jj]) + ' ' + fmt.format(outdict[key][2,jj])+' ')
-            f.write('\n')
 
 def write_bestfit_photometry():
 

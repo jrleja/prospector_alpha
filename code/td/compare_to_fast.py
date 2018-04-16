@@ -117,7 +117,7 @@ def collate_data(runname, runname_fast, filename=None, filename_grid=None, regen
     logpar = ['stellar_mass', 'ssfr_30', 'ssfr_100']
 
     ### define grids
-    ngrid_ssfr, ngrid_fast, ngrid_sfr = 100, 40, 40
+    ngrid_ssfr, ngrid_fast, ngrid_sfr = 100, 32, 40
     delssfr_lim = (-3,1)
     ssfr_lim = (-11,-8)
     delm_lim = (-1.,1.)    # minimum age is 15 Myr = log(-1.82/Gyr), maximum is tuniv(z=0.5) = 8.65
@@ -378,7 +378,7 @@ def collate_data(runname, runname_fast, filename=None, filename_grid=None, regen
 
     return out, outg
 
-def do_all(runname='td_massive', runname_fast='fast_mimic',outfolder=None,**opts):
+def do_all(runname='td_new', runname_fast=None,outfolder=None,**opts):
 
     if outfolder is None:
         outfolder = os.getenv('APPS') + '/prospector_alpha/plots/'+runname+'/fast_plots/'
@@ -401,9 +401,8 @@ def do_all(runname='td_massive', runname_fast='fast_mimic',outfolder=None,**opts
 
     sfr_m_grid(data, datag, outfolder+'conditional_sfr_m.png',outfile=outfolder+'data/conditional_sfr_fit.h5')
     sfr_m_grid(data, datag, outfolder+'conditional_sfr_m_nofix.png',fix=False,outfile=outfolder+'data/conditional_sfr_fit_nofix.h5')
-
     dm_dsfr_grid(data, datag, outfolder, outtable)
-
+    print 1/0
     deltam_with_redshift(data['fast'], data['prosp'], data['fast']['z'], outfolder+'deltam_vs_z.png', filename=outfolder+'data/masscomp.h5')
 
     mass_met_age_z(data, outfolder, outtable, popts) # this is now deprecated
@@ -457,7 +456,7 @@ def do_all(runname='td_massive', runname_fast='fast_mimic',outfolder=None,**opts
     phot_residuals(data,outfolder,popts)
     prospector_versus_z(data,outfolder+'prospector_versus_z.png',popts)
     sfr_mass_density_comparison(data,outfolder=outfolder)
-
+    print 1/0
     # full UV+IR comparison
     #uvir_comparison(data,outfolder+'sfr_uvir_comparison', popts, ssfr=False)
     #uvir_comparison(data,outfolder+'sfr_uvir_comparison_model',  popts, model_uvir = True, ssfr=False)
@@ -597,7 +596,7 @@ def fast_comparison(fast,prosp,parlabels,pnames,outname,popts,flabel='FAST',plab
     plt.close()
 
 def sfr_m_grid(data,datag,outname,fix=True,outfile=None):
-    """plots the AVERAGE of the CONDITIONAL PDF for star formation rate(M) for ALL GALAXIES
+    """plots the median of the CONDITIONAL PDF for star formation rate(M) for ALL GALAXIES
     """
 
     # plot information
@@ -618,8 +617,7 @@ def sfr_m_grid(data,datag,outname,fix=True,outfile=None):
                'grid2': datag['grids']['logm_loguvirsfr'],
                'xbins': datag['grids']['logm'],
                'ybins': datag['grids']['logsfr'],
-               'xt': 0.98, 'yt': 0.05, 'ha': 'right',
-               'dens_power': 0.5
+               'xt': 0.98, 'yt': 0.05, 'ha': 'right'
                }
     uvir_color = '#dd1c77'
 
@@ -655,12 +653,17 @@ def sfr_m_grid(data,datag,outname,fix=True,outfile=None):
         # conditional PDF
         xidx = (opt['xbins']+dx > opt['xlim'][0]) & (opt['xbins']-dx <= opt['xlim'][1])
         yidx = (opt['ybins']+dy > opt['ylim'][0]) & (opt['ybins']-dy <= opt['ylim'][1])
+
+        # index to include only galaxies in ylim, xlim
         plotgrid1 = grid1[xidx[1:] & xidx[:-1], :]
+        plotgrid1 = plotgrid1[:,yidx[1:] & yidx[:-1]].T
+        plotgrid1 = plotgrid1 / plotgrid1.max(axis=0)[None,:]
+
         plotgrid2 = grid2[xidx[1:] & xidx[:-1], :]
 
         # plot the PDF
         X, Y = np.meshgrid(opt['xbins'][xidx], opt['ybins'][yidx])
-        ax[i].pcolormesh(X, Y, (plotgrid1[:,yidx[1:] & yidx[:-1]].T)**opt['dens_power'], cmap='Greys',label=zlabels[i])
+        ax[i].pcolormesh(X, Y, plotgrid1, cmap='Greys',label=zlabels[i],alpha=0.5,edgecolor='None')
 
         # calculate percentiles of the conditional PDF
         # and errors
@@ -770,7 +773,7 @@ def sfr_m_grid(data,datag,outname,fix=True,outfile=None):
         out = {'a1': a1, 'a2': a2, 'b': b, 'a1_uvir': a1_uvir,'a2_uvir': a2_uvir, 'b_uvir': b_uvir}
         hickle.dump(out,open(outfile, "w"))
 
-def dm_dsfr_grid(data,datag,outfolder,outtable):
+def dm_dsfr_grid(data,datag,outfolder,outtable,normalize=True):
 
     # plot information
     fs, tick_fs, lw, ms = 11, 9.5, 3, 3.8
@@ -778,7 +781,7 @@ def dm_dsfr_grid(data,datag,outfolder,outtable):
                'xlim': (8.5,11.5),
                'ylim': (-0.7,0.7),
                'xtitle': 'log(M$_{\mathrm{FAST}}$/M$_{\odot}$)',
-               'ytitle': 'log(M$_{\mathrm{Prosp}}$/M$_{\mathrm{FAST}}$)',
+               'ytitle': 'log(M$_{\mathrm{Prospector}}$/M$_{\mathrm{FAST}}$)',
                'ytitle2': r'$\sigma$ [dex]',
                'xpar': data['fast']['stellar_mass'],
                'ypar': {q: data['prosp']['stellar_mass'][q] - data['fast']['stellar_mass'] for q in ['q50','q84','q16']},
@@ -795,8 +798,8 @@ def dm_dsfr_grid(data,datag,outfolder,outtable):
     dsfropts = {
                'xlim': (-10.8,-8),
                'ylim': (-2,0.999),
-               'xtitle': 'log(sSFR$_{\mathrm{Prosp}}$/yr$^{-1}$)',
-               'ytitle': 'log(SFR$_{\mathrm{Prosp}}$/SFR$_{\mathrm{UV+IR}}$)',
+               'xtitle': 'log(sSFR$_{\mathrm{Prospector}}$/yr$^{-1}$)',
+               'ytitle': 'log(SFR$_{\mathrm{Prospector}}$/SFR$_{\mathrm{UV+IR}}$)',
                'ytitle2': r'$\sigma$ [dex]',
                'xpar': data['prosp']['ssfr_30']['q50'],
                'ypar': data['prosp']['sfr_ratio'],
@@ -839,8 +842,11 @@ def dm_dsfr_grid(data,datag,outfolder,outtable):
             xidx = (opt['xbins']+dx > opt['xlim'][0]) & (opt['xbins']-dx <= opt['xlim'][1])
             yidx = (opt['ybins']+dy > opt['ylim'][0]) & (opt['ybins']-dy <= opt['ylim'][1])
             plotgrid = grid[xidx[1:] & xidx[:-1], :]
+            plotgrid = plotgrid[:,yidx[1:] & yidx[:-1]].T
+            if normalize:
+                plotgrid = plotgrid / plotgrid.max(axis=0)[None,:]
             X, Y = np.meshgrid(opt['xbins'][xidx], opt['ybins'][yidx])
-            a1[i].pcolormesh(X, Y, (plotgrid[:,yidx[1:] & yidx[:-1]].T)**opt['dens_power'], cmap='Greys',label=zlabels[i])
+            a1[i].pcolormesh(X, Y, plotgrid, cmap='Greys',label=zlabels[i],alpha=0.5,edgecolor='None')
 
             # calculate percentiles of the conditional PDF
             # and errors
@@ -912,15 +918,15 @@ def deltam_spearman(fast,prosp,outname,popts):
         mfast = fast['stellar_mass']
     params = [np.log10(prosp['half_time']['q50']/tfast),
               prosp['dust2']['q50'] - dfast]
-    xlabels = [r'log(t$_{\mathrm{Prosp}}$/t$_{\mathrm{FAST}}$)',
-               r'$\tau_{\mathrm{diffuse,Prosp}}-\tau_{\mathrm{diffuse,FAST}}$']
+    xlabels = [r'log(t$_{\mathrm{Prospector}}$/t$_{\mathrm{FAST}}$)',
+               r'$\tau_{\mathrm{diffuse,Prospector}}-\tau_{\mathrm{diffuse,FAST}}$']
     xlims = [(-3,3),
              (-2,2)]
     ylim = (-1.5,1.5)
 
     if 'massmet_2' in prosp.keys():
         params.append(prosp['massmet_2']['q50'])
-        xlabels.append(r'log(Z$_{\mathrm{Prosp}}$/Z$_{\odot}$)')
+        xlabels.append(r'log(Z$_{\mathrm{Prospector}}$/Z$_{\odot}$)')
         xlims.append((-2,0.3))
 
     # plot geometry
@@ -934,7 +940,7 @@ def deltam_spearman(fast,prosp,outname,popts):
 
     for i, par in enumerate(params):
         ax[i].errorbar(par,delta_mass,**popts)
-        ax[i].set_ylabel(r'log(M$_{\mathrm{Prosp}}$/M$_{\mathrm{FAST}}$)')
+        ax[i].set_ylabel(r'log(M$_{\mathrm{Prospector}}$/M$_{\mathrm{FAST}}$)')
         ax[i].set_xlabel(xlabels[i])
 
         ax[i].set_xlim(xlims[i])
@@ -1421,7 +1427,7 @@ def deltam_with_redshift(fast, prosp, z, outname, filename=None):
 
     ax.axhline(0, linestyle='--', color='0.4', lw=2,zorder=-1)
     ax.set_xlabel(r'log(M$_{\mathrm{FAST}}$/M$_{\odot}$)')
-    ax.set_ylabel(r'log(M$_{\mathrm{Prosp}}$/M$_{\mathrm{FAST}}$)')
+    ax.set_ylabel(r'log(M$_{\mathrm{Prospector}}$/M$_{\mathrm{FAST}}$)')
     ax.legend(prop={'size':8}, scatterpoints=1,fancybox=True,loc=4)
     ax.set_xlim(xlim)
     ax.set_ylim(-0.5,0.5)
@@ -1563,7 +1569,7 @@ def uvir_comparison(data, outname, popts, model_uvir = False, ssfr=False, filena
 
     ax[1].axhline(0, linestyle='--', color='0.5', lw=lw,zorder=-1)
     ax[1].set_xlabel('log('+prosp_label+')')
-    ax[1].set_ylabel(r'log(SFR$_{\mathrm{Prosp}}$/SFR$_{\mathrm{UV+IR,mod}}$)')
+    ax[1].set_ylabel(r'log(SFR$_{\mathrm{Prospector}}$/SFR$_{\mathrm{UV+IR,mod}}$)')
     ax[1].legend(prop={'size':8}, scatterpoints=1,fancybox=True)
     ax[1].set_ylim(-2,2)
 
