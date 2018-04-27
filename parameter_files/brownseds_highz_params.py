@@ -226,11 +226,12 @@ def load_obs(photname='', extinctname='', herschname='', objname='', **extras):
     unc[w3_idx] = np.clip(unc[w3_idx], flux[w3_idx]*0.3, np.inf) # for the silicate feature
 
     # mask filters redwards of 12 um
-    wave_effective = np.array([filt.wave_effective for filt in obs['filters']])
+    filters = observate.load_filters(fsps_filters)
+    wave_effective = np.array([filt.wave_effective for filt in filters])
     phot_mask[wave_effective > 12e4] = False
 
     # build output dictionary
-    obs['filters'] = observate.load_filters(fsps_filters)
+    obs['filters'] = filters
     obs['wave_effective'] = wave_effective
     obs['phot_mask'] = phot_mask
     obs['maggies'] = flux
