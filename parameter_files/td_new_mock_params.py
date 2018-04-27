@@ -45,18 +45,18 @@ run_params = {'verbose':True,
               'mock_gal':'AEGIS_13'
               }
 
-idlist = APPS+'/prospector_alpha/data/3dhst/td_new.ids'
-mock_gal = np.loadtxt(idlist, dtype='|S20',delimiter=',')[int(run_params['objname'])-1]
-run_params['mock_gal'] = mock_gal
-
 ############
 # OBS
 #############
 
-def load_obs(mock_gal=None, datdir=None, runname=None, snr=10, **extras):
+def load_obs(objname=None, datdir=None, runname=None, snr=10, **extras):
     """we generate a mock by sampling randomly from the *posteriors*
     if results file doesn't exist, then sample randomly
     """
+
+    idlist = APPS+'/prospector_alpha/data/3dhst/td_new.ids'
+    mock_gal = np.loadtxt(idlist, dtype='|S20',delimiter=',')[int(run_params['objname'])-1]
+
     # tools to generate a mock
     sps = load_sps(**extras)
     mod = load_model(mock_gal=mock_gal,datdir=datdir,runname=runname,**extras)
@@ -623,7 +623,10 @@ def load_sps(**extras):
     sps = NebSFH(**extras)
     return sps
 
-def load_model(mock_gal=None, datdir=None, runname=None, agelims=[], zred=None, alpha_sfh=0.2, **extras):
+def load_model(objname=None, datdir=None, runname=None, agelims=[], zred=None, alpha_sfh=0.2, **extras):
+
+    idlist = APPS+'/prospector_alpha/data/3dhst/td_new.ids'
+    mock_gal = np.loadtxt(idlist, dtype='|S20',delimiter=',')[int(run_params['objname'])-1]
 
     # we'll need this to access specific model parameters
     n = [p['name'] for p in model_params]
