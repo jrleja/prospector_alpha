@@ -41,8 +41,7 @@ run_params = {'verbose':True,
               # Data info (phot = .cat, dat = .dat, fast = .fout)
               'datdir':APPS+'/prospector_alpha/data/3dhst/',
               'runname': 'td_new',
-              'objname':'1',
-              'mock_gal':'AEGIS_13'
+              'objname':'1'
               }
 
 ############
