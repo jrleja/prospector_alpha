@@ -22,7 +22,7 @@ jansky_mks = 1e-26
 APPS = os.getenv('APPS')
 run_params = {'verbose':True,
               'debug': False,
-              'outfile': os.getenv('APPS')+'/prospector_alpha/results/brownseds_highz/brownseds_agn',
+              'outfile': os.getenv('APPS')+'/prospector_alpha/results/brownseds_highz_both/brownseds_highz_both',
               'nofork': True,
               # dynesty params
               'nested_bound': 'multi', # bounding method

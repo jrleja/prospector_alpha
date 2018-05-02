@@ -1,13 +1,12 @@
 import numpy as np
 import os
 from prospect.models import priors, sedmodel
-from prospect.sources import FastStepBasis
+from prospect.sources import CSPSpecBasis
 from sedpy import observate
 from astropy.cosmology import WMAP9
+from td_io import load_zp_offsets
 from scipy.stats import truncnorm
 from astropy.io import ascii
-from astropy.io import fits
-
 
 lsun = 3.846e33
 pc = 3.085677581467192e18  # in cm
@@ -22,7 +21,7 @@ jansky_mks = 1e-26
 APPS = os.getenv('APPS')
 run_params = {'verbose':True,
               'debug': False,
-              'outfile': os.getenv('APPS')+'/prospector_alpha/results/brownseds_highz/brownseds_agn',
+              'outfile': APPS+'/prospector_alpha/results/td_lyc/65729',
               'nofork': True,
               # dynesty params
               'nested_bound': 'multi', # bounding method
@@ -37,216 +36,73 @@ run_params = {'verbose':True,
               'compute_vega_mags': False,
               'initial_disp':0.1,
               'interp_type': 'logarithmic',
-              'agelims': [0.0,8.0,8.5,9.0,9.5,9.8,10.0],
-              # Data info
-              'datname':os.getenv('APPS')+'/prospector_alpha/data/brownseds_data/photometry/table1.fits',
-              'photname':os.getenv('APPS')+'/prospector_alpha/data/brownseds_data/photometry/table3.txt',
-              'extinctname':os.getenv('APPS')+'/prospector_alpha/data/brownseds_data/photometry/table4.fits',
-              'herschname':os.getenv('APPS')+'/prospector_alpha/data/brownseds_data/photometry/kingfish.brownapertures.flux.fits',
-              'objname':'Arp 256 N',
+              'agelims': [0.0,7.698,8.0,8.5,9.0,9.5,9.8,10.0],
+              # Data info (phot = .cat, dat = .dat, fast = .fout)
+              'datdir':APPS+'/prospector_alpha/data/3dhst/',
+              'runname': 'td_lyc',
+              'objname':'65729'
               }
-
 ############
 # OBS
 #############
+ftranslate = {'f435w': 'acs_wfc_f435w',
+              'f606w': 'wfc3_uvis_f606w',
+              'f775w': 'acs_wfc_f775w',
+              'f814w': 'wfc3_uvis_f814w',
+              'f850lp':'acs_wfc_f850lp',
+              'f098m':'wfc3_ir_f098m',
+              'f105w':'wfc3_ir_f105w',
+              'f125w':'wfc3_ir_f125w',
+              'f140w':'wfc3_ir_f140w',
+              'f160w':'wfc3_ir_f160w',
+              'F1':'spitzer_irac_ch1',
+              'F2':'spitzer_irac_ch2',
+              'F3':'spitzer_irac_ch3',
+              'F4':'spitzer_irac_ch4',
+              'Fm24': 'spitzer_mips_24'
+              }
+    
+def load_obs(objname=None, datdir=None, runname=None, err_floor=0.05, zperr=True, no_zp_corrs=False, **extras):
 
-def translate_filters(bfilters, full_list = False):
-    """translate filter names to FSPS standard
-    """
+    ''' 
+    objname: number of object in the 3D-HST COSMOS photometric catalog
+    err_floor: the fractional error floor (0.05 = 5% floor)
+    zp_err: inflate the errors by the zeropoint offsets from Skelton+14
+    '''
 
-    # this is necessary for my code
-    # to calculate effective wavelength
-    # in threed_dutils
-    translate = {
-    'FUV': 'GALEX FUV',
-    'UVW2': 'UVOT w2',
-    'UVM2': 'UVOT m2',
-    'NUV': 'GALEX NUV',
-    'UVW1': 'UVOT w1',
-    'Umag': np.nan,    # [11.9/15.7]? Swift/UVOT U AB band magnitude
-    'umag': 'SDSS Camera u Response Function, airmass = 1.3 (June 2001)',
-    'gmag': 'SDSS Camera g Response Function, airmass = 1.3 (June 2001)',
-    'Vmag': np.nan,    # [10.8/15.6]? Swift/UVOT V AB band magnitude
-    'rmag': 'SDSS Camera r Response Function, airmass = 1.3 (June 2001)',
-    'imag': 'SDSS Camera i Response Function, airmass = 1.3 (June 2001)',
-    'zmag': 'SDSS Camera z Response Function, airmass = 1.3 (June 2001)',
-    'Jmag': '2MASS J filter (total response w/atm)',
-    'Hmag': '2MASS H filter (total response w/atm)',
-    'Ksmag': '2MASS Ks filter (total response w/atm)',
-    'W1mag': 'WISE W1',
-    '[3.6]': 'IRAC Channel 1',
-    '[4.5]': 'IRAC Channel 2',
-    'W2mag': 'WISE W2',
-    '[5.8]': 'IRAC Channel 3',
-    '[8.0]': 'IRAC CH4',
-    'W3mag': 'WISE W3',
-    'PUIB': np.nan,    # [8.2/15.6]? Spitzer/IRS Blue Peak Up Imaging channel (13.3-18.7um) AB magnitude
-    'W4mag': np.nan,    # two WISE4 magnitudes, what is the correction?
-    "W4'mag": 'WISE W4',
-    'PUIR': np.nan,    # Spitzer/IRS Red Peak Up Imaging channel (18.5-26.0um) AB magnitude
-    '[24]': 'MIPS 24um',
-    'pacs70': 'Herschel PACS 70um',
-    'pacs100': 'Herschel PACS 100um',
-    'pacs160': 'Herschel PACS 160um',
-    'spire250': 'Herschel SPIRE 250um',
-    'spire350': 'Herschel SPIRE 350um',
-    'spire500': 'Herschel SPIRE 500um'
-    }
-
-    # this translates filter names
-    # to names that FSPS recognizes
-    translate_pfsps = {
-    'FUV': 'galex_FUV',
-    'UVW2': 'uvot_w2',
-    'UVM2': 'uvot_m2',
-    'NUV': 'galex_NUV',
-    'UVW1': 'uvot_w1',
-    'Umag': np.nan,    # [11.9/15.7]? Swift/UVOT U AB band magnitude
-    'umag': 'sdss_u0',
-    'gmag': 'sdss_g0',
-    'Vmag': np.nan,    # [10.8/15.6]? Swift/UVOT V AB band magnitude
-    'rmag': 'sdss_r0',
-    'imag': 'sdss_i0',
-    'zmag': 'sdss_z0',
-    'Jmag': 'twomass_J',
-    'Hmag': 'twomass_H',
-    'Ksmag': 'twomass_Ks',
-    'W1mag': 'wise_w1',
-    '[3.6]': 'spitzer_irac_ch1',
-    '[4.5]': 'spitzer_irac_ch2',
-    'W2mag': 'wise_w2',
-    '[5.8]': 'spitzer_irac_ch3',
-    '[8.0]': 'spitzer_irac_ch4',
-    'W3mag': 'wise_w3',
-    'PUIB': np.nan,    # [8.2/15.6]? Spitzer/IRS Blue Peak Up Imaging channel (13.3-18.7um) AB magnitude
-    'W4mag': np.nan,    # two WISE4 magnitudes, this one is "native" and must be corrected
-    "W4'mag": 'wise_w4',
-    'PUIR': np.nan,    # Spitzer/IRS Red Peak Up Imaging channel (18.5-26.0um) AB magnitude
-    '[24]': 'spitzer_mips_24',
-    'pacs70': 'herschel_pacs_70',
-    'pacs100': 'herschel_pacs_100',
-    'pacs160': 'herschel_pacs_160',
-    'spire250': 'herschel_spire_250',
-    'spire350': 'herschel_spire_350',
-    'spire500': 'herschel_spire_500'
-    }
-
-    if full_list:
-        return translate_pfsps.values()
-    else:
-        return np.array([translate[f] for f in bfilters]), np.array([translate_pfsps[f] for f in bfilters])
-
-
-def load_obs(photname='', extinctname='', herschname='', objname='', **extras):
-    """
-    let's do this
-    """
-    obs ={}
-
+    ### open file, load data
+    photname = datdir + runname + '.cat'
     with open(photname, 'r') as f:
         hdr = f.readline().split()
-    dtype = np.dtype([(hdr[1],'S20')] + [(n, np.float) for n in hdr[2:]])
-    dat = np.loadtxt(photname, comments = '#', delimiter='\t',
-                     dtype = dtype)
-    obj_ind = np.where(dat['id'] == objname)[0][0]
+    dtype = np.dtype([(n, np.float) for n in hdr[1:]])
+    dat = np.loadtxt(photname, comments = '#', dtype = dtype)
 
-    # extract fluxes+uncertainties for all objects and all filters
-    mag_fields = [f for f in dat.dtype.names if f[0:2] != 'e_' and (f != 'id')]
-    magunc_fields = [f for f in dat.dtype.names if f[0:2] == 'e_']
+    ### extract filters, fluxes, errors for object
+    # from ReadMe: "All fluxes are normalized to an AB zeropoint of 25, such that: magAB = 25.0-2.5*log10(flux)
+    obj_idx = dat['id'] == int(objname)
+    filters = np.array([f[2:] for f in dat.dtype.names if f[0:2] == 'f_'])
+    flux = np.squeeze([dat[obj_idx]['f_'+f] for f in filters])
+    unc = np.squeeze([dat[obj_idx]['e_'+f] for f in filters])
 
-    # extract fluxes for particular object, converting from record array to numpy array
-    mag = np.array([f for f in dat[mag_fields][obj_ind]])
-    magunc  = np.array([f for f in dat[magunc_fields][obj_ind]])
+    ### define photometric mask, convert to maggies
+    phot_mask = (flux != unc) & (flux != -99.0) & (unc > 0)
+    maggies = flux/(1e10)
+    maggies_unc = unc/(1e10)
 
-    # extinctions
-    extinct = fits.open(extinctname)
-    extinctions = np.array([np.squeeze(extinct[1].data[f][obj_ind]) for f in extinct[1].columns.names if f != 'Name'])
+    ### implement error floor
+    maggies_unc = np.clip(maggies_unc, maggies*err_floor, np.inf)
 
-    # adjust fluxes for extinction
-    mag_adj = mag - extinctions
-
-    # add correction to MIPS magnitudes (only MIPS 24 right now!)
-    mips_corr = np.array([-0.03542,-0.07669,-0.03807]) # 24, 70, 160
-    mag_adj[mag_fields.index('[24]') ] += mips_corr[0]
-
-    # then convert to maggies
-    flux = 10**((-2./5)*mag_adj)
-
-    # convert uncertainty to maggies
-    unc = magunc*flux/1.086
-
-    #### Herschel photometry
-    # find fluxes + errors
-    herschel = fits.open(herschname)
-    hflux_fields = [f for f in herschel[1].columns.names if (('pacs' in f) or ('spire' in f)) and f[-3:] != 'unc']
-    hunc_fields = [f for f in herschel[1].columns.names if (('pacs' in f) or ('spire' in f)) and f[-3:] == 'unc']
-
-    # different versions if objname is passed or no
-    if objname is not None:
-        match = herschel[1].data['Name'] == objname.lower().replace(' ','')
-        
-        hflux = np.array([np.squeeze(herschel[1].data[match][hflux_fields[i]]) for i in xrange(len(hflux_fields))])
-        hunc = np.array([np.squeeze(herschel[1].data[match][f]) for f in hunc_fields])
-    else:
-        optnames = hdulist[1].data['Name']
-        hnames   = herschel[1].data['Name']
-
-        # non-pythonic, but why change if it works?
-        hflux,hunc = np.zeros(shape=(len(hflux_fields),len(hnames))), np.zeros(shape=(len(hflux_fields),len(hnames)))
-        for ii in xrange(len(optnames)):
-            match = hnames == optnames[ii].lower().replace(' ','')
-            for kk in xrange(len(hflux_fields)):
-                hflux[kk,ii] = herschel[1].data[match][hflux_fields[kk]]
-                hunc[kk,ii]  = herschel[1].data[match][hunc_fields[kk]]
-
-    #### combine with brown catalog
-    # convert from Jy to maggies
-    flux = np.concatenate((flux,hflux/3631.))   
-    unc = np.concatenate((unc, hunc/3631.))
-    mag_fields = np.append(mag_fields,hflux_fields)   
-
-    # phot mask
-    phot_mask_brown = mag != 0
-    phot_mask_hersch = hflux != 0
-    phot_mask = np.concatenate((phot_mask_brown,phot_mask_hersch))
-
-    # map brown filters to FSPS filters
-    # and remove fluxes where we don't have filter definitions
-    filters,fsps_filters = translate_filters(mag_fields)
-    have_definition = np.array(filters) != 'nan'
-
-    fsps_filters = fsps_filters[have_definition]
-    flux = flux[have_definition]
-    unc = unc[have_definition]
-    phot_mask = phot_mask[have_definition]
-
-    # implement error floor
-    unc = np.clip(unc, flux*0.05, np.inf)
-    w3_idx = fsps_filters == 'wise_w3'
-    unc[w3_idx] = np.clip(unc[w3_idx], flux[w3_idx]*0.3, np.inf) # for the silicate feature
-
-    # mask filters redwards of 12 um
-    filters = observate.load_filters(fsps_filters)
-    wave_effective = np.array([filt.wave_effective for filt in filters])
-    phot_mask[wave_effective > 12e4] = False
-
-    # build output dictionary
-    obs['filters'] = filters
-    obs['wave_effective'] = wave_effective
+    ### build output dictionary
+    obs = {}
+    obs['filters'] = observate.load_filters([ftranslate[f] for f in filters])
+    obs['wave_effective'] = np.array([filt.wave_effective for filt in obs['filters']])
     obs['phot_mask'] = phot_mask
-    obs['maggies'] = flux
-    obs['maggies_unc'] =  unc
+    obs['maggies'] = maggies
+    obs['maggies_unc'] =  maggies_unc
     obs['wavelength'] = None
     obs['spectrum'] = None
     obs['logify_spectrum'] = False
 
-    if objname is None:
-        obs['hnames'] = herschel[1].data['Name']
-        obs['names'] = hdulist[1].data['Name']
-
-    # tidy up
-    extinct.close()
-    herschel.close()
     return obs
 
 ##########################
@@ -267,51 +123,6 @@ def massmet_to_logmass(massmet=None,**extras):
 def massmet_to_logzsol(massmet=None,**extras):
     return massmet[1]
 
-def zfrac_to_sfrac(z_fraction=None, **extras):
-    """This transforms from latent, independent `z` variables to sfr
-    fractions. The transformation is such that sfr fractions are drawn from a
-    Dirichlet prior.  See Betancourt et al. 2010
-    """
-    sfr_fraction = np.zeros(len(z_fraction) + 1)
-    sfr_fraction[0] = 1.0 - z_fraction[0]
-    for i in range(1, len(z_fraction)):
-        sfr_fraction[i] = np.prod(z_fraction[:i]) * (1.0 - z_fraction[i])
-    sfr_fraction[-1] = 1 - np.sum(sfr_fraction[:-1])
-
-    return sfr_fraction
-
-def zfrac_to_masses(logmass=None, z_fraction=None, agebins=None, **extras):
-    """This transforms from latent, independent `z` variables to sfr fractions
-    and then to bin mass fractions. The transformation is such that sfr
-    fractions are drawn from a Dirichlet prior.  See Betancourt et al. 2010
-    :returns masses:
-        The stellar mass formed in each age bin.
-    """
-    # sfr fractions (e.g. Leja 2017)
-    sfr_fraction = zfrac_to_sfrac(z_fraction)
-    # convert to mass fractions
-    time_per_bin = np.diff(10**agebins, axis=-1)[:,0]
-    sfr_fraction *= np.array(time_per_bin)
-    sfr_fraction /= sfr_fraction.sum()
-    masses = 10**logmass * sfr_fraction
-
-    return masses
-
-def masses_to_zfrac(mass=None, agebins=None, **extras):
-    """The inverse of zfrac_to_masses, for setting mock parameters based on
-    real bin masses.
-    """
-    total_mass = mass.sum()
-    time_per_bin = np.diff(10**agebins, axis=-1)[:,0]
-    sfr_fraction = mass / time_per_bin
-    sfr_fraction /= sfr_fraction.sum()
-    z_fraction = np.zeros(len(sfr_fraction) - 1)
-    z_fraction[0] = 1 - sfr_fraction[0]
-    for i in range(1, len(z_fraction)):
-        z_fraction[i] = 1.0 - sfr_fraction[i] / np.prod(z_fraction[:i])
-
-    return total_mass, z_fraction
-
 #############
 # MODEL_PARAMS
 #############
@@ -319,17 +130,10 @@ model_params = []
 
 ###### BASIC PARAMETERS ##########
 model_params.append({'name': 'zred', 'N': 1,
-                        'isfree': False,
+                        'isfree': True,
                         'init': 0.0,
                         'units': '',
-                        'prior': priors.TopHat(mini=0.0, maxi=4.0)})
-
-model_params.append({'name': 'lumdist', 'N': 1,
-                        'isfree': False,
-                        'init': 0.0,
-                        'units': 'Mpc',
-                        'prior_function': None,
-                        'prior_args': None})
+                        'prior': priors.TopHat(mini=0.0, maxi=5.0)})
 
 model_params.append({'name': 'add_igm_absorption', 'N': 1,
                         'isfree': False,
@@ -371,29 +175,36 @@ model_params.append({'name': 'logzsol', 'N': 1,
                         'units': r'$\log (Z/Z_\odot)$',
                         'prior': None})
                         
-###### SFH   ########
-model_params.append({'name': 'sfh', 'N':1,
+# --- SFH --------
+model_params.append({'name': 'sfh', 'N': 1,
                         'isfree': False,
-                        'init': 0,
-                        'units': None})
+                        'init': 4,  # 4=delayed-tau
+                        'units': 'type'})
+
+model_params.append({'name': 'tau', 'N': 1,
+                        'isfree': True,
+                        'init': 1.0,
+                        'init_disp': 0.5,
+                        'disp_floor': 0.5,
+                        'units': 'Gyr',
+                        'prior': priors.LogUniform(mini=1e-2, maxi=100)})
+
+model_params.append({'name': 'tage', 'N': 1,
+                        'isfree': True,
+                        'init': 1.0,
+                        'init_disp': 0.5,
+                        'disp_floor': 0.2,
+                        'units': 'Gyr',
+                        'prior': priors.TopHat(mini=0.01, maxi=13.0)})
+
+def get_mass(logmass=10, **extras):
+    return 10**logmass
 
 model_params.append({'name': 'mass', 'N': 1,
                      'isfree': False,
-                     'depends_on': zfrac_to_masses,
+                     'depends_on': get_mass,
                      'init': 1.,
                      'units': r'M$_\odot$',})
-
-model_params.append({'name': 'agebins', 'N': 1,
-                        'isfree': False,
-                        'init': [],
-                        'units': 'log(yr)',
-                        'prior': None})
-
-model_params.append({'name': 'z_fraction', 'N': 1,
-                        'isfree': True,
-                        'init': [],
-                        'units': '',
-                        'prior': priors.Beta(alpha=1.0, beta=1.0,mini=0.0,maxi=1.0)})
 
 ########    IMF  ##############
 model_params.append({'name': 'imf_type', 'N': 1,
@@ -431,7 +242,7 @@ model_params.append({'name': 'dust2', 'N': 1,
                         'init_disp': 0.25,
                         'disp_floor': 0.15,
                         'units': '',
-                        'prior': priors.ClippedNormal(mini=0.0, maxi=4.0, mean=0.3, sigma=1)})
+                        'prior': priors.TopHat(mini=0.0, maxi=1.0)})
 
 model_params.append({'name': 'dust_index', 'N': 1,
                         'isfree': True,
@@ -439,7 +250,7 @@ model_params.append({'name': 'dust_index', 'N': 1,
                         'init_disp': 0.25,
                         'disp_floor': 0.15,
                         'units': '',
-                        'prior': priors.TopHat(mini=-1.0, maxi=0.4)})
+                        'prior': priors.TopHat(mini=-2.2, maxi=0.4)})
 
 model_params.append({'name': 'dust1_index', 'N': 1,
                         'isfree': False,
@@ -478,7 +289,7 @@ model_params.append({'name': 'duste_umin', 'N': 1,
                         'prior': priors.TopHat(mini=0.1, maxi=25.0)})
 
 model_params.append({'name': 'duste_qpah', 'N': 1,
-                        'isfree': True,
+                        'isfree': False,
                         'init': 2.0,
                         'init_disp': 3.0,
                         'disp_floor': 3.0,
@@ -504,8 +315,9 @@ model_params.append({'name': 'nebemlineinspec', 'N': 1,
                         'prior': None})
 
 model_params.append({'name': 'gas_logz', 'N': 1,
-                        'isfree': True,
+                        'isfree': False,
                         'init': 0.0,
+                        'depends_on': tie_gas_logz,
                         'units': r'log Z/Z_\odot',
                         'prior': priors.TopHat(mini=-2.0, maxi=0.5)})
 
@@ -518,20 +330,20 @@ model_params.append({'name': 'gas_logu', 'N': 1, # scale with sSFR?
 ##### AGN dust ##############
 model_params.append({'name': 'add_agn_dust', 'N': 1,
                         'isfree': False,
-                        'init': True,
+                        'init': False,
                         'units': '',
                         'prior': None})
 
 model_params.append({'name': 'fagn', 'N': 1,
-                        'isfree': True,
+                        'isfree': False,
                         'init': 0.01,
                         'init_disp': 0.03,
                         'disp_floor': 0.02,
                         'units': '',
-                        'prior': priors.LogUniform(mini=1e-5, maxi=3.0)})
+                        'prior': priors.LogUniform(mini=1e-4, maxi=3.0)})
 
 model_params.append({'name': 'agn_tau', 'N': 1,
-                        'isfree': True,
+                        'isfree': False,
                         'init': 20.0,
                         'init_disp': 5,
                         'disp_floor': 2,
@@ -558,7 +370,7 @@ model_params.append({'name': 'mass_units', 'N': 1,
 #### resort list of parameters 
 # because we can
 parnames = [m['name'] for m in model_params]
-fit_order = ['massmet','z_fraction', 'dust2', 'dust_index', 'dust1_fraction', 'fagn', 'agn_tau', 'gas_logz']
+fit_order = ['massmet','tage', 'tau', 'dust2', 'dust_index', 'dust1_fraction']
 tparams = [model_params[parnames.index(i)] for i in fit_order]
 for param in model_params: 
     if param['name'] not in fit_order:
@@ -657,7 +469,7 @@ class MassMet(priors.Prior):
         return np.array([mass,met])
 
 ###### Redefine SPS ######
-class NebSFH(FastStepBasis):
+class NebSFH(CSPSpecBasis):
     
     @property
     def emline_wavelengths(self):
@@ -765,52 +577,41 @@ class NebSFH(FastStepBasis):
 
         return smspec * mass, phot * mass, mfrac
 
+class ZedModel(sedmodel.SedModel):
+
+    def prior_transform(self, unit_coords):
+
+        """Go from unit cube to parameter space, for nested sampling.
+        """
+        theta = np.zeros(len(unit_coords))
+        for k, inds in list(self.theta_index.items()):
+            func = self._config_dict[k]['prior'].unit_transform
+            kwargs = self._config_dict[k].get('prior_args', {})
+            theta[inds] = func(unit_coords[inds], **kwargs)
+
+        # Now redraw tage with a prior that tage < t_univ(zred)
+        if 'zred' in self.theta_index:
+            zind = self.theta_index['zred']
+            if 'tage' in self.theta_index:
+                kwargs = self._config_dict['tage'].get('prior_args', {})
+                kwargs.update(maxi=WMAP9.age(theta[zind]).value)
+
+                tind = self.theta_index['tage']
+                func = self._config_dict['tage']['prior'].unit_transform
+                theta[tind] = func(unit_coords[tind], **kwargs)
+        
+        return theta
+
 def load_sps(**extras):
 
     sps = NebSFH(**extras)
     return sps
 
-def load_model(objname='',datname='', agelims=[], alpha_sfh = 0.2, **extras):
-
-    # set redshift, tuniv
-    hdulist = fits.open(datname)
-    idx = hdulist[1].data['Name'] == objname
-    zred =  hdulist[1].data['cz'][idx][0] / 3e5
-    tuniv = WMAP9.age(zred).value
-    lumdist = hdulist[1].data['Dist'][idx][0]
-    hdulist.close()
-
-    # now construct the nonparametric SFH
-    agelims[-1] = np.log10(tuniv*1e9)
-    agebins = np.array([agelims[:-1], agelims[1:]])
-    ncomp = len(agelims) - 1
-
-    # load into `agebins` in the model_params dictionary
-    n = [p['name'] for p in model_params]
-    model_params[n.index('agebins')]['N'] = ncomp
-    model_params[n.index('agebins')]['init'] = agebins.T
-
-    # now we do the computational z-fraction setup
-    # number of zfrac variables = (number of SFH bins - 1)
-    # set initial with a constant SFH
-    # if alpha_SFH is a vector, use this as the alpha array
-    # else assume all alphas are the same
-    model_params[n.index('mass')]['N'] = ncomp
-    model_params[n.index('z_fraction')]['N'] = ncomp-1
-    if type(alpha_sfh) != type(np.array([])):
-        alpha = np.repeat(alpha_sfh,ncomp-1)
-    else:
-        alpha = alpha_sfh
-    tilde_alpha = np.array([alpha[i-1:].sum() for i in xrange(1,ncomp)])
-    model_params[n.index('z_fraction')]['prior'] = priors.Beta(alpha=tilde_alpha, beta=alpha, mini=0.0, maxi=1.0)
-    model_params[n.index('z_fraction')]['init'] = np.array([(i-1)/float(i) for i in range(ncomp,1,-1)])
-    model_params[n.index('z_fraction')]['init_disp'] = 0.02
+def load_model(**extras):
 
     # set mass-metallicity prior
-    # insert redshift into model dictionary
+    n = [p['name'] for p in model_params]
     model_params[n.index('massmet')]['prior'] = MassMet(z_mini=-1.98, z_maxi=0.19, mass_mini=7, mass_maxi=12.5)
-    model_params[n.index('zred')]['init'] = zred
-    model_params[n.index('lumdist')]['init'] = lumdist
 
-    return sedmodel.SedModel(model_params)
+    return ZedModel(model_params)
 
