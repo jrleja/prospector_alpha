@@ -18,10 +18,10 @@ def set_sfh_time_vector(res,ncalc):
         idx = np.array(res['model'].theta_labels()) == 'tage'
         maxtime = np.max(res['chain'][:ncalc,idx])
         t = np.linspace(0,maxtime,num=nt)
-    elif 'logsfr_ratios' in res['model'].theta_labels():
-        nt = 100
+    elif 'logsfr_ratios' in res['model'].free_params:
+        nt = 500
         maxtime = res['model'].params['agebins'].max()
-        t = np.linspace(6.3,maxtime,num=nt)
+        t = 10**np.linspace(6.3,maxtime,num=nt)/1e9
     elif 'agebins' in res['model'].params:
         in_years = 10**res['model'].params['agebins']/1e9
         t = np.concatenate((np.ravel(in_years)*0.9999, np.ravel(in_years)*1.001))
