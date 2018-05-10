@@ -8,22 +8,17 @@ import prosp_dynesty_plots
 from dynesty.plotting import _quantile as weighted_quantile
 from prospect.models import sedmodel
 
-def set_sfh_time_vector(res,ncalc):
+def set_sfh_time_vector(theta,model):
     """if parameterized, calculate linearly in 100 steps from t=0 to t=tage
     if nonparameterized, calculate at bin edges.
     """
 
-    if 'tage' in res['model'].theta_labels():
+    if 'tage' in model.theta_labels():
         nt = 100
-        idx = np.array(res['model'].theta_labels()) == 'tage'
-        maxtime = np.max(res['chain'][:ncalc,idx])
-        t = np.linspace(0,maxtime,num=nt)
-    elif 'logsfr_ratios' in res['model'].free_params:
-        nt = 500
-        maxtime = res['model'].params['agebins'].max()
-        t = 10**np.linspace(6.3,maxtime,num=nt)/1e9
-    elif 'agebins' in res['model'].params:
-        in_years = 10**res['model'].params['agebins']/1e9
+        tage = theta[model.theta_index['tage']]
+        t = np.linspace(0,tage,num=nt)
+    elif 'agebins' in model.params:
+        in_years = 10**model.params['agebins']/1e9
         t = np.concatenate((np.ravel(in_years)*0.9999, np.ravel(in_years)*1.001))
         t.sort()
         t = t[1:-1] # remove older than oldest bin, younger than youngest bin
@@ -34,7 +29,7 @@ def set_sfh_time_vector(res,ncalc):
     return t
 
 def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True, measure_abslines=False,
-                          **kwargs):
+                          measure_herschel=False,**kwargs):
     """calculate extra quantities: star formation history, stellar mass, spectra, photometry, etc
     shorten_spec: if on, return only the 50th / 84th / 16th percentiles. else return all spectra.
     """
@@ -85,8 +80,9 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True, measure_
     for p in extra_parnames: eout['extras'][p] = deepcopy(fmt)
 
     # sfh
-    eout['sfh']['t'] = set_sfh_time_vector(res,ncalc)
-    eout['sfh']['sfh'] = np.zeros(shape=(ncalc,eout['sfh']['t'].shape[0]))
+    tvec = set_sfh_time_vector(res['model'].initial_theta,res['model'])
+    eout['sfh']['t'] = np.zeros(shape=(ncalc,tvec.shape[0]))
+    eout['sfh']['sfh'] = np.zeros(shape=(ncalc,tvec.shape[0]))
 
     # observables
     eout['obs']['spec'] = np.zeros(shape=(ncalc,sps.wavelengths.shape[0]))
@@ -108,6 +104,12 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True, measure_
     filters = ['wfc3_uvis_f336w','wfc3_uvis_f606w']
     fobs = {'filters': load_filters(filters), 'wavelength': None}
     '''
+    if measure_herschel:
+        eout['obs']['herschel'] = {'mags':np.zeros(shape=(ncalc,5))}
+        from sedpy.observate import load_filters
+        filters = ['herschel_pacs_100','herschel_pacs_160','herschel_spire_250','herschel_spire_350','herschel_spire_500']
+        fobs = {'filters': load_filters(filters), 'wavelength': None}
+
     # generate model w/o dependencies for young star contribution
     model_params = deepcopy(res['model'].config_list)
     for j in range(len(model_params)):
@@ -129,7 +131,8 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True, measure_
         # calculate SFH-based quantities
         sfh_params = prosp_dutils.find_sfh_params(res['model'],thetas,res['obs'],sps,sm=sm)
         eout['extras']['stellar_mass']['chain'][jj] = sfh_params['mass']
-        eout['sfh']['sfh'][jj,:] = prosp_dutils.return_full_sfh(eout['sfh']['t'], sfh_params)
+        eout['sfh']['t'][jj,:] = set_sfh_time_vector(thetas,res['model'])
+        eout['sfh']['sfh'][jj,:] = prosp_dutils.return_full_sfh(eout['sfh']['t'][jj,:], sfh_params)
         eout['extras']['half_time']['chain'][jj] = prosp_dutils.halfmass_assembly_time(sfh_params)
         eout['extras']['sfr_100']['chain'][jj] = prosp_dutils.calculate_sfr(sfh_params, 0.1,  minsfr=-np.inf, maxsfr=np.inf)
         eout['extras']['ssfr_100']['chain'][jj] = eout['extras']['sfr_100']['chain'][jj].squeeze() / eout['extras']['stellar_mass']['chain'][jj].squeeze()
@@ -194,6 +197,9 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True, measure_
         res['model'].params['add_neb_continuum'] = np.array([True])
         res['model'].params['add_igm_absorption'] = np.array([True])
         '''
+        if measure_herschel:
+            _,eout['obs']['herschel']['mags'][jj,:],__ = res['model'].mean_model(thetas, fobs, sps=sps)
+
         t3 = time.time()
         print('loop {0} took {1}s ({2}s for absorption+emission)'.format(jj,t3 - t1,t3 - t2))
 
@@ -210,6 +216,7 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True, measure_
     q50, q16, q84 = weighted_quantile(eout['obs']['lyc']['mags'][:,0]/eout['obs']['lyc']['mags'][:,1], np.array([0.5, 0.16, 0.84]), weights=eout['weights'])
     for q,qstr in zip([q50,q16,q84],['rq50','rq16','rq84']): eout['obs']['lyc'][qstr] = q
     '''
+
     for key1 in eout['obs']['elines'].keys():
         for key2 in ['ew','flux']:
             q50, q16, q84 = weighted_quantile(eout['obs']['elines'][key1][key2]['chain'], np.array([0.5, 0.16, 0.84]), weights=eout['weights'])
