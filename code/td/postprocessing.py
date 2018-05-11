@@ -317,6 +317,7 @@ if __name__ == "__main__":
     parser.add_argument('--shorten_spec',type=str2bool)
     parser.add_argument('--runname', type=str)
     parser.add_argument('--plot',type=str2bool)
+    parser.add_argument('--measure_herschel',type=str2bool)
 
     args = vars(parser.parse_args())
     kwargs = {}
