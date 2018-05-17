@@ -45,6 +45,28 @@ run_params = {'verbose':True,
 ############
 # OBS
 #############
+def steeply_declining_sfr(logm,agebins):
+    """ use tau model with tage = max(agebins), tau = tage/2
+    then put SFR(t_mid) * delta(t) mass in each bin 
+    """
+    # import matplotlib.pyplot as plt
+    #plt.plot(t,sfr)
+
+    # set tage, tau
+    tage = 10**agebins.max()
+    tau = tage/10.
+
+    # define time bins
+    t = 10**agebins.mean(axis=1)
+    dt = (10**agebins[:,1]-10**agebins[:,0])
+
+    # do the integral
+    A = 10**logm / (tau*(1-np.exp(-tage/tau)))
+    sfr = A*np.exp((t-tage)/tau)
+
+    return sfr * dt
+
+
 def declining_sfr(logm,agebins):
     """ use tau model with tage = max(agebins), tau = tage/2
     then put SFR(t_mid) * delta(t) mass in each bin 
@@ -87,6 +109,22 @@ def rising_sfr(logm,agebins):
 
     return sfr*dt
 
+def steeply_rising_sfr(logm,agebins):
+    
+    # set tage, tau
+    tage = 10**agebins.max()
+    tau = tage/10.
+
+    # define time bins
+    t = 10**agebins.mean(axis=1)
+    dt = (10**agebins[:,1]-10**agebins[:,0])
+
+    # do the integral
+    A = 10**logm / (tau*(np.exp(tage/tau)-1))
+    sfr = A*np.exp((tage-t)/tau)
+
+    return sfr*dt
+
 def mock_params(mock_key,agebins):
 
     # set mass and SFH
@@ -97,6 +135,10 @@ def mock_params(mock_key,agebins):
         masses = constant_sfr(logm,agebins)
     if mock_key == 3:
         masses = rising_sfr(logm,agebins)
+    if mock_key == 4:
+        masses = steeply_declining_sfr(logm,agebins)
+    if mock_key == 5:
+        masses = steeply_rising_sfr(logm,agebins)
     mass,zfrac = masses_to_zfrac(mass=masses,agebins=agebins)
 
     # then set dust, metallicity parameters and return theta vector
