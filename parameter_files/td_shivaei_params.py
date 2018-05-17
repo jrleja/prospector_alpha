@@ -661,7 +661,7 @@ def load_model(objname=None, datdir=None, runname=None, agelims=[], zred=None, a
     fields = np.array([f.replace('-','') for f in hdu[1].data['FIELD']])
     ids = hdu[1].data['V4ID'].astype(str)
     idx_obj = (fields == objname.split('_')[0]) & (ids == objname.split('_')[1])
-    zred = float(hdu[1].data['Z_MOSFIRE'][idx_obj])
+    zred = float(hdu[1].data['Z_MOSFIRE'][idx_obj][0])
 
     tuniv = WMAP9.age(zred).value
 
@@ -700,7 +700,7 @@ def load_model(objname=None, datdir=None, runname=None, agelims=[], zred=None, a
 
     # set gas-phase metallicity prior
     # log(Z/Zsun) = -3.07 for model
-    mean = hdu[1].data['m_12LOGOH'][idx_obj]
+    mean = hdu[1].data['m_12LOGOH'][idx_obj][0]
     if (mean > -100):
         gas_logz_mean = np.clip((mean - 12) + 3.06, -2, 0.5)
         sigma = (hdu[1].data['U68_12LOGOH'] - hdu[1].data['L68_12LOGOH'])[idx_obj] / 2.

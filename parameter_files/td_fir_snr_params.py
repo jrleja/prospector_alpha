@@ -37,6 +37,7 @@ run_params = {'verbose':True,
               'initial_disp':0.1,
               'interp_type': 'logarithmic',
               'agelims': [0.0,7.4772,8.0,8.5,9.0,9.5,9.8,10.0],
+              'snr_key': 1,
               # Data info (phot = .cat, dat = .dat, fast = .fout)
               'datdir':APPS+'/prospector_alpha/data/3dhst/',
               'runname': 'td_new',
