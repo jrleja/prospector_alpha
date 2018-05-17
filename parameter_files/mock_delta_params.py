@@ -447,6 +447,14 @@ class NebSFH(FastStepBasis):
 
         return smspec * mass, phot * mass, mfrac
 
+##### log(SFR_ratio) prior ######
+class SFR_Ratio(priors.Normal):
+    """A lognormal prior on the ratio of SFRs
+    to make (mean,sigma) functions of time, I need to write a function
+    that returns (t,dt) given input SFR_ratios. this should make use of the above transforms.
+    """
+    pass
+
 def load_sps(**extras):
 
     sps = NebSFH(**extras)
