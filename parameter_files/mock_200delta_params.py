@@ -21,7 +21,7 @@ jansky_mks = 1e-26
 APPS = os.getenv('APPS')
 run_params = {'verbose':True,
               'debug': False,
-              'outfile': APPS+'/prospector_alpha/results/mock_50delta/1',
+              'outfile': APPS+'/prospector_alpha/results/mock_200delta/1',
               'nofork': True,
               # dynesty params
               'nested_bound': 'multi', # bounding method
@@ -36,7 +36,7 @@ run_params = {'verbose':True,
               'compute_vega_mags': False,
               'initial_disp':0.1,
               'interp_type': 'logarithmic',
-              'nbins_sfh': 6,
+              'nbins_sfh': 5,
               'sigma': 0.3,
               # Data info (phot = .cat, dat = .dat, fast = .fout)
               'objname':'1'
@@ -72,11 +72,12 @@ def tie_gas_logz(logzsol=None, **extras):
 def to_dust1(dust1_fraction=None, dust1=None, dust2=None, **extras):
     return dust1_fraction*dust2
 
-def logmass_to_masses(logmass=None, logssfr50=None, agebins=None, **extras):
-    nbins = agebins.shape[0]-1
+def logmass_to_masses(logmass=None, logssfr50=None, logssfr200=None, agebins=None, **extras):
+    nbins = agebins.shape[0]-2
     m1 = (10**logssfr50)*5e7*(10**logmass)
-    other_masses = np.full(nbins, (10**logmass-m1) / nbins)
-    return np.array(m1.tolist()+other_masses.tolist())
+    m2 = (10**logssfr50)*1.5e8*(10**logmass)
+    other_masses = np.full(nbins, (10**logmass-m1-m2) / nbins)
+    return np.array(m1.tolist()+m2.tolist()+other_masses.tolist())
 
 def logsfr_ratios_to_agebins(logsfr_ratios=None, tuniv=None, **extras):
     """this transforms from SFR ratios to agebins
@@ -91,10 +92,10 @@ def logsfr_ratios_to_agebins(logsfr_ratios=None, tuniv=None, **extras):
     # calculate delta(t) for the first bin
     n_ratio = logsfr_ratios.shape[0]
     sfr_ratios = 10**logsfr_ratios
-    dt1 = (tuniv[0]-5e7) / (1 + np.sum([np.prod(sfr_ratios[:(i+1)]) for i in range(n_ratio)]))
+    dt1 = (tuniv[0]-2e8) / (1 + np.sum([np.prod(sfr_ratios[:(i+1)]) for i in range(n_ratio)]))
 
     # translate into agelims vector (time bin edges)
-    agelims = [1, 5e7, dt1]
+    agelims = [1, 5e7, 2e8, dt1]
     for i in range(n_ratio): agelims += [dt1*np.prod(sfr_ratios[:(i+1)]) + agelims[-1]]
     
     return np.log10([agelims[:-1], agelims[1:]]).T
@@ -139,6 +140,12 @@ model_params.append({'name': 'logmass', 'N': 1,
                         'prior': priors.TopHat(mini=7, maxi=12)})
 
 model_params.append({'name': 'logssfr50', 'N': 1,
+                        'isfree': True,
+                        'init': -10.0,
+                        'units': 'Msun',
+                        'prior': priors.TopHat(mini=-13.5, maxi=-7.5)})
+
+model_params.append({'name': 'logssfr200', 'N': 1,
                         'isfree': True,
                         'init': -10.0,
                         'units': 'Msun',
@@ -338,7 +345,7 @@ model_params.append({'name': 'mass_units', 'N': 1,
 #### resort list of parameters 
 # because we can
 parnames = [m['name'] for m in model_params]
-fit_order = ['logmass','logssfr50','logsfr_ratios', 'logzsol', 'dust2', 'dust_index', 'dust1_fraction']
+fit_order = ['logmass','logssfr50','logssfr200','logsfr_ratios', 'logzsol', 'dust2', 'dust_index', 'dust1_fraction']
 tparams = [model_params[parnames.index(i)] for i in fit_order]
 for param in model_params: 
     if param['name'] not in fit_order:
@@ -467,7 +474,7 @@ def load_sps(**extras):
     sps = NebSFH(**extras)
     return sps
 
-def load_model(nbins_sfh=6,sigma=0.3, **extras):
+def load_model(nbins_sfh=5,sigma=0.3, **extras):
 
     # we'll need this to access specific model parameters
     n = [p['name'] for p in model_params]
