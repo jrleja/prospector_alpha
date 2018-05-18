@@ -1,6 +1,6 @@
 import pickle
 import numpy as np
-import os
+import os, glob
 from prospect.io import read_results
 
 #### where do alldata pickle files go?
@@ -43,6 +43,20 @@ def return_agn_str(idx, string=False):
         return agn_str
     else:
         return sfing, composite, agn
+
+def find_all_prospector_results(runname):
+    """ returns basenames for all h5 files in results folder "runname"
+    does NOT distinguish between multiple files for one object
+    could add this functionality in the future by transferring prospector_io logic
+    """
+
+    # find all h5 files 
+    folder = os.getenv('APPS')+'/prospector_alpha/results/'+runname+'/'
+    files = glob.glob(folder+'*h5')
+    objnames = [f.split('/')[0].split('_')[0] for f in files]
+    basenames = ["_".join(f.split('_')[:-2]) for f in files]
+
+    return basenames
 
 def load_prospector_data(filebase,no_sample_results=False,objname=None,runname=None,hdf5=True,load_extra_output=True):
     """loads Prospector results

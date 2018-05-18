@@ -3,8 +3,8 @@ import matplotlib.pyplot as plt
 import os, copy, prosp_dutils
 from dynesty import plotting as dyplot
 import matplotlib as mpl
-from matplotlib.ticker import MaxNLocator, FormatStrFormatter
-from prospector_io import load_prospector_data
+from matplotlib.ticker import MaxNLocator, FormatStrFormatter, FuncFormatter
+from prospector_io import load_prospector_data, find_all_prospector_results
 from scipy.ndimage import gaussian_filter as norm_kde
 from matplotlib import gridspec
 
@@ -213,46 +213,59 @@ def add_sfh_plot(eout,fig,ax_loc=None,
 
     xmin, ymin = np.inf, np.inf
     xmax, ymax = -np.inf, -np.inf
+
     for i, eout in enumerate(eout):
         
-        #### load SFH
-        t = eout['sfh']['t']
-        perc = np.zeros(shape=(len(t),3))
-        for jj in range(len(t)): perc[jj,:] = np.percentile(eout['sfh']['sfh'][:,jj],[16.0,50.0,84.0])
+        # create master time bin
+        min_time = eout['sfh']['t'].min()
+        max_time = eout['sfh']['t'].max()
+        tvec = 10**np.linspace(np.log10(min_time),np.log10(max_time),num=500)
+
+        # create median SFH
+        perc = np.zeros(shape=(len(tvec),3))
+        for jj in range(len(tvec)): 
+            # nearest-neighbor 'interpolation'
+            # exact answer for binned SFHs
+            idx = np.abs(eout['sfh']['t'] - tvec[jj]).argmin(axis=1)
+            perc[jj,:] = np.percentile(eout['sfh']['sfh'][np.arange(len(idx)),idx],[16.0,50.0,84.0])
 
         #### plot SFH
-        ax_inset.plot(t, perc[:,1],'-',color=main_color[i],lw=lw)
-        ax_inset.fill_between(t, perc[:,0], perc[:,2], color=main_color[i], alpha=0.3)
-        ax_inset.plot(t, perc[:,0],'-',color=main_color[i],alpha=0.3,lw=lw)
-        ax_inset.plot(t, perc[:,2],'-',color=main_color[i],alpha=0.3,lw=lw)
+        ax_inset.plot(tvec, perc[:,1],'-',color=main_color[i],lw=lw)
+        ax_inset.fill_between(tvec, perc[:,0], perc[:,2], color=main_color[i], alpha=0.3)
+        ax_inset.plot(tvec, perc[:,0],'-',color=main_color[i],alpha=0.3,lw=lw)
+        ax_inset.plot(tvec, perc[:,2],'-',color=main_color[i],alpha=0.3,lw=lw)
 
         #### update plot ranges
         if 'tage' in eout['thetas'].keys():
-            xmin = np.min([xmin,t.min()])
-            xmax = np.max([xmax,t.max()])
+            xmin = np.min([xmin,tvec.min()])
+            xmax = np.max([xmax,tvec.max()])
             ymax = np.max([ymax,perc.max()])
             ymin = ymax*1e-4
         else:
-            xmin = np.min([xmin,t.min()])
-            xmax = np.max([xmax,t.max()])
-            ymin = np.min([ymin,perc.min()])
+            xmin = np.min([xmin,tvec.min()])
+            xmax = np.max([xmax,tvec.max()])
+            ymin = np.min([ymin,perc[perc>0].min()])
             ymax = np.max([ymax,perc.max()])
 
     #### labels, format, scales !
-    xmin = np.min(t[t>0.001])/3.
+    xmin = np.min(tvec[tvec>0.001])
+    ymin = np.clip(ymin,ymax*1e-5,np.inf)
 
-    axlim_sfh=[xmax, xmin, ymin*.7, ymax*1.4]
+    axlim_sfh=[xmax*1.01, xmin*1.0001, ymin*.7, ymax*1.4]
     ax_inset.axis(axlim_sfh)
     ax_inset.set_ylabel(r'SFR [M$_{\odot}$/yr]',fontsize=axfontsize*3,labelpad=1.5*text_size)
     ax_inset.set_xlabel(r't$_{\mathrm{lookback}}$ [Gyr]',fontsize=axfontsize*3,labelpad=1.5*text_size)
     
+    ax_inset.xaxis.set_minor_formatter(FormatStrFormatter('%2.5g'))
+    ax_inset.xaxis.set_major_formatter(FormatStrFormatter('%2.5g'))
     ax_inset.set_xscale('log',subsx=([3]))
     ax_inset.set_yscale('log',subsy=([3]))
     ax_inset.tick_params('both', length=lw*3, width=lw*.6, which='both',labelsize=axfontsize*3)
     for axis in ['top','bottom','left','right']: ax_inset.spines[axis].set_linewidth(lw*.6)
 
-    ax_inset.xaxis.set_major_formatter(FormatStrFormatter('%2.2g'))
-    ax_inset.yaxis.set_major_formatter(FormatStrFormatter('%2.2g'))
+    ax_inset.xaxis.set_minor_formatter(FormatStrFormatter('%2.5g'))
+    ax_inset.xaxis.set_major_formatter(FormatStrFormatter('%2.5g'))
+    ax_inset.yaxis.set_major_formatter(FormatStrFormatter('%2.5g'))
 
 def sed_figure(outname = None,
                colors = ['#1974D2'], sresults = None, eout = None,
@@ -496,13 +509,15 @@ def make_all_plots(filebase=None,
         pfig = sed_figure(sresults = [res], eout=[eout],
                           outname=outfolder+objname+'.sed.png')
         
-def do_all(runname=None,**extras):
+def do_all(runname=None,nobase=True,**extras):
     """for a list of galaxies, make all plots
     the runname has to be accepted by generate_basenames
     extra arguments go to make_all_plots
     """
-
-    filebase, _, _ = prosp_dutils.generate_basenames(runname)
+    if nobase:
+        filebase = find_all_prospector_results(runname)
+    else:
+        filebase, _, _ = prosp_dutils.generate_basenames(runname)
     for jj in range(len(filebase)):
         print 'iteration '+str(jj) 
 

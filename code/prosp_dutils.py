@@ -102,11 +102,11 @@ def asym_errors(center, up, down, log=False):
 def running_median(x,y,nbins=10,avg=False,weights=None,bins=None,return_bincount=False):
 
     if bins is None:
-        bins = np.linspace(x.min(),x.max(), nbins+1)
+        bins = np.linspace(x.min(),x.max()*1.001, nbins+1)
     else:
         nbins = len(bins)-1
         
-    idx  = np.digitize(x,bins,right=True)
+    idx  = np.digitize(x,bins)
 
     # median
     if not avg:
@@ -141,12 +141,8 @@ def running_median(x,y,nbins=10,avg=False,weights=None,bins=None,return_bincount
         running_median = np.array(running_median)
     outbins = (bins[:-1]+bins[1:])/2.
 
-    # remove empty
-    empty = np.isnan(running_median) == 1
-    running_median[empty] = 0
-
     if return_bincount:
-        return outbins,running_median, np.array([(idx == i).sum() for i in range(nbins)])
+        return outbins,running_median, np.array([(idx-1 == i).sum() for i in range(nbins)])
     return outbins,running_median
 
 def get_cmap(N,cmap='nipy_spectral'):
@@ -299,6 +295,7 @@ def find_sfh_params(model,theta,obs,sps,sm=None):
         # Need this because mass is 
         # current mass, not total mass formed!
         out['mformed'] = out['mass'] / sm
+
     return out
 
 def test_likelihood(sps,model,obs,thetas,param_file):
@@ -639,7 +636,7 @@ def generate_basenames(runname,ancilname=None):
         parm_basename = basename+"_params"
         ancilname=None
 
-        for jj in xrange(ngals): filebase.append(os.getenv('APPS')+"/prospector_alpha/results/"+runname+'/'+basename+'_'+ids[jj])
+        for jj in xrange(ngals): filebase.append(os.getenv('APPS')+"/prospector_alpha/results/"+runname+'/'+ids[jj])
         
         # check for multiple parameter files
         parbase = os.getenv('APPS')+"/prospector_alpha/parameter_files/"+runname+'/'+parm_basename
@@ -914,11 +911,11 @@ def return_full_sfh(t, sfh_params,**kwargs):
         tcalc = t-np.max(10**sfh_params['agebins'])/1e9
     tcalc = tcalc[tcalc < 0]*-1
 
-    intsfr = np.zeros(len(t))
+    sfr = np.zeros(len(t))
     for mm in xrange(len(tcalc)): 
-        intsfr[mm] = calculate_sfr(sfh_params, deltat, tcalc = tcalc[mm], **kwargs)
+        sfr[mm] = calculate_sfr(sfh_params, deltat, tcalc = tcalc[mm], **kwargs)
 
-    return intsfr
+    return sfr
 
 def calculate_sfr(sfh_params, timescale, tcalc = None, 
                   minsfr = None, maxsfr = None):

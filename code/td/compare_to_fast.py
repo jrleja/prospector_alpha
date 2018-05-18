@@ -26,6 +26,19 @@ minsfr = 0.0001
 
 nbin_min = 10
 
+def get_cmap(N):
+
+    import matplotlib.cm as cmx
+    import matplotlib.colors as colors
+
+    '''Returns a function that maps each index in 0, 1, ... N-1 to a distinct 
+    RGB color.'''
+    color_norm  = colors.Normalize(vmin=0, vmax=N-1)
+    scalar_map = cmx.ScalarMappable(norm=color_norm, cmap='rainbow') 
+    def map_index_to_rgb_color(index):
+        return scalar_map.to_rgba(index)
+    return map_index_to_rgb_color
+
 def sfr_ratio_for_fast(tau,tage,t2=0.1):
     """ get ratio of instantaneous SFR to t2 Gyr SFR
     """
@@ -111,7 +124,7 @@ def collate_data(runname, runname_fast, filename=None, filename_grid=None, regen
 
     outprosp, outprosp_fast, outfast, outlabels = {},{'bfit':{}},{},{}
     sfr_100_uvir, sfr_100_uv, sfr_100_ir, objname = [], [], [], []
-    phot_chi, phot_percentile, phot_obslam, phot_restlam, phot_fname = [], [], [], [], []
+    phot_chi, phot_percentile, phot_sn, phot_mag, phot_obslam, phot_restlam, phot_fname = [], [], [], [], [], [], []
     outfast['z'] = []
     outfast['uvj'], outfast['uvj_prosp'], outfast['uvj_dust_prosp'], outfast['uv'], outfast['vj'] = [], [], [], [], []
     logpar = ['stellar_mass', 'ssfr_30', 'ssfr_100']
@@ -304,8 +317,10 @@ def collate_data(runname, runname_fast, filename=None, filename_grid=None, regen
 
         # photometry chi, etc.
         mask = res['obs']['phot_mask']
-        phot_percentile += ((res['obs']['maggies'][mask] - prosp['obs']['mags'][0,mask]) / res['obs']['maggies'][mask]).tolist()
+        phot_percentile += ((res['obs']['maggies'][mask] - prosp['obs']['mags'][0,mask]) / np.abs(res['obs']['maggies'][mask])).tolist()
         phot_chi += ((res['obs']['maggies'][mask] - prosp['obs']['mags'][0,mask]) / res['obs']['maggies_unc'][mask]).tolist()
+        phot_sn += (res['obs']['maggies'][mask] / res['obs']['maggies_unc'][mask]).tolist()
+        phot_mag += (-2.5*np.log10(res['obs']['maggies'][mask])).tolist()
         phot_obslam += (res['obs']['wave_effective'][mask]/1e4).tolist()
         phot_restlam += (res['obs']['wave_effective'][mask]/1e4/(1+outfast['z'][-1])).tolist()
         phot_fname += [str(fname) for fname in np.array(res['obs']['filternames'])[mask]]
@@ -367,6 +382,8 @@ def collate_data(runname, runname_fast, filename=None, filename_grid=None, regen
            'uv_sfr': np.array(sfr_100_uv),
            'phot_chi': np.array(phot_chi),
            'phot_percentile': np.array(phot_percentile),
+           'phot_mag': np.array(phot_mag),
+           'phot_sn': np.array(phot_sn),
            'phot_obslam': np.array(phot_obslam),
            'phot_restlam': np.array(phot_restlam),
            'phot_fname': np.array(phot_fname)
@@ -399,10 +416,12 @@ def do_all(runname='td_new', runname_fast=None,outfolder=None,**opts):
     if len(data['uvir_sfr']) > 4000:
         popts = {'fmt':'o', 'capthick':.05,'elinewidth':.05,'alpha':0.2,'color':'0.3','ms':0.5, 'errorevery': 5000}
 
+    phot_residuals_by_flux(data,outfolder,popts)
+    print 1/0
+
     sfr_m_grid(data, datag, outfolder+'conditional_sfr_m.png',outfile=outfolder+'data/conditional_sfr_fit.h5')
     sfr_m_grid(data, datag, outfolder+'conditional_sfr_m_nofix.png',fix=False,outfile=outfolder+'data/conditional_sfr_fit_nofix.h5')
     dm_dsfr_grid(data, datag, outfolder, outtable)
-    print 1/0
     deltam_with_redshift(data['fast'], data['prosp'], data['fast']['z'], outfolder+'deltam_vs_z.png', filename=outfolder+'data/masscomp.h5')
 
     mass_met_age_z(data, outfolder, outtable, popts) # this is now deprecated
@@ -1001,6 +1020,163 @@ def prospector_versus_z(data,outname,popts):
             axes[i].yaxis.set_major_formatter(FormatStrFormatter('%2.4g'))
     plt.tight_layout()
     plt.savefig(outname,dpi=dpi)
+    plt.close()
+
+def phot_residuals_by_flux(data,outfolder,popts_orig):
+    """ two plots: 
+    2(chi versus percentiles) by 5 (fields) [obs-frame]
+    2(chi versus percentiles) by 1 [rest-frame]
+    """
+    
+    # pull out field & filter names
+    fields = np.array([f.split('_')[-1] for f in data['phot_fname']])
+    field_names = np.unique(fields)
+    filters = np.array([f.split('_')[0] for f in data['phot_fname']])
+
+    # plot stuff
+    popts = copy.deepcopy(popts_orig)
+    popts['ms'] = 1
+    popts['zorder'] = -5
+    medopts = {'marker':' ','alpha':0.5,'zorder':5,'linestyle':'-','lw':0.8}
+    fontsize = 16
+    fs = 10
+    ylim_chi = (-4,4)
+    ylim_percentile = (-0.65,0.65)
+
+    # residuals by SN
+    fig, ax = plt.subplots(5,2, figsize=(8,18))
+    for i,field in enumerate(field_names):
+
+        # determine field and filter names
+        fidx = fields == field
+        fnames = np.unique(filters[fidx])
+
+        # determine wavelength for filters so we can sort
+        lam = []
+        fnames = np.array(['irac1','irac2','irac3','irac4','mips'])
+        for filter in fnames:
+            fmatch = filters[fidx] == filter
+            lam += [data['phot_obslam'][fidx][fmatch][0]]
+        argsort = np.array(lam).argsort()
+
+        # plot the median for these
+        colormap = get_cmap(len(fnames))
+        for j,filter in enumerate(fnames[argsort]):
+            fmatch = filters[fidx] == filter
+            sn = np.abs(data['phot_sn'])[fidx][fmatch]
+
+            x,y,bincount = prosp_dutils.running_median(sn,data['phot_chi'][fidx][fmatch],return_bincount=True,nbins=20)
+            x,y = x[bincount > 10], y[bincount > 10]
+            ax[i,0].plot(x,y, color=colormap(j), **medopts)
+
+            x,y,bincount = prosp_dutils.running_median(sn,data['phot_percentile'][fidx][fmatch],return_bincount=True,nbins=20)
+            x,y = x[bincount > 10], y[bincount > 10]
+            ax[i,1].plot(x,y, color=colormap(j), **medopts)
+
+            ax[i,0].text(0.02,0.93-j*0.035,filter,color=colormap(j),fontsize=fs,transform=ax[i,0].transAxes)
+        ax[i,0].text(0.98,0.93,field,color=colormap(j),fontsize=fs,transform=ax[i,0].transAxes,ha='right')
+
+        ax[i,0].set_ylabel('(f$_{\mathrm{obs}}$-f$_{\mathrm{model}}$)/$\sigma_{\mathrm{obs}}$',fontsize=fontsize)
+        ax[i,1].set_ylabel('(f$_{\mathrm{obs}}$-f$_{\mathrm{model}}$)/f$_{\mathrm{obs}}$',fontsize=fontsize)
+
+        ax[i,0].set_xlabel('S/N',fontsize=fontsize)
+        ax[i,1].set_xlabel('S/N',fontsize=fontsize)
+
+
+        ax[i,0].set_ylim(ylim_chi)
+        ax[i,1].set_ylim(ylim_percentile)
+
+    plt.tight_layout()
+    plt.savefig(outfolder+'residual_by_sn.png',dpi=dpi)
+    plt.close()
+ 
+    # residuals by magnitude
+    fig, ax = plt.subplots(5,2, figsize=(8,18))
+    for i,field in enumerate(field_names):
+
+        # determine field and filter names
+        fidx = fields == field
+        fnames = np.unique(filters[fidx])
+        fnames = np.array(['irac1','irac2','irac3','irac4','mips'])
+
+        # determine wavelength for filters so we can sort
+        lam = []
+        for filter in fnames:
+            fmatch = filters[fidx] == filter
+            lam += [data['phot_obslam'][fidx][fmatch][0]]
+        argsort = np.array(lam).argsort()
+
+        # plot the median for these
+        colormap = get_cmap(len(fnames))
+        for j,filter in enumerate(fnames[argsort]):
+            fmatch = filters[fidx] == filter
+            mag = np.abs(data['phot_mag'])[fidx][fmatch]
+            gidx = np.isfinite(mag)
+
+            x,y,bincount = prosp_dutils.running_median(mag[gidx],data['phot_chi'][fidx][fmatch][gidx],return_bincount=True,nbins=20)
+            x,y = x[bincount > 10], y[bincount > 10]
+            ax[i,0].plot(x,y, color=colormap(j), **medopts)
+
+            x,y,bincount = prosp_dutils.running_median(mag[gidx],data['phot_percentile'][fidx][fmatch][gidx],return_bincount=True,nbins=20)
+            x,y = x[bincount > 10], y[bincount > 10]
+            ax[i,1].plot(x,y, color=colormap(j), **medopts)
+
+            ax[i,0].text(0.02,0.93-j*0.035,filter,color=colormap(j),fontsize=fs,transform=ax[i,0].transAxes)
+
+        ax[i,0].text(0.98,0.93,field,color=colormap(j),fontsize=fs,transform=ax[i,0].transAxes,ha='right')
+
+        ax[i,0].set_ylabel('(f$_{\mathrm{obs}}$-f$_{\mathrm{model}}$)/$\sigma_{\mathrm{obs}}$',fontsize=fontsize)
+        ax[i,1].set_ylabel('(f$_{\mathrm{obs}}$-f$_{\mathrm{model}}$)/f$_{\mathrm{obs}}$',fontsize=fontsize)
+
+        ax[i,0].set_xlabel('magnitude',fontsize=fontsize)
+        ax[i,1].set_xlabel('magnitude',fontsize=fontsize)
+
+
+        ax[i,0].set_ylim(ylim_chi)
+        ax[i,1].set_ylim(ylim_percentile)
+
+    plt.tight_layout()
+    plt.savefig(outfolder+'residual_by_magnitude.png',dpi=dpi)
+    plt.close()
+
+            
+
+
+    print 1/0
+
+    # residuals by rest-frame wavelength
+    fig, ax = plt.subplots(1,2, figsize=(10,5))
+
+    ax[0].errorbar(data['phot_restlam'], data['phot_chi'], **popts)
+    ax[1].errorbar(data['phot_restlam'], data['phot_percentile'], **popts)
+
+    # plot the median for these
+    for filter in fnames:
+        x, y, bincount = prosp_dutils.running_median(np.log10(data['phot_restlam']),data['phot_chi'],avg=False,return_bincount=True,nbins=20)
+        x, y = x[bincount > nbin_min], y[bincount > nbin_min]
+        ax[0].plot(10**x,y, **medopts)
+
+        x, y, bincount = prosp_dutils.running_median(np.log10(data['phot_restlam']),data['phot_percentile'],avg=False,return_bincount=True,nbins=20)
+        x, y = x[bincount > nbin_min], y[bincount > nbin_min]
+        ax[1].plot(10**x,y, **medopts)
+
+    # labels & scale
+    for a in ax: 
+        a.set_xlabel(r'rest-frame wavelength ($\mu$m)',fontsize=fontsize)
+        a.set_xscale('log',nonposx='clip',subsx=(2,4))
+        a.xaxis.set_minor_formatter(FormatStrFormatter('%2.4g'))
+        a.xaxis.set_major_formatter(FormatStrFormatter('%2.4g'))
+        a.tick_params('both', pad=3.5, size=3.5, width=1.0, which='both',labelsize=fontsize)
+        a.axhline(0, linestyle='--', color='k',lw=2,zorder=3)
+
+    ax[0].set_ylabel('(f$_{\mathrm{obs}}$-f$_{\mathrm{model}}$)/$\sigma_{\mathrm{obs}}$',fontsize=fontsize)
+    ax[1].set_ylabel('(f$_{\mathrm{obs}}$-f$_{\mathrm{model}}$)/f$_{\mathrm{obs}}$',fontsize=fontsize)
+
+    ax[0].set_ylim(ylim_chi)
+    ax[1].set_ylim(ylim_percentile)
+
+    plt.tight_layout()
+    plt.savefig(outfolder+'residual_restframe.png',dpi=dpi)
     plt.close()
 
 def phot_residuals(data,outfolder,popts_orig):

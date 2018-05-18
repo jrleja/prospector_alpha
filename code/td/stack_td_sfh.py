@@ -56,7 +56,7 @@ def integrate_sfh_vectorized(t1,t2,agebins,zfraction):
     tweights = np.minimum(time_below_max,time_above_min) / time_per_bin
 
     # convert to total mass formed
-    mformed = (mfraction * tweights[:,None,:]).sum(axis=-1) / tweights.sum(axis=1)[:,None]
+    mformed = (mfraction * tweights[:,None,:]).sum(axis=-1)
 
     return mformed
 
@@ -190,7 +190,7 @@ def stack_sfh(data, **opts):
         stack['vert'][zstr]['agebins'] = 10**model.params['agebins']
 
         # define galaxies in redshift bin
-        data['zred'] = np.array([float(z) for z in data['zred']]) # this can be removed once regenerate is run again
+        data['zred'] = np.array([float(z) for z in data['zred']])
         zidx = (data['zred'] > z1) & (data['zred'] <= z2)
 
         # calculate SFR(MS) for each galaxy

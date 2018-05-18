@@ -343,8 +343,7 @@ def plot_all_residuals(alldata,runname):
             lam_rest = np.append(lam_rest,data['residuals']['phot']['lam_obs']/(1+data['residuals']['phot']['z'])/1e4)
 
             #### star-forming or quiescent?
-            idx = data['pextras']['parnames'] == 'ssfr_100'
-            ssfr_100 = np.append(ssfr_100,data['pextras']['q50'][idx][0])
+            ssfr_100 = np.append(ssfr_100,data['extras']['ssfr_100']['q50'])
             if ssfr_100[-1] > ssfr_limit:
                 pcolor = sfcolor
                 lam_rest_sf = np.append(lam_rest_sf,data['residuals']['phot']['lam_obs']/(1+data['residuals']['phot']['z'])/1e4)
@@ -711,37 +710,18 @@ def update_model_info(alldata, sample_results, extra_output, magphys):
     alldata['objname'] = sample_results['run_params']['objname']
     alldata['magphys'] = magphys['pdfs']
     alldata['model'] = magphys['model']
-    alldata['pquantiles'] = extra_output['quantiles']
+    alldata['thetas'] = extra_output['thetas']
     npars = sample_results['chain'].shape[-1]
     
-    alldata['spec_info'] = extra_output['spec_info']
-    alldata['model_emline'] = extra_output['model_emline']
-    alldata['lir'] = extra_output['observables']['L_IR']
-    alldata['luv'] = extra_output['observables']['L_UV']
-    alldata['lmir'] = extra_output['observables']['L_MIR']
-    mask = sample_results['obs']['phot_mask']
-    alldata['model_maggies'] = extra_output['observables']['mags'][mask]
-    alldata['model_spec'] = np.median(extra_output['observables']['spec'],axis=1)
-    alldata['model_spec_lam'] = extra_output['observables']['lam_obs']
+    alldata['spec_info'] = extra_output['obs']
+    alldata['weights'] = extra_output['weights']
+    alldata['phot_mask'] = sample_results['obs']['phot_mask']
 
-    alldata['obs_maggies'] = sample_results['obs']['maggies'][mask]
-    alldata['filters'] = np.array(sample_results['obs']['filternames'])[mask]
+    alldata['obs_maggies'] = sample_results['obs']['maggies'][alldata['phot_mask']]
+    alldata['filters'] = np.array(sample_results['obs']['filternames'])[alldata['phot_mask']]
 
-    alldata['pextras'] = extra_output['extras']
-    alldata['pquantiles']['parnames'] = np.array(sample_results['model'].theta_labels())
-    alldata['bfit'] = extra_output['bfit']
-
-    if 'mphot' in extra_output.keys() and isinstance(extra_output['mphot'],dict):
-
-        uv = -2.5*np.log10(extra_output['mphot']['mags'][0,:])+2.5*np.log10(extra_output['mphot']['mags'][1,:])
-        vj = -2.5*np.log10(extra_output['mphot']['mags'][1,:])+2.5*np.log10(extra_output['mphot']['mags'][2,:])
-
-        alldata['mphot'] = {}
-        alldata['mphot']['uv'] = np.percentile(uv,[50.0,84.0,16.0])
-        alldata['mphot']['vj'] = np.percentile(vj,[50.0,84.0,16.0])
-        alldata['mphot']['mags'] = extra_output['mphot']
-    else:
-        pass
+    alldata['extras'] = extra_output['extras']
+    
     return alldata
 
 def sed_comp_figure(sample_results, extra_output, sps, model, magphys,
@@ -759,14 +739,16 @@ def sed_comp_figure(sample_results, extra_output, sps, model, magphys,
     """
 
     sigsmooth = [450.0, 1000.0, 1.0]
-    residuals={}
+    residuals = {}
     alpha = 0.65
     ms = 8
 
+    # generate best-fit model
+    spec,mags,sm = sample_results['model'].mean_model(sample_results['chain'][extra_output['sample_idx'][0]], sample_results['obs'], sps=sps)
+
+
     ##### Prospector maximum probability model ######
-    wave_eff, obsmags, obsmags_unc, modmags, chi, frac_prosp, modspec, modlam = return_sedplot_vars(extra_output['bfit']['spec'], 
-                                                                                                    extra_output['bfit']['mags'], 
-                                                                                                    sample_results['obs'], sps)
+    wave_eff, obsmags, obsmags_unc, modmags, chi, frac_prosp, modspec, modlam = return_sedplot_vars(spec, mags, sample_results['obs'], sps)
 
     ##### magphys: spectrum + photometry #####
     m = magphys['obs']['phot_mask']
@@ -874,8 +856,8 @@ def sed_comp_figure(sample_results, extra_output, sps, model, magphys,
 
         #### SFR and mass
         # calibrated to be to the right of ax_loc = [0.38,0.68,0.13,0.13]
-        prosp_sfr = extra_output['extras']['q50'][extra_output['extras']['parnames'] == 'sfr_100'][0]
-        prosp_mass = np.log10(extra_output['extras']['q50'][np.array(extra_output['extras']['parnames']) == 'stellar_mass'][0])
+        prosp_sfr = extra_output['extras']['sfr_100']['q50']
+        prosp_mass = np.log10(extra_output['extras']['stellar_mass']['q50'])
         mag_mass = np.log10(magphys['model']['parameters'][magphys['model']['parnames'] == 'M*'][0])
         mag_sfr = magphys['model']['parameters'][magphys['model']['parnames'] == 'SFR'][0]
         
@@ -1002,7 +984,7 @@ def collate_data(filebase=None,
     # BEGIN PLOT ROUTINE
     print 'MAKING PLOTS FOR ' + objname + ' in ' + outfolder
 
-    # sed plot
+    # SED plot
     # don't cache emission lines, since we will want to turn them on / off
     sample_results['model'].params['add_neb_emission'] = np.array(True)
 
@@ -1044,10 +1026,10 @@ def plt_all(runname=None,startup=True,**extras):
     outfolder = os.getenv('APPS')+'/prospector_alpha/plots/'+runname+'/magphys/sed_residuals/'
 
     if startup == True:
-        filebase, parm_basename, ancilname=prosp_dutils.generate_basenames(runname)
+        filebase, parm_basename, ancilname = prosp_dutils.generate_basenames(runname)
         alldata = []
         sps = None
-        for jj in xrange(len(filebase)):
+        for jj in range(len(filebase)):
 
             dictionary, sps = collate_data(filebase=filebase[jj],\
                                            outfolder=outfolder,
@@ -1060,70 +1042,35 @@ def plt_all(runname=None,startup=True,**extras):
     else:
         alldata = prospector_io.load_alldata(runname=runname)
 
-    '''
-    ssfr, ssfr_up, ssfr_down, uvir_ssfr, uvir_ssfr_up, uvir_ssfr_down = [[] for i in range(6)]
-    for dat in alldata:
-        idx = dat['pextras']['parnames'] == 'ssfr_100'
-        ssfr.append(dat['pextras']['q50'][idx])
-        ssfr_up.append(dat['pextras']['q84'][idx])
-        ssfr_down.append(dat['pextras']['q16'][idx])
+    ha_idx = alldata[0]['residuals']['emlines']['em_name'] == 'H$\\alpha$'
+    hb_idx = alldata[0]['residuals']['emlines']['em_name'] == 'H$\\beta$'
 
-        luv, lir = dat['luv'], dat['lir']
-        stellar_mass = dat['pextras']['flatchain'][:,dat['pextras']['parnames'] == 'stellar_mass'].squeeze()
-        ssfr_chain = prosp_dutils.sfr_uvir(lir,luv) / stellar_mass
-        out = np.percentile(ssfr_chain, [50, 84, 16])
-        uvir_ssfr.append(out[0])
-        uvir_ssfr_up.append(out[1])
-        uvir_ssfr_down.append(out[2])
+    with open('brown_optical_info.dat', "w") as f:
+      f.write('# name ha_lum ha_lum_errup ha_lum_errdown hb_lum hb_lum_errup hb_lum_errdown dn4000\n')
+      for dat in alldata:
+        objname = str(dat['objname'])
+        halum = dat['residuals']['emlines']['obs']['lum'][ha_idx][0]
+        halum_errup = dat['residuals']['emlines']['obs']['lum_errup'][ha_idx][0]
+        halum_errdown = dat['residuals']['emlines']['obs']['lum_errdown'][ha_idx][0]
 
-    popts = {'fmt':'o', 'capthick':1.5,'elinewidth':1.5,'ms':9,'alpha':0.8,'color':'0.2'}
+        hblum = dat['residuals']['emlines']['obs']['lum'][hb_idx][0]
+        hblum_errup = dat['residuals']['emlines']['obs']['lum_errup'][hb_idx][0]
+        hblum_errdown = dat['residuals']['emlines']['obs']['lum_errdown'][hb_idx][0]
 
-    ssfr = np.squeeze(ssfr)
-    ssfr_up = np.squeeze(ssfr_up)
-    ssfr_down = np.squeeze(ssfr_down)
-    uvir_ssfr = np.squeeze(uvir_ssfr)
-    uvir_ssfr_up = np.squeeze(uvir_ssfr_up)
-    uvir_ssfr_down = np.squeeze(uvir_ssfr_down)
+        try:
+          dn4000 = dat['residuals']['emlines']['obs']['dn4000']
+        except:
+          dn4000 = -99
 
-    ssfr_err = prosp_dutils.asym_errors(ssfr, ssfr_up, ssfr_down)
-    uvir_ssfr_err = prosp_dutils.asym_errors(uvir_ssfr, uvir_ssfr_up, uvir_ssfr_down)
+        f.write(objname+" {:.4e}".format(halum)+" {:.4e}".format(halum_errup)+" {:.4e}".format(halum_errdown) + \
+                " {:.4e}".format(hblum)+" {:.4e}".format(hblum_errup)+" {:.4e}".format(hblum_errdown)+\
+                " {:.4f}".format(dn4000)+'\n')
 
-    fig, ax = plt.subplots(1,2,figsize=(12,6))
-    ax = np.ravel(ax)
 
-    ### UV_IR SFR plot
-    ax[0].errorbar(uvir_ssfr, ssfr, yerr=ssfr_err, xerr=uvir_ssfr_err, **popts)
+    plot_all_residuals(alldata,runname)
 
-    sub = ([1])
-    ax[0].set_xlabel('sSFR$_{\mathrm{UVIR}}$')
-    ax[0].set_ylabel('sSFR$_{\mathrm{Prosp}}$')
-    ax[0].set_yscale('log',nonposy='clip',subsy=sub)
-    ax[0].yaxis.set_major_formatter(majorFormatter)
-    ax[0].yaxis.set_minor_formatter(minorFormatter)
-    ax[0].set_xscale('log',nonposy='clip',subsx=sub)
-    ax[0].xaxis.set_major_formatter(majorFormatter)
-    ax[0].xaxis.set_minor_formatter(minorFormatter)
-
-    off,scat = prosp_dutils.offset_and_scatter(np.log10(uvir_ssfr),np.log10(ssfr),biweight=True)
-    scatunits = ' dex'
-    ax[0].text(0.05,0.94, 'offset='+"{:.2f}".format(off)+scatunits, transform = ax[0].transAxes)
-    ax[0].text(0.05,0.89, 'biweight scatter='+"{:.2f}".format(scat)+scatunits, transform = ax[0].transAxes)
-    lim = ax[0].get_xlim()
-    ax[0].plot([lim[0],lim[1]],[lim[0],lim[1]],'--', color='red', zorder=2)
-
-    ax[1].errorbar(ssfr, np.log10(ssfr/uvir_ssfr), **popts)
-    ax[1].set_xlabel('sSFR$_{\mathrm{Prosp}}$')
-    ax[1].set_ylabel('log(sSFR$_{\mathrm{Prosp}}$/sSFR$_{\mathrm{UVIR}}$)')
-    ax[1].axhline(0, linestyle='--', color='red',lw=2,zorder=-1)
-
-    ax[1].set_xscale('log',nonposy='clip',subsx=([1]))
-    ax[1].xaxis.set_major_formatter(majorFormatter)
-    ax[1].xaxis.set_minor_formatter(minorFormatter)
-
-    plt.tight_layout()
-    plt.show()
     print 1/0
-    '''
+
     #### herschel flag
     hflag = np.array([True if np.sum(dat['residuals']['phot']['lam_obs'] > 5e5) else False for dat in alldata])
     stack_sfh.plot_stacked_sfh(alldata,os.getenv('APPS')+'/prospector_alpha/plots/'+runname+'/pcomp/')

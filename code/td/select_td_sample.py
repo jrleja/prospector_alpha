@@ -1,6 +1,6 @@
 import td_io, os, prosp_dutils, hickle
 import numpy as np
-from astropy.io import ascii
+from astropy.io import ascii, fits
 import astropy.coordinates as coords
 from astropy import units as u
 from astropy.cosmology import WMAP9
@@ -32,6 +32,18 @@ def select_ha(phot=None,fast=None,zbest=None,gris=None,**extras):
     np.random.seed(2)
     idx = np.where((phot['use_phot'] == 1) & (zbest['use_zgrism'] == 1)  & (gris['Ha_FLUX']/gris['Ha_FLUX_ERR'] > 10) & (gris['Ha_EQW'] > 10))[0]
     return np.random.choice(idx,40,replace=False)
+
+def select_shivaei(phot=None,field=None,**extras):
+    hdu = fits.open('/Users/joel/code/python/prospector_alpha/data/3dhst/shivaei_sample.fits')
+    fields = np.array([f.replace('-','') for f in hdu[1].data['FIELD']])
+    idx = fields == field
+    ids = hdu[1].data['V4ID'][idx]
+
+    #idx = np.where(np.in1d(phot['id'],ids))
+    #print 1/0
+
+    # use dirty trick: the phot is in IDorder
+    return (ids-1)
 
 def select_td(phot=None,fast=None,zbest=None,gris=None,**extras):
     idx = np.where((phot['use_phot'] == 1) & 
@@ -139,6 +151,12 @@ def td_cut(out):
 
     return out
 
+shivaei_sample = {
+             'selection_function': select_shivaei,
+             'runname': 'td_shivaei',
+             'rm_zp_offsets': True,
+              }
+
 new_sample = {
              'selection_function': select_new_supp,
              'runname': 'td_new',
@@ -214,7 +232,7 @@ def build_sample(sample=None):
         rf = td_io.load_rf_v41(field)
 
         # make catalog cuts
-        good = sample['selection_function'](fast=fast,phot=phot,zbest=zbest,gris=gris)
+        good = sample['selection_function'](fast=fast,phot=phot,zbest=zbest,gris=gris,field=field)
 
         phot = phot[good]
         fast = fast[good]

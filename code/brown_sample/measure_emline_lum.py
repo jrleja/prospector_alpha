@@ -248,15 +248,6 @@ def measure(sample_results, extra_output, obs_spec, sps, runname='brownseds_np',
     measure emission line luminosities using prospector continuum model
     '''
 
-    '''
-    ##### FIRST, CHECK RESOLUTION IN REGION OF HALPHA
-    ##### IF IT'S JUNK, THEN RETURN NOTHING!
-    idx = (np.abs(obs_spec['rest_lam'] - 6563)).argmin()
-    dellam = obs_spec['rest_lam'][idx+1] - obs_spec['rest_lam'][idx]
-    if dellam > 14:
-        print 'low resolution, not measuring fluxes for '+sample_results['run_params']['objname']
-        return None
-    '''
     #### smoothing in km/s
     smooth       = 200
 
@@ -369,7 +360,7 @@ def measure(sample_results, extra_output, obs_spec, sps, runname='brownseds_np',
     nboot = 100
     emline_noise, residuals = [], []
     for ii in range(nboot):
-        model_flux,mags,sm = sample_results['model'].mean_model(extra_output['quantiles']['sample_chain'][ii,:], sample_results['obs'], sps=sps)
+        model_flux,mags,sm = sample_results['model'].mean_model(sample_results['chain'][extra_output['sample_idx'][ii]], sample_results['obs'], sps=sps)
         model_flux *= remove_10pc_dfactor/constants.L_sun.cgs.value
 
         #### normalize continuum model to observations
@@ -523,15 +514,20 @@ def measure(sample_results, extra_output, obs_spec, sps, runname='brownseds_np',
                                                            np.percentile(tobs_abs_eqw[kk,:],16)])
 
     # bestfit, for plotting purposes
-    out = prosp_dutils.measure_abslines(obslam/(1+zadj),obsflux,plot=True)
-    obs_lam_cont = np.zeros(nabs)
-    for kk in xrange(nabs): obs_lam_cont[kk] = out[abslines[kk]]['lam']
+    try:
+        out = prosp_dutils.measure_abslines(obslam/(1+zadj),obsflux,plot=True)
+        obs_lam_cont = np.zeros(nabs)
+        for kk in xrange(nabs): obs_lam_cont[kk] = out[abslines[kk]]['lam']
 
-    dn4000_obs = prosp_dutils.measure_Dn4000(obslam,obsflux,ax=out['ax'][5])
+        dn4000_obs = prosp_dutils.measure_Dn4000(obslam,obsflux,ax=out['ax'][5])
+        obs['dn4000'] = dn4000_obs
+        obs['continuum_lam'] = obs_lam_cont
 
-    plt.tight_layout()
-    plt.savefig(out_absobs, dpi=dpi)
-    plt.close()
+        plt.tight_layout()
+        plt.savefig(out_absobs, dpi=dpi)
+        plt.close()
+    except:
+        pass
 
     out = {}
     # SAVE OBSERVATIONS
@@ -546,7 +542,6 @@ def measure(sample_results, extra_output, obs_spec, sps, runname='brownseds_np',
     obs['flux_errup'] = emline_flux[1,:]  / dfactor / (1+z)
     obs['flux_errdown'] = emline_flux[2,:]  / dfactor / (1+z)
 
-    obs['dn4000'] = dn4000_obs
     obs['balmer_lum'] = obs_abs_flux
     obs['balmer_eqw_rest'] = obs_abs_eqw
     obs['balmer_flux'] = obs_abs_flux / dfactor / (1+z)
@@ -554,7 +549,6 @@ def measure(sample_results, extra_output, obs_spec, sps, runname='brownseds_np',
     obs['balmer_eqw_rest_chain'] = tobs_abs_eqw
 
     obs['continuum_obs'] = obs_abs_flux[:,0] / obs_abs_eqw[:,0] 
-    obs['continuum_lam'] = obs_lam_cont
 
     out['obs'] = obs
 
