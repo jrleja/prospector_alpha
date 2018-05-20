@@ -72,10 +72,10 @@ def tie_gas_logz(logzsol=None, **extras):
 def to_dust1(dust1_fraction=None, dust1=None, dust2=None, **extras):
     return dust1_fraction*dust2
 
-def logmass_to_masses(logmass=None, logssfr50=None, logssfr200=None, agebins=None, **extras):
+def logmass_to_masses(logmass=None, logssfr50=None, logssfr300=None, agebins=None, **extras):
     nbins = agebins.shape[0]-2
     m1 = (10**logssfr50)*5e7*(10**logmass)
-    m2 = (10**logssfr50)*1.5e8*(10**logmass)
+    m2 = (10**logssfr300)*1.5e8*(10**logmass)
     other_masses = np.full(nbins, (10**logmass-m1-m2) / nbins)
     return np.array(m1.tolist()+m2.tolist()+other_masses.tolist())
 
@@ -145,7 +145,7 @@ model_params.append({'name': 'logssfr50', 'N': 1,
                         'units': 'Msun',
                         'prior': priors.TopHat(mini=-13.5, maxi=-7.5)})
 
-model_params.append({'name': 'logssfr200', 'N': 1,
+model_params.append({'name': 'logssfr300', 'N': 1,
                         'isfree': True,
                         'init': -10.0,
                         'units': 'Msun',
@@ -345,7 +345,7 @@ model_params.append({'name': 'mass_units', 'N': 1,
 #### resort list of parameters 
 # because we can
 parnames = [m['name'] for m in model_params]
-fit_order = ['logmass','logssfr50','logssfr200','logsfr_ratios', 'logzsol', 'dust2', 'dust_index', 'dust1_fraction']
+fit_order = ['logmass','logssfr50','logssfr300','logsfr_ratios', 'logzsol', 'dust2', 'dust_index', 'dust1_fraction']
 tparams = [model_params[parnames.index(i)] for i in fit_order]
 for param in model_params: 
     if param['name'] not in fit_order:
