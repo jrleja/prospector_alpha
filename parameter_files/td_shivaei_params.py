@@ -21,7 +21,7 @@ jansky_mks = 1e-26
 APPS = os.getenv('APPS')
 run_params = {'verbose':True,
               'debug': False,
-              'outfile': APPS+'/prospector_alpha/results/td_shivaei/AEGIS_36257',
+              'outfile': APPS+'/prospector_alpha/results/td_shivaei/AEGIS_27252',
               'nofork': True,
               # dynesty params
               'nested_bound': 'multi', # bounding method
@@ -40,7 +40,7 @@ run_params = {'verbose':True,
               # Data info (phot = .cat, dat = .dat, fast = .fout)
               'datdir':APPS+'/prospector_alpha/data/3dhst/',
               'runname': 'td_shivaei',
-              'objname':'AEGIS_36257'
+              'objname':'AEGIS_27252'
               }
 ############
 # OBS
@@ -63,7 +63,7 @@ def load_obs(objname=None, datdir=None, runname=None, err_floor=0.05, zperr=True
 
     ### extract filters, fluxes, errors for object
     # from ReadMe: "All fluxes are normalized to an AB zeropoint of 25, such that: magAB = 25.0-2.5*log10(flux)
-    obj_idx = (dat['id'] == objname.split('_')[-1])
+    obj_idx = np.where(dat['id'] == objname.split('_')[-1])[0][0]
     filters = np.array([f[2:] for f in dat.dtype.names if f[0:2] == 'f_'])
     flux = np.squeeze([dat[obj_idx]['f_'+f] for f in filters])
     unc = np.squeeze([dat[obj_idx]['e_'+f] for f in filters])
