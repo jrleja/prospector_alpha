@@ -704,7 +704,7 @@ def load_model(objname=None, datdir=None, runname=None, agelims=[], zred=None, a
     mean = hdu[1].data['m_12LOGOH'][idx_obj][0]
     if (mean > -100):
         gas_logz_mean = np.clip((mean - 12) + 3.06, -2, 0.5)
-        sigma = (hdu[1].data['U68_12LOGOH'] - hdu[1].data['L68_12LOGOH'])[idx_obj] / 2.
+        sigma = (hdu[1].data['U68_12LOGOH'] - hdu[1].data['L68_12LOGOH'])[idx_obj][0] / 2.
         model_params[n.index('gas_logz')]['prior'] = priors.ClippedNormal(mean=gas_logz_mean,sigma=sigma,mini=-2,maxi=0.5)
 
     return sedmodel.SedModel(model_params)
