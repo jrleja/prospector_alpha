@@ -1118,6 +1118,7 @@ def integrate_sfh(t1,t2,sfh_params):
         try:
             np.testing.assert_approx_equal(np.sum(weights),t2-t1,significant=5)
         except AssertionError:
+            print 1/0
             sys.exit('weights do not sum to 1')
 
         tot_mformed = np.sum((weights/time_per_bin)*sfh_params['mass_fraction'])

@@ -111,10 +111,11 @@ def load_obs(objname=None, datdir=None, runname=None, err_floor=0.05, zperr=True
     phot_mask[neg] = False
 
     ### mask anything touching or bluewards of Ly-a
-    datname = datdir + objname.split('_')[0] + '_' + runname + '.dat'
-    dat = ascii.read(datname)
-    idx = dat['phot_id'] == int(objname.split('_')[-1])
-    zred = float(dat['z_best'][idx])
+    hdu = fits.open(APPS+'/prospector_alpha/data/3dhst/shivaei_sample.fits')
+    fields = np.array([f.replace('-','') for f in hdu[1].data['FIELD']])
+    ids = hdu[1].data['V4ID'].astype(str)
+    idx_obj = (fields == objname.split('_')[0]) & (ids == objname.split('_')[1])
+    zred = float(hdu[1].data['Z_MOSFIRE'][idx_obj][0])
     ofilters = observate.load_filters(filters)
 
     wavemax = np.array([f.wavelength[f.transmission > (f.transmission.max()*0.1)].max() for f in ofilters]) / (1+zred)
