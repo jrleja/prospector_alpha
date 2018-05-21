@@ -1,7 +1,7 @@
 import numpy as np
 import os
 from prospect.models import priors, sedmodel
-from prospect.sources import FastStepBasis
+from prospect.sources import CSPSpecBasis
 from sedpy import observate
 from astropy.cosmology import WMAP9
 from td_io import load_zp_offsets
@@ -21,7 +21,7 @@ jansky_mks = 1e-26
 APPS = os.getenv('APPS')
 run_params = {'verbose':True,
               'debug': False,
-              'outfile': APPS+'/prospector_alpha/results/mock_200delta/1',
+              'outfile': APPS+'/prospector_alpha/results/td_lyc/comp2_varz',
               'nofork': True,
               # dynesty params
               'nested_bound': 'multi', # bounding method
@@ -36,27 +36,49 @@ run_params = {'verbose':True,
               'compute_vega_mags': False,
               'initial_disp':0.1,
               'interp_type': 'logarithmic',
-              'nbins_sfh': 5,
-              'sigma': 0.3,
-              # Data info (phot = .cat, dat = .dat, fast = .fout)
-              'objname':'1'
+              'agelims': [0.0,7.698,8.0,8.5,9.0,9.5,9.8,10.0]
               }
 ############
 # OBS
 #############
-def load_obs(objname=None, errors=None, **extras):
+ftranslate = {'f435w': 'acs_wfc_f435w',
+              'f606w': 'wfc3_uvis_f606w',
+              'f775w': 'acs_wfc_f775w',
+              'f814w': 'wfc3_uvis_f814w',
+              'f850lp':'acs_wfc_f850lp',
+              'f125w':'wfc3_ir_f125w',
+              'f140w':'wfc3_ir_f140w',
+              'f160w':'wfc3_ir_f160w'
+              }
+    
+def load_obs(err_floor=0.05, zperr=True, no_zp_corrs=False, **extras):
 
-    # key will be 1-N where N is the number of runs
-    # needs to set "mock_key" to 1,2,3
-    # and generate errors on grid
-    snr_grid = [2,5,10,30,100]
-    nmocks = len(snr_grid)*3
-    mock_key = (int(objname)-1) / (nmocks/3) + 1
-    snr_key = (int(objname)-1) % len(snr_grid)
+    ''' 
+    objname: number of object in the 3D-HST COSMOS photometric catalog
+    err_floor: the fractional error floor (0.05 = 5% floor)
+    zp_err: inflate the errors by the zeropoint offsets from Skelton+14
+    '''
 
-    import mock_params
-    obs = mock_params.load_obs(mock_key=mock_key)
-    obs['maggies_unc'] = obs['maggies'] / snr_grid[snr_key]
+    ### extract filters, fluxes, errors for object
+    filters = ['F435W', 'F606W', 'F775W', 'F814W', 'F850LP', 'F125W', 'F140W', 'F160W']
+    mag = np.array([27.50991419,  26.63596947,  26.35137654,  26.23354606, 26.28809211,  26.14605866,  26.00416224,  25.87082705])
+    maggies = 10**(-0.4*mag)
+    magunc = np.array([0.5, 0.4, 0.3, 0.2, 0.1, 0.1, 0.1, 0.1])
+    maggies_unc = maggies * magunc * 1.086
+
+    ### implement error floor
+    maggies_unc = np.clip(maggies_unc, maggies*err_floor, np.inf)
+
+    ### build output dictionary
+    obs = {}
+    obs['filters'] = observate.load_filters([ftranslate[f.lower()] for f in filters])
+    obs['wave_effective'] = np.array([filt.wave_effective for filt in obs['filters']])
+    obs['phot_mask'] = np.ones_like(maggies,dtype=bool)
+    obs['maggies'] = maggies
+    obs['maggies_unc'] =  maggies_unc
+    obs['wavelength'] = None
+    obs['spectrum'] = None
+    obs['logify_spectrum'] = False
 
     return obs
 
@@ -72,35 +94,12 @@ def tie_gas_logz(logzsol=None, **extras):
 def to_dust1(dust1_fraction=None, dust1=None, dust2=None, **extras):
     return dust1_fraction*dust2
 
-def logmass_to_masses(logmass=None, logssfr50=None, logssfr300=None, agebins=None, **extras):
-    nbins = agebins.shape[0]-2
-    m1 = (10**logssfr50)*5e7*(10**logmass)
-    m2 = (10**logssfr300)*1.5e8*(10**logmass)
-    other_masses = np.full(nbins, (10**logmass-m1-m2) / nbins)
-    return np.array(m1.tolist()+m2.tolist()+other_masses.tolist())
+def massmet_to_logmass(massmet=None,**extras):
+    return massmet[0]
 
-def logsfr_ratios_to_agebins(logsfr_ratios=None, tuniv=None, **extras):
-    """this transforms from SFR ratios to agebins
-    by assuming a constant amount of mass forms in each bin
-    agebins = np.array([NBINS,2])
+def massmet_to_logzsol(massmet=None,**extras):
+    return massmet[1]
 
-    use equation:
-        delta(t1) = tuniv  / (1 + SUM(n=1 to n=nbins-1) PROD(j=1 to j=n) Sn)
-        where Sn = SFR(n) / SFR(n+1) and delta(t1) is width of youngest bin
-    """
-
-    # calculate delta(t) for the first bin
-    lowest_fixed_time = 2e8
-    n_ratio = logsfr_ratios.shape[0]
-    sfr_ratios = 10**logsfr_ratios
-    dt1 = (tuniv[0]-lowest_fixed_time) / (1 + np.sum([np.prod(sfr_ratios[:(i+1)]) for i in range(n_ratio)]))
-
-    # translate into agelims vector (time bin edges)
-    agelims = [1, lowest_fixed_time, dt1+lowest_fixed_time]
-    for i in range(n_ratio): agelims += [dt1*np.prod(sfr_ratios[:(i+1)]) + agelims[-1]]
-    
-    return np.log10([agelims[:-1], agelims[1:]]).T
-    
 #############
 # MODEL_PARAMS
 #############
@@ -108,10 +107,10 @@ model_params = []
 
 ###### BASIC PARAMETERS ##########
 model_params.append({'name': 'zred', 'N': 1,
-                        'isfree': False,
-                        'init': 1,
+                        'isfree': True,
+                        'init': 0.0,
                         'units': '',
-                        'prior': priors.TopHat(mini=0.0, maxi=4.0)})
+                        'prior': priors.TopHat(mini=0.0, maxi=5.0)})
 
 model_params.append({'name': 'add_igm_absorption', 'N': 1,
                         'isfree': False,
@@ -134,54 +133,55 @@ model_params.append({'name': 'pmetals', 'N': 1,
                         'prior_function': None,
                         'prior_args': {'mini':-3, 'maxi':-1}})
 
-model_params.append({'name': 'logmass', 'N': 1,
+model_params.append({'name': 'massmet', 'N': 2,
                         'isfree': True,
+                        'init': np.array([10,-0.5]),
+                        'prior': None})
+
+model_params.append({'name': 'logmass', 'N': 1,
+                        'isfree': False,
+                        'depends_on': massmet_to_logmass,
                         'init': 10.0,
                         'units': 'Msun',
-                        'prior': priors.TopHat(mini=7, maxi=12)})
-
-model_params.append({'name': 'logssfr50', 'N': 1,
-                        'isfree': True,
-                        'init': -10.0,
-                        'units': 'Msun',
-                        'prior': priors.TopHat(mini=-13.5, maxi=-7.5)})
-
-model_params.append({'name': 'logssfr300', 'N': 1,
-                        'isfree': True,
-                        'init': -10.0,
-                        'units': 'Msun',
-                        'prior': priors.TopHat(mini=-13.5, maxi=-7.5)})
+                        'prior': None})
 
 model_params.append({'name': 'logzsol', 'N': 1,
-                        'isfree': True,
-                        'init': -0.5,
-                        'units': r'$\log (Z/Z_\odot)$',
-                        'prior': priors.TopHat(mini=-1.98, maxi=0.19)})
-                        
-###### SFH   ########
-model_params.append({'name': 'sfh', 'N':1,
                         'isfree': False,
-                        'init': 0,
-                        'units': None})
+                        'init': -0.5,
+                        'depends_on': massmet_to_logzsol,
+                        'units': r'$\log (Z/Z_\odot)$',
+                        'prior': None})
+                        
+# --- SFH --------
+model_params.append({'name': 'sfh', 'N': 1,
+                        'isfree': False,
+                        'init': 4,  # 4=delayed-tau
+                        'units': 'type'})
+
+model_params.append({'name': 'tau', 'N': 1,
+                        'isfree': True,
+                        'init': 1.0,
+                        'init_disp': 0.5,
+                        'disp_floor': 0.5,
+                        'units': 'Gyr',
+                        'prior': priors.LogUniform(mini=1e-2, maxi=100)})
+
+model_params.append({'name': 'tage', 'N': 1,
+                        'isfree': True,
+                        'init': 1.0,
+                        'init_disp': 0.5,
+                        'disp_floor': 0.2,
+                        'units': 'Gyr',
+                        'prior': priors.TopHat(mini=0.01, maxi=13.0)})
+
+def get_mass(logmass=10, **extras):
+    return 10**logmass
 
 model_params.append({'name': 'mass', 'N': 1,
                      'isfree': False,
-                     'depends_on': logmass_to_masses,
+                     'depends_on': get_mass,
                      'init': 1.,
                      'units': r'M$_\odot$',})
-
-model_params.append({'name': 'agebins', 'N': 1,
-                        'isfree': False,
-                        'depends_on': logsfr_ratios_to_agebins,
-                        'init': [],
-                        'units': 'log(yr)',
-                        'prior': None})
-
-model_params.append({'name': 'logsfr_ratios', 'N': 1,
-                        'isfree': True,
-                        'init': [],
-                        'units': '',
-                        'prior': None})
 
 ########    IMF  ##############
 model_params.append({'name': 'imf_type', 'N': 1,
@@ -219,7 +219,7 @@ model_params.append({'name': 'dust2', 'N': 1,
                         'init_disp': 0.25,
                         'disp_floor': 0.15,
                         'units': '',
-                        'prior': priors.ClippedNormal(mini=0.0, maxi=4.0, mean=0.3, sigma=1)})
+                        'prior': priors.TopHat(mini=0.0, maxi=1.0)})
 
 model_params.append({'name': 'dust_index', 'N': 1,
                         'isfree': True,
@@ -227,7 +227,7 @@ model_params.append({'name': 'dust_index', 'N': 1,
                         'init_disp': 0.25,
                         'disp_floor': 0.15,
                         'units': '',
-                        'prior': priors.TopHat(mini=-1.0, maxi=0.4)})
+                        'prior': priors.TopHat(mini=-2.2, maxi=0.4)})
 
 model_params.append({'name': 'dust1_index', 'N': 1,
                         'isfree': False,
@@ -294,6 +294,7 @@ model_params.append({'name': 'nebemlineinspec', 'N': 1,
 model_params.append({'name': 'gas_logz', 'N': 1,
                         'isfree': False,
                         'init': 0.0,
+                        'depends_on': tie_gas_logz,
                         'units': r'log Z/Z_\odot',
                         'prior': priors.TopHat(mini=-2.0, maxi=0.5)})
 
@@ -316,7 +317,7 @@ model_params.append({'name': 'fagn', 'N': 1,
                         'init_disp': 0.03,
                         'disp_floor': 0.02,
                         'units': '',
-                        'prior': priors.LogUniform(mini=1e-5, maxi=3.0)})
+                        'prior': priors.LogUniform(mini=1e-4, maxi=3.0)})
 
 model_params.append({'name': 'agn_tau', 'N': 1,
                         'isfree': False,
@@ -346,15 +347,106 @@ model_params.append({'name': 'mass_units', 'N': 1,
 #### resort list of parameters 
 # because we can
 parnames = [m['name'] for m in model_params]
-fit_order = ['logmass','logssfr50','logssfr300','logsfr_ratios', 'logzsol', 'dust2', 'dust_index', 'dust1_fraction']
+fit_order = ['massmet','tage', 'tau', 'dust2', 'dust_index', 'dust1_fraction']
 tparams = [model_params[parnames.index(i)] for i in fit_order]
 for param in model_params: 
     if param['name'] not in fit_order:
         tparams.append(param)
 model_params = tparams
 
+##### Mass-metallicity prior ######
+class MassMet(priors.Prior):
+    """A Gaussian prior designed to approximate the Gallazzi et al. 2005 
+    stellar mass--stellar metallicity relationship.
+
+    Must be updated to have relevant functions of `distribution` in `priors.py`
+    in order to be run with a nested sampler.
+    """
+
+    prior_params = ['mass_mini', 'mass_maxi', 'z_mini', 'z_maxi']
+    distribution = truncnorm
+    massmet = np.loadtxt(os.getenv('APPS')+'/prospector_alpha/data/gallazzi_05_massmet.txt')
+
+    def scale(self,mass):
+        upper_84 = np.interp(mass, self.massmet[:,0], self.massmet[:,3]) 
+        lower_16 = np.interp(mass, self.massmet[:,0], self.massmet[:,2])
+        return (upper_84-lower_16)
+
+    def loc(self,mass):
+        return np.interp(mass, self.massmet[:,0], self.massmet[:,1])
+
+    def get_args(self,mass):
+        a = (self.params['z_mini'] - self.loc(mass)) / self.scale(mass)
+        b = (self.params['z_maxi'] - self.loc(mass)) / self.scale(mass)
+        return [a, b]
+
+    @property
+    def range(self):
+        return ((self.params['mass_mini'], self.params['mass_maxi']),\
+                (self.params['z_mini'], self.params['z_maxi']))
+
+    def bounds(self, **kwargs):
+        if len(kwargs) > 0:
+            self.update(**kwargs)
+        return self.range
+
+    def __call__(self, x, **kwargs):
+        """Compute the value of the probability density function at x and
+        return the ln of that.
+
+        :params x:
+            x[0] = mass, x[1] = metallicity. Used to calculate the prior
+
+        :param kwargs: optional
+            All extra keyword arguments are used to update the `prior_params`.
+
+        :returns lnp:
+            The natural log of the prior probability at x, scalar or ndarray of
+            same length as the prior object.
+        """
+        if len(kwargs) > 0:
+            self.update(**kwargs)
+        p = np.atleast_2d(np.zeros_like(x))
+        a, b = self.get_args(x[...,0])
+        p[...,1] = self.distribution.pdf(x[...,1], a, b, loc=self.loc(x[...,0]), scale=self.scale(x[...,0]))
+        with np.errstate(invalid='ignore'):
+            p[...,1] = np.log(p[...,1])
+        return p
+
+    def sample(self, nsample=None, **kwargs):
+        """Draw a sample from the prior distribution.
+
+        :param nsample: (optional)
+            Unused
+        """
+        if len(kwargs) > 0:
+            self.update(**kwargs)
+        mass = np.random.uniform(low=self.params['mass_mini'],high=self.params['mass_maxi'])
+        a, b = self.get_args(mass)
+        met = self.distribution.rvs(a, b, loc=self.loc(mass), scale=self.scale(mass))
+        return np.array([mass, met])
+
+    def unit_transform(self, x, **kwargs):
+        """Go from a value of the CDF (between 0 and 1) to the corresponding
+        parameter value.
+
+        :param x:
+            A scalar or vector of same length as the Prior with values between
+            zero and one corresponding to the value of the CDF.
+
+        :returns theta:
+            The parameter value corresponding to the value of the CDF given by
+            `x`.
+        """
+        if len(kwargs) > 0:
+            self.update(**kwargs)
+        mass = x[0]*(self.params['mass_maxi'] - self.params['mass_mini']) + self.params['mass_mini']
+        a, b = self.get_args(mass)
+        met = self.distribution.ppf(x[1], a, b, loc=self.loc(mass), scale=self.scale(mass))
+        return np.array([mass,met])
+
 ###### Redefine SPS ######
-class NebSFH(FastStepBasis):
+class NebSFH(CSPSpecBasis):
     
     @property
     def emline_wavelengths(self):
@@ -462,41 +554,41 @@ class NebSFH(FastStepBasis):
 
         return smspec * mass, phot * mass, mfrac
 
-##### log(SFR_ratio) prior ######
-class SFR_Ratio(priors.Normal):
-    """A lognormal prior on the ratio of SFRs
-    to make (mean,sigma) functions of time, I need to write a function
-    that returns (t,dt) given input SFR_ratios. this should make use of the above transforms.
-    """
-    pass
+class ZedModel(sedmodel.SedModel):
+
+    def prior_transform(self, unit_coords):
+
+        """Go from unit cube to parameter space, for nested sampling.
+        """
+        theta = np.zeros(len(unit_coords))
+        for k, inds in list(self.theta_index.items()):
+            func = self._config_dict[k]['prior'].unit_transform
+            kwargs = self._config_dict[k].get('prior_args', {})
+            theta[inds] = func(unit_coords[inds], **kwargs)
+
+        # Now redraw tage with a prior that tage < t_univ(zred)
+        if 'zred' in self.theta_index:
+            zind = self.theta_index['zred']
+            if 'tage' in self.theta_index:
+                kwargs = self._config_dict['tage'].get('prior_args', {})
+                kwargs.update(maxi=WMAP9.age(theta[zind]).value)
+
+                tind = self.theta_index['tage']
+                func = self._config_dict['tage']['prior'].unit_transform
+                theta[tind] = func(unit_coords[tind], **kwargs)
+        
+        return theta
 
 def load_sps(**extras):
 
     sps = NebSFH(**extras)
     return sps
 
-def load_model(nbins_sfh=5,sigma=0.3, **extras):
+def load_model(**extras):
 
-    # we'll need this to access specific model parameters
+    # set mass-metallicity prior
     n = [p['name'] for p in model_params]
+    model_params[n.index('massmet')]['prior'] = MassMet(z_mini=-1.98, z_maxi=0.19, mass_mini=7, mass_maxi=12.5)
 
-    # create SFH bins
-    zred = model_params[n.index('zred')]['init']
-    tuniv = WMAP9.age(zred).value*1e9
-
-    # now construct the nonparametric SFH
-    # set number of components
-    # set logsfr_ratio prior
-    # propagate to agebins
-    model_params[n.index('agebins')]['N'] = nbins_sfh
-    model_params[n.index('mass')]['N'] = nbins_sfh
-    model_params[n.index('logsfr_ratios')]['N'] = nbins_sfh-1
-    model_params[n.index('logsfr_ratios')]['init'] = np.full(nbins_sfh-1,0.0) # constant SFH
-    model_params[n.index('logsfr_ratios')]['prior'] = SFR_Ratio(mean=np.full(nbins_sfh-1,0.0),sigma=np.full(nbins_sfh-1,sigma))
-
-    model_params.append({'name': 'tuniv', 'N': 1,
-                            'isfree': False,
-                            'init': tuniv})
-
-    return sedmodel.SedModel(model_params)
+    return ZedModel(model_params)
 

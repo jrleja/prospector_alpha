@@ -89,12 +89,13 @@ def logsfr_ratios_to_agebins(logsfr_ratios=None, tuniv=None, **extras):
     """
 
     # calculate delta(t) for the first bin
+    lowest_fixed_time = 5e7
     n_ratio = logsfr_ratios.shape[0]
     sfr_ratios = 10**logsfr_ratios
-    dt1 = (tuniv[0]-5e7) / (1 + np.sum([np.prod(sfr_ratios[:(i+1)]) for i in range(n_ratio)]))
+    dt1 = (tuniv[0]-lowest_fixed_time) / (1 + np.sum([np.prod(sfr_ratios[:(i+1)]) for i in range(n_ratio)]))
 
     # translate into agelims vector (time bin edges)
-    agelims = [1, 5e7, dt1]
+    agelims = [1, lowest_fixed_time, dt1+lowest_fixed_time]
     for i in range(n_ratio): agelims += [dt1*np.prod(sfr_ratios[:(i+1)]) + agelims[-1]]
     
     return np.log10([agelims[:-1], agelims[1:]]).T
