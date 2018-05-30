@@ -7,21 +7,18 @@
 ### Requested computing time in minutes
 #SBATCH -t 960
 ### Partition or queue name
-#SBATCH -p conroy,shared,serial_requeue,itc_cluster,conroy-intel
+#SBATCH -p conroy-intel,shared,serial_requeue,itc_cluster
 ### memory per cpu, in MB
 #SBATCH --mem-per-cpu=4000
 ### Job name
-#SBATCH -J 'td_delta_sec'
+#SBATCH -J 'mock_hybrid_sec'
 ### output and error logs
 ### mail
 #SBATCH --mail-type=END
 #SBATCH --mail-user=joel.leja@gmail.com
-IDFILE=$APPS"/prospector_alpha/data/3dhst/td_new.ids"
-OBJID=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$IDFILE")
-
 srun -n 1 --mpi=pmi2 python $APPS/prospector_alpha/code/td/postprocessing.py \
-$APPS/prospector_alpha/parameter_files/td_delta_params.py \
---objname="$OBJID" \
+$APPS/prospector_alpha/parameter_files/mock_hybrid_params.py \
+--objname="${SLURM_ARRAY_TASK_ID}" \
 --overwrite=True \
---plot=False \
+--plot=True \
 --shorten_spec=True

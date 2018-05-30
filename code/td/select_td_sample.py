@@ -69,6 +69,14 @@ def select_huge_supp(phot=None,fast=None,zbest=None,gris=None,**extras):
     #idx_supp = idx[0][~np.in1d(idx[0],idx_huge[0])]
     return np.unique(np.concatenate((idx_huge[0],idx[0])))
 
+def select_complete(phot=None,fast=None,zbest=None,gris=None,**extras):
+    # pick out td_huge selection and new selection
+    # find where they diverge
+    idx = np.where((phot['use_phot'] == 1) & \
+                   (zbest['z_best'] >= 0.9) & (zbest['z_best'] <= 1.1) &\
+                   (fast['lmass'] >= 9))
+    return idx
+
 def select_new(phot=None,fast=None,zbest=None,gris=None,**extras):
     # pick out td_huge selection and new selection
     # find where they diverge
@@ -161,6 +169,12 @@ new_sample = {
              'selection_function': select_new_supp,
              'runname': 'td_new',
              'rm_zp_offsets': True,
+              }
+
+complete_sample = {
+             'selection_function': select_complete,
+             'runname': 'complete',
+             'rm_zp_offsets': False
               }
 
 new_supp_sample = {

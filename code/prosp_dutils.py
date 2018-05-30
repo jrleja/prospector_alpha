@@ -404,7 +404,7 @@ def chev_extinction(tau_v, lam, ebars=False):
 def charlot_and_fall_extinction(lam,dust1,dust2,dust1_index,dust2_index, kriek=False, nobc=False, nodiff=False):
 
     '''
-    returns F(obs) / F(tot) for a given attenuation curve + dust1 + dust2
+    returns F(obs) / F(emit) for a given attenuation curve + dust1 + dust2
     '''
 
     dust1_ext = np.exp(-dust1*(lam/5500.)**dust1_index)
