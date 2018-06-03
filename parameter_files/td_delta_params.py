@@ -155,15 +155,16 @@ def massmet_to_logmass(massmet=None,**extras):
 def massmet_to_logzsol(massmet=None,**extras):
     return massmet[1]
 
-def logmass_to_masses(logmass=None, logsfr_ratio30=None, logsfr_ratio200=None, agebins=None, **extras):
+def logmass_to_masses(logmass=None, logsfr_ratio30=None, logsfr_ratiomax=None, agebins=None, **extras):
     nbins = agebins.shape[0]-2
-    s30, s200 = 10**logsfr_ratio30, 10**logsfr_ratio200
-    dt30, dt200, dt1 = (10**agebins[:3,1]-10**agebins[:3,0])
-    mbin = (10**logmass) / (s30*s200*dt30/dt1 + s200*dt200/dt1 + nbins)
-    m200 = s200*mbin*dt200/dt1
-    m30 = s200*s30*mbin*dt30/dt1
-    other_masses = np.full(nbins, mbin)
-    return np.array(m30.tolist()+m200.tolist()+other_masses.tolist())
+    s30, smax = 10**logsfr_ratio30, 10**(-logsfr_ratiomax)
+    dt30, dt1 = (10**agebins[:2,1]-10**agebins[:2,0])
+    dtn, dtmax = (10**agebins[-2:,1]-10**agebins[-2:,0])
+    mbin = (10**logmass) / (s30*dt30/dt1 + smax*dtmax/dtn + nbins)
+    m30 = s30*mbin*dt30/dt1
+    mmax = smax*mbin*dtmax/dtn
+    n_masses = np.full(nbins, mbin)
+    return np.array(m30.tolist()+n_masses.tolist()+mmax.tolist())
 
 def logsfr_ratios_to_agebins(logsfr_ratios=None, tuniv=None, **extras):
     """this transforms from SFR ratios to agebins
@@ -173,20 +174,25 @@ def logsfr_ratios_to_agebins(logsfr_ratios=None, tuniv=None, **extras):
     use equation:
         delta(t1) = tuniv  / (1 + SUM(n=1 to n=nbins-1) PROD(j=1 to j=n) Sn)
         where Sn = SFR(n) / SFR(n+1) and delta(t1) is width of youngest bin
+
+    This needs to be modified to include a maximally old bin
+    and return MASSES + AGEBINS at the same time.
     """
 
     # calculate delta(t) for the first bin
-    lowest_fixed_time = 2e8
+    lower_time = 5e7
+    upper_time = tuniv[0]*0.15
+    tflex = (tuniv[0]-upper_time-lower_time)
     n_ratio = logsfr_ratios.shape[0]
     sfr_ratios = 10**logsfr_ratios
-    dt1 = (tuniv[0]-lowest_fixed_time) / (1 + np.sum([np.prod(sfr_ratios[:(i+1)]) for i in range(n_ratio)]))
+    dt1 = tflex / (1 + np.sum([np.prod(sfr_ratios[:(i+1)]) for i in range(n_ratio)]))
 
     # translate into agelims vector (time bin edges)
-    agelims = [1, 3e7, lowest_fixed_time, dt1+lowest_fixed_time]
+    agelims = [1, lower_time, dt1+lower_time]
     for i in range(n_ratio): agelims += [dt1*np.prod(sfr_ratios[:(i+1)]) + agelims[-1]]
-    
+    agelims += [tuniv[0]]
     return np.log10([agelims[:-1], agelims[1:]]).T
-    
+     
 #############
 # MODEL_PARAMS
 #############
@@ -264,7 +270,7 @@ model_params.append({'name': 'logsfr_ratio30', 'N': 1,
                         'units': 'Msun',
                         'prior': priors.Normal(mean=0.0,sigma=0.5)})
 
-model_params.append({'name': 'logsfr_ratio200', 'N': 1,
+model_params.append({'name': 'logsfr_ratiomax', 'N': 1,
                         'isfree': True,
                         'init': 0.0,
                         'units': 'Msun',
@@ -439,7 +445,7 @@ model_params.append({'name': 'mass_units', 'N': 1,
 #### resort list of parameters 
 # because we can
 parnames = [m['name'] for m in model_params]
-fit_order = ['massmet','logsfr_ratio30','logsfr_ratio200','logsfr_ratios', 'dust2', 'dust_index', 'dust1_fraction', 'fagn', 'agn_tau', 'gas_logz']
+fit_order = ['massmet','logsfr_ratio30','logsfr_ratiomax','logsfr_ratios', 'dust2', 'dust_index', 'dust1_fraction', 'fagn', 'agn_tau', 'gas_logz']
 tparams = [model_params[parnames.index(i)] for i in fit_order]
 for param in model_params: 
     if param['name'] not in fit_order:

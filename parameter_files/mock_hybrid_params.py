@@ -21,7 +21,7 @@ jansky_mks = 1e-26
 APPS = os.getenv('APPS')
 run_params = {'verbose':True,
               'debug': False,
-              'outfile': APPS+'/prospector_alpha/results/mock_200delta/1',
+              'outfile': APPS+'/prospector_alpha/results/mock_hybrid/1',
               'nofork': True,
               # dynesty params
               'nested_bound': 'multi', # bounding method

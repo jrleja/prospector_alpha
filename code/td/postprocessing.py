@@ -13,6 +13,7 @@ def set_sfh_time_vector(theta,model):
     if nonparameterized, calculate at bin edges.
     """
 
+    model.set_parameters(theta)
     if 'tage' in model.theta_labels():
         nt = 100
         tage = theta[model.theta_index['tage']]
