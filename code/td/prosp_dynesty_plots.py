@@ -248,7 +248,7 @@ def add_sfh_plot(eout,fig,ax_loc=None,
             ymax = np.max([ymax,perc.max()])
 
     #### labels, format, scales !
-    xmin = np.min(tvec[tvec>0.001])
+    xmin = np.min(tvec[tvec>0.01])
     ymin = np.clip(ymin,ymax*1e-5,np.inf)
 
     axlim_sfh=[xmax*1.01, xmin*1.0001, ymin*.7, ymax*1.4]

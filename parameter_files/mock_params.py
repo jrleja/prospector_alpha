@@ -45,6 +45,41 @@ run_params = {'verbose':True,
 ############
 # OBS
 #############
+def gauss(x,mu,sigma):
+    return 1./np.sqrt(2*np.pi*sigma**2) * np.exp(-np.power(x - mu, 2.) / (2 * np.power(sigma, 2.)))
+
+def recent_burst(logm, agebins):
+    """ declining SFH + 15% of mass in burst @ 0.5 Gyr
+    """
+
+    # separate mass into components
+    logm_smooth, m_burst = np.log10((10**logm)*0.9), (10**logm)*0.1
+    mass_smooth = constant_sfr(logm_smooth,agebins)
+
+    # define time bins
+    t = 10**agebins.mean(axis=1)
+    dt = (10**agebins[:,1]-10**agebins[:,0])
+    mu, sigma = 0.5e9, 0.1e9
+    sfr_burst = gauss(t,mu,sigma)*m_burst
+
+    return mass_smooth + sfr_burst*dt
+
+def intermediate_burst(logm, agebins):
+    """ declining SFH + burst at 2 gyr
+    """
+
+    # separate mass into components
+    logm_smooth, m_burst = np.log10((10**logm)*0.9), (10**logm)*0.1
+    mass_smooth = declining_sfr(logm_smooth,agebins)
+
+    # define time bins
+    t = 10**agebins.mean(axis=1)
+    dt = (10**agebins[:,1]-10**agebins[:,0])
+    mu, sigma = 2e9, 0.1e9
+    sfr_burst = gauss(t,mu,sigma)*m_burst
+
+    return mass_smooth + sfr_burst*dt
+
 def steeply_declining_sfr(logm,agebins):
     """ use tau model with tage = max(agebins), tau = tage/2
     then put SFR(t_mid) * delta(t) mass in each bin 
@@ -139,6 +174,10 @@ def mock_params(mock_key,agebins):
         masses = steeply_declining_sfr(logm,agebins)
     if mock_key == 5:
         masses = steeply_rising_sfr(logm,agebins)
+    if mock_key == 6:
+        masses = recent_burst(logm,agebins)
+    if mock_key == 7:
+        masses = intermediate_burst(logm,agebins)
     mass,zfrac = masses_to_zfrac(mass=masses,agebins=agebins)
 
     # then set dust, metallicity parameters and return theta vector

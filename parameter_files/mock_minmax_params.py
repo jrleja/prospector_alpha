@@ -153,7 +153,7 @@ model_params.append({'name': 'logsfr_ratio30', 'N': 1,
                         'isfree': True,
                         'init': 0.0,
                         'units': 'Msun',
-                        'prior': priors.Normal(mean=0.0,sigma=0.6)})
+                        'prior': priors.Normal(mean=0.0,sigma=0.5)})
 
 model_params.append({'name': 'logsfr_ratiomax', 'N': 1,
                         'isfree': True,
