@@ -29,7 +29,7 @@ run_params = {'verbose':True,
               'nested_walks': 50, # MC walks
               'nested_nlive_batch': 200, # size of live point "batches"
               'nested_nlive_init': 200, # number of initial live points
-              'nested_weight_kwargs': {'pfrac': 1.0}, # weight posterior over evidence by 100%
+              'nested_weight_kwargs': {'pfrac': 0.5,'post_thresh':0.015}, # weight posterior and evidence equally
               'nested_dlogz_init': 0.01,
               # Model info
               'zcontinuous': 2,
@@ -49,7 +49,7 @@ def load_obs(objname=None, errors=None, **extras):
     # key will be 1-N where N is the number of runs
     # needs to set "mock_key" to 1,2,3
     # and generate errors on grid
-    snr_grid = [2,5,10,30,100]
+    snr_grid = [2,5,10,25,100]
     nmocks = len(snr_grid)*3
     mock_key = (int(objname)-1) / (nmocks/3) + 1
     snr_key = (int(objname)-1) % len(snr_grid)
@@ -106,7 +106,7 @@ model_params = []
 ###### BASIC PARAMETERS ##########
 model_params.append({'name': 'zred', 'N': 1,
                         'isfree': False,
-                        'init': 1,
+                        'init': 0.0,
                         'units': '',
                         'prior': priors.TopHat(mini=0.0, maxi=4.0)})
 
@@ -178,39 +178,26 @@ model_params.append({'name': 'imf_type', 'N': 1,
 ######## Dust Absorption ##############
 model_params.append({'name': 'dust_type', 'N': 1,
                         'isfree': False,
-                        'init': 4,
+                        'init': 2,
                         'units': 'index',
                         'prior_function_name': None,
                         'prior_args': None})
                         
 model_params.append({'name': 'dust1', 'N': 1,
                         'isfree': False,
-                        'depends_on': to_dust1,
-                        'init': 1.0,
+                        'init': 0.0,
                         'units': '',
                         'prior': None})
-
-model_params.append({'name': 'dust1_fraction', 'N': 1,
-                        'isfree': True,
-                        'init': 1.0,
-                        'init_disp': 0.8,
-                        'disp_floor': 0.8,
-                        'units': '',
-                        'prior': priors.ClippedNormal(mini=0.0, maxi=2.0, mean=1.0, sigma=0.3)})
 
 model_params.append({'name': 'dust2', 'N': 1,
                         'isfree': True,
                         'init': 1.0,
-                        'init_disp': 0.25,
-                        'disp_floor': 0.15,
                         'units': '',
-                        'prior': priors.ClippedNormal(mini=0.0, maxi=4.0, mean=0.3, sigma=1)})
+                        'prior': priors.TopHat(mini=0.0, maxi=3.0)})
 
 model_params.append({'name': 'dust_index', 'N': 1,
-                        'isfree': True,
+                        'isfree': False,
                         'init': 0.0,
-                        'init_disp': 0.25,
-                        'disp_floor': 0.15,
                         'units': '',
                         'prior': priors.TopHat(mini=-1.0, maxi=0.4)})
 
@@ -331,7 +318,7 @@ model_params.append({'name': 'mass_units', 'N': 1,
 #### resort list of parameters 
 # because we can
 parnames = [m['name'] for m in model_params]
-fit_order = ['logmass','logsfr_ratios', 'logzsol', 'dust2', 'dust_index', 'dust1_fraction']
+fit_order = ['logmass','logsfr_ratios', 'logzsol', 'dust2']
 tparams = [model_params[parnames.index(i)] for i in fit_order]
 for param in model_params: 
     if param['name'] not in fit_order:

@@ -21,7 +21,7 @@ jansky_mks = 1e-26
 APPS = os.getenv('APPS')
 run_params = {'verbose':True,
               'debug': False,
-              'outfile': APPS+'/prospector_alpha/results/mock_hybrid/1',
+              'outfile': APPS+'/prospector_alpha/results/mock_nonpar_delta/1',
               'nofork': True,
               # dynesty params
               'nested_bound': 'multi', # bounding method
@@ -29,15 +29,15 @@ run_params = {'verbose':True,
               'nested_walks': 50, # MC walks
               'nested_nlive_batch': 200, # size of live point "batches"
               'nested_nlive_init': 200, # number of initial live points
-              'nested_weight_kwargs': {'pfrac': 1.0}, # weight posterior over evidence by 100%
+              'nested_weight_kwargs': {'pfrac': 0.5,'post_thresh':0.015}, # weight posterior and evidence equally
               'nested_dlogz_init': 0.01,
               # Model info
               'zcontinuous': 2,
               'compute_vega_mags': False,
               'initial_disp':0.1,
               'interp_type': 'logarithmic',
-              'nbins_sfh': 5,
-              'sigma': 0.3,
+              'agelims': [0.0,7.4772,8.0,8.5,9.0,9.5,9.8,10.0],
+              'alpha_sfh': 0.2,
               # Data info (phot = .cat, dat = .dat, fast = .fout)
               'objname':'1'
               }
@@ -49,7 +49,7 @@ def load_obs(objname=None, errors=None, **extras):
     # key will be 1-N where N is the number of runs
     # needs to set "mock_key" to 1,2,3
     # and generate errors on grid
-    snr_grid = [2,5,10,30,100]
+    snr_grid = [2,5,10,25,100]
     nmocks = len(snr_grid)*3
     mock_key = (int(objname)-1) / (nmocks/3) + 1
     snr_key = (int(objname)-1) % len(snr_grid)
@@ -72,38 +72,15 @@ def tie_gas_logz(logzsol=None, **extras):
 def to_dust1(dust1_fraction=None, dust1=None, dust2=None, **extras):
     return dust1_fraction*dust2
 
-def logmass_to_masses(logmass=None, logsfr_ratio30=None, logsfr_ratio200=None, agebins=None, **extras):
-    nbins = agebins.shape[0]-2
-    s30, s200 = 10**logsfr_ratio30, 10**logsfr_ratio200
-    dt30, dt200, dt1 = (10**agebins[:3,1]-10**agebins[:3,0])
-    mbin = (10**logmass) / (s30*s200*dt30/dt1 + s200*dt200/dt1 + nbins)
-    m200 = s200*mbin*dt200/dt1
-    m30 = s200*s30*mbin*dt30/dt1
-    other_masses = np.full(nbins, mbin)
-    return np.array(m30.tolist()+m200.tolist()+other_masses.tolist())
+def logmass_to_masses(logmass=None, logsfr_ratios=None, agebins=None, **extras):
+    nbins = agebins.shape[0]
+    sratios = 10**logsfr_ratios
+    dt = (10**agebins[:,1]-10**agebins[:,0])
+    coeffs = np.array([ (1./np.prod(sratios[:i])) * (np.prod(dt[1:i+1]) / np.prod(dt[:i])) for i in range(nbins)])
+    m1 = (10**logmass) / coeffs.sum()
 
-def logsfr_ratios_to_agebins(logsfr_ratios=None, tuniv=None, **extras):
-    """this transforms from SFR ratios to agebins
-    by assuming a constant amount of mass forms in each bin
-    agebins = np.array([NBINS,2])
+    return m1 * coeffs
 
-    use equation:
-        delta(t1) = tuniv  / (1 + SUM(n=1 to n=nbins-1) PROD(j=1 to j=n) Sn)
-        where Sn = SFR(n) / SFR(n+1) and delta(t1) is width of youngest bin
-    """
-
-    # calculate delta(t) for the first bin
-    lowest_fixed_time = 2e8
-    n_ratio = logsfr_ratios.shape[0]
-    sfr_ratios = 10**logsfr_ratios
-    dt1 = (tuniv[0]-lowest_fixed_time) / (1 + np.sum([np.prod(sfr_ratios[:(i+1)]) for i in range(n_ratio)]))
-
-    # translate into agelims vector (time bin edges)
-    agelims = [1, 3e7, lowest_fixed_time, dt1+lowest_fixed_time]
-    for i in range(n_ratio): agelims += [dt1*np.prod(sfr_ratios[:(i+1)]) + agelims[-1]]
-    
-    return np.log10([agelims[:-1], agelims[1:]]).T
-    
 #############
 # MODEL_PARAMS
 #############
@@ -112,7 +89,7 @@ model_params = []
 ###### BASIC PARAMETERS ##########
 model_params.append({'name': 'zred', 'N': 1,
                         'isfree': False,
-                        'init': 1,
+                        'init': 0.0,
                         'units': '',
                         'prior': priors.TopHat(mini=0.0, maxi=4.0)})
 
@@ -143,18 +120,6 @@ model_params.append({'name': 'logmass', 'N': 1,
                         'units': 'Msun',
                         'prior': priors.TopHat(mini=7, maxi=12)})
 
-model_params.append({'name': 'logsfr_ratio30', 'N': 1,
-                        'isfree': True,
-                        'init': 0.0,
-                        'units': 'Msun',
-                        'prior': priors.Normal(mean=0.0,sigma=0.5)})
-
-model_params.append({'name': 'logsfr_ratio200', 'N': 1,
-                        'isfree': True,
-                        'init': 0.0,
-                        'units': 'Msun',
-                        'prior': priors.Normal(mean=0.0,sigma=0.5)})
-
 model_params.append({'name': 'logzsol', 'N': 1,
                         'isfree': True,
                         'init': -0.5,
@@ -169,21 +134,21 @@ model_params.append({'name': 'sfh', 'N':1,
 
 model_params.append({'name': 'mass', 'N': 1,
                      'isfree': False,
+                     'init': 1e6,
                      'depends_on': logmass_to_masses,
-                     'init': 1.,
-                     'units': r'M$_\odot$',})
+                     'units': r'M$_\odot$',
+                     'prior': None})
 
-model_params.append({'name': 'agebins', 'N': 1,
-                        'isfree': False,
-                        'depends_on': logsfr_ratios_to_agebins,
-                        'init': [],
-                        'units': 'log(yr)',
-                        'prior': None})
-
-model_params.append({'name': 'logsfr_ratios', 'N': 1,
+model_params.append({'name': 'logsfr_ratios', 'N': 7,
                         'isfree': True,
                         'init': [],
                         'units': '',
+                        'prior': None})
+
+model_params.append({'name': 'agebins', 'N': 1,
+                        'isfree': False,
+                        'init': [],
+                        'units': 'log(yr)',
                         'prior': None})
 
 ########    IMF  ##############
@@ -196,39 +161,26 @@ model_params.append({'name': 'imf_type', 'N': 1,
 ######## Dust Absorption ##############
 model_params.append({'name': 'dust_type', 'N': 1,
                         'isfree': False,
-                        'init': 4,
+                        'init': 2,
                         'units': 'index',
                         'prior_function_name': None,
                         'prior_args': None})
                         
 model_params.append({'name': 'dust1', 'N': 1,
                         'isfree': False,
-                        'depends_on': to_dust1,
-                        'init': 1.0,
+                        'init': 0.0,
                         'units': '',
                         'prior': None})
-
-model_params.append({'name': 'dust1_fraction', 'N': 1,
-                        'isfree': True,
-                        'init': 1.0,
-                        'init_disp': 0.8,
-                        'disp_floor': 0.8,
-                        'units': '',
-                        'prior': priors.ClippedNormal(mini=0.0, maxi=2.0, mean=1.0, sigma=0.3)})
 
 model_params.append({'name': 'dust2', 'N': 1,
                         'isfree': True,
                         'init': 1.0,
-                        'init_disp': 0.25,
-                        'disp_floor': 0.15,
                         'units': '',
-                        'prior': priors.ClippedNormal(mini=0.0, maxi=4.0, mean=0.3, sigma=1)})
+                        'prior': priors.TopHat(mini=0.0, maxi=3.0)})
 
 model_params.append({'name': 'dust_index', 'N': 1,
-                        'isfree': True,
+                        'isfree': False,
                         'init': 0.0,
-                        'init_disp': 0.25,
-                        'disp_floor': 0.15,
                         'units': '',
                         'prior': priors.TopHat(mini=-1.0, maxi=0.4)})
 
@@ -349,12 +301,20 @@ model_params.append({'name': 'mass_units', 'N': 1,
 #### resort list of parameters 
 # because we can
 parnames = [m['name'] for m in model_params]
-fit_order = ['logmass','logsfr_ratio30','logsfr_ratio200','logsfr_ratios', 'logzsol', 'dust2', 'dust_index', 'dust1_fraction']
+fit_order = ['mass', 'logzsol', 'dust2']
 tparams = [model_params[parnames.index(i)] for i in fit_order]
 for param in model_params: 
     if param['name'] not in fit_order:
         tparams.append(param)
 model_params = tparams
+
+##### log(SFR_ratio) prior ######
+class SFR_Ratio(priors.Normal):
+    """A lognormal prior on the ratio of SFRs
+    to make (mean,sigma) functions of time, I need to write a function
+    that returns (t,dt) given input SFR_ratios. this should make use of the above transforms.
+    """
+    pass
 
 ###### Redefine SPS ######
 class NebSFH(FastStepBasis):
@@ -465,41 +425,36 @@ class NebSFH(FastStepBasis):
 
         return smspec * mass, phot * mass, mfrac
 
-##### log(SFR_ratio) prior ######
-class SFR_Ratio(priors.Normal):
-    """A lognormal prior on the ratio of SFRs
-    to make (mean,sigma) functions of time, I need to write a function
-    that returns (t,dt) given input SFR_ratios. this should make use of the above transforms.
-    """
-    pass
-
 def load_sps(**extras):
 
     sps = NebSFH(**extras)
     return sps
 
-def load_model(nbins_sfh=5,sigma=0.3, **extras):
+def load_model(nbins_sfh=7,sigma=0.3,agelims=None, **extras):
 
     # we'll need this to access specific model parameters
     n = [p['name'] for p in model_params]
 
     # create SFH bins
     zred = model_params[n.index('zred')]['init']
-    tuniv = WMAP9.age(zred).value*1e9
+    tuniv = WMAP9.age(zred).value
 
     # now construct the nonparametric SFH
-    # set number of components
-    # set logsfr_ratio prior
-    # propagate to agebins
-    model_params[n.index('agebins')]['N'] = nbins_sfh
-    model_params[n.index('mass')]['N'] = nbins_sfh
+    # current scheme: six bins, four spaced equally in logarithmic 
+    # last bin is 15% age of the Universe, first two are 0-30, 30-100
+    tbinmax = (tuniv*0.85)*1e9
+    agelims = agelims[:2] + np.linspace(agelims[2],np.log10(tbinmax),len(agelims)-3).tolist() + [np.log10(tuniv*1e9)]
+    agebins = np.array([agelims[:-1], agelims[1:]])
+    ncomp = len(agelims) - 1
+
+    # load nvariables and agebins
+    model_params[n.index('agebins')]['N'] = ncomp
+    model_params[n.index('agebins')]['init'] = agebins.T
+    model_params[n.index('mass')]['N'] = ncomp
     model_params[n.index('logsfr_ratios')]['N'] = nbins_sfh-1
     model_params[n.index('logsfr_ratios')]['init'] = np.full(nbins_sfh-1,0.0) # constant SFH
     model_params[n.index('logsfr_ratios')]['prior'] = SFR_Ratio(mean=np.full(nbins_sfh-1,0.0),sigma=np.full(nbins_sfh-1,sigma))
 
-    model_params.append({'name': 'tuniv', 'N': 1,
-                            'isfree': False,
-                            'init': tuniv})
 
     return sedmodel.SedModel(model_params)
 

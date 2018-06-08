@@ -49,7 +49,7 @@ def gauss(x,mu,sigma):
     return 1./np.sqrt(2*np.pi*sigma**2) * np.exp(-np.power(x - mu, 2.) / (2 * np.power(sigma, 2.)))
 
 def recent_burst(logm, agebins):
-    """ declining SFH + 15% of mass in burst @ 0.5 Gyr
+    """ declining SFH + 10% of mass in burst @ 0.5 Gyr
     """
 
     # separate mass into components
@@ -65,7 +65,7 @@ def recent_burst(logm, agebins):
     return mass_smooth + sfr_burst*dt
 
 def intermediate_burst(logm, agebins):
-    """ declining SFH + burst at 2 gyr
+    """ declining SFH + 10% of mass in burst at 2 Gyr
     """
 
     # separate mass into components
@@ -100,7 +100,6 @@ def steeply_declining_sfr(logm,agebins):
     sfr = A*np.exp((t-tage)/tau)
 
     return sfr * dt
-
 
 def declining_sfr(logm,agebins):
     """ use tau model with tage = max(agebins), tau = tage/2
@@ -189,10 +188,10 @@ def mock_params(mock_key,agebins):
 def load_obs(mock_key=1, **extras):
 
     # generate filters and mask
-    fnames  = ['sdss_u0','sdss_g0','sdss_r0','sdss_i0','sdss_z0'] + \
+    fnames  = ['galex_FUV','galex_NUV'] + \
+              ['sdss_u0','sdss_g0','sdss_r0','sdss_i0','sdss_z0'] + \
               ['twomass_J','twomass_H','twomass_Ks'] + \
-              ['spitzer_irac_ch1','spitzer_irac_ch2','spitzer_irac_ch3','spitzer_irac_ch4']+\
-              ['spitzer_mips_70']
+              ['spitzer_irac_ch1','spitzer_irac_ch2','spitzer_irac_ch3','spitzer_irac_ch4']
     filters = observate.load_filters(fnames)
     phot_mask = np.ones_like(filters,dtype=bool)
 
