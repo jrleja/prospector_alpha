@@ -285,7 +285,7 @@ model_params = []
 ###### BASIC PARAMETERS ##########
 model_params.append({'name': 'zred', 'N': 1,
                         'isfree': False,
-                        'init': 1,
+                        'init': 0.0,
                         'units': '',
                         'prior': priors.TopHat(mini=0.0, maxi=4.0)})
 
@@ -356,39 +356,26 @@ model_params.append({'name': 'imf_type', 'N': 1,
 ######## Dust Absorption ##############
 model_params.append({'name': 'dust_type', 'N': 1,
                         'isfree': False,
-                        'init': 4,
+                        'init': 2,
                         'units': 'index',
                         'prior_function_name': None,
                         'prior_args': None})
                         
 model_params.append({'name': 'dust1', 'N': 1,
                         'isfree': False,
-                        'depends_on': to_dust1,
-                        'init': 1.0,
+                        'init': 0.0,
                         'units': '',
                         'prior': None})
-
-model_params.append({'name': 'dust1_fraction', 'N': 1,
-                        'isfree': True,
-                        'init': 1.0,
-                        'init_disp': 0.8,
-                        'disp_floor': 0.8,
-                        'units': '',
-                        'prior': priors.ClippedNormal(mini=0.0, maxi=2.0, mean=1.0, sigma=0.3)})
 
 model_params.append({'name': 'dust2', 'N': 1,
                         'isfree': True,
                         'init': 1.0,
-                        'init_disp': 0.25,
-                        'disp_floor': 0.15,
                         'units': '',
-                        'prior': priors.ClippedNormal(mini=0.0, maxi=4.0, mean=0.3, sigma=1)})
+                        'prior': priors.TopHat(mini=0.0, maxi=3.0)})
 
 model_params.append({'name': 'dust_index', 'N': 1,
-                        'isfree': True,
+                        'isfree': False,
                         'init': 0.0,
-                        'init_disp': 0.25,
-                        'disp_floor': 0.15,
                         'units': '',
                         'prior': priors.TopHat(mini=-1.0, maxi=0.4)})
 
@@ -509,7 +496,7 @@ model_params.append({'name': 'mass_units', 'N': 1,
 #### resort list of parameters 
 # because we can
 parnames = [m['name'] for m in model_params]
-fit_order = ['logmass','z_fraction', 'logzsol', 'dust2', 'dust_index', 'dust1_fraction']
+fit_order = ['logmass','z_fraction', 'logzsol', 'dust2']
 tparams = [model_params[parnames.index(i)] for i in fit_order]
 for param in model_params: 
     if param['name'] not in fit_order:
@@ -636,7 +623,7 @@ def load_model(alpha_sfh=0.2, **extras):
     n = [p['name'] for p in model_params]
 
     # create SFH bins
-    nbins = 70
+    nbins = 120
     zred = model_params[n.index('zred')]['init']
     tuniv = WMAP9.age(zred).value
     agelims = np.linspace(6,np.log10(tuniv*1e9),nbins+1)
