@@ -181,7 +181,7 @@ def mock_params(mock_key,agebins):
 
     # then set dust, metallicity parameters and return theta vector
     # logzsol, dust2, dust_index, dust1_fraction
-    theta = np.array([np.log10(mass)]+zfrac.tolist()+[0.0,0.3,0.0,1.0])
+    theta = np.array([np.log10(mass)]+zfrac.tolist()+[0.0,0.3])
 
     return theta
 
