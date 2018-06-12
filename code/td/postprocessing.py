@@ -98,13 +98,6 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True, measure_
         abslines = ['halpha_wide', 'halpha_narrow', 'hbeta', 'hdelta_wide', 'hdelta_narrow']
         eout['obs']['abslines'] = {key+'_ew': deepcopy(fmt) for key in abslines}
 
-    '''
-    # special 4 rohan
-    eout['obs']['lyc'] = {'mags':np.zeros(shape=(ncalc,2))}
-    from sedpy.observate import load_filters
-    filters = ['wfc3_uvis_f336w','wfc3_uvis_f606w']
-    fobs = {'filters': load_filters(filters), 'wavelength': None}
-    '''
     if measure_herschel:
         eout['obs']['herschel'] = {'mags':np.zeros(shape=(ncalc,5))}
         from sedpy.observate import load_filters
@@ -184,20 +177,6 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True, measure_
         eout['extras']['avg_age']['chain'][jj], eout['extras']['lwa_lbol']['chain'][jj], \
         eout['extras']['lwa_rband']['chain'][jj] = prosp_dutils.all_ages(thetas,res['model'],sps)
 
-
-        '''
-        # rohan special
-        ndust_thetas = deepcopy(thetas)
-        ndust_thetas[parnames.index('dust1_fraction')] = 0.0
-        ndust_thetas[parnames.index('dust2')] = 0.0
-        res['model'].params['add_neb_emission'] = np.array([False])
-        res['model'].params['add_neb_continuum'] = np.array([False])
-        res['model'].params['add_igm_absorption'] = np.array([False])
-        _,eout['obs']['lyc']['mags'][jj,:],__ = res['model'].mean_model(ndust_thetas, fobs, sps=sps)
-        res['model'].params['add_neb_emission'] = np.array([True])
-        res['model'].params['add_neb_continuum'] = np.array([True])
-        res['model'].params['add_igm_absorption'] = np.array([True])
-        '''
         if measure_herschel:
             _,eout['obs']['herschel']['mags'][jj,:],__ = res['model'].mean_model(thetas, fobs, sps=sps)
 
@@ -211,12 +190,6 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True, measure_
     
     q50, q16, q84 = weighted_quantile(eout['obs']['dn4000']['chain'], np.array([0.5, 0.16, 0.84]), weights=eout['weights'])
     for q,qstr in zip([q50,q16,q84],['q50','q16','q84']): eout['obs']['dn4000'][qstr] = q
-
-    '''
-    # for rohan
-    q50, q16, q84 = weighted_quantile(eout['obs']['lyc']['mags'][:,0]/eout['obs']['lyc']['mags'][:,1], np.array([0.5, 0.16, 0.84]), weights=eout['weights'])
-    for q,qstr in zip([q50,q16,q84],['rq50','rq16','rq84']): eout['obs']['lyc'][qstr] = q
-    '''
 
     for key1 in eout['obs']['elines'].keys():
         for key2 in ['ew','flux']:
@@ -258,6 +231,9 @@ def post_processing(param_name, objname=None, runname = None, overwrite=True, ob
         if (runname == 'td_huge') | (runname == 'td_new'):
             field = obj_outfile.split('/')[-1].split('_')[0]
             obj_outfile = "/".join(obj_outfile.split('/')[:-1])+'/'+field+'/'+obj_outfile.split('/')[-1]  
+
+    if res['model'] is None:
+        res['model'] = pfile.load_model(**res['run_params'])
 
     if plot_outfolder is None:
         plot_outfolder = os.getenv('APPS')+'/prospector_alpha/plots/'+runname+'/'
