@@ -432,6 +432,7 @@ def load_model(alpha_sfh=0.2,agelims=None, **extras):
     model_params[n.index('agebins')]['init'] = agebins.T
     model_params[n.index('mass')]['N'] = ncomp
     model_params[n.index('mass')]['init'] = np.full(ncomp,1e6)
+    model_params[n.index('mass')]['prior'] = priors.LogUniform(mini=np.full(ncomp,1e5), maxi=np.full(ncomp,1e12))
 
     return sedmodel.SedModel(model_params)
 

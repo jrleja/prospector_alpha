@@ -232,9 +232,6 @@ def post_processing(param_name, objname=None, runname = None, overwrite=True, ob
             field = obj_outfile.split('/')[-1].split('_')[0]
             obj_outfile = "/".join(obj_outfile.split('/')[:-1])+'/'+field+'/'+obj_outfile.split('/')[-1]  
 
-    if res['model'] is None:
-        res['model'] = pfile.load_model(**res['run_params'])
-
     if plot_outfolder is None:
         plot_outfolder = os.getenv('APPS')+'/prospector_alpha/plots/'+runname+'/'
 
@@ -250,6 +247,9 @@ def post_processing(param_name, objname=None, runname = None, overwrite=True, ob
     if (not overwrite) & (eout is not None):
         print 'post-processing file already exists! returning.'
         return
+
+    if res['model'] is None:
+        res['model'] = pfile.load_model(**res['run_params'])
 
     # make filenames local...
     print 'Performing post-processing on ' + objname
