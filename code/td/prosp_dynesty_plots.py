@@ -7,6 +7,7 @@ from matplotlib.ticker import MaxNLocator, FormatStrFormatter, FuncFormatter
 from prospector_io import load_prospector_data, find_all_prospector_results
 from scipy.ndimage import gaussian_filter as norm_kde
 from matplotlib import gridspec
+from matplotlib.ticker import FormatStrFormatter
 
 plt.ioff() # don't pop up a window for each plot
 
@@ -227,7 +228,7 @@ def add_sfh_plot(eout,fig,ax_loc=None,
             # nearest-neighbor 'interpolation'
             # exact answer for binned SFHs
             idx = np.abs(eout['sfh']['t'] - tvec[jj]).argmin(axis=1)
-            perc[jj,:] = np.percentile(eout['sfh']['sfh'][np.arange(len(idx)),idx],[16.0,50.0,84.0])
+            perc[jj,:] = dyplot._quantile(eout['sfh']['sfh'][np.arange(len(idx)),idx],[.16,.500,.840],weights=eout['weights'])
 
         #### plot SFH
         ax_inset.plot(tvec, perc[:,1],'-',color=main_color[i],lw=lw)

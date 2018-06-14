@@ -89,7 +89,7 @@ def calc_uvj_flag(uvj, return_dflag = True):
 
     return uvj_flag
 
-def collate_data(runname, runname_fast, filename=None, filename_grid=None, regenerate=False, nobj=None, **kwargs):
+def collate_data(runname, runname_fast, runname_sample=None, filename=None, filename_grid=None, regenerate=False, nobj=None, **kwargs):
     """
     regenerate, boolean: 
         if true, always load individual files to re-create data
@@ -175,10 +175,12 @@ def collate_data(runname, runname_fast, filename=None, filename_grid=None, regen
 
     fastlist, uvirlist, adatlist = [], [], []
     allfields = np.unique(field).tolist()
+    if runname_sample is None:
+        runname_sample = runname
     for f in allfields:
-        fastlist.append(td_io.load_fast(runname,f))
-        uvirlist.append(td_io.load_ancil_data(runname,f))
-        adatlist.append(td_io.load_ancil_data(runname,f))
+        fastlist.append(td_io.load_fast(runname_sample,f))
+        uvirlist.append(td_io.load_ancil_data(runname_sample,f))
+        adatlist.append(td_io.load_ancil_data(runname_sample,f))
 
     for i, name in enumerate(basenames):
 

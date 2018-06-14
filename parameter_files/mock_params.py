@@ -49,33 +49,33 @@ def gauss(x,mu,sigma):
     return 1./np.sqrt(2*np.pi*sigma**2) * np.exp(-np.power(x - mu, 2.) / (2 * np.power(sigma, 2.)))
 
 def recent_burst(logm, agebins):
-    """ declining SFH + 10% of mass in burst @ 0.5 Gyr
+    """ declining SFH + 20% of mass in burst @ 0.5 Gyr
     """
 
     # separate mass into components
-    logm_smooth, m_burst = np.log10((10**logm)*0.9), (10**logm)*0.1
+    logm_smooth, m_burst = np.log10((10**logm)*0.8), (10**logm)*0.2
     mass_smooth = constant_sfr(logm_smooth,agebins)
 
     # define time bins
     t = 10**agebins.mean(axis=1)
     dt = (10**agebins[:,1]-10**agebins[:,0])
-    mu, sigma = 0.5e9, 0.1e9
+    mu, sigma = 0.5e9, 0.2e9
     sfr_burst = gauss(t,mu,sigma)*m_burst
 
     return mass_smooth + sfr_burst*dt
 
 def intermediate_burst(logm, agebins):
-    """ declining SFH + 10% of mass in burst at 2 Gyr
+    """ declining SFH + 20% of mass in burst at 2 Gyr
     """
 
     # separate mass into components
-    logm_smooth, m_burst = np.log10((10**logm)*0.9), (10**logm)*0.1
+    logm_smooth, m_burst = np.log10((10**logm)*0.8), (10**logm)*0.2
     mass_smooth = declining_sfr(logm_smooth,agebins)
 
     # define time bins
     t = 10**agebins.mean(axis=1)
     dt = (10**agebins[:,1]-10**agebins[:,0])
-    mu, sigma = 2e9, 0.1e9
+    mu, sigma = 2e9, 0.2e9
     sfr_burst = gauss(t,mu,sigma)*m_burst
 
     return mass_smooth + sfr_burst*dt
@@ -89,7 +89,7 @@ def steeply_declining_sfr(logm,agebins):
 
     # set tage, tau
     tage = 10**agebins.max()
-    tau = tage/10.
+    tau = tage/4.
 
     # define time bins
     t = 10**agebins.mean(axis=1)
@@ -147,7 +147,7 @@ def steeply_rising_sfr(logm,agebins):
     
     # set tage, tau
     tage = 10**agebins.max()
-    tau = tage/10.
+    tau = tage/4.
 
     # define time bins
     t = 10**agebins.mean(axis=1)
@@ -211,6 +211,8 @@ def load_obs(mock_key=1, **extras):
     ### build output dictionary
     obs['wave_effective'] = np.array([filt.wave_effective for filt in obs['filters']])
     obs['maggies'] = maggies
+    obs['spec_true'] = spec
+    obs['lam_true'] = sps.wavelengths
 
     return obs
 

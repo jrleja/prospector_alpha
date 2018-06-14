@@ -129,9 +129,6 @@ def create_prosp_filename(filebase):
     model_filename=filebase+'_'+max(times)+"_model"
     postname = mcmc_filename[:-7]+'post'
 
-    if not os.path.isfile(model_filename):
-        print 'no model file for ' + mcmc_filename
-        model_filename = None
     if not os.path.isfile(mcmc_filename):
         print 'no sampling file for ' + model_filename
         mcmc_filename = None

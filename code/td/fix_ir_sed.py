@@ -1,7 +1,7 @@
 import numpy as np
 import prosp_dutils, prospector_io, copy
 import os
-import td_params as pfile
+import td_delta_params as pfile
 from astropy import constants
 from astropy.cosmology import WMAP9
 from scipy.interpolate import interp1d
