@@ -88,7 +88,7 @@ def load_prospector_data(filebase,no_sample_results=False,objname=None,runname=N
         try:
             sample_results, powell_results, model = read_results.results_from(mcmc_filename, model_file=model_filename,inmod=None)
         except KeyError:
-            print 'failed to load file '+str(mcmc_filename)+' for object '+filebase.split('/')[-1]
+            print 'failed to load '+str(mcmc_filename)+' for object '+filebase.split('/')[-1]
             sample_results, powell_results, model = None, None, None
 
     return sample_results, powell_results, model, extra_output

@@ -419,14 +419,13 @@ def do_all(runname='td_new', runname_fast=None,outfolder=None,**opts):
         popts = {'fmt':'o', 'capthick':.05,'elinewidth':.05,'alpha':0.2,'color':'0.3','ms':0.5, 'errorevery': 5000}
 
     phot_residuals_by_flux(data,outfolder,popts)
-    print 1/0
 
     sfr_m_grid(data, datag, outfolder+'conditional_sfr_m.png',outfile=outfolder+'data/conditional_sfr_fit.h5')
     sfr_m_grid(data, datag, outfolder+'conditional_sfr_m_nofix.png',fix=False,outfile=outfolder+'data/conditional_sfr_fit_nofix.h5')
     dm_dsfr_grid(data, datag, outfolder, outtable)
     deltam_with_redshift(data['fast'], data['prosp'], data['fast']['z'], outfolder+'deltam_vs_z.png', filename=outfolder+'data/masscomp.h5')
 
-    mass_met_age_z(data, outfolder, outtable, popts) # this is now deprecated
+    # mass_met_age_z(data, outfolder, outtable, popts) # this is now deprecated
     deltam_spearman(data['fast'],data['prosp'],
                     outfolder+'deltam_spearman_fast_to_palpha.png',popts)
 
@@ -648,7 +647,7 @@ def sfr_m_grid(data,datag,outname,fix=True,outfile=None):
     zlabels = ['$'+"{0:.1f}".format(zbins[i])+'<z<'+"{0:.1f}".format(zbins[i+1])+'$' for i in range(nbins)]
     from plot_sample_selection import mass_completeness
     mcomplete = mass_completeness((zbins[1:]+zbins[:-1])/2.)
-    print mcomplete
+
     # plot geometry
     fig, ax = plt.subplots(2, 2, figsize = (10.5,6.5))
     fig.subplots_adjust(right=0.985,left=0.49,hspace=0.065,wspace=0.065,top=0.95,bottom=0.1)
@@ -1141,11 +1140,6 @@ def phot_residuals_by_flux(data,outfolder,popts_orig):
     plt.savefig(outfolder+'residual_by_magnitude.png',dpi=dpi)
     plt.close()
 
-            
-
-
-    print 1/0
-
     # residuals by rest-frame wavelength
     fig, ax = plt.subplots(1,2, figsize=(10,5))
 
@@ -1595,10 +1589,10 @@ def deltam_with_redshift(fast, prosp, z, outname, filename=None):
 
         # calculate weighted running median
         x, y, bincount = prosp_dutils.running_median(x,y,avg=False,return_bincount=True,weights=weights,bins=massbins)
-        x, y = x[bincount > nbin_min], y[bincount > nbin_min]
-        yerr = prosp_dutils.asym_errors(y[:,0], y[:,1], y[:,2])
+        idx = bincount > nbin_min
+        yerr = prosp_dutils.asym_errors(y[idx,0], y[idx,1], y[idx,2])
 
-        ax.errorbar(x-m_shift*(i-1.5), y[:,0], yerr=yerr, marker='o', linestyle='-', color=cmap[i],lw=lw,
+        ax.errorbar(x[idx]-m_shift*(i-1.5), y[idx,0], yerr=yerr, marker='o', linestyle='-', color=cmap[i],lw=lw,
                     label="{0:.1f}".format(zbins[i])+'<z<'+"{0:.1f}".format(zbins[i+1]), alpha=0.7,elinewidth=lw*0.5,capthick=lw*0.5)
         ymed += [y[:,0].tolist()]
         zmed += [(zbins[i]+zbins[i+1])/2.]

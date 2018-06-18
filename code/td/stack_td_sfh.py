@@ -1,12 +1,13 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import os, hickle, td_io, prosp_dutils, copy
-from prospector_io import load_prospector_data
+import os, hickle, prosp_dutils
+from prospector_io import load_prospector_data, find_all_prospector_results
 from astropy.cosmology import WMAP9
-import td_new_params as pfile
 from matplotlib.ticker import MaxNLocator, FormatStrFormatter
 from dynesty.plotting import _quantile as weighted_quantile
 from collections import OrderedDict
+from scipy.interpolate import interp2d
+import td_delta_params as pfile
 
 plt.ioff()
 
@@ -114,6 +115,8 @@ def do_all(runname='td_new', outfolder=None, regenerate=False, regenerate_stack=
 def collate_data(runname, filename=None, regenerate=False, **opts):
     """ pull out all of the necessary information from the individual data files
     this takes awhile, so this data is saved to disk.
+    currently this saves point estimates for objname, stellar mass, SFR (30,100), avg_age, zred
+    and chains for SFR(t), t, weight
     """
 
     # if it's already made, load it and give it back
@@ -126,41 +129,46 @@ def collate_data(runname, filename=None, regenerate=False, **opts):
         return outdict
 
     # define output containers
-    outvar = ['stellar_mass','sfr_30', 'sfr_100','half_time']
+    outvar = ['massmet_1','stellar_mass', 'sfr_50','avg_age']
     outdict = {q: {f: [] for f in ['q50','q84','q16']} for q in outvar}
-    for f in ['objname','agebins', 'weights', 'z_fraction', 'zred']: outdict[f] = [] 
+    for f in ['objname','sfh_t', 'weights', 'sfh', 'zred']: outdict[f] = [] 
 
-    # we want MASS, SFR_100, Z_FRACTION CHAIN, and AGEBINS for each galaxy
-    pfile.run_params['zred'] = None # make sure this is reset
-    basenames, _, _ = prosp_dutils.generate_basenames(runname)
+    basenames = find_all_prospector_results(runname)
     for i, name in enumerate(basenames):
 
         # load output from fit
         try:
-            res, _, model, prosp = load_prospector_data(name)
+            res, _, model, eout = load_prospector_data(name)
         except:
             print name.split('/')[-1]+' failed to load. skipping.'
             continue
-        if (res is None) or (prosp is None):
+        if (res is None) or (eout is None):
             continue
 
         outdict['objname'] += [name.split('/')[-1]]
         print 'loaded ' + outdict['objname'][-1]
 
         # agebins (and generate model)
-        pfile.run_params['objname'] = outdict['objname'][-1]
-        model = pfile.load_model(**pfile.run_params)
-        outdict['agebins'] += [model.params['agebins']]
+        outdict['sfh_t'] += [eout['sfh']['t']]
+        outdict['sfh'] += [eout['sfh']['sfh']]
+        outdict['weights'] += [eout['weights']]
+
+        # DEAR FUTURE JOEL:
+        # WE SHOULD GET REDSHIFT FROM POSTPROCESSING NOW
+        # for now, regenerate model
+        # first make filenames local...
+        for key in res['run_params']:
+            if type(res['run_params'][key]) == unicode:
+                if 'prospector_alpha' in res['run_params'][key]:
+                    res['run_params'][key] = os.getenv('APPS')+'/prospector_alpha'+res['run_params'][key].split('prospector_alpha')[-1]
+        model = pfile.load_model(**res['run_params'])
         outdict['zred'] += [float(model.params['zred'])]
-
-        # zfraction
-        zidx = model.theta_index['z_fraction']
-        outdict['z_fraction'] += [res['chain'][prosp['sample_idx'], zidx]]
-        outdict['weights'] += [prosp['weights']]
-
         # extra variables
         for v in outvar:
-            for f in ['q50','q84','q16']: outdict[v][f] += [prosp['extras'][v][f]]
+            if v in eout['thetas'].keys():
+                for f in ['q50','q84','q16']: outdict[v][f] += [eout['thetas'][v][f]]
+            else:
+                for f in ['q50','q84','q16']: outdict[v][f] += [eout['extras'][v][f]]
 
     # dump files and return
     hickle.dump(outdict,open(filename, "w"))
@@ -176,28 +184,30 @@ def stack_sfh(data, **opts):
     # stack horizontal
     # first iterate over redshift
     stack = {'hor':{},'vert': {}}
+    data['zred'] = np.array(data['zred'])
+    nt = 100 # number of time elements in output stacked SFHs
+    nsamps = 3000 # number of samples in posterior files
+
+    ssfrmin, ssfrmax = -13, -8 # intermediate interpolation onto regular sSFR grid
+    ssfr_arr = 10**np.linspace(ssfrmin,ssfrmax,1001)
     for (z1, z2) in opts['zbins']:
 
         # generate zavg, add containers
         zavg = (z1+z2)/2.
         zstr = "{:.2f}".format(zavg)
 
-        # calculate the time bins at average redshift
-        pfile.run_params['zred'] = zavg
-        model = pfile.load_model(**pfile.run_params)
-        stack['hor'][zstr], stack['vert'][zstr] = {}, {}
-        stack['hor'][zstr]['agebins'] = 10**model.params['agebins']
-        stack['vert'][zstr]['agebins'] = 10**model.params['agebins']
+        # setup time bins
+        tbins = 10**np.linspace(-2,np.log10(WMAP9.age(z1).value),nt)
+        stack['hor'][zstr], stack['vert'][zstr] = {'t':tbins}, {'t':tbins}
 
         # define galaxies in redshift bin
-        data['zred'] = np.array([float(z) for z in data['zred']])
         zidx = (data['zred'] > z1) & (data['zred'] <= z2)
 
         # calculate SFR(MS) for each galaxy
         # perhaps should calculate at z_gal for accuracy?
         stellar_mass = np.log10(data['stellar_mass']['q50'])[zidx]
-        logsfr = np.log10(data['sfr_30']['q50'])[zidx]
-        logsfr_ms = sfr_ms(zavg,stellar_mass,**opts)
+        logsfr = np.log10(data['sfr_100']['q50'])[zidx]
+        logsfr_ms = sfr_ms(data['zred'][zidx],stellar_mass,**opts)
         on_ms = (stellar_mass > opts['low_mass_cutoff']) & \
                 (stellar_mass < opts['high_mass_cutoff']) & \
                 (np.abs(logsfr - logsfr_ms) < opts['sigma_sf'])
@@ -209,8 +219,9 @@ def stack_sfh(data, **opts):
         percentiles = [0.5,opts['show_disp'][1],opts['show_disp'][0]]
 
         # for each main sequence bin, in mass, stack SFH
+        """
         for j in range(opts['nbins_horizontal']):
-            
+
             # what galaxies are in this mass bin?
             # save individual mass and SFR
             in_bin = (stellar_mass[on_ms] >= stack['hor'][zstr]['mass_bins'][j]) & \
@@ -219,27 +230,45 @@ def stack_sfh(data, **opts):
             tdict = {key:[] for key in ['median','err','errup','errdown']}
             tdict['logm'],tdict['logsfr'] = stellar_mass[on_ms][in_bin],logsfr[on_ms][in_bin]
 
-            # calculate sSFR chains (fn / sum(tn*fn))
-            # first transform to SFR fraction
-            # then add the nth bin
-            # finally, ensure it's normalized (no floating point errors)
-            # this is where we'd use the individual agebins if we so chose!
-            outfrac, outweight = [], []
-            for zf,weight,agebins in zip(np.array(data['z_fraction'])[zidx][on_ms][in_bin], 
-                                         np.array(data['weights'])[zidx][on_ms][in_bin],
-                                         np.array(data['agebins'])[zidx][on_ms][in_bin]):
-                frac = prosp_dutils.transform_zfraction_to_sfrfraction(zf)
-                frac = np.concatenate((frac, (1-frac.sum(axis=1))[:,None]),axis=1)
-                time_per_bin = np.diff(10**agebins, axis=-1)[:,0]
-                norm = (frac * time_per_bin).sum(axis=1) # sum(fn*tn)
-                outfrac += [frac/norm[:,None]]
-                outweight += [weight]
+            # calculate (SFR / M) chains on regular time grid
+            # each draw has its own (SFR,t) vector with an associated weight
+            # here we transform into (SFR/M)(t) and interpolate onto regular time grid
+            # we do this with nearest-neighbor interpolation which is precisely correct for step-function SFH
+            ngal = in_bin.sum()
+            ssfr,weights = np.empty(shape=(nsamps,nt,ngal)), np.empty(shape=(nsamps,ngal))
+            for m, (tm,weight,sfh,t_sfh) in enumerate(zip(np.array(data['massmet_1']['q50'])[zidx][on_ms][in_bin], 
+                                                          np.array(data['weights'])[zidx][on_ms][in_bin],
+                                                          np.array(data['sfh'])[zidx][on_ms][in_bin],
+                                                          np.array(data['sfh_t'])[zidx][on_ms][in_bin])):
+                
+                # weight by (t_univ(z=zgal) / t_univ(z=z_min)) to account for variation in t_univ
+                # i.e. all galaxies in a given stack should have the same average sSFR
+                ssfh = sfh / (10**tm) * t_sfh.max()/tbins.max()
+                for i in range(nt):
+                    if tbins[i] > t_sfh.max():
+                        ssfr[:,i,m] = np.nan
+                    else:
+                        ssfr[:,i,m] = ssfh[:,np.abs(t_sfh - tbins[i]).argmin(axis=-1)][:,0]
+                weights[:,m] = weight
 
-            # calculate weighted mean for each SFR bin
-            for i in range(time_per_bin.shape[0]):
-                frac = [f[:,i] for f in outfrac]
-                mean,errup,errdown = calculate_median(frac, outweight)
-                tdict['median'] += [mean]
+            # now create stacked sSFR
+            # this returns weighted sSFR median + quantiles
+            for i in range(nt):
+
+                # construct empty sSFR PDF and determine which galaxies contribute
+                in_samp = np.where(np.isfinite(ssfr[0,i,:]))[0]
+                hist = np.zeros(shape=ssfr_arr.shape[0]-1)
+
+                # for each object in sample, add to sSFR PDF
+                for idx in in_samp:
+                    ssfr_in_hist = np.clip(ssfr[:,i,idx],10**ssfrmin,10**ssfrmax)
+                    g1,_ = np.histogram(ssfr_in_hist, normed=True,weights=weights[:,idx], bins=ssfr_arr)
+                    hist += g1
+
+                # calculate weighted quantiles from sSFR PDF at fixed T
+                median, errup, errdown = weighted_quantile((ssfr_arr[1:]+ssfr_arr[:-1])/2., [0.5,.84,.16],weights=hist)
+
+                tdict['median'] += [median]
                 tdict['errup'] += [errup]
                 tdict['errdown'] += [errdown]
 
@@ -248,7 +277,7 @@ def stack_sfh(data, **opts):
                                                     np.array(tdict['errup']),
                                                     np.array(tdict['errdown']))
             stack['hor'][zstr]['bin'+str(j)] = tdict
-
+        """
         # stack vertical
         for j in range(opts['nbins_vertical']):
 
@@ -266,34 +295,52 @@ def stack_sfh(data, **opts):
                          (stellar_mass < opts['high_mass_cutoff']) & \
                          ((logsfr - logsfr_ms) < sigup)
             tdict['logm'],tdict['logsfr'] = stellar_mass[in_bin],logsfr[in_bin]
+            print 1/0
+            # calculate (SFR / M) chains on regular time grid
+            # each draw has its own (SFR,t) vector with an associated weight
+            # here we transform into (SFR/M)(t) and interpolate onto regular time grid
+            # we do this with nearest-neighbor interpolation which is precisely correct for step-function SFH
+            ngal = in_bin.sum()
+            ssfr,weights = np.empty(shape=(nsamps,nt,ngal)), np.empty(shape=(nsamps,ngal))
+            for m, (tm,weight,sfh,t_sfh) in enumerate(zip(np.array(data['massmet_1']['q50'])[zidx][in_bin], 
+                                                          np.array(data['weights'])[zidx][in_bin],
+                                                          np.array(data['sfh'])[zidx][in_bin],
+                                                          np.array(data['sfh_t'])[zidx][in_bin])):
+                
+                # weight by (t_univ(z=zgal) / t_univ(z=z_min)) to account for variation in t_univ
+                # i.e. all galaxies in a given stack should have the same average sSFR
+                ssfh = sfh / (10**tm) * t_sfh.max()/tbins.max()
+                for i in range(nt):
+                    if tbins[i] > t_sfh.max():
+                        ssfr[:,i,m] = np.nan
+                    else:
+                        ssfr[:,i,m] = ssfh[:,np.abs(t_sfh - tbins[i]).argmin(axis=-1)][:,0]
+                weights[:,m] = weight
 
-            # calculate sSFR chains (fn / sum(tn*fn))
-            # first transform to SFR fraction
-            # then add the nth bin
-            # finally, ensure it's normalized (no floating point errors)
-            # this is where we'd use the individual agebins if we so chose!
-            outfrac, outweight = [], []
-            for zf,weight,agebins in zip(np.array(data['z_fraction'])[zidx][in_bin], 
-                                         np.array(data['weights'])[zidx][in_bin],
-                                         np.array(data['agebins'])[zidx][in_bin]):
-                frac = prosp_dutils.transform_zfraction_to_sfrfraction(zf)
-                frac = np.concatenate((frac, (1-frac.sum(axis=1))[:,None]),axis=1)
-                time_per_bin = np.diff(10**agebins, axis=-1)[:,0]
-                norm = (frac * time_per_bin).sum(axis=1) # sum(fn*tn)
-                outfrac += [frac/norm[:,None]]
-                outweight += [weight]
+            # now create stacked sSFR
+            # this returns weighted sSFR median + quantiles
+            for i in range(nt):
 
-            # calculate median of sSFR for each SFR bin
-            for i in range(time_per_bin.shape[0]):
-                frac = [f[:,i] for f in outfrac]
-                mean,errup,errdown = calculate_median(frac, outweight)
-                tdict['median'] += [mean]
+                # construct empty sSFR PDF and determine which galaxies contribute
+                in_samp = np.where(np.isfinite(ssfr[0,i,:]))[0]
+                hist = np.zeros(shape=ssfr_arr.shape[0]-1)
+
+                # for each object in sample, add to sSFR PDF
+                for idx in in_samp:
+                    ssfr_in_hist = np.clip(ssfr[:,i,idx],10**ssfrmin,10**ssfrmax)
+                    g1,_ = np.histogram(ssfr_in_hist, normed=True,weights=weights[:,idx], bins=ssfr_arr)
+                    hist += g1
+
+                # calculate weighted quantiles from sSFR PDF at fixed T
+                median, errup, errdown = weighted_quantile((ssfr_arr[1:]+ssfr_arr[:-1])/2., [0.5,.84,.16],weights=hist)
+
+                tdict['median'] += [median]
                 tdict['errup'] += [errup]
                 tdict['errdown'] += [errdown]
 
             tdict['err'] = prosp_dutils.asym_errors(np.array(tdict['median']),
-                                                     np.array(tdict['errup']),
-                                                     np.array(tdict['errdown']))
+                                                    np.array(tdict['errup']),
+                                                    np.array(tdict['errdown']))
 
             ### name your bin something creative!
             stack['vert'][zstr]['bin'+str(j)] = tdict
@@ -360,7 +407,7 @@ def plot_stacked_sfh(dat,outfolder,**opts):
                          **ms_plot_opts)
 
             # plot SFH stacks
-            log_mean_t = np.log10(np.mean(dat['hor'][zstr]['agebins'],axis=1))
+            log_mean_t = np.log10(dat['hor'][zstr]['t']*1e9)
             ax[1,j].errorbar(10**(log_mean_t-x_stack_offset*(i-1)),bdict['median'],
                              yerr=bdict['err'],
                              color=opts['horizontal_bin_colors'][i],
@@ -438,7 +485,7 @@ def plot_stacked_sfh(dat,outfolder,**opts):
                        **ms_plot_opts)
 
             # plot SFH stacks
-            log_mean_t = np.log10(np.mean(dat['vert'][zstr]['agebins'],axis=1))
+            log_mean_t = np.log10(dat['vert'][zstr]['t']*1e9)
             ax[1,j].errorbar(10**(log_mean_t-x_stack_offset*(i-1)),bdict['median'],
                              yerr=bdict['err'],
                              color=opts['vertical_bin_colors'][i],
@@ -468,7 +515,7 @@ def plot_stacked_sfh(dat,outfolder,**opts):
 
         # plot mass ranges
         xr = np.linspace(xlim[0],xlim[1],50)
-        yr = sfr_ms(zavg,xr,**opts)
+        yr = sfr_ms(np.full(xr.shape[0],zavg),xr,**opts)
         idx = 1
         for i in range(opts['nbins_vertical']):
 
@@ -526,7 +573,7 @@ def plot_stacked_sfh(dat,outfolder,**opts):
 def plot_main_sequence(ax,z,sigma_sf=None,low_mass_cutoff=7, **junk):
 
     mass = np.linspace(low_mass_cutoff,12,40)
-    sfr = sfr_ms(z,mass,**junk)
+    sfr = sfr_ms(np.full(mass.shape[0],z),mass,**junk)
 
     ax.plot(mass, sfr,
               color='green',
@@ -541,7 +588,7 @@ def plot_main_sequence(ax,z,sigma_sf=None,low_mass_cutoff=7, **junk):
 def sfr_ms(z,logm,adjust_sfr=0.0,**opts):
     """ returns the SFR of the star-forming sequence from Whitaker+14
     as a function of mass and redshift
-    note that this is only valid over 0.5 < z < 2.5.
+    note that this is strictly only valid over 0.5 < z < 2.5
     we use the broken power law form (as opposed to the quadratic form)
     """
     z, logm = np.atleast_1d(z), np.atleast_1d(logm)
@@ -552,43 +599,26 @@ def sfr_ms(z,logm,adjust_sfr=0.0,**opts):
     ahigh = np.array([0.14,0.51,0.62,0.67])
     b = np.array([1.11, 1.31, 1.49, 1.62])
 
-    # check with redshift
-    idx = np.where(zwhit == z[0])[0][0]
-    if idx == -1:
-        print 'you know this is really poorly implemented, fix it'
-        print 1/0
+    def sfr_bpl(alow,ahigh,b,logm):
+        # generate SFR(M) at specific redshifts
+        logsfr = alow*(logm - 10.2)
+        high = (logm > 10.2)
+        logsfr[high] = ahigh*(logm[high] - 10.2)
+        return logsfr + b
 
-    # generate SFR(M) at all redshifts 
-    log_sfr = alow[idx]*(logm - 10.2) + b[idx]
-    high = (logm > 10.2).squeeze()
-    log_sfr[high] = ahigh[idx]*(logm[high] - 10.2) + b[idx]
+    # build grids
+    mgrid = np.linspace(logm.min(),logm.max(),100)
+    logsfr = np.array([[sfr_bpl(alow[i],ahigh[i],b[i],mgrid)] for i in range(4)]).squeeze().T
+
+    # interpolate
+    xx, yy = np.meshgrid(zwhit,mgrid)
+    intfnc = interp2d(xx,yy,logsfr,kind='linear')
+    sfrnew = intfnc(z,logm)
     
     if adjust_sfr:
-        log_sfr += adjust_sfr
+        sfrnew += adjust_sfr
 
-    return log_sfr
-
-def calculate_median(pdf, weight):
-    """given list of N PDFs, sum them
-    and return median + 16th, 84th percentile of sum
-    """
-    ssfrmin, ssfrmax = -13, -8
-    sfrac_arr = 10**np.linspace(ssfrmin,ssfrmax,1001)
-    hist = np.zeros(shape=sfrac_arr.shape[0]-1)
-
-    for i, (f,w) in enumerate(zip(pdf,weight)):
-        g1,_ = np.histogram(np.clip(f,10**ssfrmin,10**ssfrmax), normed=True,weights=w, bins=sfrac_arr)
-        hist += g1
-    median, errup, errdown = weighted_quantile((sfrac_arr[1:]+sfrac_arr[:-1])/2., [0.5,.84,.16],weights=hist)
-    """
-    nobj = len(pdf)
-    median_array = []
-
-    for i,(f,w) in enumerate(zip(pdf,weight)): median_array += [weighted_quantile(f, np.array([0.5]), weights=w)]
-    median, errup, errdown = np.percentile(median_array, [50,84,16])
-    """
-    return median, errup, errdown
-
+    return np.diagonal(sfrnew)
 
 
 
