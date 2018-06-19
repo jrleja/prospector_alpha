@@ -129,7 +129,7 @@ def collate_data(runname, filename=None, regenerate=False, **opts):
         return outdict
 
     # define output containers
-    outvar = ['massmet_1','stellar_mass', 'sfr_50','avg_age']
+    outvar = ['massmet_1','stellar_mass', 'sfr_30','avg_age']
     outdict = {q: {f: [] for f in ['q50','q84','q16']} for q in outvar}
     for f in ['objname','sfh_t', 'weights', 'sfh', 'zred']: outdict[f] = [] 
 
@@ -206,8 +206,8 @@ def stack_sfh(data, **opts):
         # calculate SFR(MS) for each galaxy
         # perhaps should calculate at z_gal for accuracy?
         stellar_mass = np.log10(data['stellar_mass']['q50'])[zidx]
-        logsfr = np.log10(data['sfr_100']['q50'])[zidx]
-        logsfr_ms = sfr_ms(data['zred'][zidx],stellar_mass,**opts)
+        logsfr = np.log10(data['sfr_30']['q50'])[zidx]
+        logsfr_ms = sfr_ms(np.full(stellar_mass.shape[0],0.75),stellar_mass,**opts)
         on_ms = (stellar_mass > opts['low_mass_cutoff']) & \
                 (stellar_mass < opts['high_mass_cutoff']) & \
                 (np.abs(logsfr - logsfr_ms) < opts['sigma_sf'])
@@ -219,7 +219,6 @@ def stack_sfh(data, **opts):
         percentiles = [0.5,opts['show_disp'][1],opts['show_disp'][0]]
 
         # for each main sequence bin, in mass, stack SFH
-        """
         for j in range(opts['nbins_horizontal']):
 
             # what galaxies are in this mass bin?
@@ -277,7 +276,7 @@ def stack_sfh(data, **opts):
                                                     np.array(tdict['errup']),
                                                     np.array(tdict['errdown']))
             stack['hor'][zstr]['bin'+str(j)] = tdict
-        """
+
         # stack vertical
         for j in range(opts['nbins_vertical']):
 
@@ -295,7 +294,7 @@ def stack_sfh(data, **opts):
                          (stellar_mass < opts['high_mass_cutoff']) & \
                          ((logsfr - logsfr_ms) < sigup)
             tdict['logm'],tdict['logsfr'] = stellar_mass[in_bin],logsfr[in_bin]
-            print 1/0
+
             # calculate (SFR / M) chains on regular time grid
             # each draw has its own (SFR,t) vector with an associated weight
             # here we transform into (SFR/M)(t) and interpolate onto regular time grid
@@ -405,14 +404,21 @@ def plot_stacked_sfh(dat,outfolder,**opts):
             ax[0,j].plot(bdict['logm'],bdict['logsfr'],
                          color=opts['horizontal_bin_colors'][i],
                          **ms_plot_opts)
+            
+            ax[1,j].fill_between(dat['hor'][zstr]['t']*1e9, bdict['errdown'], bdict['errup'], 
+                               color=opts['horizontal_bin_colors'][i], alpha=0.3,zorder=-1)
+            ax[1,j].plot(dat['hor'][zstr]['t']*1e9, bdict['median'], 'o-',
+                       color=opts['horizontal_bin_colors'][i], alpha=0.9,zorder=-1,lw=1.8)
 
+            """
             # plot SFH stacks
+
             log_mean_t = np.log10(dat['hor'][zstr]['t']*1e9)
             ax[1,j].errorbar(10**(log_mean_t-x_stack_offset*(i-1)),bdict['median'],
                              yerr=bdict['err'],
                              color=opts['horizontal_bin_colors'][i],
                              **stack_plot_opts)
-
+            """
         # labels and ranges
         ax[0,j].set_xlabel(r'log(M$_{*}$/M$_{\odot}$)',fontsize=fontsize)
         ax[0,j].set_xlim(dat['hor'][zstr]['mass_bins'].min()-0.5,dat['hor'][zstr]['mass_bins'].max()+0.5)
@@ -484,12 +490,20 @@ def plot_stacked_sfh(dat,outfolder,**opts):
                        color=opts['vertical_bin_colors'][i],
                        **ms_plot_opts)
 
+            
+            ax[1,j].fill_between(dat['vert'][zstr]['t']*1e9, bdict['errdown'], bdict['errup'], 
+                               color=opts['horizontal_bin_colors'][i], alpha=0.3,zorder=-1)
+            ax[1,j].plot(dat['vert'][zstr]['t']*1e9, bdict['median'], 'o-',
+                       color=opts['horizontal_bin_colors'][i], alpha=0.9,zorder=-1,lw=1.8)
+
+            """
             # plot SFH stacks
             log_mean_t = np.log10(dat['vert'][zstr]['t']*1e9)
             ax[1,j].errorbar(10**(log_mean_t-x_stack_offset*(i-1)),bdict['median'],
                              yerr=bdict['err'],
                              color=opts['vertical_bin_colors'][i],
                              **stack_plot_opts)
+            """
             if i == 0:
                 minmass,maxmass = bdict['logm'].min(),bdict['logm'].max()
                 minsfr,maxsfr = bdict['logsfr'].min(),bdict['logsfr'].max()
@@ -600,25 +614,20 @@ def sfr_ms(z,logm,adjust_sfr=0.0,**opts):
     b = np.array([1.11, 1.31, 1.49, 1.62])
 
     def sfr_bpl(alow,ahigh,b,logm):
-        # generate SFR(M) at specific redshifts
-        logsfr = alow*(logm - 10.2)
-        high = (logm > 10.2)
-        logsfr[high] = ahigh*(logm[high] - 10.2)
-        return logsfr + b
+        if logm < 10.2:
+            return alow*(logm - 10.2) + b
+        else:
+            return ahigh*(logm - 10.2) + b
 
     # build grids
-    mgrid = np.linspace(logm.min(),logm.max(),100)
-    logsfr = np.array([[sfr_bpl(alow[i],ahigh[i],b[i],mgrid)] for i in range(4)]).squeeze().T
-
-    # interpolate
-    xx, yy = np.meshgrid(zwhit,mgrid)
-    intfnc = interp2d(xx,yy,logsfr,kind='linear')
-    sfrnew = intfnc(z,logm)
-    
+    outsfr = []
+    for (m,zred) in zip(logm,z):
+        logsfr = sfr_bpl(alow,ahigh,b,m)
+        outsfr += [np.interp(zred,zwhit,logsfr)]
+    outsfr = np.array(outsfr)
     if adjust_sfr:
-        sfrnew += adjust_sfr
+        outsfr += adjust_sfr
 
-    return np.diagonal(sfrnew)
-
+    return outsfr
 
 

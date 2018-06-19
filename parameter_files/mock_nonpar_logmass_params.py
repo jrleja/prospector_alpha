@@ -72,8 +72,11 @@ def tie_gas_logz(logzsol=None, **extras):
 def to_dust1(dust1_fraction=None, dust1=None, dust2=None, **extras):
     return dust1_fraction*dust2
 
-def masses_to_logmass(logmass=None,mass=None,**extras):
-    return np.log10(mass.sum())
+def logmasses_to_logmass(logmass=None,logmasses=None,**extras):
+    return np.log10(np.sum(10**logmasses))
+
+def logmasses_to_mass(logmasses=None,mass=None,**extras):
+    return 10**logmasses
 
 #############
 # MODEL_PARAMS
@@ -110,7 +113,7 @@ model_params.append({'name': 'pmetals', 'N': 1,
 
 model_params.append({'name': 'logmass', 'N': 1,
                         'isfree': False,
-                        'depends_on': masses_to_logmass,
+                        'depends_on': logmasses_to_logmass,
                         'init': 10.0,
                         'units': 'Msun',
                         'prior': None})
@@ -128,10 +131,17 @@ model_params.append({'name': 'sfh', 'N':1,
                         'units': None})
 
 model_params.append({'name': 'mass', 'N': 1,
-                     'isfree': True,
+                     'isfree': False,
+                     'depends_on': logmasses_to_mass,
                      'init': 1e6,
                      'units': r'M$_\odot$',
                      'prior': priors.LogUniform(mini=1e5, maxi=1e12)})
+
+model_params.append({'name': 'logmasses', 'N': 1,
+                     'isfree': True,
+                     'init': 6,
+                     'units': r'M$_\odot$',
+                     'prior': priors.TopHat(mini=5, maxi=12)})
 
 model_params.append({'name': 'agebins', 'N': 1,
                         'isfree': False,
@@ -289,7 +299,7 @@ model_params.append({'name': 'mass_units', 'N': 1,
 #### resort list of parameters 
 # because we can
 parnames = [m['name'] for m in model_params]
-fit_order = ['mass', 'logzsol', 'dust2']
+fit_order = ['logmasses', 'logzsol', 'dust2']
 tparams = [model_params[parnames.index(i)] for i in fit_order]
 for param in model_params: 
     if param['name'] not in fit_order:
@@ -433,6 +443,10 @@ def load_model(alpha_sfh=0.2,agelims=None, **extras):
     model_params[n.index('mass')]['N'] = ncomp
     model_params[n.index('mass')]['init'] = np.full(ncomp,1e6)
     model_params[n.index('mass')]['prior'] = priors.LogUniform(mini=np.full(ncomp,1e5), maxi=np.full(ncomp,1e12))
+    model_params[n.index('logmasses')]['N'] = ncomp
+    model_params[n.index('logmasses')]['init'] = np.full(ncomp,6)
+    model_params[n.index('logmasses')]['prior'] = priors.TopHat(mini=np.full(ncomp,5), maxi=np.full(ncomp,12))
+
 
     return sedmodel.SedModel(model_params)
 
