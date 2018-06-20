@@ -86,14 +86,14 @@ def do_all(runname='td_new', outfolder=None, regenerate=False, regenerate_stack=
               'nbins_horizontal':3,            # number of bins in horizontal stack
               'nbins_vertical':4,              # number of bins in vertical stack
               'horizontal_bin_colors': ['#45ADA8','#FC913A','#FF4E50'],
-              'vertical_bin_colors': ['red','#FC913A','#45ADA8','#323299'],
+              'vertical_bin_colors': ['#ca0020','#f4a582','#008080','#045a8c'],
               'low_mass_cutoff':9.5,          # log(M) where we stop stacking and plotting
               'high_mass_cutoff': 11.5,
               'ylim_horizontal_sfr': (-0.8,3),
-              'ylim_horizontal_ssfr': (0.5e-12,4e-9),
-              'ylim_vertical_sfr': (-3,3),
-              'ylim_vertical_ssfr': (0.8e-13,5e-9),
-              'xlim_t': (3e6,9.9e9),
+              'ylim_horizontal_ssfr': (1e-11,1.5e-9),
+              'ylim_vertical_sfr': (-2,3),
+              'ylim_vertical_ssfr': (2.5e-13,4e-9),
+              'xlim_t': (2e7,9e9),
               'show_disp':[0.16,0.84],         # percentile of population distribution to show on plot
               'adjust_sfr': -0.25,             # adjust whitaker SFRs by how much?
               'zbins': [(0.5,1.),(1.,1.5),(1.5,2.),(2.,2.5)]
@@ -207,7 +207,7 @@ def stack_sfh(data, **opts):
         # perhaps should calculate at z_gal for accuracy?
         stellar_mass = np.log10(data['stellar_mass']['q50'])[zidx]
         logsfr = np.log10(data['sfr_30']['q50'])[zidx]
-        logsfr_ms = sfr_ms(np.full(stellar_mass.shape[0],0.75),stellar_mass,**opts)
+        logsfr_ms = sfr_ms(np.full(stellar_mass.shape[0],zavg),stellar_mass,**opts)
         on_ms = (stellar_mass > opts['low_mass_cutoff']) & \
                 (stellar_mass < opts['high_mass_cutoff']) & \
                 (np.abs(logsfr - logsfr_ms) < opts['sigma_sf'])
@@ -363,16 +363,16 @@ def plot_stacked_sfh(dat,outfolder,**opts):
                     'marker':'o',
                     'ms':1.5
                    }
-    # options for stripes delineating MS bins (left-hand side)
+    # options for stripes delineating MS bins (top panels)
     size = 1.25
     ms_line_plot_opts = {
                          'lw':2.*size,
                          'linestyle':'-',
-                         'alpha':0.8,
+                         'alpha':1,
                          'zorder':-32
                         }
-    # options for the stack plots (right-hand side)
-    x_stack_offset = 0.03
+    # options for the stack plots (bottom panels)
+    x_stack_offset = 0.02
     stack_plot_opts = {
                       'alpha':0.9,
                       'fmt':'o',
@@ -385,6 +385,18 @@ def plot_stacked_sfh(dat,outfolder,**opts):
                       'capsize':3,
                       'capthick':3
                       }
+    lopts = {
+             'alpha': 0.9,
+             'ms': 0.0,
+             'linestyle': '-',
+             'zorder': 1,
+             'lw': 3
+            }
+    fillopts = {
+                'alpha': 0.25,
+                'zorder': -1
+               }
+
 
     # horizontal stack figure
     fig, ax = plt.subplots(2,4, figsize=figsize)
@@ -406,9 +418,9 @@ def plot_stacked_sfh(dat,outfolder,**opts):
                          **ms_plot_opts)
             
             ax[1,j].fill_between(dat['hor'][zstr]['t']*1e9, bdict['errdown'], bdict['errup'], 
-                               color=opts['horizontal_bin_colors'][i], alpha=0.3,zorder=-1)
-            ax[1,j].plot(dat['hor'][zstr]['t']*1e9, bdict['median'], 'o-',
-                       color=opts['horizontal_bin_colors'][i], alpha=0.9,zorder=-1,lw=1.8)
+                               color=opts['horizontal_bin_colors'][i], **fillopts)
+            ax[1,j].plot(dat['hor'][zstr]['t']*1e9, bdict['median'],
+                       color=opts['horizontal_bin_colors'][i], **lopts)
 
             """
             # plot SFH stacks
@@ -492,9 +504,9 @@ def plot_stacked_sfh(dat,outfolder,**opts):
 
             
             ax[1,j].fill_between(dat['vert'][zstr]['t']*1e9, bdict['errdown'], bdict['errup'], 
-                               color=opts['horizontal_bin_colors'][i], alpha=0.3,zorder=-1)
-            ax[1,j].plot(dat['vert'][zstr]['t']*1e9, bdict['median'], 'o-',
-                       color=opts['horizontal_bin_colors'][i], alpha=0.9,zorder=-1,lw=1.8)
+                               color=opts['vertical_bin_colors'][i], **fillopts)
+            ax[1,j].plot(dat['vert'][zstr]['t']*1e9, bdict['median'],
+                       color=opts['vertical_bin_colors'][i], **lopts)
 
             """
             # plot SFH stacks
@@ -563,7 +575,7 @@ def plot_stacked_sfh(dat,outfolder,**opts):
         
         if j == 0:
             ax[0,j].set_ylabel(r'log(SFR M$_{\odot}$ yr$^{-1}$)',fontsize=fontsize)
-            ax[1,j].set_ylabel(r'median SFR(t)/M$_{\mathrm{tot}}$ [yr$^{-1}$]',fontsize=fontsize)
+            ax[1,j].set_ylabel(r'SFR(t)/M$_{\mathrm{tot}}$ [yr$^{-1}$]',fontsize=fontsize)
             ax[0,j].text(0.98, 0.92, opts['zbin_labels'][j],ha='right',transform=ax[0,j].transAxes,fontsize=fontsize)
 
             handles, labels = ax[0,j].get_legend_handles_labels()

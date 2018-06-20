@@ -518,7 +518,7 @@ def load_model(nbins_sfh=5,sigma=0.3, **extras):
     model_params[n.index('mass')]['N'] = nbins_sfh
     model_params[n.index('logsfr_ratios')]['N'] = nbins_sfh-1
     model_params[n.index('logsfr_ratios')]['init'] = np.full(nbins_sfh-1,0.0) # constant SFH
-    model_params[n.index('logsfr_ratios')]['prior'] = SFR_Ratio(mean=np.full(nbins_sfh-1,0.15),sigma=np.full(nbins_sfh-1,sigma),skew=np.full(nbins_sfh-1,-2.0))
+    model_params[n.index('logsfr_ratios')]['prior'] = SFR_Ratio(mean=np.full(nbins_sfh-1,0.21),sigma=np.full(nbins_sfh-1,sigma),skew=np.full(nbins_sfh-1,-2.0))
 
     model_params.append({'name': 'tuniv', 'N': 1,
                             'isfree': False,
