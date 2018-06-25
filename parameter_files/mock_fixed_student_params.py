@@ -430,7 +430,7 @@ def load_sps(**extras):
     sps = NebSFH(**extras)
     return sps
 
-def load_model(nbins_sfh=7,sigma=0.3,df=3.5,agelims=None, **extras):
+def load_model(nbins_sfh=7,sigma=0.3,df=2.,agelims=None, **extras):
 
     # we'll need this to access specific model parameters
     n = [p['name'] for p in model_params]
