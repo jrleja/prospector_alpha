@@ -763,12 +763,11 @@ def integral_average(x,y,x0,x1):
     the relevant range
     """
 
-    xarr_new = np.linspace(x0, x1, 40)
+    xarr_new = np.linspace(x0, x1, 400)
     bad = xarr_new == 0.0
     if np.sum(bad) > 0:
         xarr_new[bad]=1e-10
-    intfnc = interp1d(x,y, bounds_error = False, fill_value = 0)
-    yarr_new = intfnc(xarr_new)
+    yarr_new = np.interp(xarr_new,x,y)
 
     from scipy import integrate
     I1 = integrate.simps(yarr_new, xarr_new) / (x1 - x0)
