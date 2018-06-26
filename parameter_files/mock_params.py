@@ -221,6 +221,7 @@ def load_obs(mock_key=1, **extras):
 
     # generate mock parameters
     model = load_model(**extras)
+    model.params['nebemlineinspec'] = True
     theta = mock_params(mock_key,model.params['agebins'])
     sps = load_sps(**extras)
     spec,maggies,sm = model.mean_model(theta, obs, sps=sps)
