@@ -897,7 +897,7 @@ def return_full_sfh(t, sfh_params,**kwargs):
     tcalc = tcalc[tcalc < 0]*-1
 
     sfr = np.zeros(len(t))
-    for mm in xrange(len(tcalc)): 
+    for mm in range(len(tcalc)): 
         sfr[mm] = calculate_sfr(sfh_params, deltat, tcalc = tcalc[mm], **kwargs)
 
     return sfr
