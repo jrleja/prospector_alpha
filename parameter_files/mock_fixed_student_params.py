@@ -73,6 +73,7 @@ def to_dust1(dust1_fraction=None, dust1=None, dust2=None, **extras):
     return dust1_fraction*dust2
 
 def logmass_to_masses(logmass=None, logsfr_ratios=None, agebins=None, **extras):
+    logsfr_ratios = np.clip(logsfr_ratios,-100,100) # numerical issues...
     nbins = agebins.shape[0]
     sratios = 10**logsfr_ratios
     dt = (10**agebins[:,1]-10**agebins[:,0])

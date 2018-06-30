@@ -466,6 +466,19 @@ def make_all_plots(filebase=None,
 
     if (res is None) or (eout is None):
         return
+
+    # restore model
+    if res['model'] is None:
+        from prospect.models import model_setup
+        # make filenames local
+        for key in res['run_params']:
+            if type(res['run_params'][key]) == unicode:
+                if 'prospector_alpha' in res['run_params'][key]:
+                    res['run_params'][key] = os.getenv('APPS')+'/prospector_alpha'+res['run_params'][key].split('prospector_alpha')[-1]
+        pfile = model_setup.import_module_from_file(res['run_params']['param_file'])
+        res['model'] = pfile.load_model(**res['run_params'])
+        pfile = None
+
     
     # transform to preferred model variables
     res['chain'], parnames = transform_chain(res['chain'],res['model'])

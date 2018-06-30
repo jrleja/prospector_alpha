@@ -68,8 +68,8 @@ def load_obs(objname=None, datloc=None, err_floor=0.05, **extras):
 
     ### define photometric mask, convert from Jy to maggies
     phot_mask = (flux != unc) & (flux != -99.0) & (unc > 0)
-    maggies = flux * 3631
-    maggies_unc = unc * 3631
+    maggies = flux / 3631
+    maggies_unc = unc / 3631
 
     ### implement error floor
     maggies_unc = np.clip(maggies_unc, maggies*err_floor, np.inf)
@@ -125,6 +125,7 @@ def massmet_to_logzsol(massmet=None,**extras):
     return massmet[1]
 
 def logmass_to_masses(massmet=None, logsfr_ratios=None, agebins=None, **extras):
+    logsfr_ratios = np.clip(logsfr_ratios,-100,100) # numerical issues...
     nbins = agebins.shape[0]
     sratios = 10**logsfr_ratios
     dt = (10**agebins[:,1]-10**agebins[:,0])
