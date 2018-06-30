@@ -20,7 +20,7 @@ jansky_mks = 1e-26
 APPS = os.getenv('APPS')
 run_params = {'verbose':True,
               'debug': False,
-              'outfile': APPS+'/prospector_alpha/results/gama_continuity/6826',
+              'outfile': APPS+'/prospector_alpha/results/gama_logm/6826',
               'nofork': True,
               # dynesty params
               'nested_bound': 'multi', # bounding method
@@ -131,15 +131,9 @@ def massmet_to_logmass(massmet=None,**extras):
 def massmet_to_logzsol(massmet=None,**extras):
     return massmet[1]
 
-def logmass_to_masses(massmet=None, logsfr_ratios=None, agebins=None, **extras):
-    logsfr_ratios = np.clip(logsfr_ratios,-100,100) # numerical issues...
-    nbins = agebins.shape[0]
-    sratios = 10**logsfr_ratios
-    dt = (10**agebins[:,1]-10**agebins[:,0])
-    coeffs = np.array([ (1./np.prod(sratios[:i])) * (np.prod(dt[1:i+1]) / np.prod(dt[:i])) for i in range(nbins)])
-    m1 = (10**massmet[0]) / coeffs.sum()
-
-    return m1 * coeffs
+def logmasses_to_mass(logmasses=None,logmass=None,massmet=None,**extras):
+    ratio = 10**massmet[0] / (10**logmasses).sum()
+    return (10**logmasses)*ratio
 
 #############
 # MODEL_PARAMS
@@ -202,20 +196,20 @@ model_params.append({'name': 'sfh', 'N':1,
 model_params.append({'name': 'mass', 'N': 1,
                      'isfree': False,
                      'init': 1e6,
-                     'depends_on': logmass_to_masses,
+                     'depends_on': logmasses_to_mass,
                      'units': r'M$_\odot$',
                      'prior': None})
+
+model_params.append({'name': 'logmasses', 'N': 1,
+                     'isfree': True,
+                     'init': 6,
+                     'units': r'M$_\odot$',
+                     'prior': priors.TopHat(mini=5, maxi=12)})
 
 model_params.append({'name': 'agebins', 'N': 1,
                         'isfree': False,
                         'init': [],
                         'units': 'log(yr)',
-                        'prior': None})
-
-model_params.append({'name': 'logsfr_ratios', 'N': 7,
-                        'isfree': True,
-                        'init': [],
-                        'units': '',
                         'prior': None})
 
 ########    IMF  ##############
@@ -381,7 +375,7 @@ model_params.append({'name': 'mass_units', 'N': 1,
 #### resort list of parameters 
 # because we can
 parnames = [m['name'] for m in model_params]
-fit_order = ['massmet','logsfr_ratios', 'dust2', 'dust_index', 'dust1_fraction', 'gas_logz','duste_qpah','duste_umin','duste_gamma']
+fit_order = ['massmet','logmasses', 'dust2', 'dust_index', 'dust1_fraction', 'gas_logz','duste_qpah','duste_umin','duste_gamma']
 tparams = [model_params[parnames.index(i)] for i in fit_order]
 for param in model_params: 
     if param['name'] not in fit_order:
@@ -622,11 +616,9 @@ def load_model(objname=None, datloc=None, agelims=[], zred=None, nbins_sfh=7, si
     model_params[n.index('agebins')]['N'] = ncomp
     model_params[n.index('agebins')]['init'] = agebins.T
     model_params[n.index('mass')]['N'] = ncomp
-    model_params[n.index('logsfr_ratios')]['N'] = nbins_sfh-1
-    model_params[n.index('logsfr_ratios')]['init'] = np.full(nbins_sfh-1,0.0) # constant SFH
-    model_params[n.index('logsfr_ratios')]['prior'] = priors.StudentT(mean=np.full(nbins_sfh-1,0.0),
-                                                                      scale=np.full(nbins_sfh-1,sigma),
-                                                                      df=np.full(nbins_sfh-1,df))
+    model_params[n.index('logmasses')]['N'] = ncomp
+    model_params[n.index('logmasses')]['init'] = np.full(ncomp,6)
+    model_params[n.index('logmasses')]['prior'] = priors.TopHat(mini=np.full(ncomp,5), maxi=np.full(ncomp,12))
 
     # set mass-metallicity prior
     # insert redshift into model dictionary
