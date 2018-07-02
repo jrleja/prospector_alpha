@@ -1,8 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import os, copy, prosp_dutils
+import os
+from prosp_dutils import generate_basenames, smooth_spectrum, transform_zfraction_to_sfrfraction
 from dynesty import plotting as dyplot
-import matplotlib as mpl
 from matplotlib.ticker import MaxNLocator, FormatStrFormatter, FuncFormatter
 from prospector_io import load_prospector_data, find_all_prospector_results
 from scipy.ndimage import gaussian_filter as norm_kde
@@ -51,7 +51,6 @@ def subcorner(res, eout, parnames, outname=None, maxprob=False, boost=None):
         ax.xaxis.set_tick_params(labelsize=tick_fs*.7)
         ax.yaxis.set_tick_params(labelsize=tick_fs*.7)
 
-
     # extra parameters
     eout_toplot = ['stellar_mass','sfr_100', 'ssfr_100', 'avg_age', 'H alpha 6563', 'H alpha/H beta']
     not_log = ['half_time','H alpha/H beta']
@@ -92,10 +91,7 @@ def subcorner(res, eout, parnames, outname=None, maxprob=False, boost=None):
 
         # add SFH plot
         sfh_ax = fig.add_axes([0.75,0.435,0.22,0.22],zorder=32)
-        add_sfh_plot([eout], fig,
-                     main_color = ['black'],
-                     ax_inset=sfh_ax,
-                     text_size=2,lw=4)
+        add_sfh_plot([eout], fig, main_color = ['black'], ax_inset=sfh_ax, text_size=2,lw=4)
 
         # create extra parameters
         axis_size = fig.get_axes()[0].get_position().size
@@ -185,7 +181,7 @@ def transform_chain(flatchain, model):
     # turn z_fraction into sfr_fraction
     if 'z_fraction' in model.free_params:
         zidx = model.theta_index['z_fraction']
-        flatchain[:,zidx] = prosp_dutils.transform_zfraction_to_sfrfraction(flatchain[:,zidx]) 
+        flatchain[:,zidx] = transform_zfraction_to_sfrfraction(flatchain[:,zidx]) 
         parnames = np.core.defchararray.replace(parnames,'z_fraction','sfr_fraction')
 
     # rename mass_met
@@ -219,7 +215,7 @@ def add_sfh_plot(eout,fig,ax_loc=None,
         # create master time bin
         min_time = eout['sfh']['t'].min()
         max_time = eout['sfh']['t'].max()
-        tvec = 10**np.linspace(np.log10(min_time),np.log10(max_time),num=500)
+        tvec = 10**np.linspace(np.log10(min_time),np.log10(max_time),num=50)
 
         # create median SFH
         perc = np.zeros(shape=(len(tvec),3))
@@ -227,7 +223,7 @@ def add_sfh_plot(eout,fig,ax_loc=None,
             # nearest-neighbor 'interpolation'
             # exact answer for binned SFHs
             idx = np.abs(eout['sfh']['t'] - tvec[jj]).argmin(axis=-1)
-            perc[jj,:] = dyplot._quantile(eout['sfh']['sfh'][:,idx],[.16,.500,.840],weights=eout['weights'])
+            perc[jj,:] = dyplot._quantile(eout['sfh']['sfh'][np.arange(idx.shape[0]),idx],[0.16,0.50,0.84],weights=eout['weights'])
 
         #### plot SFH
         ax_inset.plot(tvec, perc[:,1],'-',color=main_color[i],lw=lw)
@@ -342,7 +338,7 @@ def sed_figure(outname = None,
 
         # model spectra
         yplt = spec_pdf[:,1]
-        pspec = prosp_dutils.smooth_spectrum(modspec_lam*1e4,yplt,200,minlam=1e3,maxlam=1e5)
+        pspec = smooth_spectrum(modspec_lam*1e4,yplt,200,minlam=1e3,maxlam=1e5)
         nz = pspec > 0
         phot.plot(modspec_lam[nz], pspec[nz], linestyle='-',
                   color=colors[i], alpha=0.9,zorder=-1,label = labels[i],**kwargs)  
@@ -478,7 +474,6 @@ def make_all_plots(filebase=None,
         pfile = model_setup.import_module_from_file(res['run_params']['param_file'])
         res['model'] = pfile.load_model(**res['run_params'])
         pfile = None
-
     
     # transform to preferred model variables
     res['chain'], parnames = transform_chain(res['chain'],res['model'])
