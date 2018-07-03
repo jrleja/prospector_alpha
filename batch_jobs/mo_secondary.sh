@@ -7,7 +7,7 @@
 ### Requested computing time in minutes
 #SBATCH -t 960
 ### Partition or queue name
-#SBATCH -p conroy,shared,serial_requeue
+#SBATCH -p conroy,shared,serial_requeue,itc_cluster,conroy-intel
 ### memory per cpu, in MB
 #SBATCH --mem-per-cpu=4000
 ### Job name
@@ -16,11 +16,13 @@
 ### mail
 #SBATCH --mail-type=END
 #SBATCH --mail-user=joel.leja@gmail.com
-IDFILE=$APPS"/prospector_alpha/data/3dhst/mo.ids"
-OBJID=$(sed -n "${n}p" "$IDFILE")
+IDFILE=$APPS"/prospector_alpha/data/3dhst/mo.cat"
+n1=`expr $SLURM_ARRAY_TASK_ID + 1`
+OBJID=$(awk -v i=$n1 -v j=1 'FNR == i {print $j}' $IDFILE)
+
 srun -n 1 --exclusive --mpi=pmi2 python $APPS/prospector_alpha/code/td/postprocessing.py \
 $APPS/prospector_alpha/parameter_files/mo_params.py \
 --objname="$OBJID" \
 --overwrite=True \
---plot=False \
+--plot=True \
 --shorten_spec=True
