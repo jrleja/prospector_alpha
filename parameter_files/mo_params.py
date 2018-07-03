@@ -103,7 +103,7 @@ def load_obs(photname=None, objname=None, err_floor=0.05, **extras):
     obs['wavelength'] = None
     obs['spectrum'] = None
     obs['logify_spectrum'] = False
-    print 1/0
+
     return obs
 
 ##########################
