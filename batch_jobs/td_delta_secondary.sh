@@ -13,6 +13,8 @@
 ### Job name
 #SBATCH -J 'td_delta_sec'
 ### output and error logs
+#SBATCH -o td_delta_sec_%a.out
+#SBATCH -e td_delta_sec_%a.err
 ### mail
 #SBATCH --mail-type=END
 #SBATCH --mail-user=joel.leja@gmail.com

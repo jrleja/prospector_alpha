@@ -36,8 +36,10 @@ run_params = {'verbose':True,
               'compute_vega_mags': False,
               'initial_disp':0.1,
               'interp_type': 'logarithmic',
-              'nbins_sfh': 5,
+              'nbins_sfh': 7,
               'sigma': 0.3,
+              'df': 2,
+              'agelims': [0.0,7.4772,8.0,8.5,9.0,9.5,9.8,10.0],
               # Data info (phot = .cat, dat = .dat, fast = .fout)
               'datdir':APPS+'/prospector_alpha/data/3dhst/',
               'runname': 'td_new',
@@ -155,44 +157,16 @@ def massmet_to_logmass(massmet=None,**extras):
 def massmet_to_logzsol(massmet=None,**extras):
     return massmet[1]
 
-def logmass_to_masses(logmass=None, logsfr_ratio30=None, logsfr_ratiomax=None, agebins=None, **extras):
-    nbins = agebins.shape[0]-2
-    s30, smax = 10**logsfr_ratio30, 10**(-logsfr_ratiomax)
-    dt30, dt1 = (10**agebins[:2,1]-10**agebins[:2,0])
-    dtn, dtmax = (10**agebins[-2:,1]-10**agebins[-2:,0])
-    mbin = (10**logmass) / (s30*dt30/dt1 + smax*dtmax/dtn + nbins)
-    m30 = s30*mbin*dt30/dt1
-    mmax = smax*mbin*dtmax/dtn
-    n_masses = np.full(nbins, mbin)
-    return np.array(m30.tolist()+n_masses.tolist()+mmax.tolist())
+def logmass_to_masses(massmet=None, logsfr_ratios=None, agebins=None, **extras):
+    logsfr_ratios = np.clip(logsfr_ratios,-100,100) # numerical issues...
+    nbins = agebins.shape[0]
+    sratios = 10**logsfr_ratios
+    dt = (10**agebins[:,1]-10**agebins[:,0])
+    coeffs = np.array([ (1./np.prod(sratios[:i])) * (np.prod(dt[1:i+1]) / np.prod(dt[:i])) for i in range(nbins)])
+    m1 = (10**massmet[0]) / coeffs.sum()
 
-def logsfr_ratios_to_agebins(logsfr_ratios=None, tuniv=None, **extras):
-    """this transforms from SFR ratios to agebins
-    by assuming a constant amount of mass forms in each bin
-    agebins = np.array([NBINS,2])
+    return m1 * coeffs
 
-    use equation:
-        delta(t1) = tuniv  / (1 + SUM(n=1 to n=nbins-1) PROD(j=1 to j=n) Sn)
-        where Sn = SFR(n) / SFR(n+1) and delta(t1) is width of youngest bin
-
-    This needs to be modified to include a maximally old bin
-    and return MASSES + AGEBINS at the same time.
-    """
-
-    # calculate delta(t) for the first bin
-    lower_time = 5e7
-    upper_time = tuniv[0]*0.15
-    tflex = (tuniv[0]-upper_time-lower_time)
-    n_ratio = logsfr_ratios.shape[0]
-    sfr_ratios = 10**logsfr_ratios
-    dt1 = tflex / (1 + np.sum([np.prod(sfr_ratios[:(i+1)]) for i in range(n_ratio)]))
-
-    # translate into agelims vector (time bin edges)
-    agelims = [1, lower_time, dt1+lower_time]
-    for i in range(n_ratio): agelims += [dt1*np.prod(sfr_ratios[:(i+1)]) + agelims[-1]]
-    agelims += [tuniv[0]]
-    return np.log10([agelims[:-1], agelims[1:]]).T
-     
 #############
 # MODEL_PARAMS
 #############
@@ -259,24 +233,11 @@ model_params.append({'name': 'mass', 'N': 1,
 
 model_params.append({'name': 'agebins', 'N': 1,
                         'isfree': False,
-                        'depends_on': logsfr_ratios_to_agebins,
                         'init': [],
                         'units': 'log(yr)',
                         'prior': None})
 
-model_params.append({'name': 'logsfr_ratio30', 'N': 1,
-                        'isfree': True,
-                        'init': 0.0,
-                        'units': 'Msun',
-                        'prior': priors.Normal(mean=0.0,sigma=0.5)})
-
-model_params.append({'name': 'logsfr_ratiomax', 'N': 1,
-                        'isfree': True,
-                        'init': 0.0,
-                        'units': 'Msun',
-                        'prior': priors.Normal(mean=0.0,sigma=0.5)})
-
-model_params.append({'name': 'logsfr_ratios', 'N': 1,
+model_params.append({'name': 'logsfr_ratios', 'N': 7,
                         'isfree': True,
                         'init': [],
                         'units': '',
@@ -445,7 +406,7 @@ model_params.append({'name': 'mass_units', 'N': 1,
 #### resort list of parameters 
 # because we can
 parnames = [m['name'] for m in model_params]
-fit_order = ['massmet','logsfr_ratio30','logsfr_ratiomax','logsfr_ratios', 'dust2', 'dust_index', 'dust1_fraction', 'fagn', 'agn_tau', 'gas_logz']
+fit_order = ['massmet','logsfr_ratios', 'dust2', 'dust_index', 'dust1_fraction', 'fagn', 'agn_tau', 'gas_logz']
 tparams = [model_params[parnames.index(i)] for i in fit_order]
 for param in model_params: 
     if param['name'] not in fit_order:
@@ -664,7 +625,7 @@ def load_sps(**extras):
     sps = NebSFH(**extras)
     return sps
 
-def load_model(nbins_sfh=5,sigma=0.3,objname=None, datdir=None, runname=None, zred=None, **extras):
+def load_model(nbins_sfh=7, sigma=0.3, df=2, agelims=[], objname=None, datdir=None, runname=None, zred=None, **extras):
 
     # we'll need this to access specific model parameters
     n = [p['name'] for p in model_params]
@@ -679,18 +640,22 @@ def load_model(nbins_sfh=5,sigma=0.3,objname=None, datdir=None, runname=None, zr
     tuniv = WMAP9.age(zred).value*1e9
 
     # now construct the nonparametric SFH
-    # set number of components, set logsfr_ratio prior
-    # propagate to agebins
-    model_params[n.index('agebins')]['N'] = nbins_sfh
-    model_params[n.index('mass')]['N'] = nbins_sfh
+    # current scheme:  last bin is 15% age of the Universe, first two are 0-30, 30-100
+    # remaining N-3 bins spaced equally in logarithmic space
+    tbinmax = (tuniv*0.85)
+    agelims = agelims[:2] + np.linspace(agelims[2],np.log10(tbinmax),len(agelims)-3).tolist() + [np.log10(tuniv)]
+    agebins = np.array([agelims[:-1], agelims[1:]])
+    ncomp = len(agelims) - 1
+
+    # load nvariables and agebins
+    model_params[n.index('agebins')]['N'] = ncomp
+    model_params[n.index('agebins')]['init'] = agebins.T
+    model_params[n.index('mass')]['N'] = ncomp
     model_params[n.index('logsfr_ratios')]['N'] = nbins_sfh-1
     model_params[n.index('logsfr_ratios')]['init'] = np.full(nbins_sfh-1,0.0) # constant SFH
-    model_params[n.index('logsfr_ratios')]['prior'] = SFR_Ratio(mean=np.full(nbins_sfh-1,0.0),sigma=np.full(nbins_sfh-1,sigma))
-
-    model_params.append({'name': 'tuniv', 'N': 1,
-                            'isfree': False,
-                            'init': tuniv})
-
+    model_params[n.index('logsfr_ratios')]['prior'] = priors.StudentT(mean=np.full(nbins_sfh-1,0.0),
+                                                                      scale=np.full(nbins_sfh-1,sigma),
+                                                                      df=np.full(nbins_sfh-1,df))
     # set mass-metallicity prior
     # insert redshift into model dictionary
     model_params[n.index('massmet')]['prior'] = MassMet(z_mini=-1.98, z_maxi=0.19, mass_mini=7, mass_maxi=12.5)
