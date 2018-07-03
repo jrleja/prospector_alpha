@@ -39,7 +39,7 @@ run_params = {'verbose':True,
               'agelims': [0.0,7.4772,8.0,8.5,9.0,9.5,9.8,10.0],
               # Data info (phot = .cat, dat = .dat, fast = .fout)
               'photname':APPS+'/prospector_alpha/data/3dhst/mo.cat',
-              'objname': '1.'
+              'objname': '1'
               }
 ############
 # OBS
@@ -65,7 +65,7 @@ def load_obs(photname=None, objname=None, err_floor=0.05, **extras):
 
     ### extract filters, fluxes, errors for object
     # from ReadMe: "All fluxes are normalized to an AB zeropoint of 25, such that: magAB = 25.0-2.5*log10(flux)
-    obj_idx = (dat['id'] == objname.split('_')[-1])
+    obj_idx = (dat['id'] == str(objname))
     filters = np.array([f[2:] for f in dat.dtype.names if f[0:2] == 'f_'])
     flux = np.squeeze([dat[obj_idx]['f_'+f] for f in filters])
     unc = np.squeeze([dat[obj_idx]['e_'+f] for f in filters])
@@ -103,7 +103,7 @@ def load_obs(photname=None, objname=None, err_floor=0.05, **extras):
     obs['wavelength'] = None
     obs['spectrum'] = None
     obs['logify_spectrum'] = False
-
+    print 1/0
     return obs
 
 ##########################
