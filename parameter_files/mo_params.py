@@ -91,7 +91,8 @@ def load_obs(photname=None, objname=None, err_floor=0.05, **extras):
     wavemin = np.array([f.wavelength[f.transmission > (f.transmission.max()*0.1)].min() for f in ofilters]) / (1+zred)
     filtered = [1230]
     for f in filtered: phot_mask[(wavemax > f) & (wavemin < f)] = False
-    phot_mask[wavemin < 1200] = False
+    idx = wavemin < 1200
+    maggies_unc[idx] = maggies_unc[idx]*np.sqrt(5)  # 5% and 10% added in quadrature
 
     ### build output dictionary
     obs = {}
