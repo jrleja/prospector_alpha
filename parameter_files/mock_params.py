@@ -95,6 +95,27 @@ def intermediate_burst(logm, agebins):
 
     return mass_smooth + sfr_burst*dt
 
+def very_steep_declining_sfr(logm,agebins):
+    """ use tau model with tage = max(agebins), tau = tage/2
+    then put SFR(t_mid) * delta(t) mass in each bin 
+    """
+    # import matplotlib.pyplot as plt
+    #plt.plot(t,sfr)
+
+    # set tage, tau
+    tage = 10**agebins.max()
+    tau = tage/10.
+
+    # define time bins
+    t = 10**agebins.mean(axis=1)
+    dt = (10**agebins[:,1]-10**agebins[:,0])
+
+    # do the integral
+    A = 10**logm / (tau*(1-np.exp(-tage/tau)))
+    sfr = A*np.exp((t-tage)/tau)
+
+    return sfr * dt
+
 def steeply_declining_sfr(logm,agebins):
     """ use tau model with tage = max(agebins), tau = tage/2
     then put SFR(t_mid) * delta(t) mass in each bin 
@@ -194,6 +215,8 @@ def mock_params(mock_key,agebins):
         masses = intermediate_burst(logm,agebins)
     if mock_key == 8:
         masses = sharp_quench(logm,agebins)
+    if mock_key == 9:
+        masses = very_steep_declining_sfr(logm,agebins)
     mass,zfrac = masses_to_zfrac(mass=masses,agebins=agebins)
 
     # then set dust, metallicity parameters and return theta vector
