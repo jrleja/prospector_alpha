@@ -75,7 +75,7 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True, measure_
         eout['thetas'][p] = {'q50': q50, 'q16': q16, 'q84': q84}
 
     # extras
-    extra_parnames = ['avg_age','lwa_rband','lwa_lbol','half_time','sfr_100','ssfr_100','ssfr_50','sfr_50',\
+    extra_parnames = ['avg_age','lwa_rband','lwa_lbol','half_time','sfr_100','ssfr_100','ssfr_30','sfr_30',\
                       'stellar_mass','lir','luv','lmir','lbol','luv_young','lir_young']
     if 'fagn' in parnames:
         extra_parnames += ['l_agn', 'fmir', 'luv_agn', 'lir_agn']
@@ -131,8 +131,8 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True, measure_
         eout['extras']['half_time']['chain'][jj] = prosp_dutils.halfmass_assembly_time(sfh_params)
         eout['extras']['sfr_100']['chain'][jj] = prosp_dutils.calculate_sfr(sfh_params, 0.1,  minsfr=-np.inf, maxsfr=np.inf)
         eout['extras']['ssfr_100']['chain'][jj] = eout['extras']['sfr_100']['chain'][jj].squeeze() / eout['extras']['stellar_mass']['chain'][jj].squeeze()
-        eout['extras']['sfr_50']['chain'][jj] = prosp_dutils.calculate_sfr(sfh_params, 0.05,  minsfr=-np.inf, maxsfr=np.inf)
-        eout['extras']['ssfr_50']['chain'][jj] = eout['extras']['sfr_50']['chain'][jj].squeeze() / eout['extras']['stellar_mass']['chain'][jj].squeeze()
+        eout['extras']['sfr_30']['chain'][jj] = prosp_dutils.calculate_sfr(sfh_params, 0.03,  minsfr=-np.inf, maxsfr=np.inf)
+        eout['extras']['ssfr_30']['chain'][jj] = eout['extras']['sfr_30']['chain'][jj].squeeze() / eout['extras']['stellar_mass']['chain'][jj].squeeze()
 
         # calculate AGN parameters if necessary
         if 'fagn' in parnames:
@@ -249,9 +249,6 @@ def post_processing(param_name, objname=None, runname = None, overwrite=True, ob
         print 'post-processing file already exists! returning.'
         return
 
-    if res['model'] is None:
-        res['model'] = pfile.load_model(**res['run_params'])
-
     # make filenames local...
     print 'Performing post-processing on ' + objname
     for key in res['run_params']:
@@ -260,6 +257,8 @@ def post_processing(param_name, objname=None, runname = None, overwrite=True, ob
                 res['run_params'][key] = os.getenv('APPS')+'/prospector_alpha'+res['run_params'][key].split('prospector_alpha')[-1]
     sps = pfile.load_sps(**res['run_params'])
     obs = res['obs']
+    if res['model'] is None:
+        res['model'] = pfile.load_model(**res['run_params'])
 
     # sample from chain
     extra_output = calc_extra_quantities(res,sps,obs,**kwargs)
