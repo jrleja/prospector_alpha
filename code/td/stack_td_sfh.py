@@ -261,7 +261,7 @@ def stack_sfh(data, **opts):
                 # for each object in sample, add to sSFR PDF
                 for idx in in_samp:
                     ssfr_in_hist = np.clip(ssfr[:,i,idx],10**ssfrmin,10**ssfrmax)
-                    g1,_ = np.histogram(ssfr_in_hist, normed=True,weights=weights[:,idx], bins=ssfr_arr)
+                    g1,_ = np.histogram(ssfr_in_hist, density=False,weights=weights[:,idx], bins=ssfr_arr)
                     hist += g1
 
                 # calculate weighted quantiles from sSFR PDF at fixed T

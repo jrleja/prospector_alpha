@@ -401,8 +401,8 @@ def sed_figure(outname = None,
     phot.set_yscale('log',nonposx='clip')
     phot.set_xscale('log',nonposx='clip')
     resid.set_xscale('log',nonposx='clip',subsx=(2,5))
-    resid.xaxis.set_minor_formatter(FormatStrFormatter('%2.2g'))
-    resid.xaxis.set_major_formatter(FormatStrFormatter('%2.2g'))
+    resid.xaxis.set_minor_formatter(FormatStrFormatter('%2.4g'))
+    resid.xaxis.set_major_formatter(FormatStrFormatter('%2.4g'))
     resid.tick_params('both', pad=3.5, size=3.5, width=1.0, which='both',labelsize=ticksize)
     phot.tick_params('y', which='major', labelsize=ticksize)
 
@@ -419,8 +419,8 @@ def sed_figure(outname = None,
     ax2.set_xlabel(r'$\lambda_{\mathrm{rest}}$ [$\mu$m]',fontsize=fs)
     ax2.set_ylim(y1, y2)
     ax2.set_xscale('log',nonposx='clip',subsx=(2,5))
-    ax2.xaxis.set_minor_formatter(FormatStrFormatter('%2.2g'))
-    ax2.xaxis.set_major_formatter(FormatStrFormatter('%2.2g'))
+    ax2.xaxis.set_minor_formatter(FormatStrFormatter('%2.4g'))
+    ax2.xaxis.set_major_formatter(FormatStrFormatter('%2.4g'))
     ax2.tick_params('both', pad=2.5, size=3.5, width=1.0, which='both',labelsize=ticksize)
 
     # remove ticks

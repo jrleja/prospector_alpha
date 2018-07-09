@@ -82,6 +82,7 @@ def load_obs(photname=None, objname=None, err_floor=0.05, **extras):
     ### where super negative is <0 with 95% certainty
     neg = (maggies < 0) & (np.abs(maggies/maggies_unc) > 2)
     phot_mask[neg] = False
+    print 1/0
 
     ### mask anything touching or bluewards of Ly-a
     zred = 1.882
@@ -90,7 +91,6 @@ def load_obs(photname=None, objname=None, err_floor=0.05, **extras):
     wavemax = np.array([f.wavelength[f.transmission > (f.transmission.max()*0.1)].max() for f in ofilters]) / (1+zred)
     wavemin = np.array([f.wavelength[f.transmission > (f.transmission.max()*0.1)].min() for f in ofilters]) / (1+zred)
     filtered = [1230]
-    for f in filtered: phot_mask[(wavemax > f) & (wavemin < f)] = False
     idx = wavemin < 1200
     maggies_unc[idx] = maggies_unc[idx]*np.sqrt(5)  # 5% and 10% added in quadrature
 
@@ -104,7 +104,6 @@ def load_obs(photname=None, objname=None, err_floor=0.05, **extras):
     obs['wavelength'] = None
     obs['spectrum'] = None
     obs['logify_spectrum'] = False
-
     return obs
 
 ##########################
