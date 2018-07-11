@@ -72,7 +72,7 @@ def load_zp_offsets(field):
 
     return dat
 
-def load_grism_dat(field,process=False):
+def load_grism_dat(field,process=False,lines_to_save=['Ha']):
     """if process, turn into a manageable size and interpret some things
     note that we return OBSERVED-FRAME equivalent width!
     else return the whole shebang
@@ -86,7 +86,6 @@ def load_grism_dat(field,process=False):
     
     # grab specific lines
     hdr, hdr_type = [], []
-    lines_to_save = ['Ha']
     line_list = ['_FLUX', '_FLUX_ERR', '_EQW', '_EQW_ERR']
     for line in lines_to_save:
         for ltype in line_list:
@@ -98,10 +97,24 @@ def load_grism_dat(field,process=False):
     for idx in dat_to_save:
         hdr.append(idx)
         hdr_type.append(dat.dtype[idx])
-    
-    # buil output array
+
+    # get grism use flag
+    loc = '/Users/joel/data/3d_hst/v4.1_spectral/'+field.lower()+'_3dhst_v4.1.5_catalogs/'+field.lower()+'_3dhst.v4.1.5.zfit.linematched.fits'
+    hdu2 = fits.open(loc)
+    dat2 = hdu2[1].data
+    dat_to_save = ['use_zgrism']
+    for idx in dat_to_save:
+        hdr.append(idx)
+        hdr_type.append(dat2.dtype[idx])
+
+    # build output array
     out = np.recarray(dat.shape, dtype=[(x,y) for x,y in zip(hdr,hdr_type)]) 
-    for idx in hdr: out[idx][:] = dat[idx][:]
+    for idx in hdr: 
+        try:
+            out[idx][:] = dat[idx][:]
+        except:
+            out[idx][:] = dat2[idx][:]
+
     return out
 
 def return_fast_sed(fastname,objname, sps=None, obs=None, dustem = False):

@@ -82,7 +82,6 @@ def load_obs(photname=None, objname=None, err_floor=0.05, **extras):
     ### where super negative is <0 with 95% certainty
     neg = (maggies < 0) & (np.abs(maggies/maggies_unc) > 2)
     phot_mask[neg] = False
-    print 1/0
 
     ### mask anything touching or bluewards of Ly-a
     zred = 1.882

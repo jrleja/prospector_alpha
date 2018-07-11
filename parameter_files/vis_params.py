@@ -77,7 +77,7 @@ def load_obs(filter_key=1, **extras):
     params = {
               'logmass': 10,
               'logzsol': -0.75,
-              'z_fraction': np.array([0.625,0.6,0.5,0.55555556,0.4]), # hacked, gently rising
+              'logsfr': np.array([0.15,0.15,0.15,0.15,0.15,0.15]), # hacked, gently rising
               'dust2': 0.5,
               'dust1_fraction': 0.9,
               'fagn': 0.05,
@@ -136,50 +136,15 @@ def tie_gas_logz(logzsol=None, **extras):
 def to_dust1(dust1_fraction=None, dust1=None, dust2=None, **extras):
     return dust1_fraction*dust2
 
-def zfrac_to_sfrac(z_fraction=None, **extras):
-    """This transforms from latent, independent `z` variables to sfr
-    fractions. The transformation is such that sfr fractions are drawn from a
-    Dirichlet prior.  See Betancourt et al. 2010
-    """
-    sfr_fraction = np.zeros(len(z_fraction) + 1)
-    sfr_fraction[0] = 1.0 - z_fraction[0]
-    for i in range(1, len(z_fraction)):
-        sfr_fraction[i] = np.prod(z_fraction[:i]) * (1.0 - z_fraction[i])
-    sfr_fraction[-1] = 1 - np.sum(sfr_fraction[:-1])
+def logmass_to_masses(logmass=None, logsfr_ratios=None, agebins=None, **extras):
+    logsfr_ratios = np.clip(logsfr_ratios,-100,100) # numerical issues...
+    nbins = agebins.shape[0]
+    sratios = 10**logsfr_ratios
+    dt = (10**agebins[:,1]-10**agebins[:,0])
+    coeffs = np.array([ (1./np.prod(sratios[:i])) * (np.prod(dt[1:i+1]) / np.prod(dt[:i])) for i in range(nbins)])
+    m1 = (10**logmass) / coeffs.sum()
 
-    return sfr_fraction
-
-def zfrac_to_masses(logmass=None, z_fraction=None, agebins=None, **extras):
-    """This transforms from latent, independent `z` variables to sfr fractions
-    and then to bin mass fractions. The transformation is such that sfr
-    fractions are drawn from a Dirichlet prior.  See Betancourt et al. 2010
-    :returns masses:
-        The stellar mass formed in each age bin.
-    """
-    # sfr fractions (e.g. Leja 2017)
-    sfr_fraction = zfrac_to_sfrac(z_fraction)
-    # convert to mass fractions
-    time_per_bin = np.diff(10**agebins, axis=-1)[:,0]
-    sfr_fraction *= np.array(time_per_bin)
-    sfr_fraction /= sfr_fraction.sum()
-    masses = 10**logmass * sfr_fraction
-
-    return masses
-
-def masses_to_zfrac(mass=None, agebins=None, **extras):
-    """The inverse of zfrac_to_masses, for setting mock parameters based on
-    real bin masses.
-    """
-    total_mass = mass.sum()
-    time_per_bin = np.diff(10**agebins, axis=-1)[:,0]
-    sfr_fraction = mass / time_per_bin
-    sfr_fraction /= sfr_fraction.sum()
-    z_fraction = np.zeros(len(sfr_fraction) - 1)
-    z_fraction[0] = 1 - sfr_fraction[0]
-    for i in range(1, len(z_fraction)):
-        z_fraction[i] = 1.0 - sfr_fraction[i] / np.prod(z_fraction[:i])
-
-    return total_mass, z_fraction
+    return m1 * coeffs
 
 #############
 # MODEL_PARAMS
@@ -236,7 +201,7 @@ model_params.append({'name': 'sfh', 'N':1,
 
 model_params.append({'name': 'mass', 'N': 1,
                      'isfree': False,
-                     'depends_on': zfrac_to_masses,
+                     'depends_on': logmass_to_masses,
                      'init': 1.,
                      'units': r'M$_\odot$',})
 
@@ -246,11 +211,11 @@ model_params.append({'name': 'agebins', 'N': 1,
                         'units': 'log(yr)',
                         'prior': None})
 
-model_params.append({'name': 'z_fraction', 'N': 1,
+model_params.append({'name': 'logsfr_ratios', 'N': 7,
                         'isfree': True,
                         'init': [],
                         'units': '',
-                        'prior': priors.Beta(alpha=1.0, beta=1.0,mini=0.0,maxi=1.0)})
+                        'prior': None})
 
 ########    IMF  ##############
 model_params.append({'name': 'imf_type', 'N': 1,
@@ -416,7 +381,7 @@ model_params.append({'name': 'mass_units', 'N': 1,
 #### resort list of parameters 
 # because we can
 parnames = [m['name'] for m in model_params]
-fit_order = ['logmass','logzsol','z_fraction', 'dust2', 'dust_index', 'dust1_fraction', 'fagn', 'agn_tau','duste_qpah','duste_umin','duste_gamma']
+fit_order = ['logmass','logzsol','logsfr_ratios', 'dust2', 'dust_index', 'dust1_fraction', 'fagn', 'agn_tau','duste_qpah','duste_umin','duste_gamma']
 tparams = [model_params[parnames.index(i)] for i in fit_order]
 for param in model_params: 
     if param['name'] not in fit_order:
@@ -537,7 +502,7 @@ def load_sps(**extras):
     sps = NebSFH(**extras)
     return sps
 
-def load_model(agelims=[], alpha_sfh=0.2, **extras):
+def load_model(agelims=[], nbins_sfh=7, sigma=0.3, df=2, **extras):
 
     # we'll need this to access specific model parameters
     n = [p['name'] for p in model_params]
@@ -562,21 +527,15 @@ def load_model(agelims=[], alpha_sfh=0.2, **extras):
     model_params[n.index('agebins')]['N'] = ncomp
     model_params[n.index('agebins')]['init'] = agebins.T
 
-    # now we do the computational z-fraction setup
-    # number of zfrac variables = (number of SFH bins - 1)
-    # set initial with a constant SFH
-    # if alpha_SFH is a vector, use this as the alpha array
-    # else assume all alphas are the same
+    # load nvariables and agebins
+    model_params[n.index('agebins')]['N'] = ncomp
+    model_params[n.index('agebins')]['init'] = agebins.T
     model_params[n.index('mass')]['N'] = ncomp
-    model_params[n.index('z_fraction')]['N'] = ncomp-1
-    if type(alpha_sfh) != type(np.array([])):
-        alpha = np.repeat(alpha_sfh,ncomp-1)
-    else:
-        alpha = alpha_sfh
-    tilde_alpha = np.array([alpha[i-1:].sum() for i in xrange(1,ncomp)])
-    model_params[n.index('z_fraction')]['prior'] = priors.Beta(alpha=tilde_alpha, beta=alpha, mini=0.0, maxi=1.0)
-    model_params[n.index('z_fraction')]['init'] = np.array([(i-1)/float(i) for i in range(ncomp,1,-1)])
-    model_params[n.index('z_fraction')]['init_disp'] = 0.02
+    model_params[n.index('logsfr_ratios')]['N'] = nbins_sfh-1
+    model_params[n.index('logsfr_ratios')]['init'] = np.full(nbins_sfh-1,0.0) # constant SFH
+    model_params[n.index('logsfr_ratios')]['prior'] = priors.StudentT(mean=np.full(nbins_sfh-1,0.0),
+                                                                      scale=np.full(nbins_sfh-1,sigma),
+                                                                      df=np.full(nbins_sfh-1,df))
 
     return sedmodel.SedModel(model_params)
 
