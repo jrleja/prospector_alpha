@@ -188,16 +188,16 @@ def collate_data(runname, runname_fast, runname_sample=None, filename=None, file
 
         ### make sure all files exist
         try:
-            res, _, model, prosp = load_prospector_data(name)
+            res, _, _, prosp = load_prospector_data(name)
             if runname_fast is not None:
-                fres, _, fmodel, prosp_fast = load_prospector_data(basenames_fast[i])
+                fres, _, _, prosp_fast = load_prospector_data(basenames_fast[i])
             else:
                 prosp_fast = None
         except:
             print name.split('/')[-1]+' failed to load. skipping.'
             continue
 
-        if (prosp is None) or (model is None) or ((prosp_fast is None) & (runname_fast is not None)):
+        if (prosp is None) or ((prosp_fast is None) & (runname_fast is not None)):
             continue
 
         # object name
@@ -220,7 +220,7 @@ def collate_data(runname, runname_fast, runname_sample=None, filename=None, file
         # input flux must be in mJy
         midx = np.array(['mips' in u for u in res['obs']['filternames']],dtype=bool)
         mips_flux = prosp['obs']['mags'][:,midx].squeeze() * 3631 * 1e3
-        lir = mips_to_lir(mips_flux, res['model'].params['zred'][0])
+        lir = mips_to_lir(mips_flux, prosp['zred'])
         uvir_chain = prosp_dutils.sfr_uvir(lir,prosp['extras']['luv']['chain'])
 
         truelir = prosp['extras']['lir']['chain']
@@ -312,7 +312,7 @@ def collate_data(runname, runname_fast, runname_sample=None, filename=None, file
         outfast['half_time'] += [prosp_dutils.exp_decl_sfh_half_time(10**fast['lage'][f_idx][0],10**fast['ltau'][f_idx][0])/1e9]
 
         outfast['avg_age'] += [prosp_dutils.exp_decl_sfh_avg_age(10**fast['lage'][f_idx][0],10**fast['ltau'][f_idx][0])/1e9]
-        outfast['z'] += [float(model.params['zred'])]
+        outfast['z'] += [float(prosp['zred'])]
         sfr_100_uvir += [uvir['sfr'][u_idx][0]]
         sfr_100_ir += [uvir['sfr_IR'][u_idx][0]]
         sfr_100_uv += [uvir['sfr_UV'][u_idx][0]]
@@ -397,7 +397,7 @@ def collate_data(runname, runname_fast, runname_sample=None, filename=None, file
 
     return out, outg
 
-def do_all(runname='td_new', runname_fast=None,outfolder=None,**opts):
+def do_all(runname='td_delta', runname_fast=None,outfolder=None,**opts):
 
     if outfolder is None:
         outfolder = os.getenv('APPS') + '/prospector_alpha/plots/'+runname+'/fast_plots/'
@@ -1016,7 +1016,7 @@ def prospector_versus_z(data,outname,popts):
 
         # logscale
         if par == 'sfr_30' or par == 'fagn':
-            axes[i].set_yscale('log',nonposx='clip',subsy=([3]))
+            axes[i].set_yscale('log',nonposy='clip',subsy=([3]))
             axes[i].yaxis.set_minor_formatter(FormatStrFormatter('%2.4g'))
             axes[i].yaxis.set_major_formatter(FormatStrFormatter('%2.4g'))
     plt.tight_layout()
@@ -1513,7 +1513,7 @@ def star_forming_sequence(sfr,mass,zred,outname,popts,xlabel=None,ylabel=None,ou
             ax[i].plot(nx,ny, **whitopts)
             ax[0].text(0.02,0.93,'UV+IR SFRs',color=whitopts['color'],transform=ax[0].transAxes)
         elif plt_whit:
-            sfr_whit = 10**sfr_ms(zwhit[i],logm_whit)
+            sfr_whit = 10**sfr_ms(np.full(logm_whit.shape[0],zwhit[i]),logm_whit)
             ax[i].plot(logm_whit, sfr_whit, **whitopts)
             ax[0].text(0.02,0.93,'Whitaker+14',color=whitopts['color'],transform=ax[0].transAxes)
 

@@ -66,7 +66,7 @@ def collate_data(runname, filename=None, regenerate=False, nobj=None, **opts):
 
         # load output from fit
         try:
-            res, _, model, prosp = load_prospector_data(name)
+            res, _, _, prosp = load_prospector_data(name)
         except:
             #print name.split('/')[-1]+' failed to load. skipping.'
             continue
@@ -116,7 +116,7 @@ def collate_data(runname, filename=None, regenerate=False, nobj=None, **opts):
 
         midx = np.array(['mips' in u for u in res['obs']['filternames']],dtype=bool)
         mips_flux = prosp['obs']['mags'][:,midx].squeeze() * 3631 * 1e3 # input for this LIR must be in janskies
-        lir = mips_to_lir(mips_flux, res['model'].params['zred'][0])
+        lir = mips_to_lir(mips_flux, prosp['zred'])
         sfr_uvir_lirfrommips_prosp = prosp_dutils.sfr_uvir(lir,prosp['extras']['luv']['chain'])
 
         # here we estimate LIR+LUV fractions for AGN, young stars, and old stars

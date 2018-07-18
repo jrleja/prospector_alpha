@@ -135,7 +135,7 @@ model_params.append({'name': 'mass', 'N': 1,
                      'depends_on': logmasses_to_mass,
                      'init': 1e6,
                      'units': r'M$_\odot$',
-                     'prior': priors.LogUniform(mini=1e5, maxi=1e12)})
+                     'prior': priors.LogUniform(mini=1e3, maxi=1e12)})
 
 model_params.append({'name': 'logmasses', 'N': 1,
                      'isfree': True,

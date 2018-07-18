@@ -32,7 +32,7 @@ opts = {
 opts['massbins'] = np.linspace(opts['xlim'][0],opts['xlim'][1],opts['nmassbins']+1)
 opts['zbin_labels'] = ["{0:.1f}".format(z1)+'<z<'+"{0:.1f}".format(z2) for (z1, z2) in opts['zbins']]
 
-def do_all(runname='td_new', outfolder=None, data=None, stack=None, regenerate=False):
+def do_all(runname='td_new', outfolder=None, data=None, stack=None, regenerate=False, **args):
 
     if outfolder is None:
         outfolder = os.getenv('APPS') + '/prospector_alpha/plots/'+runname+'/fast_plots/'
@@ -41,11 +41,12 @@ def do_all(runname='td_new', outfolder=None, data=None, stack=None, regenerate=F
             os.makedirs(outfolder+'data/')
 
     if data is None:
-        data = collate_data(runname,filename=outfolder+'data/agn.h5',regenerate=regenerate,**opts)
+        data = collate_data(runname,filename=outfolder+'data/agn.h5',regenerate=regenerate,**args)
         return data
     if stack is None:
         stack = stack_agn_bins(data, **opts)
         return stack
+
 
     # print some information
     #z1, z2, m1, m2 = 0.5, 2.5, 10.9, 11.1
@@ -57,7 +58,8 @@ def do_all(runname='td_new', outfolder=None, data=None, stack=None, regenerate=F
         outname = 'agn_strength_10thpercentile'
         if opts['one_sigma']:
             outname += '_1sig'
-
+    print 'plotting'
+    print outfolder
     agn_table(stack, outfolder+'tables/'+outname+'.dat')
     agn_plots(stack, outfolder+outname+'.png', opts)
 
@@ -79,7 +81,7 @@ def agn_table(stack, outtable):
     formats['z'] = str
     ascii.write(odat, outtable, format='aastex',overwrite=True, formats=formats)
 
-def collate_data(runname, filename=None, regenerate=False, **opts):
+def collate_data(runname, runname_sample=None, filename=None, regenerate=False, **opts):
     """ pull out all of the necessary information from the individual data files
     this takes awhile, so this data is saved to disk.
     """
@@ -104,6 +106,9 @@ def collate_data(runname, filename=None, regenerate=False, **opts):
     outdict = {q: {f: [] for f in ['q50','q84','q16']} for q in outvar}
     for f in ['objname', 'weights', 'fmir_chain', 'fagn_chain', 'zred', 'mips_sn']: outdict[f] = [] 
 
+    if runname_sample == None:
+        runname_sample = runname
+
     # we want MASS, SFR_100, F_AGN, F_MIR CHAIN, for each galaxy
     basenames, _, _ = generate_basenames(runname)
     for i, name in enumerate(basenames):
@@ -111,7 +116,7 @@ def collate_data(runname, filename=None, regenerate=False, **opts):
         # load. do we keep it? check redshift
         objname = name.split('/')[-1]
         datdir = os.getenv('APPS')+'/prospector_alpha/data/3dhst/'
-        datname = datdir + objname.split('_')[0] + '_' + runname + '.dat'
+        datname = datdir + objname.split('_')[0] + '_' + runname_sample + '.dat'
         dat = ascii.read(datname)
         idx = dat['phot_id'] == int(objname.split('_')[-1])
         zred = float(dat['z_best'][idx])
@@ -121,7 +126,7 @@ def collate_data(runname, filename=None, regenerate=False, **opts):
 
         # load output from fit
         try:
-            res, _, model, prosp = load_prospector_data(name)
+            res, _, _, prosp = load_prospector_data(name)
         except:
             print name.split('/')[-1]+' failed to load. skipping.'
             continue
@@ -133,7 +138,7 @@ def collate_data(runname, filename=None, regenerate=False, **opts):
         print 'loaded ' + objname
 
         # load up chains
-        fidx = model.theta_index['fagn']
+        fidx = res['theta_labels'].index(u'fagn')
         outdict['fagn_chain'] += [res['chain'][prosp['sample_idx'], fidx]]
         outdict['fmir_chain'] += [prosp['extras']['fmir']['chain']]
         outdict['weights'] += [prosp['weights'].tolist()]
