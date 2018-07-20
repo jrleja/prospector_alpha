@@ -86,7 +86,7 @@ def load_grism_dat(field,process=False,lines_to_save=['Ha']):
     
     # grab specific lines
     hdr, hdr_type = [], []
-    line_list = ['_FLUX', '_FLUX_ERR', '_EQW', '_EQW_ERR']
+    line_list = ['_FLUX', '_FLUX_ERR', '_EQW', '_EQW_ERR', '_SCALE']
     for line in lines_to_save:
         for ltype in line_list:
             hdr.append(line+ltype)

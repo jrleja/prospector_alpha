@@ -73,7 +73,7 @@ def calculate_sfr(agebins, zfraction, timescale, dt):
 
     return sfr
 
-def do_all(runname='td_new', outfolder=None, regenerate=False, regenerate_stack=False, **opts):
+def do_all(runname='td_delta', outfolder=None, regenerate=False, regenerate_stack=False, **opts):
 
     if outfolder is None:
         outfolder = os.getenv('APPS') + '/prospector_alpha/plots/'+runname+'/fast_plots/'
@@ -87,15 +87,14 @@ def do_all(runname='td_new', outfolder=None, regenerate=False, regenerate_stack=
               'nbins_vertical':4,              # number of bins in vertical stack
               'horizontal_bin_colors': ['#45ADA8','#FC913A','#FF4E50'],
               'vertical_bin_colors': ['#ca0020','#f4a582','#008080','#045a8c'],
-              'low_mass_cutoff':9.5,          # log(M) where we stop stacking and plotting
+              'low_mass_cutoff':9.,          # log(M) where we stop stacking and plotting
               'high_mass_cutoff': 11.5,
               'ylim_horizontal_sfr': (-0.8,3),
               'ylim_horizontal_ssfr': (1e-11,1.5e-9),
-              'ylim_vertical_sfr': (-2,3),
               'ylim_vertical_ssfr': (2.5e-13,4e-9),
               'xlim_t': (2e7,9e9),
               'show_disp':[0.16,0.84],         # percentile of population distribution to show on plot
-              'adjust_sfr': -0.25,             # adjust whitaker SFRs by how much?
+              'adjust_sfr': -0.3,             # adjust whitaker SFRs by how much?
               'zbins': [(0.5,1.),(1.,1.5),(1.5,2.),(2.,2.5)]
              }
     stack_opts['zbin_labels'] = ["{0:.1f}".format(z1)+'<z<'+"{0:.1f}".format(z2) for (z1, z2) in stack_opts['zbins']]

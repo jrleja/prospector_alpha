@@ -46,8 +46,6 @@ def return_agn_str(idx, string=False):
 
 def find_all_prospector_results(runname):
     """ returns basenames for all h5 files in results folder "runname"
-    does NOT distinguish between multiple files for one object
-    could add this functionality in the future by transferring prospector_io logic
     """
 
     # find all h5 files 
@@ -56,7 +54,7 @@ def find_all_prospector_results(runname):
     objnames = [f.split('/')[0].split('_')[0] for f in files]
     basenames = ["_".join(f.split('_')[:-2]) for f in files]
 
-    return basenames
+    return np.unique(basenames)
 
 def load_prospector_data(filebase,no_sample_results=False,objname=None,runname=None,hdf5=True,load_extra_output=True):
     """loads Prospector results
