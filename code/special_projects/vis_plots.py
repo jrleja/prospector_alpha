@@ -59,7 +59,7 @@ def collate_data(runname, filename=None, regenerate=False, **opts):
     for i, name in enumerate(out['names']):
         
         try:
-            res, _, mod, eout = load_prospector_data(None,runname=runname,objname=name)
+            res, _, mod, eout = load_prospector_data(None,runname=runname,objname='vis_'+name)
             out['weights'] += [eout['weights']]
         except TypeError:
             print name +' is not available'
@@ -91,6 +91,7 @@ def collate_data(runname, filename=None, regenerate=False, **opts):
             sps = vis_params.load_sps(**vis_params.run_params)
         mod = vis_params.load_model(**vis_params.run_params)
         mod.params.update(res['obs']['true_params'])
+        mod.set_parameters(res['obs']['true_params'])
         mod.params['nebemlineinspec'] = np.atleast_1d(True)
         res['obs']['true_spec'], _, _ = mod.mean_model(mod.theta, res['obs'], sps=sps)
         tobs = {
@@ -109,9 +110,7 @@ def collate_data(runname, filename=None, regenerate=False, **opts):
             out['truths']['fagn'] = np.log10(out['truths']['fagn'])
 
             # calculate sSFR, mean age for true model
-            masses = vis_params.zfrac_to_masses(logmass=res['obs']['true_params']['logmass'], 
-                                                z_fraction=res['obs']['true_params']['z_fraction'], 
-                                                agebins=mod.params['agebins'])
+            masses = mod.params['mass']
             time_per_bin = np.diff(10**mod.params['agebins'], axis=-1)[:,0]
             age_in_bin = np.sum(10**mod.params['agebins'],axis=-1)/2.
 

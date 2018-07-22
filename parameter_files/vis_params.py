@@ -77,7 +77,7 @@ def load_obs(filter_key=1, **extras):
     params = {
               'logmass': 10,
               'logzsol': -0.75,
-              'logsfr': np.array([0.15,0.15,0.15,0.15,0.15,0.15]), # hacked, gently rising
+              'logsfr_ratios': np.array([0.15,0.15,0.15,0.15,0.15,0.15]), # hacked, gently rising
               'dust2': 0.5,
               'dust1_fraction': 0.9,
               'fagn': 0.05,
