@@ -91,6 +91,7 @@ def do_all(runname='td_delta', outfolder=None, regenerate=False, regenerate_stac
               'high_mass_cutoff': 11.5,
               'ylim_horizontal_sfr': (-0.8,3),
               'ylim_horizontal_ssfr': (1e-11,1.5e-9),
+              'ylim_vertical_sfr': (-0.8,3),
               'ylim_vertical_ssfr': (2.5e-13,4e-9),
               'xlim_t': (2e7,9e9),
               'show_disp':[0.16,0.84],         # percentile of population distribution to show on plot
@@ -128,7 +129,7 @@ def collate_data(runname, filename=None, regenerate=False, **opts):
         return outdict
 
     # define output containers
-    outvar = ['massmet_1','stellar_mass', 'sfr_30','avg_age']
+    outvar = ['massmet_1','stellar_mass', 'sfr_30','sfr_100','avg_age']
     outdict = {q: {f: [] for f in ['q50','q84','q16']} for q in outvar}
     for f in ['objname','sfh_t', 'weights', 'sfh', 'zred']: outdict[f] = [] 
 
@@ -173,7 +174,7 @@ def collate_data(runname, filename=None, regenerate=False, **opts):
     hickle.dump(outdict,open(filename, "w"))
     return outdict
 
-def stack_sfh(data, **opts):
+def stack_sfh(data,nt=None, **opts):
     """stack in VERTICAL and HORIZONTAL slices on the main sequence
     we measure the average sSFR for each galaxy
     then report the median of the average for each bin
@@ -184,7 +185,8 @@ def stack_sfh(data, **opts):
     # first iterate over redshift
     stack = {'hor':{},'vert': {}}
     data['zred'] = np.array(data['zred'])
-    nt = 100 # number of time elements in output stacked SFHs
+    if nt is None:
+        nt = 100 # number of time elements in output stacked SFHs
     nsamps = 3000 # number of samples in posterior files
 
     ssfrmin, ssfrmax = -13, -8 # intermediate interpolation onto regular sSFR grid
@@ -205,7 +207,7 @@ def stack_sfh(data, **opts):
         # calculate SFR(MS) for each galaxy
         # perhaps should calculate at z_gal for accuracy?
         stellar_mass = np.log10(data['stellar_mass']['q50'])[zidx]
-        logsfr = np.log10(data['sfr_30']['q50'])[zidx]
+        logsfr = np.log10(data['sfr_100']['q50'])[zidx]
         logsfr_ms = sfr_ms(np.full(stellar_mass.shape[0],zavg),stellar_mass,**opts)
         on_ms = (stellar_mass > opts['low_mass_cutoff']) & \
                 (stellar_mass < opts['high_mass_cutoff']) & \
@@ -219,7 +221,7 @@ def stack_sfh(data, **opts):
 
         # for each main sequence bin, in mass, stack SFH
         for j in range(opts['nbins_horizontal']):
-
+            print 'horizontal bin {0}'.format(j)
             # what galaxies are in this mass bin?
             # save individual mass and SFR
             in_bin = (stellar_mass[on_ms] >= stack['hor'][zstr]['mass_bins'][j]) & \
@@ -234,11 +236,12 @@ def stack_sfh(data, **opts):
             # we do this with nearest-neighbor interpolation which is precisely correct for step-function SFH
             ngal = in_bin.sum()
             ssfr,weights = np.empty(shape=(nsamps,nt,ngal)), np.empty(shape=(nsamps,ngal))
-            for m, (tm,weight,sfh,t_sfh) in enumerate(zip(np.array(data['massmet_1']['q50'])[zidx][on_ms][in_bin], 
-                                                          np.array(data['weights'])[zidx][on_ms][in_bin],
-                                                          np.array(data['sfh'])[zidx][on_ms][in_bin],
-                                                          np.array(data['sfh_t'])[zidx][on_ms][in_bin])):
-                
+
+            tm_s = np.array(data['massmet_1']['q50'])[zidx][on_ms][in_bin]
+            weight_s = np.array(data['weights'])[zidx][on_ms][in_bin]
+            sfh_s = np.array(data['sfh'])[zidx][on_ms][in_bin]
+            t_sfh_s = np.array(data['sfh_t'])[zidx][on_ms][in_bin]
+            for m, (tm,weight,sfh,t_sfh) in enumerate(zip(tm_s,weight_s,sfh_s,t_sfh_s)):
                 # weight by (t_univ(z=zgal) / t_univ(z=z_min)) to account for variation in t_univ
                 # i.e. all galaxies in a given stack should have the same average sSFR
                 ssfh = sfh / (10**tm) * t_sfh.max()/tbins.max()
@@ -278,7 +281,7 @@ def stack_sfh(data, **opts):
 
         # stack vertical
         for j in range(opts['nbins_vertical']):
-
+            print 'vertical bin {0}'.format(j)
             # define bin edges, then define members of the bin
             # special definition for first bin so we get quiescent galaxies too (?)
             tdict = {key:[] for key in ['median','err','errup','errdown']}

@@ -118,8 +118,8 @@ def load_obs(mock_key=1, **extras):
     # determine S/N
     idx = np.in1d(dat['CATAID'],names.astype(np.int32))
     sn = []
-    for f in gama_fnames: sn += [np.median(dat[f+'_flux'][idx]/dat[f+'_fluxerr'][idx])]
-    sn = np.clip(sn,-np.inf,20)
+    for f in gama_fnames: sn += [np.percentile(dat[f+'_flux'][idx]/dat[f+'_fluxerr'][idx],95)]
+    sn = np.clip(sn,-np.inf,100)
 
     # generate photometry
     sps = load_sps(**extras)
