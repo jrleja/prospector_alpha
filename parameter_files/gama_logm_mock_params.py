@@ -142,7 +142,7 @@ model_params.append({'name': 'logmasses', 'N': 1,
                      'isfree': True,
                      'init': 6,
                      'units': r'M$_\odot$',
-                     'prior': priors.TopHat(mini=5, maxi=12)})
+                     'prior': priors.TopHat(mini=3, maxi=12)})
 
 model_params.append({'name': 'agebins', 'N': 1,
                         'isfree': False,
@@ -553,7 +553,7 @@ def load_model(objname=None, datloc=None, agelims=[], nbins_sfh=7, sigma=0.3,df=
     model_params[n.index('mass')]['N'] = ncomp
     model_params[n.index('logmasses')]['N'] = ncomp
     model_params[n.index('logmasses')]['init'] = np.full(ncomp,6)
-    model_params[n.index('logmasses')]['prior'] = priors.TopHat(mini=np.full(ncomp,5), maxi=np.full(ncomp,12))
+    model_params[n.index('logmasses')]['prior'] = priors.TopHat(mini=np.full(ncomp,3), maxi=np.full(ncomp,12))
 
     # set mass-metallicity prior
     # insert redshift into model dictionary
