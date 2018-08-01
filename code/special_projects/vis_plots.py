@@ -91,7 +91,6 @@ def collate_data(runname, filename=None, regenerate=False, **opts):
             sps = vis_params.load_sps(**vis_params.run_params)
         mod = vis_params.load_model(**vis_params.run_params)
         mod.params.update(res['obs']['true_params'])
-        mod.set_parameters(res['obs']['true_params'])
         mod.params['nebemlineinspec'] = np.atleast_1d(True)
         res['obs']['true_spec'], _, _ = mod.mean_model(mod.theta, res['obs'], sps=sps)
         tobs = {
@@ -336,7 +335,7 @@ def plot_sed(ax,obs,truths,filters,xlim,ylim,truth=True,posterior=True):
     # set labels
     ax.set_ylabel(r'$\nu f_{\nu}$',fontsize=fs)
     ax.set_xlabel(r'$\lambda_{\mathrm{obs}}$ [$\mu$m]',fontsize=fs)
-    ax.set_yscale('log',nonposx='clip')
+    ax.set_yscale('log',nonposy='clip')
     ax.set_xscale('log',nonposx='clip',subsx=(2,5))
     ax.xaxis.set_minor_formatter(FormatStrFormatter('%3.3g'))
     ax.xaxis.set_major_formatter(FormatStrFormatter('%3.3g'))
@@ -378,12 +377,10 @@ def plot_prior(ax,mod,par,max,runname,nsamp=100000,ssfr_prior=None):
 
             # grab zfraction prior, sample
             logmass = 1 # doesn't matter, but needs definition
-            zprior = mod._config_dict['z_fraction']['prior']
+            logsfr_prior = mod._config_dict['logsfr_ratios']['prior']
             agebins = mod.params['agebins']
             mass = np.zeros(shape=(agebins.shape[0],nsamp))
-
-            # convert to mass in bins
-            for n in range(nsamp): mass[:,n] = vis_params.zfrac_to_masses(logmass=logmass, z_fraction=zprior.sample(), agebins=agebins)
+            for n in range(nsamp): mass[:,n] = vis_params.logmass_to_masses(logmass=logmass, logsfr_ratios=logsfr_prior.sample(), agebins=agebins)
 
             # final conversion
             # convert to sSFR or mean age

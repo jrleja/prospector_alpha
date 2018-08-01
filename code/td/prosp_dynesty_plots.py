@@ -398,7 +398,7 @@ def sed_figure(outname = None,
     else:
         phot.set_ylabel(r'$\nu f_{\nu}$ [maggie Hz]',fontsize=fs)
     resid.set_xlabel(r'$\lambda_{\mathrm{obs}}$ [$\mu$m]',fontsize=fs)
-    phot.set_yscale('log',nonposx='clip')
+    phot.set_yscale('log',nonposy='clip')
     phot.set_xscale('log',nonposx='clip')
     resid.set_xscale('log',nonposx='clip',subsx=(2,5))
     resid.xaxis.set_minor_formatter(FormatStrFormatter('%2.4g'))
