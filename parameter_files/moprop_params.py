@@ -100,7 +100,7 @@ def load_obs(objname=None, err_floor=0.05, **extras):
     # remove very blue filters
     zred = 2.1478
     wavemin = np.array([f.wavelength[f.transmission > (f.transmission.max()*0.1)].min() for f in ofilters]) / (1+zred)
-    idx = wavemin < 1000
+    idx = wavemin < 1250
     phot_mask[idx] = 0
 
     ### build output dictionary
@@ -126,12 +126,6 @@ def tie_gas_logz(logzsol=None, **extras):
 
 def to_dust1(dust1_fraction=None, dust1=None, dust2=None, **extras):
     return dust1_fraction*dust2
-
-def massmet_to_logmass(massmet=None,**extras):
-    return massmet[0]
-
-def massmet_to_logzsol(massmet=None,**extras):
-    return massmet[1]
 
 def logmass_to_masses(massmet=None, logsfr_ratios=None, agebins=None, **extras):
     logsfr_ratios = np.clip(logsfr_ratios,-100,100) # numerical issues...
@@ -182,18 +176,16 @@ model_params.append({'name': 'massmet', 'N': 2,
                         'prior': None})
 
 model_params.append({'name': 'logmass', 'N': 1,
-                        'isfree': False,
-                        'depends_on': massmet_to_logmass,
+                        'isfree': True,
                         'init': 10.0,
                         'units': 'Msun',
-                        'prior': None})
+                        'prior': priors.TopHat(mini=7, maxi=13)})
 
 model_params.append({'name': 'logzsol', 'N': 1,
-                        'isfree': False,
+                        'isfree': True,
                         'init': -0.5,
-                        'depends_on': massmet_to_logzsol,
                         'units': r'$\log (Z/Z_\odot)$',
-                        'prior': None})
+                        'prior': priors.TopHat(mini=-2, maxi=0.19)})
                         
 ###### SFH   ########
 model_params.append({'name': 'sfh', 'N':1,
@@ -382,96 +374,12 @@ model_params.append({'name': 'mass_units', 'N': 1,
 #### resort list of parameters 
 # because we can
 parnames = [m['name'] for m in model_params]
-fit_order = ['massmet','logsfr_ratios', 'dust2', 'dust_index', 'dust1_fraction', 'gas_logz']
+fit_order = ['logmass','logsfr_ratios', 'logzsol','dust2', 'dust_index', 'dust1_fraction', 'gas_logz']
 tparams = [model_params[parnames.index(i)] for i in fit_order]
 for param in model_params: 
     if param['name'] not in fit_order:
         tparams.append(param)
 model_params = tparams
-
-##### Mass-metallicity prior ######
-class MassMet(priors.Prior):
-    """A Gaussian prior designed to approximate the Gallazzi et al. 2005 
-    stellar mass--stellar metallicity relationship.
-    Must be updated to have relevant functions of `distribution` in `priors.py`
-    in order to be run with a nested sampler.
-    """
-
-    prior_params = ['mass_mini', 'mass_maxi', 'z_mini', 'z_maxi']
-    distribution = truncnorm
-    massmet = np.loadtxt(os.getenv('APPS')+'/prospector_alpha/data/gallazzi_05_massmet.txt')
-
-    def scale(self,mass):
-        upper_84 = np.interp(mass, self.massmet[:,0], self.massmet[:,3]) 
-        lower_16 = np.interp(mass, self.massmet[:,0], self.massmet[:,2])
-        return (upper_84-lower_16)
-
-    def loc(self,mass):
-        return np.interp(mass, self.massmet[:,0], self.massmet[:,1])
-
-    def get_args(self,mass):
-        a = (self.params['z_mini'] - self.loc(mass)) / self.scale(mass)
-        b = (self.params['z_maxi'] - self.loc(mass)) / self.scale(mass)
-        return [a, b]
-
-    @property
-    def range(self):
-        return ((self.params['mass_mini'], self.params['mass_maxi']),\
-                (self.params['z_mini'], self.params['z_maxi']))
-
-    def bounds(self, **kwargs):
-        if len(kwargs) > 0:
-            self.update(**kwargs)
-        return self.range
-
-    def __call__(self, x, **kwargs):
-        """Compute the value of the probability density function at x and
-        return the ln of that.
-        :params x:
-            x[0] = mass, x[1] = metallicity. Used to calculate the prior
-        :param kwargs: optional
-            All extra keyword arguments are used to update the `prior_params`.
-        :returns lnp:
-            The natural log of the prior probability at x, scalar or ndarray of
-            same length as the prior object.
-        """
-        if len(kwargs) > 0:
-            self.update(**kwargs)
-        p = np.atleast_2d(np.zeros_like(x))
-        a, b = self.get_args(x[...,0])
-        p[...,1] = self.distribution.pdf(x[...,1], a, b, loc=self.loc(x[...,0]), scale=self.scale(x[...,0]))
-        with np.errstate(invalid='ignore'):
-            p[...,1] = np.log(p[...,1])
-        return p
-
-    def sample(self, nsample=None, **kwargs):
-        """Draw a sample from the prior distribution.
-        :param nsample: (optional)
-            Unused
-        """
-        if len(kwargs) > 0:
-            self.update(**kwargs)
-        mass = np.random.uniform(low=self.params['mass_mini'],high=self.params['mass_maxi'])
-        a, b = self.get_args(mass)
-        met = self.distribution.rvs(a, b, loc=self.loc(mass), scale=self.scale(mass))
-        return np.array([mass, met])
-
-    def unit_transform(self, x, **kwargs):
-        """Go from a value of the CDF (between 0 and 1) to the corresponding
-        parameter value.
-        :param x:
-            A scalar or vector of same length as the Prior with values between
-            zero and one corresponding to the value of the CDF.
-        :returns theta:
-            The parameter value corresponding to the value of the CDF given by
-            `x`.
-        """
-        if len(kwargs) > 0:
-            self.update(**kwargs)
-        mass = x[0]*(self.params['mass_maxi'] - self.params['mass_mini']) + self.params['mass_mini']
-        a, b = self.get_args(mass)
-        met = self.distribution.ppf(x[1], a, b, loc=self.loc(mass), scale=self.scale(mass))
-        return np.array([mass,met])
 
 ###### Redefine SPS ######
 class NebSFH(FastStepBasis):
@@ -616,10 +524,7 @@ def load_model(objname=None, datdir=None, runname=None, agelims=[], zred=2.1478,
     model_params[n.index('logsfr_ratios')]['prior'] = priors.StudentT(mean=np.full(nbins_sfh-1,0.0),
                                                                       scale=np.full(nbins_sfh-1,sigma),
                                                                       df=np.full(nbins_sfh-1,df))
-
-    # set mass-metallicity prior
     # insert redshift into model dictionary
-    model_params[n.index('massmet')]['prior'] = MassMet(z_mini=-1.98, z_maxi=0.19, mass_mini=7, mass_maxi=12.5)
     model_params[n.index('zred')]['init'] = zred
 
     return sedmodel.SedModel(model_params)
