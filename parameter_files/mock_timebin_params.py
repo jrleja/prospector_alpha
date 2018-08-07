@@ -445,14 +445,13 @@ def load_model(nbins_sfh=7,sigma=0.3,df=2.,agelims=None,objname=None, **extras):
     # current scheme: six bins, four spaced equally in logarithmic 
     # last bin is 15% age of the Universe, first two are 0-30, 30-100
     tbinmax = (tuniv*0.85)*1e9
-    agelims = agelims[:2] + np.linspace(agelims[2],np.log10(tbinmax),len(agelims)-3).tolist() + [np.log10(tuniv*1e9)]
+    agelims = agelims[:2] + np.linspace(agelims[2],np.log10(tbinmax),nbins_sfh-2).tolist() + [np.log10(tuniv*1e9)]
     agebins = np.array([agelims[:-1], agelims[1:]])
-    ncomp = len(agelims) - 1
 
     # load nvariables and agebins
-    model_params[n.index('agebins')]['N'] = ncomp
+    model_params[n.index('agebins')]['N'] = nbins_sfh
     model_params[n.index('agebins')]['init'] = agebins.T
-    model_params[n.index('mass')]['N'] = ncomp
+    model_params[n.index('mass')]['N'] = nbins_sfh
     model_params[n.index('logsfr_ratios')]['N'] = nbins_sfh-1
     model_params[n.index('logsfr_ratios')]['init'] = np.full(nbins_sfh-1,0.0) # constant SFH
     model_params[n.index('logsfr_ratios')]['prior'] = priors.StudentT(mean=np.full(nbins_sfh-1,0.0),
