@@ -177,8 +177,8 @@ model_params.append({'name': 'logmass', 'N': 1,
                         'prior': priors.TopHat(mini=7, maxi=13)})
 
 model_params.append({'name': 'logzsol', 'N': 1,
-                        'isfree': True,
-                        'init': -0.5,
+                        'isfree': False,
+                        'init':0.16,
                         'units': r'$\log (Z/Z_\odot)$',
                         'prior': priors.TopHat(mini=-2, maxi=0.19)})
                         
@@ -369,7 +369,7 @@ model_params.append({'name': 'mass_units', 'N': 1,
 #### resort list of parameters 
 # because we can
 parnames = [m['name'] for m in model_params]
-fit_order = ['logmass','logsfr_ratios', 'logzsol','dust2', 'dust_index', 'dust1_fraction', 'gas_logz']
+fit_order = ['logmass','logsfr_ratios', 'dust2', 'dust_index', 'dust1_fraction', 'gas_logz']
 tparams = [model_params[parnames.index(i)] for i in fit_order]
 for param in model_params: 
     if param['name'] not in fit_order:
