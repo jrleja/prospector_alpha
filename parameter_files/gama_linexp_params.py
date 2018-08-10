@@ -20,7 +20,7 @@ jansky_mks = 1e-26
 APPS = os.getenv('APPS')
 run_params = {'verbose':True,
               'debug': False,
-              'outfile': APPS+'/prospector_alpha/results/gama_logm/6826',
+              'outfile': APPS+'/prospector_alpha/results/gama_linexp/6826',
               'nofork': True,
               # dynesty params
               'nested_bound': 'multi', # bounding method

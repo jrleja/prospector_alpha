@@ -13,8 +13,9 @@ plt.ioff() # don't pop up a window for each plot
 # plotting variables
 fs, tick_fs = 28, 22
 obs_color = '#545454'
+truth_color = 'blue'
 
-def subcorner(res, eout, parnames, outname=None, maxprob=False, boost=None):
+def subcorner(res, eout, parnames, outname=None, maxprob=False, truth_dict=None, truths=None):
     """ wrapper around dyplot.cornerplot()
     adds in a star formation history and marginalized parameters
     for some key outputs (stellar mass, SFR, sSFR, half-mass time)
@@ -24,28 +25,21 @@ def subcorner(res, eout, parnames, outname=None, maxprob=False, boost=None):
     title_kwargs = {'fontsize':fs*.7}
     label_kwargs = {'fontsize':fs*.7}
 
-    if maxprob:
+    if truth_dict is not None:
+        truths = []
+        for par in parnames:
+            if par in truth_dict.keys():
+                truths += [truth_dict[par]]
+            else:
+                truths += [np.nan]
+
+    if (maxprob) & (truths is None):
         truths = res['samples'][eout['sample_idx'][0],:]
-    else:
-        truths = None 
-
-    # change stellar mass, SFR, total mass, SFH by some boosting factor
-    if boost is not None:
-        # total mass
-        for q in ['q50','q84','q16']: eout['thetas']['massmet_1'][q] = np.log10(10**eout['thetas']['massmet_1'][q]*boost)
-        res['samples'][:,0] = np.log10(10**res['samples'][:,0] * boost)
-
-        # stellar mass, SFR
-        for q in ['q50','q84','q16','chain']:
-            eout['extras']['sfr_100'][q] *= boost 
-            eout['extras']['stellar_mass'][q] *= boost 
-        eout['sfh']['sfh'] *= boost # SFH
-
 
     # create dynesty plot
     # maximum probability solution in red
     fig, axes = dyplot.cornerplot(res, show_titles=True, labels=parnames, truths=truths,
-                                  truth_color='purple',
+                                  truth_color=truth_color,
                                   label_kwargs=label_kwargs, title_kwargs=title_kwargs)
     for ax in axes.ravel():
         ax.xaxis.set_tick_params(labelsize=tick_fs*.7)
@@ -83,7 +77,7 @@ def subcorner(res, eout, parnames, outname=None, maxprob=False, boost=None):
         add_sfh_plot([eout], fig2,
                      main_color = ['black'],
                      ax_inset=sfh_ax,
-                     text_size=1.5,lw=2)
+                     text_size=1.5,lw=2,truth_dict=truth_dict)
         fig2.savefig('{0}.corner.extra.png'.format(outname))
         plt.close(fig2)
 
@@ -91,7 +85,7 @@ def subcorner(res, eout, parnames, outname=None, maxprob=False, boost=None):
 
         # add SFH plot
         sfh_ax = fig.add_axes([0.75,0.435,0.22,0.22],zorder=32)
-        add_sfh_plot([eout], fig, main_color = ['black'], ax_inset=sfh_ax, text_size=2,lw=4)
+        add_sfh_plot([eout], fig, main_color = ['black'], ax_inset=sfh_ax, text_size=2,lw=4,truth_dict=truth_dict)
 
         # create extra parameters
         axis_size = fig.get_axes()[0].get_position().size
@@ -155,8 +149,27 @@ def subcorner(res, eout, parnames, outname=None, maxprob=False, boost=None):
             ax.set_title(title, va='bottom',**title_kwargs)
             ax.set_xlabel(ptitle[jj],**label_kwargs)
 
+            # look for truth
+            min, max = pchain.min(), pchain.max()
+            if truth_dict is not None:
+                if ename in truth_dict.keys():
+                    if ename not in not_log:
+                        tplt = np.log10(truth_dict[ename])
+                    else:
+                        tplt = truth_dict[ename]
+                    ax.axvline(tplt, ls=":", color=truth_color,lw=1.5)
+
+                    min = np.min([min,tplt.min()])
+                    max = np.max([max,tplt.max()])
+
+            if ename in not_log:
+                min, max = min*0.99, max*1.01
+            else:
+                min = min - 0.02
+                max = max + 0.02
+
             # set range
-            ax.set_xlim(pchain.min(),pchain.max())
+            ax.set_xlim(min,max)
             ax.set_ylim(0, 1.1 * np.max(n))
             ax.set_yticklabels([])
             ax.xaxis.set_major_locator(MaxNLocator(5))
@@ -194,7 +207,7 @@ def transform_chain(flatchain, model):
 
 def add_sfh_plot(eout,fig,ax_loc=None,
                  main_color=None,tmin=0.01,
-                 text_size=1,ax_inset=None,lw=1):
+                 text_size=1,ax_inset=None,lw=1,truth_dict=None):
     """add a small SFH plot at ax_loc
     text_size: multiply font size by this, to accomodate larger/smaller figures
     """
@@ -242,6 +255,9 @@ def add_sfh_plot(eout,fig,ax_loc=None,
             xmax = np.max([xmax,tvec.max()])
             ymin = np.min([ymin,perc[perc>0].min()])
             ymax = np.max([ymax,perc.max()])
+
+    if truth_dict is not None:
+        ax_inset.plot(truth_dict['t'],truth_dict['sfh'],':',color=truth_color,lw=lw)
 
     #### labels, format, scales !
     xmin = np.min(tvec[tvec>0.01])

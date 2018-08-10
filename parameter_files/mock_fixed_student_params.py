@@ -44,7 +44,7 @@ run_params = {'verbose':True,
 ############
 # OBS
 #############
-def load_obs(objname=None, errors=None, altered_RGB=False, **extras):
+def load_obs(objname=None, errors=None, altered_RGB=True, **extras):
 
     # key will be 1-N where N is the number of runs
     # needs to set "mock_key" to 1,2,3
@@ -70,6 +70,12 @@ def load_obs(objname=None, errors=None, altered_RGB=False, **extras):
                             1.56087687e+07, 2.41272107e+07, 3.66612773e+07, 5.23255588e+07,
                             6.84816549e+07, 5.72895450e+07, 3.04722061e+07, 2.07141642e+07,
                             1.76533741e+07, 1.85510742e+07])
+
+    if (mock_key == 2) & (altered_RGB):
+        maggies = np.array([9.09651128e+06, 1.03969940e+07, 1.78874444e+07, 4.36221086e+07,
+                            6.33107022e+07, 7.65723415e+07, 1.02255678e+08, 1.30061774e+08,
+                            1.57459171e+08, 1.31011857e+08, 7.66392018e+07, 5.47333489e+07,
+                            7.36370641e+07, 1.38072249e+08])
 
 
     obs['maggies_unc'] = obs['maggies'] / snr_grid[snr_key]
