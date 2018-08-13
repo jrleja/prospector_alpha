@@ -294,7 +294,8 @@ def find_sfh_params(model,theta,obs,sps,sm=None):
     else:
         # Need this because mass is 
         # current mass, not total mass formed!
-        out['mformed'] = out['mass'] / sm
+        out['mformed'] = out['mass']
+        out['mass'] *= sm
 
     return out
 
