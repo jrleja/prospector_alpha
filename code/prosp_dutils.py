@@ -655,7 +655,7 @@ def generate_basenames(runname,ancilname=None):
         ancilname=None
 
         for jj in xrange(ngals):
-            filebase.append(os.getenv('APPS')+'/prospector_alpha/results/'+runname+'/'+ids[jj])
+            filebase.append(os.getenv('APPS')+'/prospector_alpha/results/'+runname+'/'+ids[jj].split('_')[0]+'/'+ids[jj])
             parm.append(os.getenv('APPS')+"/prospector_alpha/parameter_files/"+parm_basename+'.py') 
 
     elif 'td' in runname:

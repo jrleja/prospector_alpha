@@ -133,7 +133,7 @@ def collate_data(runname, filename=None, regenerate=False, **opts):
     outdict = {q: {f: [] for f in ['q50','q84','q16']} for q in outvar}
     for f in ['objname','sfh_t', 'weights', 'sfh', 'zred']: outdict[f] = [] 
 
-    basenames = find_all_prospector_results(runname)
+    basenames,_,_ = prosp_dutils.generate_basenames(runname)
     for i, name in enumerate(basenames):
 
         # load output from fit
