@@ -234,7 +234,7 @@ def plot(data, outfolder, use_rachel_smass=True, **popts):
     print 'number of galaxies: {0}'.format(idx.sum())
 
     simulate_offsets(data['prosp_smass']['q50'][idx], data[fidx][idx], data[didx]['q50'][idx])
-    print 1/0
+
 def simulate_offsets(prosp_mass, fast_mass, dyn_mass):
 
     nsim = 100000

@@ -91,9 +91,9 @@ def do_all(runname='td_delta', outfolder=None, regenerate=False, regenerate_stac
               'high_mass_cutoff': 11.5,
               'ylim_horizontal_sfr': (-0.8,3),
               'ylim_horizontal_ssfr': (1e-11,1.5e-9),
-              'ylim_vertical_sfr': (-0.8,3),
-              'ylim_vertical_ssfr': (2.5e-13,4e-9),
-              'xlim_t': (2e7,9e9),
+              'ylim_vertical_sfr': (-2,2.9),
+              'ylim_vertical_ssfr': (1e-13,4e-9),
+              'xlim_t': (0.05,9),
               'show_disp':[0.16,0.84],         # percentile of population distribution to show on plot
               'adjust_sfr': -0.3,             # adjust whitaker SFRs by how much?
               'zbins': [(0.5,1.),(1.,1.5),(1.5,2.),(2.,2.5)]
@@ -153,17 +153,8 @@ def collate_data(runname, filename=None, regenerate=False, **opts):
         outdict['sfh'] += [eout['sfh']['sfh']]
         outdict['weights'] += [eout['weights']]
 
-        # DEAR FUTURE JOEL:
-        # WE SHOULD GET REDSHIFT FROM POSTPROCESSING NOW
-        # for now, regenerate model
-        # first make filenames local...
-        for key in res['run_params']:
-            if type(res['run_params'][key]) == unicode:
-                if 'prospector_alpha' in res['run_params'][key]:
-                    res['run_params'][key] = os.getenv('APPS')+'/prospector_alpha'+res['run_params'][key].split('prospector_alpha')[-1]
-        model = pfile.load_model(**res['run_params'])
-        outdict['zred'] += [float(model.params['zred'])]
         # extra variables
+        outdict['zred'] += [eout['zred']]
         for v in outvar:
             if v in eout['thetas'].keys():
                 for f in ['q50','q84','q16']: outdict[v][f] += [eout['thetas'][v][f]]
@@ -185,12 +176,11 @@ def stack_sfh(data,nt=None, **opts):
     # first iterate over redshift
     stack = {'hor':{},'vert': {}}
     data['zred'] = np.array(data['zred'])
-    if nt is None:
-        nt = 100 # number of time elements in output stacked SFHs
     nsamps = 3000 # number of samples in posterior files
 
     ssfrmin, ssfrmax = -13, -8 # intermediate interpolation onto regular sSFR grid
     ssfr_arr = 10**np.linspace(ssfrmin,ssfrmax,1001)
+
     for (z1, z2) in opts['zbins']:
 
         # generate zavg, add containers
@@ -198,20 +188,25 @@ def stack_sfh(data,nt=None, **opts):
         zstr = "{:.2f}".format(zavg)
 
         # setup time bins
-        tbins = 10**np.linspace(-2,np.log10(WMAP9.age(z1).value),nt)
+        # here we fuse the two youngest bins into one for presentation purposes
+        mod = pfile.load_model(zred=zavg,**pfile.run_params)
+        agebins = mod.params['agebins'][1:,:]
+        agebins[0,0] = 7
+        tbins = 10**np.mean(agebins,axis=1)/1e9
+        nt = len(tbins)
         stack['hor'][zstr], stack['vert'][zstr] = {'t':tbins}, {'t':tbins}
 
         # define galaxies in redshift bin
-        zidx = (data['zred'] > z1) & (data['zred'] <= z2)
+        zidx = np.where((data['zred'] > z1) & (data['zred'] <= z2))[0]
 
         # calculate SFR(MS) for each galaxy
         # perhaps should calculate at z_gal for accuracy?
         stellar_mass = np.log10(data['stellar_mass']['q50'])[zidx]
         logsfr = np.log10(data['sfr_100']['q50'])[zidx]
         logsfr_ms = sfr_ms(np.full(stellar_mass.shape[0],zavg),stellar_mass,**opts)
-        on_ms = (stellar_mass > opts['low_mass_cutoff']) & \
-                (stellar_mass < opts['high_mass_cutoff']) & \
-                (np.abs(logsfr - logsfr_ms) < opts['sigma_sf'])
+        on_ms = np.where((stellar_mass > opts['low_mass_cutoff']) & \
+                         (stellar_mass < opts['high_mass_cutoff']) & \
+                         (np.abs(logsfr - logsfr_ms) < opts['sigma_sf']))[0]
 
         # save mass ranges and which galaxies are on MS
         stack['hor'][zstr]['mass_range'] = (stellar_mass[on_ms].min(),stellar_mass[on_ms].max())
@@ -224,8 +219,8 @@ def stack_sfh(data,nt=None, **opts):
             print 'horizontal bin {0}'.format(j)
             # what galaxies are in this mass bin?
             # save individual mass and SFR
-            in_bin = (stellar_mass[on_ms] >= stack['hor'][zstr]['mass_bins'][j]) & \
-                     (stellar_mass[on_ms] <= stack['hor'][zstr]['mass_bins'][j+1])
+            in_bin = np.where((stellar_mass[on_ms] >= stack['hor'][zstr]['mass_bins'][j]) & \
+                              (stellar_mass[on_ms] <= stack['hor'][zstr]['mass_bins'][j+1]))[0]
 
             tdict = {key:[] for key in ['median','err','errup','errdown']}
             tdict['logm'],tdict['logsfr'] = stellar_mass[on_ms][in_bin],logsfr[on_ms][in_bin]
@@ -234,19 +229,25 @@ def stack_sfh(data,nt=None, **opts):
             # each draw has its own (SFR,t) vector with an associated weight
             # here we transform into (SFR/M)(t) and interpolate onto regular time grid
             # we do this with nearest-neighbor interpolation which is precisely correct for step-function SFH
-            ngal = in_bin.sum()
+            ngal = in_bin.shape[0]
+            print '{0} galaxies in horizontal bin {1}'.format(ngal,j)
             ssfr,weights = np.empty(shape=(nsamps,nt,ngal)), np.empty(shape=(nsamps,ngal))
 
-            tm_s = np.array(data['massmet_1']['q50'])[zidx][on_ms][in_bin]
-            weight_s = np.array(data['weights'])[zidx][on_ms][in_bin]
-            sfh_s = np.array(data['sfh'])[zidx][on_ms][in_bin]
-            t_sfh_s = np.array(data['sfh_t'])[zidx][on_ms][in_bin]
-            for m, (tm,weight,sfh,t_sfh) in enumerate(zip(tm_s,weight_s,sfh_s,t_sfh_s)):
+            indexes = zidx[on_ms][in_bin]
+            for m, idx in enumerate(indexes):
                 # weight by (t_univ(z=zgal) / t_univ(z=z_min)) to account for variation in t_univ
                 # i.e. all galaxies in a given stack should have the same average sSFR
+                tm = data['massmet_1']['q50'][idx]
+                weight = data['weights'][idx]
+                sfh = data['sfh'][idx]
+                t_sfh = data['sfh_t'][idx]
+
                 ssfh = sfh / (10**tm) * t_sfh.max()/tbins.max()
+                ssfh_100 =  (ssfh[:,0]*0.3 + ssfh[:,2]*0.7) # weighted average to get ssfr_100 chain
                 for i in range(nt):
-                    if tbins[i] > t_sfh.max():
+                    if i == 0:
+                        ssfr[:,i,m] = ssfh_100
+                    elif tbins[i] > t_sfh.max():
                         ssfr[:,i,m] = np.nan
                     else:
                         ssfr[:,i,m] = ssfh[:,np.abs(t_sfh - tbins[i]).argmin(axis=-1)][:,0]
@@ -255,7 +256,6 @@ def stack_sfh(data,nt=None, **opts):
             # now create stacked sSFR
             # this returns weighted sSFR median + quantiles
             for i in range(nt):
-
                 # construct empty sSFR PDF and determine which galaxies contribute
                 in_samp = np.where(np.isfinite(ssfr[0,i,:]))[0]
                 hist = np.zeros(shape=ssfr_arr.shape[0]-1)
@@ -287,32 +287,38 @@ def stack_sfh(data,nt=None, **opts):
             tdict = {key:[] for key in ['median','err','errup','errdown']}
             sigup, sigdown = opts['sigma_sf']*2*(j-1.5), opts['sigma_sf']*2*(j-2.5)
             if j != 0 :
-                in_bin = (stellar_mass > opts['low_mass_cutoff']) & \
+                in_bin = np.where((stellar_mass > opts['low_mass_cutoff']) & \
                          (stellar_mass < opts['high_mass_cutoff']) & \
                          ((logsfr - logsfr_ms) >= sigdown) & \
-                         ((logsfr - logsfr_ms) < sigup)
+                         ((logsfr - logsfr_ms) < sigup))[0]
             else:
-                in_bin = (stellar_mass > opts['low_mass_cutoff']) & \
+                in_bin = np.where((stellar_mass > opts['low_mass_cutoff']) & \
                          (stellar_mass < opts['high_mass_cutoff']) & \
-                         ((logsfr - logsfr_ms) < sigup)
+                         ((logsfr - logsfr_ms) < sigup))[0]
             tdict['logm'],tdict['logsfr'] = stellar_mass[in_bin],logsfr[in_bin]
 
             # calculate (SFR / M) chains on regular time grid
             # each draw has its own (SFR,t) vector with an associated weight
             # here we transform into (SFR/M)(t) and interpolate onto regular time grid
             # we do this with nearest-neighbor interpolation which is precisely correct for step-function SFH
-            ngal = in_bin.sum()
+            ngal = in_bin.shape[0]
+            print '{0} galaxies in vertical bin {1}'.format(ngal,j)
             ssfr,weights = np.empty(shape=(nsamps,nt,ngal)), np.empty(shape=(nsamps,ngal))
-            for m, (tm,weight,sfh,t_sfh) in enumerate(zip(np.array(data['massmet_1']['q50'])[zidx][in_bin], 
-                                                          np.array(data['weights'])[zidx][in_bin],
-                                                          np.array(data['sfh'])[zidx][in_bin],
-                                                          np.array(data['sfh_t'])[zidx][in_bin])):
-                
+            indexes = zidx[in_bin]
+            for m, idx in enumerate(indexes):
                 # weight by (t_univ(z=zgal) / t_univ(z=z_min)) to account for variation in t_univ
                 # i.e. all galaxies in a given stack should have the same average sSFR
+                tm = data['massmet_1']['q50'][idx]
+                weight = data['weights'][idx]
+                sfh = data['sfh'][idx]
+                t_sfh = data['sfh_t'][idx]
+
                 ssfh = sfh / (10**tm) * t_sfh.max()/tbins.max()
+                ssfh_100 =  (ssfh[:,0]*0.3 + ssfh[:,2]*0.7) # weighted average to get ssfr_100 chain
                 for i in range(nt):
-                    if tbins[i] > t_sfh.max():
+                    if i == 0:
+                        ssfr[:,i,m] = ssfh_100
+                    elif tbins[i] > t_sfh.max():
                         ssfr[:,i,m] = np.nan
                     else:
                         ssfr[:,i,m] = ssfh[:,np.abs(t_sfh - tbins[i]).argmin(axis=-1)][:,0]
@@ -321,7 +327,6 @@ def stack_sfh(data,nt=None, **opts):
             # now create stacked sSFR
             # this returns weighted sSFR median + quantiles
             for i in range(nt):
-
                 # construct empty sSFR PDF and determine which galaxies contribute
                 in_samp = np.where(np.isfinite(ssfr[0,i,:]))[0]
                 hist = np.zeros(shape=ssfr_arr.shape[0]-1)
@@ -419,9 +424,9 @@ def plot_stacked_sfh(dat,outfolder,**opts):
                          color=opts['horizontal_bin_colors'][i],
                          **ms_plot_opts)
             
-            ax[1,j].fill_between(dat['hor'][zstr]['t']*1e9, bdict['errdown'], bdict['errup'], 
+            ax[1,j].fill_between(dat['hor'][zstr]['t'], bdict['errdown'], bdict['errup'], 
                                color=opts['horizontal_bin_colors'][i], **fillopts)
-            ax[1,j].plot(dat['hor'][zstr]['t']*1e9, bdict['median'],
+            ax[1,j].plot(dat['hor'][zstr]['t'], bdict['median'],
                        color=opts['horizontal_bin_colors'][i], **lopts)
 
             """
@@ -451,10 +456,12 @@ def plot_stacked_sfh(dat,outfolder,**opts):
 
         ax[1,j].set_xlim(opts['xlim_t'])
         ax[1,j].set_ylim(opts['ylim_horizontal_ssfr'])
-        ax[1,j].set_xlabel(r'time [yr]',fontsize=fontsize)
+        ax[1,j].set_xlabel(r'time [Gyr]',fontsize=fontsize)
 
-        ax[1,j].set_xscale('log',nonposx='clip')
+        ax[1,j].set_xscale('log',subsx=(1,3),nonposx='clip')
         ax[1,j].set_yscale('log',nonposy='clip')
+        ax[1,j].xaxis.set_major_formatter(FormatStrFormatter('%2.5g'))
+        ax[1,j].xaxis.set_minor_formatter(FormatStrFormatter('%2.5g'))
         ax[1,j].tick_params('both', pad=3.5, size=3.5, width=1.0, which='both',labelsize=fontsize)
 
         # plot mass ranges 
@@ -505,9 +512,9 @@ def plot_stacked_sfh(dat,outfolder,**opts):
                        **ms_plot_opts)
 
             
-            ax[1,j].fill_between(dat['vert'][zstr]['t']*1e9, bdict['errdown'], bdict['errup'], 
+            ax[1,j].fill_between(dat['vert'][zstr]['t'], bdict['errdown'], bdict['errup'], 
                                color=opts['vertical_bin_colors'][i], **fillopts)
-            ax[1,j].plot(dat['vert'][zstr]['t']*1e9, bdict['median'],
+            ax[1,j].plot(dat['vert'][zstr]['t'], bdict['median'],
                        color=opts['vertical_bin_colors'][i], **lopts)
 
             """
@@ -537,9 +544,11 @@ def plot_stacked_sfh(dat,outfolder,**opts):
         ax[1,j].set_xlim(opts['xlim_t'])
         ax[1,j].set_ylim(opts['ylim_vertical_ssfr'])
         ax[1,j].tick_params('both', pad=3.5, size=3.5, width=1.0, which='both',labelsize=fontsize)
-        ax[1,j].set_xscale('log',nonposx='clip')
+        ax[1,j].set_xscale('log',subsx=(1,3),nonposx='clip')
         ax[1,j].set_yscale('log',nonposy='clip')
-        ax[1,j].set_xlabel(r'time [yr]',fontsize=fontsize)
+        ax[1,j].xaxis.set_major_formatter(FormatStrFormatter('%2.5g'))
+        ax[1,j].xaxis.set_minor_formatter(FormatStrFormatter('%2.5g'))
+        ax[1,j].set_xlabel(r'time [Gyr]',fontsize=fontsize)
 
         # plot mass ranges
         xr = np.linspace(xlim[0],xlim[1],50)

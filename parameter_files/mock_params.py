@@ -666,7 +666,7 @@ def load_model(alpha_sfh=0.2, **extras):
     n = [p['name'] for p in model_params]
 
     # create SFH bins
-    nbins = 120
+    nbins = 2000
     zred = model_params[n.index('zred')]['init']
     tuniv = WMAP9.age(zred).value
     agelims = np.linspace(6,np.log10(tuniv*1e9),nbins+1)
