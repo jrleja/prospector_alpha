@@ -7,7 +7,7 @@
 ### Requested computing time in minutes
 #SBATCH -t 960
 ### Partition or queue name
-#SBATCH -p conroy-intel,shared,serial_requeue,itc_cluster
+#SBATCH -p conroy,shared,serial_requeue,itc_cluster
 ### memory per cpu, in MB
 #SBATCH --mem-per-cpu=4000
 ### Job name
