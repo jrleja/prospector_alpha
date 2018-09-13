@@ -79,9 +79,8 @@ def zfrac_to_sfrac(z_fraction=None, **extras):
     """
     sfr_fraction = np.zeros(len(z_fraction) + 1)
     sfr_fraction[0] = 1.0 - z_fraction[0]
-    for i in range(1, len(z_fraction)):
-        sfr_fraction[i] = np.prod(z_fraction[:i]) * (1.0 - z_fraction[i])
-    sfr_fraction[-1] = 1 - np.sum(sfr_fraction[:-1])
+    for i in range(1, len(z_fraction)): sfr_fraction[i] = np.prod(z_fraction[:i]) * (1.0 - z_fraction[i])
+    sfr_fraction[-1] = np.clip(1 - np.sum(sfr_fraction[:-1]),0,1)
 
     return sfr_fraction
 
