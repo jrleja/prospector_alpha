@@ -22,7 +22,7 @@ jansky_mks = 1e-26
 APPS = os.getenv('APPS')
 run_params = {'verbose':True,
               'debug': False,
-              'outfile': os.getenv('APPS')+'/prospector_alpha/results/brownseds_highz/brownseds_agn',
+              'outfile': os.getenv('APPS')+'/prospector_alpha/results/brownseds_highz/brownseds_highz',
               'nofork': True,
               # dynesty params
               'nested_bound': 'multi', # bounding method
@@ -267,50 +267,16 @@ def massmet_to_logmass(massmet=None,**extras):
 def massmet_to_logzsol(massmet=None,**extras):
     return massmet[1]
 
-def zfrac_to_sfrac(z_fraction=None, **extras):
-    """This transforms from latent, independent `z` variables to sfr
-    fractions. The transformation is such that sfr fractions are drawn from a
-    Dirichlet prior.  See Betancourt et al. 2010
-    """
-    sfr_fraction = np.zeros(len(z_fraction) + 1)
-    sfr_fraction[0] = 1.0 - z_fraction[0]
-    for i in range(1, len(z_fraction)):
-        sfr_fraction[i] = np.prod(z_fraction[:i]) * (1.0 - z_fraction[i])
-    sfr_fraction[-1] = 1 - np.sum(sfr_fraction[:-1])
+def logmass_to_masses(massmet=None, logsfr_ratios=None, agebins=None, **extras):
+    logsfr_ratios = np.clip(logsfr_ratios,-100,100) # numerical issues...
+    nbins = agebins.shape[0]
+    sratios = 10**logsfr_ratios
+    dt = (10**agebins[:,1]-10**agebins[:,0])
+    coeffs = np.array([ (1./np.prod(sratios[:i])) * (np.prod(dt[1:i+1]) / np.prod(dt[:i])) for i in range(nbins)])
+    m1 = (10**massmet[0]) / coeffs.sum()
 
-    return sfr_fraction
+    return m1 * coeffs
 
-def zfrac_to_masses(logmass=None, z_fraction=None, agebins=None, **extras):
-    """This transforms from latent, independent `z` variables to sfr fractions
-    and then to bin mass fractions. The transformation is such that sfr
-    fractions are drawn from a Dirichlet prior.  See Betancourt et al. 2010
-    :returns masses:
-        The stellar mass formed in each age bin.
-    """
-    # sfr fractions (e.g. Leja 2017)
-    sfr_fraction = zfrac_to_sfrac(z_fraction)
-    # convert to mass fractions
-    time_per_bin = np.diff(10**agebins, axis=-1)[:,0]
-    sfr_fraction *= np.array(time_per_bin)
-    sfr_fraction /= sfr_fraction.sum()
-    masses = 10**logmass * sfr_fraction
-
-    return masses
-
-def masses_to_zfrac(mass=None, agebins=None, **extras):
-    """The inverse of zfrac_to_masses, for setting mock parameters based on
-    real bin masses.
-    """
-    total_mass = mass.sum()
-    time_per_bin = np.diff(10**agebins, axis=-1)[:,0]
-    sfr_fraction = mass / time_per_bin
-    sfr_fraction /= sfr_fraction.sum()
-    z_fraction = np.zeros(len(sfr_fraction) - 1)
-    z_fraction[0] = 1 - sfr_fraction[0]
-    for i in range(1, len(z_fraction)):
-        z_fraction[i] = 1.0 - sfr_fraction[i] / np.prod(z_fraction[:i])
-
-    return total_mass, z_fraction
 
 #############
 # MODEL_PARAMS
@@ -379,7 +345,7 @@ model_params.append({'name': 'sfh', 'N':1,
 
 model_params.append({'name': 'mass', 'N': 1,
                      'isfree': False,
-                     'depends_on': zfrac_to_masses,
+                     'depends_on': logmass_to_masses,
                      'init': 1.,
                      'units': r'M$_\odot$',})
 
@@ -389,11 +355,11 @@ model_params.append({'name': 'agebins', 'N': 1,
                         'units': 'log(yr)',
                         'prior': None})
 
-model_params.append({'name': 'z_fraction', 'N': 1,
+model_params.append({'name': 'logsfr_ratios', 'N': 7,
                         'isfree': True,
                         'init': [],
                         'units': '',
-                        'prior': priors.Beta(alpha=1.0, beta=1.0,mini=0.0,maxi=1.0)})
+                        'prior': None})
 
 ########    IMF  ##############
 model_params.append({'name': 'imf_type', 'N': 1,
@@ -462,26 +428,20 @@ model_params.append({'name': 'add_dust_emission', 'N': 1,
                         'prior': None})
 
 model_params.append({'name': 'duste_gamma', 'N': 1,
-                        'isfree': False,
+                        'isfree': True,
                         'init': 0.01,
-                        'init_disp': 0.2,
-                        'disp_floor': 0.15,
                         'units': None,
                         'prior': priors.TopHat(mini=0.0, maxi=1.0)})
 
 model_params.append({'name': 'duste_umin', 'N': 1,
-                        'isfree': False,
+                        'isfree': True,
                         'init': 1.0,
-                        'init_disp': 5.0,
-                        'disp_floor': 4.5,
                         'units': None,
                         'prior': priors.TopHat(mini=0.1, maxi=25.0)})
 
 model_params.append({'name': 'duste_qpah', 'N': 1,
-                        'isfree': False,
+                        'isfree': True,
                         'init': 2.0,
-                        'init_disp': 3.0,
-                        'disp_floor': 3.0,
                         'units': 'percent',
                         'prior': priors.TopHat(mini=0.0, maxi=7.0)})
 
@@ -504,14 +464,14 @@ model_params.append({'name': 'nebemlineinspec', 'N': 1,
                         'prior': None})
 
 model_params.append({'name': 'gas_logz', 'N': 1,
-                        'isfree': True,
+                        'isfree': False,
                         'init': 0.0,
                         'units': r'log Z/Z_\odot',
                         'prior': priors.TopHat(mini=-2.0, maxi=0.5)})
 
 model_params.append({'name': 'gas_logu', 'N': 1, # scale with sSFR?
                         'isfree': False,
-                        'init': -1.0,
+                        'init': -2.0,
                         'units': '',
                         'prior': priors.TopHat(mini=-4.0, maxi=-1.0)})
 
@@ -558,7 +518,7 @@ model_params.append({'name': 'mass_units', 'N': 1,
 #### resort list of parameters 
 # because we can
 parnames = [m['name'] for m in model_params]
-fit_order = ['massmet','z_fraction', 'dust2', 'dust_index', 'dust1_fraction', 'fagn', 'agn_tau', 'gas_logz']
+fit_order = ['massmet','logsfr_ratios', 'dust2', 'dust_index', 'dust1_fraction', 'fagn', 'agn_tau', 'duste_qpah', 'duste_umin', 'duste_gamma']
 tparams = [model_params[parnames.index(i)] for i in fit_order]
 for param in model_params: 
     if param['name'] not in fit_order:
@@ -770,41 +730,35 @@ def load_sps(**extras):
     sps = NebSFH(**extras)
     return sps
 
-def load_model(objname='',datname='', agelims=[], alpha_sfh = 0.2, **extras):
+def load_model(objname='',datname='', agelims=[], nbins_sfh=7, sigma=0.3, df=2, **extras):
+
+    # we'll need this to access specific model parameters
+    n = [p['name'] for p in model_params]
 
     # set redshift, tuniv
     hdulist = fits.open(datname)
     idx = hdulist[1].data['Name'] == objname
     zred =  hdulist[1].data['cz'][idx][0] / 3e5
-    tuniv = WMAP9.age(zred).value
+    tuniv = WMAP9.age(zred).value*1e9
     lumdist = hdulist[1].data['Dist'][idx][0]
     hdulist.close()
 
     # now construct the nonparametric SFH
-    agelims[-1] = np.log10(tuniv*1e9)
+    # current scheme:  last bin is 15% age of the Universe, first two are 0-30, 30-100
+    # remaining N-3 bins spaced equally in logarithmic space
+    tbinmax = (tuniv*0.85)
+    agelims = agelims[:2] + np.linspace(agelims[2],np.log10(tbinmax),nbins_sfh-2).tolist() + [np.log10(tuniv)]
     agebins = np.array([agelims[:-1], agelims[1:]])
-    ncomp = len(agelims) - 1
 
-    # load into `agebins` in the model_params dictionary
-    n = [p['name'] for p in model_params]
-    model_params[n.index('agebins')]['N'] = ncomp
+    # load nvariables and agebins
+    model_params[n.index('agebins')]['N'] = nbins_sfh
     model_params[n.index('agebins')]['init'] = agebins.T
-
-    # now we do the computational z-fraction setup
-    # number of zfrac variables = (number of SFH bins - 1)
-    # set initial with a constant SFH
-    # if alpha_SFH is a vector, use this as the alpha array
-    # else assume all alphas are the same
-    model_params[n.index('mass')]['N'] = ncomp
-    model_params[n.index('z_fraction')]['N'] = ncomp-1
-    if type(alpha_sfh) != type(np.array([])):
-        alpha = np.repeat(alpha_sfh,ncomp-1)
-    else:
-        alpha = alpha_sfh
-    tilde_alpha = np.array([alpha[i-1:].sum() for i in xrange(1,ncomp)])
-    model_params[n.index('z_fraction')]['prior'] = priors.Beta(alpha=tilde_alpha, beta=alpha, mini=0.0, maxi=1.0)
-    model_params[n.index('z_fraction')]['init'] = np.array([(i-1)/float(i) for i in range(ncomp,1,-1)])
-    model_params[n.index('z_fraction')]['init_disp'] = 0.02
+    model_params[n.index('mass')]['N'] = nbins_sfh
+    model_params[n.index('logsfr_ratios')]['N'] = nbins_sfh-1
+    model_params[n.index('logsfr_ratios')]['init'] = np.full(nbins_sfh-1,0.0) # constant SFH
+    model_params[n.index('logsfr_ratios')]['prior'] = priors.StudentT(mean=np.full(nbins_sfh-1,0.0),
+                                                                      scale=np.full(nbins_sfh-1,sigma),
+                                                                      df=np.full(nbins_sfh-1,df))
 
     # set mass-metallicity prior
     # insert redshift into model dictionary
