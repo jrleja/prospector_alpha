@@ -72,8 +72,8 @@ def to_dust1(dust1_fraction=None, dust1=None, dust2=None, **extras):
     return dust1_fraction*dust2
 
 def logmass_to_masses(logmass=None, logsfr_ratio30=None, logsfr_ratiomax=None, agebins=None, **extras):
-    logsfr_ratio30 = np.clip(logsfr_ratio30,-100,100)
-    logsfr_ratiomax = np.clip(logsfr_ratiomax,-100,100)
+    logsfr_ratio30 = np.clip(logsfr_ratio30,-10,10)
+    logsfr_ratiomax = np.clip(logsfr_ratiomax,-10,10)
 
     nbins = agebins.shape[0]-2
     s30, smax = 10**logsfr_ratio30, 10**logsfr_ratiomax
@@ -96,8 +96,8 @@ def logsfr_ratios_to_agebins(logsfr_ratios=None, tuniv=None, **extras):
         where Sn = SFR(n) / SFR(n+1) and delta(t1) is width of youngest bin
     """
 
-    # clip to 5 dex for numerical stability
-    logsfr_ratios = np.clip(logsfr_ratios,-5,5)
+    # clip to 10 dex for numerical stability
+    logsfr_ratios = np.clip(logsfr_ratios,-10,10)
 
     # calculate delta(t) for the first bin
     lower_time = 5e7

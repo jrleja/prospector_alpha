@@ -158,7 +158,7 @@ def massmet_to_logzsol(massmet=None,**extras):
     return massmet[1]
 
 def logmass_to_masses(massmet=None, logsfr_ratios=None, agebins=None, **extras):
-    logsfr_ratios = np.clip(logsfr_ratios,-100,100) # numerical issues...
+    logsfr_ratios = np.clip(logsfr_ratios,-10,10) # numerical issues...
     nbins = agebins.shape[0]
     sratios = 10**logsfr_ratios
     dt = (10**agebins[:,1]-10**agebins[:,0])

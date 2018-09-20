@@ -169,7 +169,7 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True, measure_
 
         # isolate young star contribution
         nodep_model.params['mass'] = np.zeros_like(res['model'].params['mass'])
-        nodep_model.params['mass'][0] = res['model'].params['mass'][0]
+        nodep_model.params['mass'][:1] = res['model'].params['mass'][:1]
         out = prosp_dutils.measure_restframe_properties(sps, model = nodep_model, thetas = nagn_thetas, measure_ir = True, measure_luv = True)
         eout['extras']['luv_young']['chain'][jj] = out['luv']
         eout['extras']['lir_young']['chain'][jj] = out['lir']
@@ -241,7 +241,7 @@ def post_processing(param_name, objname=None, runname = None, overwrite=True, ob
         os.makedirs(plot_outfolder)
 
     # I/O
-    res, powell_results, model, eout = load_prospector_data(obj_outfile,hdf5=True,load_extra_output=True)
+    res, powell_results, _, eout = load_prospector_data(obj_outfile,hdf5=True,load_extra_output=True)
     if res is None:
         print 'there are no sampling results! returning.'
         return

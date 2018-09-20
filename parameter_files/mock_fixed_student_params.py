@@ -95,7 +95,7 @@ def to_dust1(dust1_fraction=None, dust1=None, dust2=None, **extras):
     return dust1_fraction*dust2
 
 def logmass_to_masses(logmass=None, logsfr_ratios=None, agebins=None, **extras):
-    logsfr_ratios = np.clip(logsfr_ratios,-100,100) # numerical issues...
+    logsfr_ratios = np.clip(logsfr_ratios,-10,10) # numerical issues...
     nbins = agebins.shape[0]
     sratios = 10**logsfr_ratios
     dt = (10**agebins[:,1]-10**agebins[:,0])
@@ -330,14 +330,6 @@ for param in model_params:
     if param['name'] not in fit_order:
         tparams.append(param)
 model_params = tparams
-
-##### log(SFR_ratio) prior ######
-class SFR_Ratio(priors.Normal):
-    """A lognormal prior on the ratio of SFRs
-    to make (mean,sigma) functions of time, I need to write a function
-    that returns (t,dt) given input SFR_ratios. this should make use of the above transforms.
-    """
-    pass
 
 ###### Redefine SPS ######
 class NebSFH(FastStepBasis):
