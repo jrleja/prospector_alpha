@@ -44,7 +44,7 @@ run_params = {'verbose':True,
 ############
 # OBS
 #############
-def load_obs(objname=None, errors=None, altered_RGB=True, **extras):
+def load_obs(objname=None, errors=None, altered_RGB=False, **extras):
 
     # key will be 1-N where N is the number of runs
     # needs to set "mock_key" to 1,2,3
@@ -56,27 +56,6 @@ def load_obs(objname=None, errors=None, altered_RGB=True, **extras):
 
     import mock_params
     obs = mock_params.load_obs(mock_key=mock_key)
-
-    if (altered_RGB):
-        print 'using photometry with altered RGB settings'
-
-    if (mock_key == 5) & (altered_RGB):
-        obs['maggies'] = np.array([3.67005568e+07, 4.13232823e+07, 6.23436461e+07, 1.30072333e+08,
-                            1.65352822e+08, 1.77965461e+08, 2.24802687e+08, 2.67518772e+08,
-                            3.08847788e+08, 2.57215128e+08, 1.61208776e+08, 1.20733170e+08,
-                            2.08514386e+08, 4.56765435e+08])
-    if (mock_key == 9) & (altered_RGB):
-        obs['maggies'] = np.array([6.92928161e+03, 2.66844689e+04, 1.08343208e+06, 6.78748607e+06,
-                            1.56087687e+07, 2.41272107e+07, 3.66612773e+07, 5.23255588e+07,
-                            6.84816549e+07, 5.72895450e+07, 3.04722061e+07, 2.07141642e+07,
-                            1.76533741e+07, 1.85510742e+07])
-
-    if (mock_key == 2) & (altered_RGB):
-        obs['maggies'] = np.array([9.09651128e+06, 1.03969940e+07, 1.78874444e+07, 4.36221086e+07,
-                            6.33107022e+07, 7.65723415e+07, 1.02255678e+08, 1.30061774e+08,
-                            1.57459171e+08, 1.31011857e+08, 7.66392018e+07, 5.47333489e+07,
-                            7.36370641e+07, 1.38072249e+08])
-
 
     obs['maggies_unc'] = obs['maggies'] / snr_grid[snr_key]
 
