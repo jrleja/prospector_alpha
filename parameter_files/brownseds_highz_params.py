@@ -8,14 +8,6 @@ from scipy.stats import truncnorm
 from astropy.io import ascii
 from astropy.io import fits
 
-
-lsun = 3.846e33
-pc = 3.085677581467192e18  # in cm
-
-lightspeed = 2.998e18  # AA/s
-to_cgs = lsun/(4.0 * np.pi * (pc*10)**2)
-jansky_mks = 1e-26
-
 #############
 # RUN_PARAMS
 #############
@@ -268,7 +260,7 @@ def massmet_to_logzsol(massmet=None,**extras):
     return massmet[1]
 
 def logmass_to_masses(massmet=None, logsfr_ratios=None, agebins=None, **extras):
-    logsfr_ratios = np.clip(logsfr_ratios,-100,100) # numerical issues...
+    logsfr_ratios = np.clip(logsfr_ratios,-10,10) # numerical issues...
     nbins = agebins.shape[0]
     sratios = 10**logsfr_ratios
     dt = (10**agebins[:,1]-10**agebins[:,0])
@@ -652,6 +644,13 @@ class NebSFH(FastStepBasis):
         add emission lines directly to photometry
         """
 
+        lsun = 3.846e33
+        pc = 3.085677581467192e18  # in cm
+
+        lightspeed = 2.998e18  # AA/s
+        to_cgs = lsun/(4.0 * np.pi * (pc*10)**2)
+        jansky_mks = 1e-26
+
         # Spectrum in Lsun/Hz per solar mass formed, restframe
         wave, spectrum, mfrac = self.get_galaxy_spectrum(**params)
 
@@ -671,7 +670,7 @@ class NebSFH(FastStepBasis):
         wa, sa = wave * (a + b), spectrum * af  # Observed Frame
         if outwave is None:
             outwave = wa
-        
+
         spec_aa = lightspeed/wa**2 * sa # convert to perAA
         # Observed frame photometry, as absolute maggies
         if filters is not None:
