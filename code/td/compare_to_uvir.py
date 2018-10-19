@@ -145,7 +145,7 @@ def collate_data(runname, filename=None, regenerate=False, nobj=None, **opts):
     hickle.dump(out,open(filename, "w"))
     return out
 
-def do_all(runname='td_huge', outfolder=None,**opts):
+def do_all(runname='td_delta', outfolder=None,**opts):
 
     if outfolder is None:
         outfolder = os.getenv('APPS') + '/prospector_alpha/plots/'+runname+'/fast_plots/'

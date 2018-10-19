@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import os, hickle, td_io, prosp_dutils, copy
 from prospector_io import load_prospector_data, find_all_prospector_results
 from astropy.cosmology import WMAP9
-import brownseds_highz as pfile
+import brownseds_highz_params as pfile
 from matplotlib.ticker import MaxNLocator, FormatStrFormatter
 from dynesty.plotting import _quantile as weighted_quantile
 from collections import OrderedDict

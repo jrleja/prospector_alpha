@@ -89,7 +89,7 @@ def calc_uvj_flag(uvj, return_dflag = True):
 
     return uvj_flag
 
-def collate_data(runname, runname_fast, runname_sample=None, filename=None, filename_grid=None, regenerate=False, nobj=None, **kwargs):
+def collate_data(runname, runname_fast, runname_sample='td_new', filename=None, filename_grid=None, regenerate=False, nobj=None, **kwargs):
     """
     regenerate, boolean: 
         if true, always load individual files to re-create data
@@ -130,7 +130,7 @@ def collate_data(runname, runname_fast, runname_sample=None, filename=None, file
     logpar = ['stellar_mass', 'ssfr_30', 'ssfr_100']
 
     ### define grids
-    ngrid_ssfr, ngrid_fast, ngrid_sfr = 100, 32, 40
+    ngrid_ssfr, ngrid_fast, ngrid_sfr = 100, 25, 30
     delssfr_lim = (-3,1)
     ssfr_lim = (-11,-8)
     delm_lim = (-1.,1.)    # minimum age is 15 Myr = log(-1.82/Gyr), maximum is tuniv(z=0.5) = 8.65

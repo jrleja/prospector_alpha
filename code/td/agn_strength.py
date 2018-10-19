@@ -32,7 +32,7 @@ opts = {
 opts['massbins'] = np.linspace(opts['xlim'][0],opts['xlim'][1],opts['nmassbins']+1)
 opts['zbin_labels'] = ["{0:.1f}".format(z1)+'<z<'+"{0:.1f}".format(z2) for (z1, z2) in opts['zbins']]
 
-def do_all(runname='td_new', outfolder=None, data=None, stack=None, regenerate=False, **args):
+def do_all(runname='td_delta', runname_sample='td_new', outfolder=None, data=None, stack=None, regenerate=False, **args):
 
     if outfolder is None:
         outfolder = os.getenv('APPS') + '/prospector_alpha/plots/'+runname+'/fast_plots/'
@@ -41,7 +41,7 @@ def do_all(runname='td_new', outfolder=None, data=None, stack=None, regenerate=F
             os.makedirs(outfolder+'data/')
 
     if data is None:
-        data = collate_data(runname,filename=outfolder+'data/agn.h5',regenerate=regenerate,**args)
+        data = collate_data(runname,filename=outfolder+'data/agn.h5',regenerate=regenerate,runname_sample=runname_sample,**args)
         return data
     if stack is None:
         stack = stack_agn_bins(data, **opts)

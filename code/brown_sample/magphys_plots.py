@@ -13,6 +13,7 @@ from allpar_plot import allpar_plot
 import stack_sfh
 import stack_irs_spectra
 import time
+import brownseds_highz_params as pfile
 
 c = 3e18   # angstroms per second
 dpi = 150
@@ -331,14 +332,9 @@ def plot_all_residuals(alldata,runname):
         if data:
 
             #### save chi
-            chi_magphys = np.append(chi_magphys,data['residuals']['phot']['chi_magphys'])
             chi_prosp = np.append(chi_prosp,data['residuals']['phot']['chi_prosp'])
 
-            #### save fractional difference
-            frac_magphys = np.append(frac_magphys,np.log10(1./(1-data['residuals']['phot']['frac_prosp'])))
-
             #### save goodness of fit
-            chisq_magphys = np.append(chisq_magphys,data['residuals']['phot']['chisq_magphys'])
             chisq_prosp = np.append(chisq_prosp,data['residuals']['phot']['chisq_prosp'])
             lam_rest = np.append(lam_rest,data['residuals']['phot']['lam_obs']/(1+data['residuals']['phot']['z'])/1e4)
 
@@ -367,7 +363,6 @@ def plot_all_residuals(alldata,runname):
     sfflag = ssfr_100 > ssfr_limit
 
     ##### calculate and plot running median
-    magbins, magmedian = median_by_band(lam_rest,frac_magphys)
     pro_sf_bins, pro_sf_median = median_by_band(lam_rest_sf,frac_prosp_sf)
     pro_qu_bins, pro_qu_median = median_by_band(lam_rest_qu,frac_prosp_qu)
 
@@ -617,12 +612,9 @@ def plot_obs_spec(obs_spec, phot, spec_res, alpha,
     if label != 'Spitzer IRS':
         modspec_smooth = prosp_dutils.smooth_spectrum(modlam,
                                                 modspec,sigsmooth)
-        magspec_smooth = prosp_dutils.smooth_spectrum(maglam/(1+z),
-                                                magspec,sigsmooth)
         obs_flux = obs_spec['flux'][mask]
     else: # observations!
         modspec_smooth = modspec
-        magspec_smooth = magspec
         obs_flux = prosp_dutils.smooth_spectrum(obslam, obs_spec['flux'][mask], 2500)
 
     # interpolate fsps spectra onto observational wavelength grid
@@ -635,17 +627,8 @@ def plot_obs_spec(obs_spec, phot, spec_res, alpha,
     obs_spec_plot = np.log10(obs_flux)
     prosp_spec_plot = np.log10(pro_flux_interp(obslam))
 
-    # interpolate magphys onto fsps grid
-    mag_flux_interp = interp1d(maglam, magspec_smooth,
-                               bounds_error=False, fill_value=0)
-    magphys_resid = np.log10(obs_flux) - np.log10(mag_flux_interp(obslam))
-    nolines = mask_emission_lines(obslam,z)
-    temp_yplot = magphys_resid
-    temp_yplot[~nolines] = np.nan
-
     #### calculate rms
     # mask emission lines
-    magphys_rms = calc_rms(obslam, z, magphys_resid)
     prospector_rms = calc_rms(obslam, z, prospector_resid)
 
     if spec_res is not None:
@@ -674,7 +657,6 @@ def plot_obs_spec(obs_spec, phot, spec_res, alpha,
         spec_res.axhline(0, linestyle=':', color='grey')
         spec_res.set_xlim(min(obslam)*0.85,max(obslam)*1.15)
         if label == 'Optical':
-            spec_res.set_ylim(-np.std(magphys_resid)*5,np.std(magphys_resid)*5)
             spec_res.set_xlim(min(obslam)*0.98,max(obslam)*1.02)
 
         plt_max=np.array([np.nanmax(np.abs(obs_spec_plot)),np.nanmax(np.abs(prosp_spec_plot))]).max()
@@ -696,8 +678,6 @@ def plot_obs_spec(obs_spec, phot, spec_res, alpha,
     # output rest-frame wavelengths + residuals
     out = {
            'obs_restlam': obslam/(1+z),
-           'magphys_resid': magphys_resid,
-           'magphys_rms': magphys_rms,
            'obs_obslam': obslam,
            'prospector_resid': prospector_resid,
            'prospector_rms': prospector_rms
@@ -708,8 +688,6 @@ def plot_obs_spec(obs_spec, phot, spec_res, alpha,
 def update_model_info(alldata, sample_results, extra_output, magphys):
 
     alldata['objname'] = sample_results['run_params']['objname']
-    alldata['magphys'] = magphys['pdfs']
-    alldata['model'] = magphys['model']
     alldata['thetas'] = extra_output['thetas']
     npars = sample_results['chain'].shape[-1]
     
@@ -724,7 +702,7 @@ def update_model_info(alldata, sample_results, extra_output, magphys):
     
     return alldata
 
-def sed_comp_figure(sample_results, extra_output, sps, model, magphys,
+def sed_comp_figure(sample_results, extra_output, sps, magphys,
                     alpha=0.3, samples = [-1],
                     maxprob=0, outname=None, fast=False,
                     truths = None, agb_off = False, runname=None,
@@ -738,6 +716,8 @@ def sed_comp_figure(sample_results, extra_output, sps, model, magphys,
     magphys and prospector.
     """
 
+    z_txt = copy.copy(sample_results['model'].params['zred'])
+    lumdist = copy.copy(sample_results['model'].params['lumdist'])
     sigsmooth = [450.0, 1000.0, 1.0]
     residuals = {}
     alpha = 0.65
@@ -746,20 +726,8 @@ def sed_comp_figure(sample_results, extra_output, sps, model, magphys,
     # generate best-fit model
     spec,mags,sm = sample_results['model'].mean_model(sample_results['chain'][extra_output['sample_idx'][0]], sample_results['obs'], sps=sps)
 
-
     ##### Prospector maximum probability model ######
     wave_eff, obsmags, obsmags_unc, modmags, chi, frac_prosp, modspec, modlam = return_sedplot_vars(spec, mags, sample_results['obs'], sps)
-
-    ##### magphys: spectrum + photometry #####
-    m = magphys['obs']['phot_mask']
-
-    # comes out in maggies, change to maggies*Hz
-    nu_eff = c / wave_eff
-    spec_fac = c / magphys['model']['lam']
-    
-    chi_magphys = (magphys['obs']['flux'][m]-magphys['model']['flux'][m])/magphys['obs']['flux_unc'][m]
-    frac_magphys = (magphys['obs']['flux'][m]-magphys['model']['flux'][m])/magphys['obs']['flux'][m]
-    nz = magphys['model']['spec'] > 0
 
     if outname is not None:
         #### set up plot
@@ -825,7 +793,7 @@ def sed_comp_figure(sample_results, extra_output, sps, model, magphys,
     for ii in xrange(3):
         
         if label[ii] == 'Optical':
-            residuals['emlines'] = measure_emline_lum.measure(sample_results, extra_output, obs_spec,sps,runname=runname)
+            residuals['emlines'] = measure_emline_lum.measure(sample_results, extra_output, obs_spec, sps,runname=runname)
             if residuals.get('emlines',None) is not None:
                 sigsmooth[ii] = residuals['emlines']['sigsmooth']
             else:
@@ -835,14 +803,13 @@ def sed_comp_figure(sample_results, extra_output, sps, model, magphys,
         mask = obs_spec['source'] == source
         if np.sum(mask) > 0:
             residuals[label[ii]] = plot_obs_spec(obs_spec, phot, resplots[nplot], alpha, modlam/1e4, modspec,
-                                                 magphys['model']['lam']/1e4, magphys['model']['spec']*spec_fac,
-                                                 magphys['metadata']['redshift'], sample_results['run_params']['objname'],
+                                                 None, None,
+                                                 extra_output['zred'], sample_results['run_params']['objname'],
                                                  source, color=obs_color, label=label[ii],sigsmooth=sigsmooth[ii])
             nplot += 1
 
     # calculate reduced chi-squared
     chisq=np.sum(chi**2)/(np.sum(sample_results['obs']['phot_mask']))
-    chisq_magphys=np.sum(chi_magphys**2)/np.sum(sample_results['obs']['phot_mask'])
 
     if outname is not None:
 
@@ -858,14 +825,10 @@ def sed_comp_figure(sample_results, extra_output, sps, model, magphys,
         # calibrated to be to the right of ax_loc = [0.38,0.68,0.13,0.13]
         prosp_sfr = extra_output['extras']['sfr_100']['q50']
         prosp_mass = np.log10(extra_output['extras']['stellar_mass']['q50'])
-        mag_mass = np.log10(magphys['model']['parameters'][magphys['model']['parnames'] == 'M*'][0])
-        mag_sfr = magphys['model']['parameters'][magphys['model']['parnames'] == 'SFR'][0]
-        
+
         phot.text(textx, texty-deltay, r'best-fit $\chi^2$/N$_{\mathrm{phot}}$='+"{:.2f}".format(chisq),
                   fontsize=14, ha='left', color=prosp_color,transform = phot.transAxes)
-            
-        z_txt = sample_results['model'].params['zred'][0]
-            
+                        
         # galaxy text
         phot.text(textx, texty-2*deltay, 'z='+"{:.2f}".format(z_txt),
                   fontsize=14, ha='left',transform = phot.transAxes)
@@ -882,10 +845,6 @@ def sed_comp_figure(sample_results, extra_output, sps, model, magphys,
         add_sfh_plot([extra_output],fig,sps,text_size=text_size,ax_inset=ax_inset,main_color=['black'])
 
         ##### add MAGPHYS SFH
-        magmass = magphys['model']['full_parameters'][[magphys['model']['full_parnames'] == 'M*/Msun']]
-        magsfr = np.log10(magphys['sfh']['sfr']*magmass)
-        magtime = np.abs(np.max(magphys['sfh']['age']) - magphys['sfh']['age'])/1e9
-
         ax_inset.set_xlabel('time [Gyr]')
 
 
@@ -939,15 +898,12 @@ def sed_comp_figure(sample_results, extra_output, sps, model, magphys,
         plt.close()
 
     # save chi+fractional difference for photometry
-    out = {'chi_magphys': chi_magphys,
-           'frac_magphys': frac_magphys,
-           'chi_prosp': chi,
+    out = {'chi_prosp': chi,
            'frac_prosp': frac_prosp,
            'chisq_prosp': chisq,
-           'chisq_magphys': chisq_magphys,
            'lam_obs': wave_eff,
-           'z': magphys['metadata']['redshift'],
-           'lumdist': model.params['lumdist'][0]
+           'z': extra_output['zred'],
+           'lumdist': lumdist
            }
     residuals['phot'] = out
     return residuals
@@ -975,18 +931,21 @@ def collate_data(filebase=None,
         return None
 
     if not sps:
-        sps = model_setup.load_sps(**sample_results['run_params'])
+        sps = pfile.load_sps(**sample_results['run_params'])
 
     # load magphys
     objname = sample_results['run_params']['objname']
-    magphys = read_magphys_output(objname=objname)
+    #magphys = read_magphys_output(objname=objname)
 
     # BEGIN PLOT ROUTINE
     print 'MAKING PLOTS FOR ' + objname + ' in ' + outfolder
 
-    # SED plot
-    # don't cache emission lines, since we will want to turn them on / off
-    sample_results['model'].params['add_neb_emission'] = np.array(True)
+    # do we have a model?
+    for key in sample_results['run_params']:
+      if type(sample_results['run_params'][key]) == unicode:
+          if 'prospector_alpha' in sample_results['run_params'][key]:
+              sample_results['run_params'][key] = os.getenv('APPS')+'/prospector_alpha'+sample_results['run_params'][key].split('prospector_alpha')[-1]
+    sample_results['model'] = pfile.load_model(**sample_results['run_params'])
 
     if elines_only:
         print 'analyzing spectrum ONLY'
@@ -996,8 +955,8 @@ def collate_data(filebase=None,
         outname = outfolder+objname.replace(' ','_')+'.sed.png'
     # plot
     t1 = time.time()
-    residuals = sed_comp_figure(sample_results, extra_output, sps, copy.deepcopy(sample_results['model']),
-                                magphys, maxprob=1,runname=runname, outname=outname)
+    residuals = sed_comp_figure(sample_results, extra_output, sps,
+                                None, maxprob=1,runname=runname, outname=outname)
     print('line measurement took {0}s'.format(time.time()-t1))
     print 'SAVING OUTPUTS for ' + sample_results['run_params']['objname']
     print ' '
@@ -1006,7 +965,7 @@ def collate_data(filebase=None,
     alldata = {}
     if residuals is not None:
         alldata['residuals'] = residuals
-        alldata = update_model_info(alldata, sample_results, extra_output, magphys)
+        alldata = update_model_info(alldata, sample_results, extra_output, None)
     else:
         alldata = None
 
@@ -1069,12 +1028,10 @@ def plt_all(runname=None,startup=True,**extras):
 
     plot_all_residuals(alldata,runname)
 
-    print 1/0
 
     #### herschel flag
     hflag = np.array([True if np.sum(dat['residuals']['phot']['lam_obs'] > 5e5) else False for dat in alldata])
     stack_sfh.plot_stacked_sfh(alldata,os.getenv('APPS')+'/prospector_alpha/plots/'+runname+'/pcomp/')
-    print 1/0
     mag_ensemble.plot_emline_comp(alldata,os.getenv('APPS')+'/prospector_alpha/plots/'+runname+'/magphys/emlines_comp/',hflag)
     mag_ensemble.prospector_comparison(alldata,os.getenv('APPS')+'/prospector_alpha/plots/'+runname+'/pcomp/',hflag)
     mag_ensemble.plot_relationships(alldata,os.getenv('APPS')+'/prospector_alpha/plots/'+runname+'/magphys/')
@@ -1256,8 +1213,7 @@ def add_prosp_mag_info(runname='brownseds_np'):
     filebase, parm_basename, ancilname=prosp_dutils.generate_basenames(runname)
     for ii,dat in enumerate(alldata):
         sample_results, powell_results, model, extra_output = prospector_io.load_prospector_data(filebase[ii], hdf5=True)
-        magphys = read_magphys_output(objname=dat['objname'])
-        dat = update_model_info(dat, sample_results, extra_output, magphys)
+        dat = update_model_info(dat, sample_results, extra_output)
         print str(ii)+' done'
 
     prospector_io.save_alldata(alldata,runname=runname)

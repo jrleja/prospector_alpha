@@ -770,8 +770,7 @@ def integral_average(x,y,x0,x1):
         xarr_new[bad]=1e-10
     yarr_new = np.interp(xarr_new,x,y)
 
-    from scipy import integrate
-    I1 = integrate.simps(yarr_new, xarr_new) / (x1 - x0)
+    I1 = simps(yarr_new, xarr_new) / (x1 - x0)
 
     return I1
 
