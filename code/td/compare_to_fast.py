@@ -124,7 +124,7 @@ def collate_data(runname, runname_fast, runname_sample='td_new', filename=None, 
 
     outprosp, outprosp_fast, outfast, outlabels = {},{'bfit':{}},{},{}
     sfr_100_uvir, sfr_100_uv, sfr_100_ir, objname = [], [], [], []
-    phot_chi, phot_percentile, phot_sn, phot_mag, phot_obslam, phot_restlam, phot_fname = [], [], [], [], [], [], []
+    phot_chi, phot_percentile, phot_sn, phot_mag, phot_obslam, phot_restlam, phot_fname, phot_ids = [], [], [], [], [], [], [], []
     outfast['z'] = []
     outfast['uvj'], outfast['uvj_prosp'], outfast['uvj_dust_prosp'], outfast['uv'], outfast['vj'] = [], [], [], [], []
     logpar = ['stellar_mass', 'ssfr_30', 'ssfr_100']
@@ -182,6 +182,7 @@ def collate_data(runname, runname_fast, runname_sample='td_new', filename=None, 
         uvirlist.append(td_io.load_ancil_data(runname_sample,f))
         adatlist.append(td_io.load_ancil_data(runname_sample,f))
 
+    counter = 0
     for i, name in enumerate(basenames):
 
         print 'loading '+name.split('/')[-1]
@@ -199,6 +200,8 @@ def collate_data(runname, runname_fast, runname_sample='td_new', filename=None, 
 
         if (prosp is None) or ((prosp_fast is None) & (runname_fast is not None)):
             continue
+
+        counter += 1
 
         # object name
         objname.append(name.split('/')[-1])
@@ -326,6 +329,7 @@ def collate_data(runname, runname_fast, runname_sample='td_new', filename=None, 
         phot_obslam += (res['obs']['wave_effective'][mask]/1e4).tolist()
         phot_restlam += (res['obs']['wave_effective'][mask]/1e4/(1+outfast['z'][-1])).tolist()
         phot_fname += [str(fname) for fname in np.array(res['obs']['filternames'])[mask]]
+        phot_ids += np.repeat(counter,mask.sum()).tolist()
 
         # grid calculations
         # these are clipped to the edges in the Y-direction (otherwise they're counted as NaNs!)
@@ -388,7 +392,8 @@ def collate_data(runname, runname_fast, runname_sample='td_new', filename=None, 
            'phot_sn': np.array(phot_sn),
            'phot_obslam': np.array(phot_obslam),
            'phot_restlam': np.array(phot_restlam),
-           'phot_fname': np.array(phot_fname)
+           'phot_fname': np.array(phot_fname),
+           'phot_ids': np.array(phot_ids)
           }
 
     ### dump files and return
@@ -817,7 +822,7 @@ def dm_dsfr_grid(data,datag,outfolder,outtable,normalize=True):
 
     dsfropts = {
                'xlim': (-10.8,-8),
-               'ylim': (-2,0.999),
+               'ylim': (-1,0.999),
                'xtitle': 'log(sSFR$_{\mathrm{Prospector}}$/yr$^{-1}$)',
                'ytitle': 'log(SFR$_{\mathrm{Prospector}}$/SFR$_{\mathrm{UV+IR}}$)',
                'ytitle2': r'$\sigma$ [dex]',
