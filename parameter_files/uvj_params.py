@@ -160,13 +160,13 @@ def tie_gas_logz(logzsol=None, **extras):
 def to_dust1(dust1_fraction=None, dust1=None, dust2=None, **extras):
     return dust1_fraction*dust2
 
-def logmass_to_masses(massmet=None, logsfr_ratios=None, agebins=None, **extras):
+def logmass_to_masses(logmass=None, logsfr_ratios=None, agebins=None, **extras):
     logsfr_ratios = np.clip(logsfr_ratios,-10,10) # numerical issues...
     nbins = agebins.shape[0]
     sratios = 10**logsfr_ratios
     dt = (10**agebins[:,1]-10**agebins[:,0])
     coeffs = np.array([ (1./np.prod(sratios[:i])) * (np.prod(dt[1:i+1]) / np.prod(dt[:i])) for i in range(nbins)])
-    m1 = (10**massmet[0]) / coeffs.sum()
+    m1 = (10**logmass[0]) / coeffs.sum()
 
     return m1 * coeffs
 
