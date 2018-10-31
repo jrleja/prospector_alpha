@@ -93,7 +93,7 @@ def do_all(runname='uvj', outfolder=None,**opts):
     with open('/Users/joel/code/python/prospector_alpha/plots/td_delta/fast_plots/data/fastcomp.h5', "r") as f:
         threedhst_data = hickle.load(f)
     threedhst_data['fast']['uvj_dust_prosp'] = threedhst_data['fast']['uvj_dust_prosp'].astype(bool)
-
+    print 1/0
     plot_3d_maps(threedhst_data,pars,plabels_avg,lims,outfolder+'3dhst_maps.png')
     plot_3d_hists(threedhst_data,pars,plabels,lims,outfolder+'3dhst_histograms.png')
 
@@ -546,7 +546,7 @@ def plot_3d_hists(dat,pars,plabels,lims,outname):
                       100*qu_idx.sum()/float(sf_idx.sum()+qu_idx.sum()), 
                       100*qu_dust_idx.sum()/float(qu_idx.sum()),
                       100*sf_dust_idx.sum()/float(sf_idx.sum())
-                    ]).astype(int)
+                     ]).astype(int)
 
     # ssfr contamination
     qu_contam = (dat['prosp']['ssfr_100']['q50'][qu_idx] > ssfr_lim).sum() / float(qu_idx.sum())

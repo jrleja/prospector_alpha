@@ -5,9 +5,9 @@
 ### Requested number of nodes
 #SBATCH -N 1
 ### Requested computing time in minutes
-#SBATCH -t 10080
+#SBATCH -t 5760
 ### Partition or queue name
-#SBATCH -p shared
+#SBATCH -p shared, conroy_requeue, itc_cluster
 ### memory per cpu, in MB
 #SBATCH --mem-per-cpu=4000
 ### Job name
