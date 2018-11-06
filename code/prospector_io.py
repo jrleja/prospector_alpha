@@ -68,7 +68,7 @@ def load_prospector_data(filebase,no_sample_results=False,objname=None,runname=N
     if (objname is not None) & (runname is not None):
         filebase = os.getenv('APPS')+'/prospector_alpha/results/'+runname+'/'+objname
 
-    mcmc_filename, model_filename, extra_name = create_prosp_filename(filebase)
+    mcmc_filename, extra_name = create_prosp_filename(filebase)
     if (mcmc_filename) is None:
         return None, None, None, None
 
@@ -79,15 +79,11 @@ def load_prospector_data(filebase,no_sample_results=False,objname=None,runname=N
     if load_extra_output:
         extra_output = load_prospector_extra(filebase)
 
-    if no_sample_results:
-        model, powell_results = read_results.read_model(model_filename)
-        sample_results = None
-    else:
-        try:
-            sample_results, powell_results, model = read_results.results_from(mcmc_filename, model_file=model_filename,inmod=None)
-        except KeyError:
-            print 'failed to load '+str(mcmc_filename)+' for object '+filebase.split('/')[-1]
-            sample_results, powell_results, model = None, None, None
+    try:
+        sample_results, powell_results, model = read_results.results_from(mcmc_filename,inmod=None)
+    except KeyError:
+        print 'failed to load '+str(mcmc_filename)+' for object '+filebase.split('/')[-1]
+        sample_results, powell_results, model = None, None, None
 
     return sample_results, powell_results, model, extra_output
 
@@ -96,7 +92,7 @@ def load_prospector_extra(filebase,objname=None,runname=None):
     import hickle
 
     #### shortcut: pass None to filebase and objname + runname keywords
-    mcmc_filename, model_filename, extra_name = create_prosp_filename(filebase)
+    mcmc_filename,  extra_name = create_prosp_filename(filebase)
 
     try:
         with open(extra_name, "r") as f:
@@ -114,7 +110,7 @@ def create_prosp_filename(filebase):
     folder = "/".join(filebase.split('/')[:-1])
     filename = filebase.split("/")[-1]
 
-    files = [f for f in os.listdir(folder) if "_".join(f.split('_')[:-2]) == filename]  
+    files = [f for f in os.listdir(folder) if filename in ("_".join(f.split('_')[:-2]))]
     times = [f.split('_')[-2] for f in files]
 
     # if we found no files, skip this object
@@ -123,15 +119,14 @@ def create_prosp_filename(filebase):
         return None,None,None
 
     # generate output
-    mcmc_filename=filebase+'_'+max(times)+"_mcmc.h5"
-    model_filename=filebase+'_'+max(times)+"_model"
+    mcmc_filename = "/".join(filebase.split('/')[:-1])+'/'+files[np.array(times).argmax()]
+    #mcmc_filename=filebase+'_'+max(times)+"_mcmc.h5"
     postname = mcmc_filename[:-7]+'post'
-
     if not os.path.isfile(mcmc_filename):
-        print 'no sampling file for ' + model_filename
+        print 'no sampling file for ' + mcmc_filename
         mcmc_filename = None
 
-    return mcmc_filename, model_filename, postname
+    return mcmc_filename, postname
 
 def load_moustakas_data(objnames = None):
 
