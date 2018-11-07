@@ -170,7 +170,10 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True, measure_
         # isolate young star contribution
         nodep_model.params['mass'] = np.zeros_like(res['model'].params['mass'])
         nodep_model.params['mass'][:1] = res['model'].params['mass'][:1]
-        out = prosp_dutils.measure_restframe_properties(sps, model = nodep_model, thetas = nagn_thetas, measure_ir = True, measure_luv = True)
+        try:
+            out = prosp_dutils.measure_restframe_properties(sps, model = nodep_model, thetas = nagn_thetas, measure_ir = True, measure_luv = True)
+        except AssertionError: # this fails sometimes if SFR(0-100) Myr is near zero
+            out = {'luv': 0.0, 'lir': 0.0}
         eout['extras']['luv_young']['chain'][jj] = out['luv']
         eout['extras']['lir_young']['chain'][jj] = out['lir']
 
@@ -241,7 +244,7 @@ def post_processing(param_name, objname=None, runname = None, overwrite=True, ob
         os.makedirs(plot_outfolder)
 
     # I/O
-    res, powell_results, _, eout = load_prospector_data(obj_outfile,hdf5=True,load_extra_output=True)
+    res, powell_results, _, eout = load_prospector_data(obj_outfile,hdf5=True,load_extra_output=True,postprocessing=True)
     if res is None:
         print 'there are no sampling results! returning.'
         return
@@ -264,7 +267,7 @@ def post_processing(param_name, objname=None, runname = None, overwrite=True, ob
     extra_output = calc_extra_quantities(res,sps,obs,**kwargs)
     
     # create post-processing name, dump info
-    _, extra_filename = create_prosp_filename(obj_outfile)
+    _, extra_filename = create_prosp_filename(obj_outfile,postprocessing=True)
     hickle.dump(extra_output,open(extra_filename, "w"))
 
     # make standard plots

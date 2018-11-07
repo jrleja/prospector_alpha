@@ -56,7 +56,7 @@ def find_all_prospector_results(runname):
 
     return np.unique(basenames)
 
-def load_prospector_data(filebase,no_sample_results=False,objname=None,runname=None,hdf5=True,load_extra_output=True):
+def load_prospector_data(filebase,objname=None,runname=None,hdf5=True,load_extra_output=True,postprocessing=False):
     """loads Prospector results
     filebase: string describing the location + objname. automatically finds 
     no_sample_results: only load the Powell results and the model
@@ -68,7 +68,7 @@ def load_prospector_data(filebase,no_sample_results=False,objname=None,runname=N
     if (objname is not None) & (runname is not None):
         filebase = os.getenv('APPS')+'/prospector_alpha/results/'+runname+'/'+objname
 
-    mcmc_filename, extra_name = create_prosp_filename(filebase)
+    mcmc_filename, extra_name = create_prosp_filename(filebase,postprocessing=postprocessing)
     if (mcmc_filename) is None:
         return None, None, None, None
 
@@ -77,7 +77,7 @@ def load_prospector_data(filebase,no_sample_results=False,objname=None,runname=N
 
     extra_output = None
     if load_extra_output:
-        extra_output = load_prospector_extra(filebase)
+        extra_output = load_prospector_extra(filebase,postprocessing=postprocessing)
 
     try:
         sample_results, powell_results, model = read_results.results_from(mcmc_filename,inmod=None)
@@ -87,12 +87,12 @@ def load_prospector_data(filebase,no_sample_results=False,objname=None,runname=N
 
     return sample_results, powell_results, model, extra_output
 
-def load_prospector_extra(filebase,objname=None,runname=None):
+def load_prospector_extra(filebase,objname=None,runname=None,postprocessing=False):
 
     import hickle
 
     #### shortcut: pass None to filebase and objname + runname keywords
-    mcmc_filename,  extra_name = create_prosp_filename(filebase)
+    mcmc_filename,  extra_name = create_prosp_filename(filebase,postprocessing=postprocessing)
 
     try:
         with open(extra_name, "r") as f:
@@ -103,15 +103,23 @@ def load_prospector_extra(filebase,objname=None,runname=None):
 
     return extra_output
 
-def create_prosp_filename(filebase):
+def create_prosp_filename(filebase,postprocessing=False):
 
     # find most recent output file
     # with the objname
     folder = "/".join(filebase.split('/')[:-1])
     filename = filebase.split("/")[-1]
 
-    files = [f for f in os.listdir(folder) if filename in ("_".join(f.split('_')[:-2]))]
+    # if it's for postprocessing, find the latest h5 file
+    if postprocessing:
+        files = [f for f in os.listdir(folder) if ((filename == ("_".join(f.split('_')[:-2]))) & (f[-2:] == 'h5'))]
+    # otherwise, find the latest h5 with postprocessing files
+    else:
+        files = [f for f in os.listdir(folder) if ((filename == ("_".join(f.split('_')[:-2]))) & (f[-4:] == 'post'))]
+
+    # take the oldest
     times = [f.split('_')[-2] for f in files]
+    fbase = files[np.array(times).astype(float).argmax()]
 
     # if we found no files, skip this object
     if len(times) == 0:
@@ -119,8 +127,7 @@ def create_prosp_filename(filebase):
         return None,None,None
 
     # generate output
-    mcmc_filename = "/".join(filebase.split('/')[:-1])+'/'+files[np.array(times).argmax()]
-    #mcmc_filename=filebase+'_'+max(times)+"_mcmc.h5"
+    mcmc_filename = "/".join(filebase.split('/')[:-1])+'/'+"_".join(fbase.split('_')[:-1])+'_mcmc.h5'
     postname = mcmc_filename[:-7]+'post'
     if not os.path.isfile(mcmc_filename):
         print 'no sampling file for ' + mcmc_filename

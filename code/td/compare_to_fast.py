@@ -13,6 +13,9 @@ from astropy.io import ascii
 from astropy.table import Table
 from matplotlib.ticker import MaxNLocator
 from scipy.optimize import curve_fit
+from simulate_sfh_prior import draw_from_prior
+import td_delta_params as pfile
+from scipy.stats import entropy
 
 plt.ioff()
 
@@ -57,6 +60,63 @@ def integrate_exp_tau(t1,t2,tau,tage):
     norm = tau*(1-np.exp(-tage/tau))
 
     return integrand/norm
+
+def load_priors(nbins=50):
+    """ loads priors created in simulate_sfh_prior
+    """
+    zprior = np.linspace(0.5,2.5,21)
+    zstr = ["{0:.1f}".format(z) for z in zprior]
+
+    out = {f: {'bins':[],'pdf':[]} for f in ['mwa','ssfr_100']}
+    out['zprior'] = zprior
+    for z in zstr:
+        prior = draw_from_prior(None,os.getenv('APPS')+'/sfh_prior/data/3dhst_'+z+'.hickle')
+
+        pdf, bins = make_kl_bins(np.log10(prior['mwa']),nbins=nbins)
+        out['mwa']['pdf'] += [pdf]
+        out['mwa']['bins'] += [bins]
+
+        pdf, bins = make_kl_bins(np.log10(prior['ssfr']),nbins=nbins)
+        out['ssfr_100']['pdf'] += [pdf]
+        out['ssfr_100']['bins'] += [bins]
+
+    return out
+
+def kld(chain,weight,prior,nbins=50,nsample=500000):
+    # linked priors are tough to handle
+    # sample & marginalize over others...
+    if type(prior) == dict:
+        pdf_prior, bins = prior['pdf'], prior['bins']
+        pdf, _ = np.histogram(chain,bins=bins,weights=weight)
+        kld_out = entropy(pdf,qk=pdf_prior) 
+    elif chain.ndim == 1:
+        bins = np.linspace(prior.range[0],prior.range[1], nbins+1)
+        pdf_prior = prior.distribution.pdf(bins[1:]-(bins[1]-bins[0])/2.,*prior.args,loc=prior.loc, scale=prior.scale)
+        pdf, _ = np.histogram(chain,bins=bins,weights=weight)
+        kld_out = entropy(pdf,qk=pdf_prior) 
+    else:
+        npar = chain.shape[1]
+        kld_out = np.zeros(npar)
+        samples = prior.sample(loc=prior.loc, scale=prior.scale, nsample=nsample)
+        for i in range(npar):
+            pdf_prior, bins = make_kl_bins(samples[i,:],nbins=nbins)
+            pdf, _ = np.histogram(chain[:,i],bins=bins,weights=weight)
+            kld_out[i] = entropy(pdf,qk=pdf_prior) 
+    return kld_out
+
+def make_kl_bins(chain, nbins=10, weights=None):
+    """Create bins with an ~equal number of data points in each 
+    when there are empty bins, the KL divergence is undefined 
+    this adaptive binning scheme avoids that problem
+    """
+    sorted = np.sort(chain)
+    nskip = np.floor(chain.shape[0]/float(nbins)).astype(int)-1
+    bins = sorted[::nskip]
+    bins[-1] = sorted[-1]  # ensure the maximum bin is the maximum of the chain
+    assert bins.shape[0] == nbins+1
+    pdf, bins = np.histogram(chain, bins=bins,weights=weights)
+
+    return pdf, bins
 
 def calc_uvj_flag(uvj, return_dflag = True):
     """calculate a UVJ flag as Whitaker et al. 2012
@@ -111,6 +171,10 @@ def collate_data(runname, runname_fast, runname_sample='td_new', filename=None, 
             outg = None
         return outdict, outg
 
+    ### load priors for KLD, determine how finely they're sampled
+    nbins = 50
+    priors = load_priors(nbins=nbins)
+
     ### define output containers
     parlabels = [r'log(M$_{\mathrm{stellar}}$/M$_{\odot}$)', 'SFR [M$_{\odot}$/yr]',
                  r'$\tau_{\mathrm{diffuse}}$', r'log(sSFR) [yr$^-1$]',
@@ -128,6 +192,27 @@ def collate_data(runname, runname_fast, runname_sample='td_new', filename=None, 
     outfast['z'] = []
     outfast['uvj'], outfast['uvj_prosp'], outfast['uvj_dust_prosp'], outfast['uv'], outfast['vj'] = [], [], [], [], []
     logpar = ['stellar_mass', 'ssfr_30', 'ssfr_100']
+
+    for i,par in enumerate(pnames+enames):
+        
+        ### look for it in FAST
+        if par in fnames:
+            outfast[par] = []
+
+        ### if it's in FAST, it's in Prospector-FAST
+        if par in outfast.keys():
+            outprosp_fast[par] = {q:[] for q in ['q50','q84','q16']}
+            outprosp_fast['bfit'][par] = []
+
+        ### it's always in Prospector
+        outprosp[par] = {}
+        outprosp[par]['q50'],outprosp[par]['q84'],outprosp[par]['q16'] = [],[],[]
+
+    ### KLD stuff
+    mod = pfile.load_model(**pfile.run_params)
+    outkld = {p: [] for p in mod.theta_labels()}
+    outkld['ssfr_100'] = []
+    outkld['mwa'] = []
 
     ### define grids
     ngrid_ssfr, ngrid_fast, ngrid_sfr = 100, 25, 30
@@ -149,21 +234,6 @@ def collate_data(runname, runname_fast, runname_sample='td_new', filename=None, 
                     'ssfr': np.linspace(ssfr_lim[0],ssfr_lim[1],ngrid_ssfr+1),
                     'delssfr': np.linspace(delssfr_lim[0],delssfr_lim[1],ngrid_ssfr+1)
                    }
-
-    for i,par in enumerate(pnames+enames):
-        
-        ### look for it in FAST
-        if par in fnames:
-            outfast[par] = []
-
-        ### if it's in FAST, it's in Prospector-FAST
-        if par in outfast.keys():
-            outprosp_fast[par] = {q:[] for q in ['q50','q84','q16']}
-            outprosp_fast['bfit'][par] = []
-
-        ### it's always in Prospector
-        outprosp[par] = {}
-        outprosp[par]['q50'],outprosp[par]['q84'],outprosp[par]['q16'] = [],[],[]
 
     # fill output containers
     basenames, _, _ = prosp_dutils.generate_basenames(runname)
@@ -360,6 +430,22 @@ def collate_data(runname, runname_fast, runname_sample='td_new', filename=None, 
         outg['grids']['logm_logsfr'] += [g3]
         outg['grids']['logm_loguvirsfr'] += [g4]
 
+        # KLD
+        pfile.run_params['zred'] = prosp['zred']
+        mod = pfile.load_model(**pfile.run_params)
+        for par in mod.free_params:
+            if par == 'logsfr_ratios':
+                continue
+            idx = mod.theta_index[par]
+            kld_measure = kld(res['chain'][:,idx].squeeze(),res['weights'],mod._config_dict[par]['prior'])
+            if par in outkld.keys():
+                outkld[par] += [kld_measure]
+            else:
+                for i in range(len(kld_measure)): outkld[par+'_'+str(i+1)] += [kld_measure[i]]
+        pidx = np.abs(priors['zprior']-prosp['zred']).argmin()
+        outkld['mwa'] += [kld(np.log10(prosp['extras']['avg_age']['chain']), prosp['weights'], {'pdf':priors['mwa']['pdf'][pidx], 'bins':priors['mwa']['bins'][pidx]})]
+        outkld['ssfr_100'] += [kld(np.log10(prosp['extras']['ssfr_100']['chain']), prosp['weights'], {'pdf':priors['ssfr_100']['pdf'][pidx], 'bins':priors['ssfr_100']['bins'][pidx]})]
+
     ### turn everything into numpy arrays
     for k1 in outprosp.keys():
         for k2 in outprosp[k1].keys():
@@ -368,6 +454,7 @@ def collate_data(runname, runname_fast, runname_sample='td_new', filename=None, 
         for k2 in outprosp_fast[k1].keys():
             outprosp_fast[k1][k2] = np.array(outprosp_fast[k1][k2])
     for key in outfast: outfast[key] = np.array(outfast[key])
+    for key in outkld: outkld[key] = np.array(outkld[key])
 
     # and for outg
     for k1 in outg.keys():
@@ -381,6 +468,7 @@ def collate_data(runname, runname_fast, runname_sample='td_new', filename=None, 
            'fast':outfast,
            'prosp':outprosp,
            'prosp_fast': outprosp_fast,
+           'kld': outkld,
            'labels':np.array(parlabels),
            'pnames':np.array(pnames),
            'uvir_sfr': np.array(sfr_100_uvir),

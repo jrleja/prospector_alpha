@@ -1,24 +1,26 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import uvj_params as pfile
+import uvj_old_params as pfile
 import os, pickle, hickle, td_io, prosp_dutils
 from prospector_io import load_prospector_data
 from scipy.ndimage import gaussian_filter as norm_kde
 from matplotlib.ticker import FormatStrFormatter
 import matplotlib.colors as colors
 from scipy.ndimage.filters import gaussian_filter
+from scipy.stats import entropy
 from dynesty.plotting import _quantile as wquantile
 from scipy.interpolate import interp1d
 import copy
+from simulate_sfh_prior import draw_from_prior
 
 minlogssfr, maxlogssfr = -13, -8
 ssfr_lim = -10.5
 bin_min = 10 # minimum bin count to show up on plot
 nbins_3dhst = 20
-
+kl_vmin, kl_vmax = 0, 2
 plt.ioff()
 
-def collate_data(runname, filename=None, regenerate=False, **opts):
+def collate_data(runname, prior, filename=None, regenerate=False, **opts):
     
     ### if it's already made, load it and give it back
     # else, start with the making!
@@ -28,16 +30,18 @@ def collate_data(runname, filename=None, regenerate=False, **opts):
             return outdict
 
     ### define output containers
-    out = {'names':[],'weights':[],'log':{'ssfr_100':True,'avg_age':True},'pars':{},'chains':{},'lnlike':[]}
+    out = {'names':[],'weights':[],'log':{'ssfr_100':True,'avg_age':True},'pars':{},'chains':{},'kld':{},'lnlike':[]}
     entries = ['dust_index','ssfr_100','dust2','avg_age','logzsol']
-    for e in entries: out['pars'][e] = []
-    for e in entries: out['chains'][e] = []
+    for e in entries: 
+        out['pars'][e] = []
+        out['chains'][e] = []
+        out['kld'][e] = []
     out['uv'], out['vj'] = [], []
 
     ### fill them up
     out['names'] = [str(i+1) for i in range(625)]
     for i, name in enumerate(out['names']):
-        res, _, _, eout = load_prospector_data(None,runname='uvj',objname=name)
+        res, _, _, eout = load_prospector_data(None,runname='uvj',objname='uvj_'+name)
         uv, vj = pfile.return_uvj(int(name))
         out['uv'] += [uv]
         out['vj'] += [vj]
@@ -49,6 +53,7 @@ def collate_data(runname, filename=None, regenerate=False, **opts):
             for key in out['pars'].keys(): 
                 out['pars'][key] += [np.nan]
                 out['chains'][key] += [None]
+                out['kld'][key] += [None]
             print 'failed to load '+str(i)
             continue
 
@@ -61,16 +66,67 @@ def collate_data(runname, filename=None, regenerate=False, **opts):
                 out['pars'][key] += [eout['thetas'][key]['q50']]
                 idx = res['theta_labels'].index(key)
                 out['chains'][key] += [res['chain'][eout['sample_idx'],idx].flatten()]
+                out['kld'][key] += [kld(res['chain'][:,idx],res['weights'],prior[key])]
             else:
                 out['pars'][key] += [eout['extras'][key]['q50']]
                 out['chains'][key] += [eout['extras'][key]['chain'].flatten()]
+                out['kld'][key] += [kld(np.log10(eout['extras'][key]['chain']),eout['weights'],np.log10(prior[key]))]
 
     ### dump files and return
     pickle.dump(out,open(filename, "w"))
 
     return out
 
-def do_all(runname='uvj', outfolder=None,**opts):
+def load_priors(pars,outloc,ndraw=100000,regenerate_prior=False):
+    """ return ``ndraw'' samples from the prior 
+    works for any model theta and many SFH parameters
+    """
+
+    mod = pfile.load_model(**pfile.run_params)
+
+    # if we have an analytical function, sample at regular intervals across the function
+    # otherwise, we sample numerically
+    out = {}
+    sfh_prior = draw_from_prior(pfile,outloc,ndraw=ndraw, sm=1.0, regenerate=regenerate_prior)
+    for par in pars:
+        out[par] = {}
+        if par in mod.free_params:
+            out[par] = mod._config_dict[par]['prior']
+        elif (par == 'ssfr_100'):
+            out[par] = sfh_prior['ssfr']
+        elif (par == 'avg_age'):
+            out[par] = sfh_prior['mwa']
+        else:
+            print 1/0
+
+    return out
+
+def kld(chain,weight,prior):
+    nbins = 50
+    if type(prior) is type(np.array([])):
+        pdf_prior, bins = make_kl_bins(np.array(prior), nbins=nbins)
+    else:
+        bins = np.linspace(prior.range[0],prior.range[1], nbins+1)
+        pdf_prior = prior.distribution.pdf(bins[1:]-(bins[1]-bins[0])/2.,*prior.args,loc=prior.loc, scale=prior.scale)
+    pdf, _ = np.histogram(chain,bins=bins,weights=weight)
+    kld_out = entropy(pdf,qk=pdf_prior) 
+    return kld_out
+
+def make_kl_bins(chain, nbins=10, weights=None):
+    """Create bins with an ~equal number of data points in each 
+    when there are empty bins, the KL divergence is undefined 
+    this adaptive binning scheme avoids that problem
+    """
+    sorted = np.sort(chain)
+    nskip = np.floor(chain.shape[0]/float(nbins)).astype(int)-1
+    bins = sorted[::nskip]
+    bins[-1] = sorted[-1]  # ensure the maximum bin is the maximum of the chain
+    assert bins.shape[0] == nbins+1
+    pdf, bins = np.histogram(chain, bins=bins,weights=weights)
+
+    return pdf, bins
+
+def do_all(runname='uvj', outfolder=None, regenerate_prior=False, **opts):
 
     if outfolder is None:
         outfolder = os.getenv('APPS') + '/prospector_alpha/plots/'+runname+'/uvj_plots/'
@@ -80,20 +136,26 @@ def do_all(runname='uvj', outfolder=None,**opts):
 
     # global plotting parameters
     pars = ['ssfr_100','dust2','massmet_2','avg_age']# ,'dust_index'
+    mock_pars = copy.copy(pars)
+    mock_pars[mock_pars.index('massmet_2')] = 'logzsol'
     plabels = ['log(sSFR)', r'$\tau_{\mathrm{diffuse}}$', r'log(Z/Z$_{\odot}$)', r'log(stellar age/Gyr)'] # 'dust index'
     plabels_avg = ['log(<sSFR>)', r'<$\tau_{\mathrm{diffuse}}$>', r'log(<Z/Z$_{\odot}$>)', r'log(<stellar age>/Gyr)'] # 'dust index'
     lims = [(-14,-8.2),(0,2.4),(-1.99,0.2),(0.0,10)] # (-2.2,0.4)
 
     # mocks
-    uvj_mock = collate_data(runname,filename=outfolder+'data/dat.h5',**opts)
-    plot_mock_maps(uvj_mock, pars, plabels, lims, outfolder+'mock_maps.png')
+    priors = load_priors(mock_pars+['dust_index'], outfolder+'data/prior.h5',regenerate_prior=regenerate_prior)
+    uvj_mock = collate_data(runname,priors,filename=outfolder+'data/dat.h5',**opts)
+    plot_mock_maps(uvj_mock, mock_pars, plabels, lims, outfolder+'mock_maps.png')
+    plot_mock_maps(uvj_mock, mock_pars, plabels, lims, outfolder+'mock_kld.png',priors=priors,cmap='Reds')
 
     # plots from 3dhst uvj_mock
     # load uvj_mock, hard-coded
     with open('/Users/joel/code/python/prospector_alpha/plots/td_delta/fast_plots/data/fastcomp.h5', "r") as f:
         threedhst_data = hickle.load(f)
+    threedhst_data['kld']['avg_age'] = threedhst_data['kld']['mwa']
     threedhst_data['fast']['uvj_dust_prosp'] = threedhst_data['fast']['uvj_dust_prosp'].astype(bool)
-    print 1/0
+
+    plot_3d_maps(threedhst_data,pars,plabels_avg,lims,outfolder+'3dhst_kld_maps.png',kld=True,cmap='Reds')
     plot_3d_maps(threedhst_data,pars,plabels_avg,lims,outfolder+'3dhst_maps.png')
     plot_3d_hists(threedhst_data,pars,plabels,lims,outfolder+'3dhst_histograms.png')
 
@@ -109,7 +171,7 @@ def do_all(runname='uvj', outfolder=None,**opts):
     # for real uvj_mock: what are UVJ-quiescent but actually-starforming galaxies doing?
     plot_interloper_properties(threedhst_data, outfolder+'3dhst_interlopers.png',**opts)
 
-def plot_interloper_properties(dat,outname,sederrs=False,density=False):
+def plot_interloper_properties(dat,outname,sederrs=False,density=False,**opts):
     """ distribution in mass, sSFR, metallicity, dust, age
     and average SEDs
     """
@@ -322,14 +384,10 @@ def plot_mock_qfrac(dat, ax):
     plot_uvj_box(ax)
 
 def lnlike_cut(lnlike):
+
     return (lnlike < -45.5) | (~np.isfinite(lnlike))
 
-def plot_mock_maps(dat, npars, plabels, lims, outname, smooth=True):
-
-    fig, axes = plt.subplots(2,2, figsize=(6,6))
-    axes = axes.ravel()
-    pars = copy.copy(npars)
-    pars[pars.index('massmet_2')] = 'logzsol'
+def plot_mock_maps(dat, pars, plabels, lims, outname, smooth=True, priors=None, cmap='plasma'):
 
     # pull out data, define ranges
     logpars = ['massmet_2','ssfr_100','avg_age']
@@ -339,22 +397,39 @@ def plot_mock_maps(dat, npars, plabels, lims, outname, smooth=True):
 
     idx_poor = lnlike_cut(np.array(dat['lnlike']).astype(float))
 
+    # plot options
+    if priors is not None:
+        fig, axes = plt.subplots(2,2, figsize=(7,6))
+        vmin, vmax, cax = kl_vmin, kl_vmax, fig.add_axes([0.85, 0.15, 0.05, 0.7])
+    else:
+        fig, axes = plt.subplots(2,2, figsize=(6,6))
+        vmin, vmax, cax = None, None, None
+    axes = axes.ravel()
+
     # construct maps
     for i, par in enumerate(pars):
 
-        qvals = np.array(dat['pars'][par])
-        if par in ['avg_age','ssfr_100']:
-            qvals = np.log10(qvals)
-        qvals[idx_poor] = np.nan
-        valmap = qvals.reshape(nbin,nbin).swapaxes(0,1)
+        # either KLD map w/ prior
+        # or median of PDF
+        if priors is not None:
+            vmap = np.array(dat['kld'][par])
+            ax = None
+        else:
+            vmap = np.array(dat['pars'][par])
+            if par in ['avg_age','ssfr_100']:
+                vmap = np.log10(vmap)
+            ax = axes[i]
+
+        vmap[idx_poor] = np.nan
+        valmap = vmap.reshape(nbin,nbin).swapaxes(0,1)
         if smooth:
             valmap = nansmooth(valmap)
 
         # show map
-        img = axes[i].imshow(valmap, origin='lower', cmap='plasma',
-                             extent=(0,2.5,0,2.5))
+        img = axes[i].imshow(valmap, origin='lower', cmap=cmap,
+                             extent=(0,2.5,0,2.5),vmin=vmin,vmax=vmax)
         axes[i].set_title(plabels[i])
-        cbar = fig.colorbar(img, ax=axes[i],aspect=10,fraction=0.1)
+        cbar = fig.colorbar(img, ax=ax, cax=cax, aspect=10,fraction=0.1)
         cbar.solids.set_rasterized(True)
         cbar.solids.set_edgecolor("face")
 
@@ -365,6 +440,8 @@ def plot_mock_maps(dat, npars, plabels, lims, outname, smooth=True):
         plot_uvj_box(a)
 
     plt.tight_layout(h_pad=0.05,w_pad=0.05)
+    if priors is not None:
+        fig.subplots_adjust(right=0.85)
     plt.savefig(outname, dpi=150)
     plt.close()
 
@@ -422,13 +499,16 @@ def plot(data,outfolder):
         plt.savefig(outfolder+key+'.png',dpi=150)
         plt.close()
 
-def plot_3d_maps(dat,pars,plabels,lims,outname,smooth=True):
+def plot_3d_maps(dat,pars,plabels,lims,outname,kld=False,smooth=True,density=False,cmap='plasma'):
 
-    # make plots
-    fig, axes = plt.subplots(2,2, figsize=(12,5))
-    fig.subplots_adjust(left=0.54,wspace=0.3,hspace=0.5,right=0.98)
+    # make plot geometry
+    if kld:
+        fig, axes = plt.subplots(2,2, figsize=(7,6))
+        vmin, vmax, cax = kl_vmin, kl_vmax, fig.add_axes([0.85, 0.15, 0.05, 0.7])
+    else:
+        fig, axes = plt.subplots(2,2, figsize=(7,7))
+        vmin, vmax, cax = None, None, None
     axes = axes.ravel()
-    dax = fig.add_axes([0.08, 0.1, 0.38, 0.8])
 
     # pull out data, define ranges
     logpars = ['massmet_2','ssfr_100','avg_age']
@@ -440,23 +520,30 @@ def plot_3d_maps(dat,pars,plabels,lims,outname,smooth=True):
     vj_range = np.linspace(vj_lim[0],vj_lim[1],nbins_3dhst)
 
     # density
-    he, xedges, yedges = np.histogram2d(vj, uv, bins=(vj_range,uv_range))
-    he[he<bin_min] = 0.0
-    xmid = (xedges[1:] + xedges[:-1])/2.
-    ymid = (yedges[1:] + yedges[:-1])/2.
-    logn = np.log10(he.T)
-    logn[(~np.isfinite(logn))] = np.nan
-    logn_min, logn_max = np.nanmin(logn), np.nanmax(logn)
-    contours = 10**np.linspace(logn_min,logn_max,ncont+1)
+    if density:
+        fig.subplots_adjust(left=0.54,wspace=0.3,hspace=0.5,right=0.98)
+        dax = fig.add_axes([0.08, 0.1, 0.38, 0.8])
 
-    cs = dax.contourf(xmid,ymid, he.T, contours, zorder=2, alpha=1.0, cmap='RdGy_r', 
-                     norm=colors.LogNorm(vmin=10**logn_min, vmax=10**logn_max))
-    dax.contour(xmid,ymid, he.T, contours[3:], linewidths=1, zorder=2, colors='k',alpha=0.5)
-    dax.set_title(r'N$_{\mathrm{galaxies}}$',fontsize=14)
+        he, xedges, yedges = np.histogram2d(vj, uv, bins=(vj_range,uv_range))
+        he[he<bin_min] = 0.0
+        xmid = (xedges[1:] + xedges[:-1])/2.
+        ymid = (yedges[1:] + yedges[:-1])/2.
+        logn = np.log10(he.T)
+        logn[(~np.isfinite(logn))] = np.nan
+        logn_min, logn_max = np.nanmin(logn), np.nanmax(logn)
+        contours = 10**np.linspace(logn_min,logn_max,ncont+1)
 
-    cb = fig.colorbar(cs, ax=dax, aspect=10, ticks=[1, 10, 30, 100, 300, 1000])
-    #cb.ax.set_yticklabels(['1', '10', '30', '100', '300', '1000'])
-    cb.solids.set_edgecolor("face")
+        cs = dax.contourf(xmid,ymid, he.T, contours, zorder=2, alpha=1.0, cmap='RdGy_r', 
+                         norm=colors.LogNorm(vmin=10**logn_min, vmax=10**logn_max))
+        dax.contour(xmid,ymid, he.T, contours[3:], linewidths=1, zorder=2, colors='k',alpha=0.5)
+        dax.set_title(r'N$_{\mathrm{galaxies}}$',fontsize=14)
+        dax.set_xlabel('V-J')
+        dax.set_ylabel('U-V')
+        plot_uvj_box(a)
+
+        cb = fig.colorbar(cs, ax=dax, aspect=10, ticks=[1, 10, 30, 100, 300, 1000])
+        cb.ax.set_yticklabels(['1', '10', '30', '100', '300', '1000'])
+        cb.solids.set_edgecolor("face")
 
     # averages
     for i, par in enumerate(pars):
@@ -476,7 +563,9 @@ def plot_3d_maps(dat,pars,plabels,lims,outname,smooth=True):
                 if idx.sum() < bin_min:
                     avgmap[k,j] = np.nan
                 else:
-                    if par in logpars:
+                    if kld:
+                        avgmap[k,j] = np.nanmedian(dat['kld'][par][idx])
+                    elif par in logpars:
                         avgmap[k,j] = np.log10(np.mean(10**qvals[idx]))
                     else:
                         avgmap[k,j] = np.mean(qvals[idx])
@@ -484,20 +573,29 @@ def plot_3d_maps(dat,pars,plabels,lims,outname,smooth=True):
         if smooth:
             avgmap = nansmooth(avgmap)
 
+        if kld:
+            ax = None
+        else:
+            ax = axes[i]
+
         # show map
-        img = axes[i].imshow(avgmap, origin='lower', cmap='plasma',
-                             extent=(vj_lim[0],vj_lim[1],uv_lim[0],uv_lim[1]))
+        img = axes[i].imshow(avgmap, origin='lower', cmap=cmap,
+                             extent=(vj_lim[0],vj_lim[1],uv_lim[0],uv_lim[1]),
+                             vmin=vmin,vmax=vmax)
         axes[i].set_title(plabels[i])
-        cbar = fig.colorbar(img, ax=axes[i],aspect=8)
+        cbar = fig.colorbar(img, ax=ax,cax=cax,aspect=8)
         cbar.solids.set_rasterized(True)
         cbar.solids.set_edgecolor("face")
 
     # labels
-    for a in [dax] + axes.tolist():
+    for a in axes:
         a.set_xlabel('V-J')
         a.set_ylabel('U-V')
         plot_uvj_box(a)
 
+    plt.tight_layout(h_pad=0.05,w_pad=0.05)
+    if kld:
+        fig.subplots_adjust(right=0.85)
     plt.savefig(outname, dpi=150)
     plt.close()
 
@@ -606,19 +704,18 @@ def plot_uvj_box(ax,lw=2):
     ax.plot([1.5,1.5],[1.9,xlim[1]],linestyle='-',color='k',lw=lw)
     ax.set_xlim()
 
-def nansmooth(valmap):
+def nansmooth(valmap,sigma=1.0):
 
-    sigma = 1.0
     V=valmap.copy()
     V[valmap!=valmap]=0
-    VV=gaussian_filter(V,sigma=sigma)
+    VV=gaussian_filter(V.astype(float),sigma=sigma)
 
     W=0*valmap.copy()+1
     W[valmap!=valmap]=0
-    WW=gaussian_filter(W,sigma=sigma)
+    WW=gaussian_filter(W.astype(float),sigma=sigma)
 
     Z=VV/WW
-    Z[~np.isfinite(valmap)] = np.nan
+    Z[~np.isfinite(valmap.astype(float))] = np.nan
     return Z
 
 

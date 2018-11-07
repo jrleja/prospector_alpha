@@ -487,9 +487,9 @@ class MassMet(priors.Prior):
         """
         if len(kwargs) > 0:
             self.update(**kwargs)
-        mass = np.random.uniform(low=self.params['mass_mini'],high=self.params['mass_maxi'])
+        mass = np.random.uniform(low=self.params['mass_mini'],high=self.params['mass_maxi'],size=nsample)
         a, b = self.get_args(mass)
-        met = self.distribution.rvs(a, b, loc=self.loc(mass), scale=self.scale(mass))
+        met = self.distribution.rvs(a, b, loc=self.loc(mass), scale=self.scale(mass), size=nsample)
         return np.array([mass, met])
 
     def unit_transform(self, x, **kwargs):
