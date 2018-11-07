@@ -264,7 +264,7 @@ def post_processing(param_name, objname=None, runname = None, overwrite=True, ob
     extra_output = calc_extra_quantities(res,sps,obs,**kwargs)
     
     # create post-processing name, dump info
-    _, _, extra_filename = create_prosp_filename(obj_outfile)
+    _, extra_filename = create_prosp_filename(obj_outfile)
     hickle.dump(extra_output,open(extra_filename, "w"))
 
     # make standard plots
