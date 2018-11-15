@@ -14,14 +14,14 @@ from astropy.io import ascii
 plt.ioff()
 
 popts = {'fmt':'o', 'capthick':1.5,'elinewidth':1.5,'ms':9,'alpha':0.8,'color':'0.3'}
-red = '#FF3D0D'
+red = '#f90000'
 dpi = 200 # plot resolution
 cmap = 'cool'
 minsfr, minssfr = 0.01, 1e-13
 ms, s = 0.5, 1 # symbol sizes
 alpha, alpha_scat = 0.1, 0.3
-medopts = {'marker':' ','alpha':0.95,'color':'red','ms': 7,'mec':'k','zorder':5}
-popts = {'fmt':'o', 'capthick':.05,'elinewidth':.05,'alpha':0.2,'color':'0.3','ms':0.5}
+medopts = {'marker':' ','alpha':0.95,'color':red,'ms': 7,'mec':'k','zorder':5,'lw':2}
+popts = {'fmt':'o', 'capthick':.05,'elinewidth':.05,'alpha':0.2,'color':'k','ms':0.5}
 nbin_min = 10
 
 def collate_data(runname, filename=None, regenerate=False, nobj=None, **opts):
@@ -259,14 +259,28 @@ def plot_heating_sources(data, outfolder, color_by_fagn=False, color_by_logzsol=
         x, y, bincount = prosp_dutils.running_median(xvar,yvar,avg=False,weights=np.ones_like(xvar),return_bincount=True,bins=bins)
         x, y = x[bincount > nbin_min], y[bincount > nbin_min]
         yerr = prosp_dutils.asym_errors(y[:,0], y[:,1], y[:,2])
-        ax2[i].errorbar(x,y[:,0],yerr=yerr, **medopts)
+        ax2[i].errorbar(x,y[:,0],yerr=yerr, label='running median',**medopts)
 
     # labels and limits
     for i, a in enumerate(ax2): 
-        a.set_xlabel('log(sSFR$_{\mathrm{Prosp}}$)')
+        a.set_xlabel('log(sSFR$_{\mathrm{Prosp}}$/yr$^{-1}$)')
         a.set_ylim(0,1)
         a.set_ylabel(ylabels[i])
         a.set_xlim(-13,-7.9)
+
+    # add UV+IR assumption
+    if old_stars_only:
+        ax2[0].axhline(0.0,linestyle=':',zorder=-1,color='blue')
+        ax2[0].text(-12.7,0.02,r'default for 3D-HST SFR$_{\mathrm{UV+IR}}$',fontsize=10,color='blue')
+        ax2[0].set_ylim(-0.05,1)
+
+        # De Looze 2014 result
+        dl_color = '#08d80c'
+        xarr = np.linspace(xlim[0],-9.9,200)
+        logheating = 0.42*xarr+4.14
+        yarr = 1-10**logheating
+        ax2[0].plot(xarr,yarr,'-',color=dl_color,lw=2.5, label='De Looze+14',zorder=1)
+        ax2[0].legend(loc=1,prop={'size':8.5}, scatterpoints=1,fancybox=True)
 
     # clean up
     fig.tight_layout()
@@ -282,6 +296,7 @@ def plot_heating_sources(data, outfolder, color_by_fagn=False, color_by_logzsol=
         odat = Table([np.array(x), np.array(y[:,0]), np.array(y[:,1]), y[:,2]], 
                       names=['log(sSFR/Gyr$^{-1}$)', 'P50', 'P84', 'P16'])
         formats = {name: '%1.2f' for name in odat.columns.keys()}
+        formats['log(sSFR/Gyr$^{-1}$)'] = '%1.1f'
         ascii.write(odat, outtable, format='aastex',overwrite=True, formats=formats)
 
 def plot_spearmanr(data, outname):

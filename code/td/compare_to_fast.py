@@ -889,7 +889,7 @@ def sfr_m_grid(data,datag,outname,fix=True,outfile=None):
 def dm_dsfr_grid(data,datag,outfolder,outtable,normalize=True):
 
     # plot information
-    fs, tick_fs, lw, ms = 11, 9.5, 3, 3.8
+    fs, tick_fs, lw, ms = 15, 11, 3, 3.8
     dmopts = {
                'xlim': (8.5,11.5),
                'ylim': (-0.7,0.7),
@@ -905,7 +905,8 @@ def dm_dsfr_grid(data,datag,outfolder,outtable,normalize=True):
                'table_out': outtable+'conditional_dm.dat',
                'xt': 0.97, 'yt': 0.04, 'ha': 'right',
                'legend_loc': 4, 'legend_ncol': 1,
-               'dens_power': 1., 'xticks': [9,10,11]
+               'dens_power': 1., 'xticks': [9,10,11],
+               'figsize': (11,6.5), 'left': 0.51, 'summary_left': 0.11, 'summary_size': 0.31
                }
 
     dsfropts = {
@@ -922,8 +923,9 @@ def dm_dsfr_grid(data,datag,outfolder,outtable,normalize=True):
                'outname': outfolder+'conditional_dsfr_vs_z.png',
                'table_out': outtable+'conditional_dsfr.dat',
                'xt': 0.97, 'yt': 0.04, 'ha': 'right',
-               'legend_loc': 4, 'legend_ncol': 1,
-               'dens_power': 0.5, 'xticks': [-11,-10,-9,-8]
+               'legend_loc': 2, 'legend_ncol': 1,
+               'dens_power': 0.5, 'xticks': [-11,-10,-9,-8],
+               'figsize': (11.8,6.5), 'left': 0.52, 'summary_left': 0.115, 'summary_size': 0.29
                }
 
     # redshift bins + colors
@@ -934,10 +936,10 @@ def dm_dsfr_grid(data,datag,outfolder,outtable,normalize=True):
     # loop over options
     for opt in [dmopts,dsfropts]:
 
-        fig, a1 = plt.subplots(2, 2, figsize = (10.5,6.5))
-        fig.subplots_adjust(right=0.985,left=0.49,hspace=0.065,wspace=0.065,top=0.95,bottom=0.1)
+        fig, a1 = plt.subplots(2, 2, figsize = opt['figsize'])
+        fig.subplots_adjust(right=0.985,left=opt['left'],hspace=0.065,wspace=0.065,top=0.95,bottom=0.1)
         a1 = np.ravel(a1)
-        bigax = fig.add_axes([0.09, 0.275, 0.31, 0.5])
+        bigax = fig.add_axes([opt['summary_left'], 0.275, opt['summary_size'], 0.5])
 
         # grid information
         ngrid = opt['xbins'].shape[0]
@@ -1017,6 +1019,7 @@ def dm_dsfr_grid(data,datag,outfolder,outtable,normalize=True):
 
         plt.savefig(opt['outname'],dpi=dpi)
         plt.close()
+    print 1/0
 
 def deltam_spearman(fast,prosp,outname,popts):
 
