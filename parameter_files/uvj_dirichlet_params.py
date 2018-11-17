@@ -21,8 +21,7 @@ jansky_mks = 1e-26
 APPS = os.getenv('APPS')
 run_params = {'verbose':True,
               'debug': False,
-              'outfile': APPS+'/prospector_alpha/results/td_delta/AEGIS_13',
-              'nofork': True,
+              'outfile': APPS+'/prospector_alpha/results/uvj/uvj_1',
               # dynesty params
               'nested_bound': 'multi', # bounding method
               'nested_sample': 'rwalk', # sampling method
@@ -31,111 +30,121 @@ run_params = {'verbose':True,
               'nested_nlive_init': 200, # number of initial live points
               'nested_weight_kwargs': {'pfrac': 1.0}, # weight posterior over evidence by 100%
               'nested_dlogz_init': 0.01,
+              'nested_stop_kwargs': {'post_thresh': 0.008, 'n_mc':50}, #higher threshold, more MCMC
               # Model info
               'zcontinuous': 2,
               'compute_vega_mags': False,
               'initial_disp':0.1,
               'interp_type': 'logarithmic',
-              'nbins_sfh': 7,
-              'sigma': 0.3,
-              'df': 2,
-              'agelims': [0.0,7.4772,8.0,8.5,9.0,9.5,9.8,10.0],
+              'agelims': [0.0,8.0,8.5,9.0,9.5,9.8,10.0],
               # Data info (phot = .cat, dat = .dat, fast = .fout)
-              'datdir':APPS+'/prospector_alpha/data/3dhst/',
-              'runname': 'td_new',
-              'objname':'AEGIS_13'
+              'uvj_key':1
               }
 ############
 # OBS
 #############
 
-def load_obs(objname=None, datdir=None, runname=None, err_floor=0.05, zperr=True, no_zp_corrs=False, **extras):
+def plot_uvj():
+    from matplotlib import pyplot as plt
+    
+    # line is UV = 0.8*VJ+0.7
+    # constant UV=1.3, VJ=1.5
+    lw = 1.5
+    fig, ax = plt.subplots(1,1, figsize=(5, 5))
+    ax.plot([-0.5,0.75],[1.3,1.3],linestyle='-',color='k',lw=lw)
+    ax.plot([0.75,1.5],[1.3,1.9],linestyle='-',color='k',lw=lw)
+    ax.plot([1.5,1.5],[1.9,4],linestyle='-',color='k',lw=lw)
 
-    ''' 
-    objname: number of object in the 3D-HST COSMOS photometric catalog
-    err_floor: the fractional error floor (0.05 = 5% floor)
-    zp_err: inflate the errors by the zeropoint offsets from Skelton+14
-    '''
+    # star-forming line: UV = 0.8*VJ
+    uv, vj = starforming_uvj()
+    ax.plot(vj,uv,'o',linestyle='-',color='blue')
+    uv, vj = quiescent_uvj()
+    ax.plot(vj,uv,'o',linestyle='-',color='red')
 
-    ### open file, load data
-    photname = datdir + objname.split('_')[0] + '_' + runname + '.cat'
-    with open(photname, 'r') as f:
-        hdr = f.readline().split()
-    dtype = np.dtype([(hdr[1],'S20')] + [(n, np.float) for n in hdr[2:]])
-    dat = np.loadtxt(photname, comments = '#', delimiter=' ', dtype = dtype)
+    for i in range(1,11):
+        uv, vj = return_uvj(i)
+        ax.text(vj-0.05,uv+0.1, str(i), color='k')
 
-    ### extract filters, fluxes, errors for object
-    # from ReadMe: "All fluxes are normalized to an AB zeropoint of 25, such that: magAB = 25.0-2.5*log10(flux)
-    obj_idx = (dat['id'] == objname.split('_')[-1])
-    filters = np.array([f[2:] for f in dat.dtype.names if f[0:2] == 'f_'])
-    flux = np.squeeze([dat[obj_idx]['f_'+f] for f in filters])
-    unc = np.squeeze([dat[obj_idx]['e_'+f] for f in filters])
+    # plot rotated UVJ axis
+    # perpendicular line has slope -1.25, make it pass thru (1.75,0.9) 
+    # UV = -1.25*VJ+2.875
+    if True:
+        vj = np.linspace(0,2.5)
+        uv = -1.25*vj+3
+        ax.plot(vj,uv,linestyle='--',color='0.5',lw=lw)
 
-    ### add correction to MIPS magnitudes (only MIPS 24 right now!)
-    # due to weird MIPS filter conventions
-    dAB_mips_corr = np.array([-0.03542,-0.07669,-0.03807]) # 24, 70, 160, in AB magnitudes
-    dflux = 10**(-dAB_mips_corr/2.5)
+        ax.arrow(1.745, 0.805, 0.2, 0.2, head_width=0.2, head_length=0.1, fc='0.5', ec='k', lw=lw,width=0.08)
+        ax.text(1.65, 1.13, '"dusty"',fontsize=14,weight='semibold')
 
-    mips_idx = np.array(['mips_24um' in f for f in filters],dtype=bool)
-    flux[mips_idx] *= dflux[0]
-    unc[mips_idx] *= dflux[0]
+    ax.set_xlim(0,2.5)
+    ax.set_ylim(0,2.5)
+    ax.set_xlabel('V-J')
+    ax.set_ylabel('U-V')
 
-    ### define photometric mask, convert to maggies
-    phot_mask = (flux != unc) & (flux != -99.0) & (unc > 0)
-    maggies = flux/(1e10)
-    maggies_unc = unc/(1e10)
+    plt.show()
 
-    # deal with the zeropoint errors
-    # ~5% to ~20% effect
-    # either REMOVE them or INFLATE THE ERRORS by them
-    # in general, we don't inflate errors of space-based bands
-    # if use_zp is set, RE-APPLY these offsets
-    if (zperr) or (no_zp_corrs):
-        no_zp_correction = ['f435w','f606w','f606wcand','f775w','f814w',
-                            'f814wcand','f850lp','f850lpcand','f125w','f140w','f160w']
-        zp_offsets = load_zp_offsets(None)
-        band_names = np.array([x['Band'].lower()+'_'+x['Field'].lower() for x in zp_offsets])
-        for ii,f in enumerate(filters):
-            match = band_names == f
-            if match.sum():
-                in_exempt = len([s for s in no_zp_correction if s in f])
-                if (no_zp_corrs) & (not in_exempt):
-                    maggies[ii] /= zp_offsets[match]['Flux-Correction'][0]
-                    maggies_unc[ii] /= zp_offsets[match]['Flux-Correction'][0]
-                if zperr & (not in_exempt):
-                    maggies_unc[ii] = ( (maggies_unc[ii]**2) + (maggies[ii]*(1-zp_offsets[match]['Flux-Correction'][0]))**2 ) **0.5
+def quiescent_uvj():
+    vj = np.linspace(0.55,1.35,4)
+    uv = vj * 0.8 + 1.05
+    return uv, vj
 
-    ### implement error floor
-    maggies_unc = np.clip(maggies_unc, maggies*err_floor, np.inf)
+def starforming_uvj():
+    vj = np.linspace(0.3,2.4,6)
+    uv = vj * 0.8 + 0.2
+    return uv, vj
 
-    ### if we have super negative flux, then mask it !
-    ### where super negative is <0 with 95% certainty
-    neg = (maggies < 0) & (np.abs(maggies/maggies_unc) > 2)
-    phot_mask[neg] = False
+def return_uvj(uvj_key, old_method=False):
 
-    ### mask anything touching or bluewards of Ly-a
-    datname = datdir + objname.split('_')[0] + '_' + runname + '.dat'
-    dat = ascii.read(datname)
-    idx = dat['phot_id'] == int(objname.split('_')[-1])
-    zred = float(dat['z_best'][idx])
-    ofilters = observate.load_filters(filters)
+    # old method: a few simple lines, hand-chosen
+    # new method: the whole grid
+    uvj_key -= 1    # SLURM arrays don't zero-index, so we translate here
+    if old_method:
+        if uvj_key <= 5:
+            uv, vj = starforming_uvj()
+            uv, vj = uv[uvj_key], vj[uvj_key]
+        else:
+            uv, vj = quiescent_uvj()
+            uv, vj = uv[uvj_key-6], vj[uvj_key-6]
 
-    wavemax = np.array([f.wavelength[f.transmission > (f.transmission.max()*0.1)].max() for f in ofilters]) / (1+zred)
-    wavemin = np.array([f.wavelength[f.transmission > (f.transmission.max()*0.1)].min() for f in ofilters]) / (1+zred)
-    filtered = [1230]
-    for f in filtered: phot_mask[(wavemax > f) & (wavemin < f)] = False
-    phot_mask[wavemin < 1200] = False
+    else:
+        uv = np.arange(25)/10.+0.05
+        vj = np.arange(25)/10.+0.05
+
+        uv = uv[uvj_key % 25]
+        vj = vj[uvj_key / 25]
+
+    return uv, vj
+
+def load_obs(**extras):
+    """the key word will be "uvj_key"
+    generate UVJ fluxes based off of this
+    """
+
+    # first load the filters
+    fnames = ['bessell_U','bessell_V','twomass_J']
+
+    # generate uvj color
+    uv, vj = return_uvj(int(extras['uvj_key']))
+
+    # translate to fluxes
+    # do this by fixing V-flux in maggies
+    # this corresponds roughly to M~1e10
+    vflux = 5e7
+    maggies = np.array([10**(-uv/2.5), 1, 10**(vj/2.5)]) * vflux
+    maggies_unc = maggies / 40.
 
     ### build output dictionary
     obs = {}
-    obs['filters'] = ofilters
+    obs['filters'] = observate.load_filters(fnames)
     obs['wave_effective'] = np.array([filt.wave_effective for filt in obs['filters']])
-    obs['phot_mask'] = phot_mask
+    obs['phot_mask'] = np.ones_like(maggies,dtype=bool)
     obs['maggies'] = maggies
     obs['maggies_unc'] =  maggies_unc
     obs['wavelength'] = None
     obs['spectrum'] = None
     obs['logify_spectrum'] = False
+    obs['uv'] = uv
+    obs['vj'] = vj
 
     return obs
 
@@ -151,21 +160,50 @@ def tie_gas_logz(logzsol=None, **extras):
 def to_dust1(dust1_fraction=None, dust1=None, dust2=None, **extras):
     return dust1_fraction*dust2
 
-def massmet_to_logmass(massmet=None,**extras):
-    return massmet[0]
+def zfrac_to_sfrac(z_fraction=None, **extras):
+    """This transforms from latent, independent `z` variables to sfr
+    fractions. The transformation is such that sfr fractions are drawn from a
+    Dirichlet prior.  See Betancourt et al. 2010
+    """
+    sfr_fraction = np.zeros(len(z_fraction) + 1)
+    sfr_fraction[0] = 1.0 - z_fraction[0]
+    for i in range(1, len(z_fraction)):
+        sfr_fraction[i] = np.prod(z_fraction[:i]) * (1.0 - z_fraction[i])
+    sfr_fraction[-1] = 1 - np.sum(sfr_fraction[:-1])
 
-def massmet_to_logzsol(massmet=None,**extras):
-    return massmet[1]
+    return sfr_fraction
 
-def logmass_to_masses(massmet=None, logsfr_ratios=None, agebins=None, **extras):
-    logsfr_ratios = np.clip(logsfr_ratios,-10,10) # numerical issues...
-    nbins = agebins.shape[0]
-    sratios = 10**logsfr_ratios
-    dt = (10**agebins[:,1]-10**agebins[:,0])
-    coeffs = np.array([ (1./np.prod(sratios[:i])) * (np.prod(dt[1:i+1]) / np.prod(dt[:i])) for i in range(nbins)])
-    m1 = (10**massmet[0]) / coeffs.sum()
+def zfrac_to_masses(logmass=None, z_fraction=None, agebins=None, **extras):
+    """This transforms from latent, independent `z` variables to sfr fractions
+    and then to bin mass fractions. The transformation is such that sfr
+    fractions are drawn from a Dirichlet prior.  See Betancourt et al. 2010
+    :returns masses:
+        The stellar mass formed in each age bin.
+    """
+    # sfr fractions (e.g. Leja 2017)
+    sfr_fraction = zfrac_to_sfrac(z_fraction)
+    # convert to mass fractions
+    time_per_bin = np.diff(10**agebins, axis=-1)[:,0]
+    sfr_fraction *= np.array(time_per_bin)
+    sfr_fraction /= sfr_fraction.sum()
+    masses = 10**logmass * sfr_fraction
 
-    return m1 * coeffs
+    return masses
+
+def masses_to_zfrac(mass=None, agebins=None, **extras):
+    """The inverse of zfrac_to_masses, for setting mock parameters based on
+    real bin masses.
+    """
+    total_mass = mass.sum()
+    time_per_bin = np.diff(10**agebins, axis=-1)[:,0]
+    sfr_fraction = mass / time_per_bin
+    sfr_fraction /= sfr_fraction.sum()
+    z_fraction = np.zeros(len(sfr_fraction) - 1)
+    z_fraction[0] = 1 - sfr_fraction[0]
+    for i in range(1, len(z_fraction)):
+        z_fraction[i] = 1.0 - sfr_fraction[i] / np.prod(z_fraction[:i])
+
+    return total_mass, z_fraction
 
 #############
 # MODEL_PARAMS
@@ -200,24 +238,20 @@ model_params.append({'name': 'pmetals', 'N': 1,
                         'prior_function': None,
                         'prior_args': {'mini':-3, 'maxi':-1}})
 
-model_params.append({'name': 'massmet', 'N': 2,
-                        'isfree': True,
-                        'init': np.array([10,-0.5]),
-                        'prior': None})
 
 model_params.append({'name': 'logmass', 'N': 1,
-                        'isfree': False,
-                        'depends_on': massmet_to_logmass,
+                        'isfree': True,
                         'init': 10.0,
                         'units': 'Msun',
-                        'prior': None})
+                        'prior': priors.TopHat(mini=6.0, maxi=12.0)})
 
 model_params.append({'name': 'logzsol', 'N': 1,
-                        'isfree': False,
+                        'isfree': True,
                         'init': -0.5,
-                        'depends_on': massmet_to_logzsol,
+                        'init_disp': 0.25,
+                        'disp_floor': 0.2,
                         'units': r'$\log (Z/Z_\odot)$',
-                        'prior': None})
+                        'prior': priors.TopHat(mini=-1.98, maxi=0.19)})
                         
 ###### SFH   ########
 model_params.append({'name': 'sfh', 'N':1,
@@ -227,7 +261,7 @@ model_params.append({'name': 'sfh', 'N':1,
 
 model_params.append({'name': 'mass', 'N': 1,
                      'isfree': False,
-                     'depends_on': logmass_to_masses,
+                     'depends_on': zfrac_to_masses,
                      'init': 1.,
                      'units': r'M$_\odot$',})
 
@@ -237,11 +271,11 @@ model_params.append({'name': 'agebins', 'N': 1,
                         'units': 'log(yr)',
                         'prior': None})
 
-model_params.append({'name': 'logsfr_ratios', 'N': 7,
+model_params.append({'name': 'z_fraction', 'N': 1,
                         'isfree': True,
                         'init': [],
                         'units': '',
-                        'prior': None})
+                        'prior': priors.Beta(alpha=1.0, beta=1.0,mini=0.0,maxi=1.0)})
 
 ########    IMF  ##############
 model_params.append({'name': 'imf_type', 'N': 1,
@@ -279,7 +313,7 @@ model_params.append({'name': 'dust2', 'N': 1,
                         'init_disp': 0.25,
                         'disp_floor': 0.15,
                         'units': '',
-                        'prior': priors.ClippedNormal(mini=0.0, maxi=4.0, mean=0.3, sigma=1)})
+                        'prior': priors.TopHat(mini=0.0, maxi=3.0)})
 
 model_params.append({'name': 'dust_index', 'N': 1,
                         'isfree': True,
@@ -287,7 +321,7 @@ model_params.append({'name': 'dust_index', 'N': 1,
                         'init_disp': 0.25,
                         'disp_floor': 0.15,
                         'units': '',
-                        'prior': priors.TopHat(mini=-1.0, maxi=0.4)})
+                        'prior': priors.ClippedNormal(mini=-0.8, maxi=0.4, mean=0.0, sigma=0.4)})
 
 model_params.append({'name': 'dust1_index', 'N': 1,
                         'isfree': False,
@@ -352,34 +386,35 @@ model_params.append({'name': 'nebemlineinspec', 'N': 1,
                         'prior': None})
 
 model_params.append({'name': 'gas_logz', 'N': 1,
-                        'isfree': True,
+                        'isfree': False,
                         'init': 0.0,
+                        'depends_on': tie_gas_logz,
                         'units': r'log Z/Z_\odot',
                         'prior': priors.TopHat(mini=-2.0, maxi=0.5)})
 
 model_params.append({'name': 'gas_logu', 'N': 1, # scale with sSFR?
                         'isfree': False,
-                        'init': -1.0,
+                        'init': -2.0,
                         'units': '',
                         'prior': priors.TopHat(mini=-4.0, maxi=-1.0)})
 
 ##### AGN dust ##############
 model_params.append({'name': 'add_agn_dust', 'N': 1,
                         'isfree': False,
-                        'init': True,
+                        'init': False,
                         'units': '',
                         'prior': None})
 
 model_params.append({'name': 'fagn', 'N': 1,
-                        'isfree': True,
+                        'isfree': False,
                         'init': 0.01,
                         'init_disp': 0.03,
                         'disp_floor': 0.02,
                         'units': '',
-                        'prior': priors.LogUniform(mini=1e-5, maxi=3.0)})
+                        'prior': priors.LogUniform(mini=1e-4, maxi=3.0)})
 
 model_params.append({'name': 'agn_tau', 'N': 1,
-                        'isfree': True,
+                        'isfree': False,
                         'init': 20.0,
                         'init_disp': 5,
                         'disp_floor': 2,
@@ -403,103 +438,15 @@ model_params.append({'name': 'mass_units', 'N': 1,
                      'isfree': False,
                      'init': 'mformed'})
 
-#### resort list of parameters for later display purposes
+#### resort list of parameters 
+# because we can
 parnames = [m['name'] for m in model_params]
-fit_order = ['massmet','logsfr_ratios', 'dust2', 'dust_index', 'dust1_fraction', 'fagn', 'agn_tau', 'gas_logz']
+fit_order = ['logmass','logzsol','z_fraction', 'dust2', 'dust_index', 'dust1_fraction']
 tparams = [model_params[parnames.index(i)] for i in fit_order]
 for param in model_params: 
     if param['name'] not in fit_order:
         tparams.append(param)
 model_params = tparams
-
-
-##### Mass-metallicity prior ######
-class MassMet(priors.Prior):
-    """A Gaussian prior designed to approximate the Gallazzi et al. 2005 
-    stellar mass--stellar metallicity relationship.
-    """
-
-    prior_params = ['mass_mini', 'mass_maxi', 'z_mini', 'z_maxi']
-    distribution = truncnorm
-    massmet = np.loadtxt(os.getenv('APPS')+'/prospector_alpha/data/gallazzi_05_massmet.txt')
-
-    def scale(self,mass):
-        upper_84 = np.interp(mass, self.massmet[:,0], self.massmet[:,3]) 
-        lower_16 = np.interp(mass, self.massmet[:,0], self.massmet[:,2])
-        return (upper_84-lower_16)
-
-    def loc(self,mass):
-        return np.interp(mass, self.massmet[:,0], self.massmet[:,1])
-
-    def get_args(self,mass):
-        a = (self.params['z_mini'] - self.loc(mass)) / self.scale(mass)
-        b = (self.params['z_maxi'] - self.loc(mass)) / self.scale(mass)
-        return [a, b]
-
-    @property
-    def range(self):
-        return ((self.params['mass_mini'], self.params['mass_maxi']),\
-                (self.params['z_mini'], self.params['z_maxi']))
-
-    def bounds(self, **kwargs):
-        if len(kwargs) > 0:
-            self.update(**kwargs)
-        return self.range
-
-    def __call__(self, x, **kwargs):
-        """Compute the value of the probability density function at x and
-        return the ln of that.
-
-        :params x:
-            x[0] = mass, x[1] = metallicity. Used to calculate the prior
-
-        :param kwargs: optional
-            All extra keyword arguments are used to update the `prior_params`.
-
-        :returns lnp:
-            The natural log of the prior probability at x, scalar or ndarray of
-            same length as the prior object.
-        """
-        if len(kwargs) > 0:
-            self.update(**kwargs)
-        p = np.atleast_2d(np.zeros_like(x))
-        a, b = self.get_args(x[...,0])
-        p[...,1] = self.distribution.pdf(x[...,1], a, b, loc=self.loc(x[...,0]), scale=self.scale(x[...,0]))
-        with np.errstate(invalid='ignore'):
-            p[...,1] = np.log(p[...,1])
-        return p
-
-    def sample(self, nsample=None, **kwargs):
-        """Draw a sample from the prior distribution.
-
-        :param nsample: (optional)
-            Unused
-        """
-        if len(kwargs) > 0:
-            self.update(**kwargs)
-        mass = np.random.uniform(low=self.params['mass_mini'],high=self.params['mass_maxi'],size=nsample)
-        a, b = self.get_args(mass)
-        met = self.distribution.rvs(a, b, loc=self.loc(mass), scale=self.scale(mass), size=nsample)
-        return np.array([mass, met])
-
-    def unit_transform(self, x, **kwargs):
-        """Go from a value of the CDF (between 0 and 1) to the corresponding
-        parameter value.
-
-        :param x:
-            A scalar or vector of same length as the Prior with values between
-            zero and one corresponding to the value of the CDF.
-
-        :returns theta:
-            The parameter value corresponding to the value of the CDF given by
-            `x`.
-        """
-        if len(kwargs) > 0:
-            self.update(**kwargs)
-        mass = x[0]*(self.params['mass_maxi'] - self.params['mass_mini']) + self.params['mass_mini']
-        a, b = self.get_args(mass)
-        met = self.distribution.ppf(x[1], a, b, loc=self.loc(mass), scale=self.scale(mass))
-        return np.array([mass,met])
 
 ###### Redefine SPS ######
 class NebSFH(FastStepBasis):
@@ -532,7 +479,8 @@ class NebSFH(FastStepBasis):
 
     def get_spectrum(self, outwave=None, filters=None, peraa=False, **params):
         """Get a spectrum and SED for the given params.
-        check for flag nebeminspec. if not true,
+        ripped from SSPBasis
+        addition: check for flag nebeminspec. if not true,
         add emission lines directly to photometry
         """
 
@@ -614,40 +562,47 @@ def load_sps(**extras):
     sps = NebSFH(**extras)
     return sps
 
-def load_model(nbins_sfh=7, sigma=0.3, df=2, agelims=[], objname=None, datdir=None, runname=None, zred=None, **extras):
+def load_model(agelims=[], zred=None, alpha_sfh=0.2, **extras):
 
     # we'll need this to access specific model parameters
     n = [p['name'] for p in model_params]
 
-    # first calculate redshift and corresponding t_universe
-    # if no redshift is specified, read from file
-    if zred is None:
-        datname = datdir + objname.split('_')[0] + '_' + runname + '.dat'
-        dat = ascii.read(datname)
-        idx = dat['phot_id'] == int(objname.split('_')[-1])
-        zred = float(dat['z_best'][idx])
-    tuniv = WMAP9.age(zred).value*1e9
+    # first calculate t_universe at z=1
+    tuniv = WMAP9.age(1.0).value
 
     # now construct the nonparametric SFH
-    # current scheme: last bin is 15% age of the Universe, first two are 0-30, 30-100
-    # remaining N-3 bins spaced equally in logarithmic space
-    tbinmax = (tuniv*0.85)
-    agelims = agelims[:2] + np.linspace(agelims[2],np.log10(tbinmax),nbins_sfh-2).tolist() + [np.log10(tuniv)]
-    agebins = np.array([agelims[:-1], agelims[1:]])
+    # current scheme: six bins, four spaced equally in logarithmic 
+    # space AFTER t=100 Myr + BEFORE tuniv-1 Gyr
+    tbinmax = (tuniv-1)*1e9
+    if tbinmax < 0:
+        tbinmax = (tuniv-0.25)*1e9
 
-    # load nvariables and agebins
-    model_params[n.index('agebins')]['N'] = nbins_sfh
+    agelims = agelims[:1] + np.linspace(agelims[1],np.log10(tbinmax),len(agelims)-2).tolist() + [np.log10(tuniv*1e9)]
+    agebins = np.array([agelims[:-1], agelims[1:]])
+    ncomp = len(agelims) - 1
+
+    # load into `agebins` in the model_params dictionary
+    model_params[n.index('agebins')]['N'] = ncomp
     model_params[n.index('agebins')]['init'] = agebins.T
-    model_params[n.index('mass')]['N'] = nbins_sfh
-    model_params[n.index('logsfr_ratios')]['N'] = nbins_sfh-1
-    model_params[n.index('logsfr_ratios')]['init'] = np.full(nbins_sfh-1,0.0) # constant SFH
-    model_params[n.index('logsfr_ratios')]['prior'] = priors.StudentT(mean=np.full(nbins_sfh-1,0.0),
-                                                                      scale=np.full(nbins_sfh-1,sigma),
-                                                                      df=np.full(nbins_sfh-1,df))
-    # set mass-metallicity prior
+
+    # now we do the computational z-fraction setup
+    # number of zfrac variables = (number of SFH bins - 1)
+    # set initial with a constant SFH
+    # if alpha_SFH is a vector, use this as the alpha array
+    # else assume all alphas are the same
+    model_params[n.index('mass')]['N'] = ncomp
+    model_params[n.index('z_fraction')]['N'] = ncomp-1
+    if type(alpha_sfh) != type(np.array([])):
+        alpha = np.repeat(alpha_sfh,ncomp-1)
+    else:
+        alpha = alpha_sfh
+    tilde_alpha = np.array([alpha[i-1:].sum() for i in xrange(1,ncomp)])
+    model_params[n.index('z_fraction')]['prior'] = priors.Beta(alpha=tilde_alpha, beta=alpha, mini=0.0, maxi=1.0)
+    model_params[n.index('z_fraction')]['init'] = np.array([(i-1)/float(i) for i in range(ncomp,1,-1)])
+    model_params[n.index('z_fraction')]['init_disp'] = 0.02
+
     # insert redshift into model dictionary
-    model_params[n.index('massmet')]['prior'] = MassMet(z_mini=-1.98, z_maxi=0.19, mass_mini=7, mass_maxi=12.5)
-    model_params[n.index('zred')]['init'] = zred
+    model_params[n.index('zred')]['init'] = 0.0
 
     return sedmodel.SedModel(model_params)
 
