@@ -423,13 +423,13 @@ model_params.append({'name': 'duste_gamma', 'N': 1,
                         'isfree': True,
                         'init': 0.01,
                         'units': None,
-                        'prior': priors.TopHat(mini=0.0, maxi=1.0)})
+                        'prior': priors.TopHat(mini=0.0, maxi=0.15)})
 
 model_params.append({'name': 'duste_umin', 'N': 1,
                         'isfree': True,
                         'init': 1.0,
                         'units': None,
-                        'prior': priors.TopHat(mini=0.1, maxi=25.0)})
+                        'prior': priors.TopHat(mini=0.1, maxi=15.0)})
 
 model_params.append({'name': 'duste_qpah', 'N': 1,
                         'isfree': True,
