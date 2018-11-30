@@ -5,8 +5,7 @@ from prospect.sources import CSPSpecBasis
 from sedpy import observate
 from astropy.cosmology import WMAP9
 from td_io import load_zp_offsets
-tophat = priors.tophat
-logarithmic = priors.logarithmic
+from astropy.io import ascii
 APPS = os.getenv('APPS')
 
 #############
@@ -17,20 +16,14 @@ run_params = {'verbose':True,
               'debug': False,
               'outfile': APPS+'/prospector_alpha/results/fast_mimic/AEGIS_13',
               'nofork': True,
-              # Optimizer params
-              'ftol':0.5e-5, 
-              'maxfev':5000,
-              # MCMC params
-              'nwalkers':140,
-              'nburn':[50,100,100], 
-              'niter': 5000,
-              'interval': 0.2,
-              # Convergence criteria
-              'convergence_check_interval': 50,
-              'convergence_chunks': 400,
-              'convergence_kl_threshold': 0.016,
-              'convergence_stable_points_criteria': 8, 
-              'convergence_nhist': 50,
+              # dynesty params
+              'nested_bound': 'multi', # bounding method
+              'nested_sample': 'rwalk', # sampling method
+              'nested_bootstrap': 10, # how much bootstrapping? tone down a bit
+              'nested_nlive_batch': 200, # size of live point "batches"
+              'nested_nlive_init': 100, # number of initial live points
+              'nested_weight_kwargs': {'pfrac': 1.0}, # weight posterior over evidence by 100%
+              'nested_dlogz_init': 0.01,
               # Model info
               'zcontinuous': 2,
               'compute_vega_mags': False,
@@ -38,7 +31,7 @@ run_params = {'verbose':True,
               'interp_type': 'logarithmic',
               # Data info (phot = .cat, dat = .dat, fast = .fout)
               'datdir':APPS+'/prospector_alpha/data/3dhst/',
-              'runname': 'fast_mimic',
+              'runname': 'td_new',
               'objname':'AEGIS_13'
               }
 
