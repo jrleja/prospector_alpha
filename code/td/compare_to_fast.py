@@ -513,20 +513,15 @@ def do_all(runname='td_delta', runname_fast=None,outfolder=None,**opts):
 
     phot_residuals_by_flux(data,outfolder,popts)
 
-    sfr_m_grid(data, datag, outfolder+'conditional_sfr_m.png',outfile=outfolder+'data/conditional_sfr_fit.h5')
-    sfr_m_grid(data, datag, outfolder+'conditional_sfr_m_nofix.png',fix=False,outfile=outfolder+'data/conditional_sfr_fit_nofix.h5')
-    dm_dsfr_grid(data, datag, outfolder, outtable)
-    deltam_with_redshift(data['fast'], data['prosp'], data['fast']['z'], outfolder+'deltam_vs_z.png', filename=outfolder+'data/masscomp.h5')
-
-    # mass_met_age_z(data, outfolder, outtable, popts) # this is now deprecated
-    deltam_spearman(data['fast'],data['prosp'],
-                    outfolder+'deltam_spearman_fast_to_palpha.png',popts)
-
     # star-forming sequence.
     idx = (data['uvir_sfr'] > 0) & (data['fast']['uvj_prosp'] < 3) # to make it look like Kate's selection
     zred = data['fast']['z']
-    uvir_sfr, prosp_sfr = np.log10(data['uvir_sfr']), np.log10(data['prosp']['sfr_30']['q50'])
+    uvir_sfr, prosp_sfr = np.log10(data['uvir_sfr']), np.log10(data['prosp']['sfr_100']['q50'])
     fast_mass, prosp_mass = data['fast']['stellar_mass'], data['prosp']['stellar_mass']['q50']
+
+    illustris_sfseq(prosp_sfr[idx], prosp_mass[idx], zred[idx],
+                    outfolder+'prospector_sf_sequence.png',popts,outfile='~',
+                    xlabel='', ylabel='')
 
     star_forming_sequence(uvir_sfr[idx], fast_mass[idx], zred[idx],
                           outfolder+'star_forming_sequence_uvir.png',popts,
@@ -546,6 +541,16 @@ def do_all(runname='td_delta', runname_fast=None,outfolder=None,**opts):
                           xlabel='[FAST]', ylabel=r'[UV+IR$_{\mathrm{model}}$]',outfile=outfolder+'data/sfrcomp_uvir.h5')
 
     uvir_comparison(data,outfolder+'ssfr_uvir_comparison', popts, filename=outfolder+'data/ssfrcomp.h5', ssfr=True)
+
+    sfr_m_grid(data, datag, outfolder+'conditional_sfr_m.png',outfile=outfolder+'data/conditional_sfr_fit.h5')
+    sfr_m_grid(data, datag, outfolder+'conditional_sfr_m_nofix.png',fix=False,outfile=outfolder+'data/conditional_sfr_fit_nofix.h5')
+    dm_dsfr_grid(data, datag, outfolder, outtable)
+    deltam_with_redshift(data['fast'], data['prosp'], data['fast']['z'], outfolder+'deltam_vs_z.png', filename=outfolder+'data/masscomp.h5')
+
+    # mass_met_age_z(data, outfolder, outtable, popts) # this is now deprecated
+    deltam_spearman(data['fast'],data['prosp'],
+                    outfolder+'deltam_spearman_fast_to_palpha.png',popts)
+
 
     # if we have FAST-mimic runs, do a thorough comparison
     # else just do Prospector-FAST
@@ -569,7 +574,7 @@ def do_all(runname='td_delta', runname_fast=None,outfolder=None,**opts):
     phot_residuals(data,outfolder,popts)
     prospector_versus_z(data,outfolder+'prospector_versus_z.png',popts)
     sfr_mass_density_comparison(data,outfolder=outfolder)
-    print 1/0
+
     # full UV+IR comparison
     #uvir_comparison(data,outfolder+'sfr_uvir_comparison', popts, ssfr=False)
     #uvir_comparison(data,outfolder+'sfr_uvir_comparison_model',  popts, model_uvir = True, ssfr=False)
@@ -1019,7 +1024,6 @@ def dm_dsfr_grid(data,datag,outfolder,outtable,normalize=True):
 
         plt.savefig(opt['outname'],dpi=dpi)
         plt.close()
-    print 1/0
 
 def deltam_spearman(fast,prosp,outname,popts):
 
@@ -1525,6 +1529,91 @@ def mass_met_age_z(data,outfolder,outtable,popts):
 
         plt.savefig(opt['outname'],dpi=dpi)
         plt.close()
+
+def illustris_sfseq(sfr,mass,zred,outname,popts,xlabel=None,ylabel=None,outfile=None,priors=False,plt_whit=True):
+    """ Plot <SFR(M)> for input mass, SFR
+    """
+
+    # Figure geometry
+    fig, ax = plt.subplots(1, 2, figsize = (7,3.5))
+    ax = np.ravel(ax)
+
+    # colors and limits
+    medopts = {'marker':' ','alpha':0.85,'zorder':5,'lw':3}
+    corrected_opts = {'marker':' ','alpha':0.85,'color':'orange','zorder':5,'lw':1.5}
+    fs, lw, ms = 12, 3, 5.5
+    xlim = (8.8, 11.5)
+    ylim = (0.01,900)
+    xtitle = r'log(M/M$_{\odot}$) ' + xlabel
+    ytitle = r'SFR/M$_{\odot}$ yr$^{-1}$ ' + ylabel
+
+    # mass and redshift bins
+    zbins = np.array([[0.8,1.2],[1.8,2.2]])
+    zlabels = ["{0:.1f}".format(zbins[i,0])+'<z<'+"{0:.1f}".format(zbins[i,1]) for i in range(2)]
+    mbins = np.linspace(xlim[0],xlim[1],14)
+    sfr = 10**sfr
+
+    # Whitaker+14 SFR-M relationship
+    zwhit = np.array([0.75, 1.25, 1.75, 2.25])
+    logm_whit = np.linspace(xlim[0],xlim[1],50)
+    whitopts = {'color':'#dd1c77','alpha':0.85,'lw':1.5,'zorder':5,'linestyle':'-.'}
+
+    # let's go!
+    mass_save, sfr_save = [], []
+    for i in range(2):
+
+        # the data
+        in_bin = (zred > zbins[i,0]) & \
+                 (zred <= zbins[i,1]) & \
+                 (np.isfinite(sfr))
+        ax[i].errorbar(mass[in_bin], sfr[in_bin], **popts)
+
+        # calculate and plot running average
+        x, y = prosp_dutils.running_median(mass[in_bin], sfr[in_bin], bins=mbins,avg=False)
+        ax[i].errorbar(x, y, color=cmap[i],**medopts)
+
+        # scales
+        subsy, tickfs = ([1]), fs
+        ax[i].set_yscale('log', subsy=subsy)
+        ax[i].yaxis.set_minor_formatter(FormatStrFormatter('%2.4g'))
+        ax[i].yaxis.set_major_formatter(FormatStrFormatter('%2.4g'))
+        for tl in ax[i].get_yticklabels():tl.set_visible(False)
+        ax[i].tick_params('both', pad=3.5, labelsize=tickfs,size=3.5, width=1.0, which='both')
+
+        # labels
+        ax[i].set_xlabel(xtitle,fontsize=fs)
+        for tl in ax[i].get_xticklabels():tl.set_fontsize(fs)
+        ax[i].xaxis.set_major_locator(MaxNLocator(3))
+
+        ax[i].set_ylabel(ytitle,fontsize=fs)
+        for tl in ax[i].get_yticklabels():tl.set_fontsize(fs)
+
+        # the Whitaker+14 model
+        sfr_whit = 10**sfr_ms(np.full(logm_whit.shape[0],zbins.mean(axis=1)[i]),logm_whit)
+        ax[i].plot(logm_whit, sfr_whit, **whitopts)
+        ax[0].text(0.02,0.93,'Whitaker+14',color=whitopts['color'],transform=ax[0].transAxes)
+
+        # zlabel
+        ax[i].text(0.98, 0.05, zlabels[i],transform=ax[i].transAxes,zorder=1,ha='right')
+
+        # save masses and star formation rates
+        mass_save += x.tolist()
+        sfr_save += [y.tolist()]
+
+    # limits
+    for a in ax:
+        a.set_xlim(xlim)
+        a.set_ylim(ylim)
+
+    plt.tight_layout()
+    plt.savefig(outname,dpi=150)
+    plt.close()
+
+    # save data
+    if outfile is not None:
+        out = {'mass':x,'sfr':np.array(sfr_save).T,'z':zwhit}
+        np.savetxt('/Users/joel/z1.dat', np.transpose([x,np.array(sfr_save)[0,:]]), fmt='%1.4f', header='mass,sfr')
+        np.savetxt('/Users/joel/z2.dat', np.transpose([x,np.array(sfr_save)[1,:]]), fmt='%1.4f', header='mass,sfr')
 
 def star_forming_sequence(sfr,mass,zred,outname,popts,xlabel=None,ylabel=None,outfile=None,priors=False,
                           plt_whit=True):

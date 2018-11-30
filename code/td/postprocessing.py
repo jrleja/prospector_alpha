@@ -90,6 +90,7 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True, measure_
     eout['obs']['spec'] = np.zeros(shape=(ncalc,sps.wavelengths.shape[0]))
     eout['obs']['mags'] = np.zeros(shape=(ncalc,len(res['obs']['filters'])))
     eout['obs']['uvj'] = np.zeros(shape=(ncalc,3))
+    eout['obs']['rf'] = np.zeros(shape=(ncalc,3))
     eout['obs']['lam_obs'] = sps.wavelengths
     elines = ['H beta 4861', 'H alpha 6563','Br gamma 21657','Pa alpha 18752']
     eout['obs']['elines'] = {key: {'ew': deepcopy(fmt), 'flux': deepcopy(fmt)} for key in elines}
@@ -144,12 +145,13 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True, measure_
         # measure from rest-frame spectrum
         t2 = time.time()
         props = prosp_dutils.measure_restframe_properties(sps, thetas = thetas, model=res['model'], measure_uvj=True, abslines=measure_abslines, 
-                                                          measure_ir=True, measure_luv=True, measure_mir=True, emlines=elines)
+                                                          measure_ir=True, measure_luv=True, measure_mir=True, emlines=elines,measure_rf=True)
         eout['extras']['lir']['chain'][jj] = props['lir']
         eout['extras']['luv']['chain'][jj] = props['luv']
         eout['extras']['lmir']['chain'][jj] = props['lmir']
         eout['obs']['dn4000']['chain'][jj] = props['dn4000']
         eout['obs']['uvj'][jj,:] = props['uvj']
+        eout['obs']['rf'][jj,:] = props['rf']
 
         for e in elines: 
             eout['obs']['elines'][e]['flux']['chain'][jj] = props['emlines'][e]['flux']
@@ -171,7 +173,7 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True, measure_
         nodep_model.params['mass'] = np.zeros_like(res['model'].params['mass'])
         nodep_model.params['mass'][:1] = res['model'].params['mass'][:1]
         try:
-            out = prosp_dutils.measure_restframe_properties(sps, model = nodep_model, thetas = nagn_thetas, measure_ir = True, measure_luv = True)
+            out = prosp_dutils.measure_restframe_properties(sps, model = nodep_model, thetas = nagn_thetas, measure_ir=True, measure_luv=True)
         except AssertionError: # this fails sometimes if SFR(0-100) Myr is near zero
             out = {'luv': 0.0, 'lir': 0.0}
         eout['extras']['luv_young']['chain'][jj] = out['luv']

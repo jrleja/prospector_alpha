@@ -206,7 +206,7 @@ def transform_chain(flatchain, model):
     return flatchain.squeeze(), parnames
 
 def add_sfh_plot(eout,fig,ax_loc=None,
-                 main_color=None,tmin=0.01,
+                 main_color=None,tmin=0.01,smooth_sfh=False,
                  text_size=1,ax_inset=None,lw=1,truth_dict=None):
     """add a small SFH plot at ax_loc
     text_size: multiply font size by this, to accomodate larger/smaller figures
@@ -237,6 +237,10 @@ def add_sfh_plot(eout,fig,ax_loc=None,
             # exact answer for binned SFHs
             idx = np.abs(eout['sfh']['t'] - tvec[jj]).argmin(axis=-1)
             perc[jj,:] = dyplot._quantile(eout['sfh']['sfh'][np.arange(idx.shape[0]),idx],[0.16,0.50,0.84],weights=eout['weights'])
+
+        if smooth_sfh:
+            for j in range(3):
+                perc[:,j] = norm_kde(perc[:,j],1)
 
         #### plot SFH
         ax_inset.plot(tvec, perc[:,1],'-',color=main_color[i],lw=lw)

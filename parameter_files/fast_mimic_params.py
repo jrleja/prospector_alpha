@@ -45,7 +45,7 @@ run_params = {'verbose':True,
 ############
 # OBS
 #############
-def load_obs(objname=None, datdir=None, err_floor=0.05, zperr=True, **extras):
+def load_obs(objname=None, datdir=None, runname=None, err_floor=0.05, zperr=True, no_zp_corrs=False, **extras):
 
     ''' 
     objname: number of object in the 3D-HST COSMOS photometric catalog
@@ -54,12 +54,11 @@ def load_obs(objname=None, datdir=None, err_floor=0.05, zperr=True, **extras):
     '''
 
     ### open file, load data
-    photname = datdir + objname.split('_')[0] + '_td_new.cat'
+    photname = datdir + objname.split('_')[0] + '_' + runname + '.cat'
     with open(photname, 'r') as f:
         hdr = f.readline().split()
     dtype = np.dtype([(hdr[1],'S20')] + [(n, np.float) for n in hdr[2:]])
-    dat = np.loadtxt(photname, comments = '#', delimiter=' ',
-                     dtype = dtype)
+    dat = np.loadtxt(photname, comments = '#', delimiter=' ', dtype = dtype)
 
     ### extract filters, fluxes, errors for object
     # from ReadMe: "All fluxes are normalized to an AB zeropoint of 25, such that: magAB = 25.0-2.5*log10(flux)
@@ -79,31 +78,55 @@ def load_obs(objname=None, datdir=None, err_floor=0.05, zperr=True, **extras):
 
     ### define photometric mask, convert to maggies
     phot_mask = (flux != unc) & (flux != -99.0) & (unc > 0)
-    phot_mask[mips_idx] = False # NO DUST EMISSION FOR FAST!
     maggies = flux/(1e10)
     maggies_unc = unc/(1e10)
 
-    ### implement error floor
-    maggies_unc = np.clip(maggies_unc, maggies*err_floor, np.inf)
-
-    ### inflate errors by zeropoint offsets from Table 11, Skelton+14
+    # deal with the zeropoint errors
     # ~5% to ~20% effect
-    if zperr:
+    # either REMOVE them or INFLATE THE ERRORS by them
+    # in general, we don't inflate errors of space-based bands
+    # if use_zp is set, RE-APPLY these offsets
+    if (zperr) or (no_zp_corrs):
+        no_zp_correction = ['f435w','f606w','f606wcand','f775w','f814w',
+                            'f814wcand','f850lp','f850lpcand','f125w','f140w','f160w']
         zp_offsets = load_zp_offsets(None)
         band_names = np.array([x['Band'].lower()+'_'+x['Field'].lower() for x in zp_offsets])
         for ii,f in enumerate(filters):
             match = band_names == f
             if match.sum():
-                maggies_unc[ii] = ( (maggies_unc[ii]**2) + (maggies[ii]*(1-zp_offsets[match]['Flux-Correction'][0]))**2 ) **0.5
+                in_exempt = len([s for s in no_zp_correction if s in f])
+                if (no_zp_corrs) & (not in_exempt):
+                    maggies[ii] /= zp_offsets[match]['Flux-Correction'][0]
+                    maggies_unc[ii] /= zp_offsets[match]['Flux-Correction'][0]
+                if zperr & (not in_exempt):
+                    maggies_unc[ii] = ( (maggies_unc[ii]**2) + (maggies[ii]*(1-zp_offsets[match]['Flux-Correction'][0]))**2 ) **0.5
+
+    ### implement error floor
+    maggies_unc = np.clip(maggies_unc, maggies*err_floor, np.inf)
 
     ### if we have super negative flux, then mask it !
     ### where super negative is <0 with 95% certainty
     neg = (maggies < 0) & (np.abs(maggies/maggies_unc) > 2)
     phot_mask[neg] = False
 
+    ### mask anything touching or bluewards of Ly-a
+    ### or redwards of 3um
+    datname = datdir + objname.split('_')[0] + '_' + runname + '.dat'
+    dat = ascii.read(datname)
+    idx = dat['phot_id'] == int(objname.split('_')[-1])
+    zred = float(dat['z_best'][idx])
+    ofilters = observate.load_filters(filters)
+
+    wavemax = np.array([f.wavelength[f.transmission > (f.transmission.max()*0.1)].max() for f in ofilters]) / (1+zred)
+    wavemin = np.array([f.wavelength[f.transmission > (f.transmission.max()*0.1)].min() for f in ofilters]) / (1+zred)
+    filtered = [1230]
+    for f in filtered: phot_mask[(wavemax > f) & (wavemin < f)] = False
+    phot_mask[wavemin < 1200] = False
+    phot_mask[wavemax > 30000] = False
+
     ### build output dictionary
     obs = {}
-    obs['filters'] = observate.load_filters(filters)
+    obs['filters'] = ofilters
     obs['wave_effective'] = np.array([filt.wave_effective for filt in obs['filters']])
     obs['phot_mask'] = phot_mask
     obs['maggies'] = maggies
@@ -113,6 +136,7 @@ def load_obs(objname=None, datdir=None, err_floor=0.05, zperr=True, **extras):
     obs['logify_spectrum'] = False
 
     return obs
+
 
 ##########################
 # TRANSFORMATION FUNCTIONS

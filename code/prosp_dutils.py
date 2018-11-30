@@ -493,31 +493,6 @@ def g05_prior(size=1000):
 
     return tavg
 
-def exp_decl_sfh_avg_age_with_burst(tage,tau,Aburst,tburst):
-    """ this is done numerically
-    assume bursts are instantaneous
-    and that ONLY ONE burst can happen
-    these assumptions are incorrect!
-    """
-
-    # set up SFR(t) for declining SFH
-    t = np.linspace(0,tage,1000)
-    delta_t = t[1]-t[0]
-    sfr_t = np.exp(-t/tau)
-    mass = np.trapz(sfr_t,x=t)
-
-    # add in burst, renormalize
-    if tburst < tage:
-        mformed = mass*Aburst
-        mass += mformed
-        idx = np.abs(t-tburst).argmin()
-        sfr_t[idx] += (mformed/delta_t)
-
-    # numerical calculation of tavg
-    tavg = np.trapz(t*sfr_t,x=t) / mass
-    return tavg
-
-
 def exp_decl_sfh_avg_age(tage,tau):
     ''' this is done numerically
     '''
@@ -1169,7 +1144,7 @@ def estimate_xray_lum(sfr):
 
 def measure_restframe_properties(sps, model = None, thetas = None, emlines = False,
                                  measure_ir = False, measure_luv = False, measure_mir = False,
-                                 abslines = False, measure_uvj = False):
+                                 abslines = False, measure_rf = False, measure_uvj=False):
     """measures a variety of rest-frame properties: total IR luminosity,
     total UV luminosity, total MIR luminosity, emission line luminosity, etc.
     absorption line depths can be measured as well, via fixed definitions.
@@ -1199,6 +1174,8 @@ def measure_restframe_properties(sps, model = None, thetas = None, emlines = Fal
     if measure_uvj:
         from sedpy.observate import load_filters
         filters = ['bessell_U','bessell_V','twomass_J']# ,'bessell_B','bessell_R','twomass_Ks']
+        if measure_rf:
+            filters += ['sdss_g0','sdss_r0','sdss_i0']
         obs['filters'] += load_filters(filters)
 
     ### calculate SED. comes out as maggies per Hz, @ 10pc
@@ -1236,8 +1213,10 @@ def measure_restframe_properties(sps, model = None, thetas = None, emlines = Fal
     if measure_mir:
         out['lmir'] = return_lmir(w,spec, z=None)/constants.L_sun.cgs.value # comes out in ergs/s, convert to Lsun
     if measure_uvj:
-        out['uvj'] = mags
-        out['photname'] = filters
+        out['uvj'] = mags[:3]
+        out['photname'] = filters[:3]
+    if measure_rf:
+        out['rf'] = mags[3:]
 
     return out
 
