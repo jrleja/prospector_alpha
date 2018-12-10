@@ -118,13 +118,13 @@ def create_prosp_filename(filebase,postprocessing=False):
         files = [f for f in os.listdir(folder) if ((filename == ("_".join(f.split('_')[:-2]))) & (f[-4:] == 'post'))]
 
     # take the oldest
-    times = [f.split('_')[-2] for f in files]
-    fbase = files[np.array(times).astype(float).argmax()]
-
     # if we found no files, skip this object
+    times = [f.split('_')[-2] for f in files]
     if len(times) == 0:
         print 'Failed to find any files to extract times in ' + folder + ' of form ' + filename
-        return None,None,None
+        return None,None
+    fbase = files[np.array(times).astype(float).argmax()]
+
 
     # generate output
     mcmc_filename = "/".join(filebase.split('/')[:-1])+'/'+"_".join(fbase.split('_')[:-1])+'_mcmc.h5'

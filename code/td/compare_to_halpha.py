@@ -20,7 +20,7 @@ def nii_ha_ratio():
     func = interp2d(mass, zred, dat, kind='cubic')
     return func
 
-def collate_data(runname, filename=None, regenerate=False, **opts):
+def collate_data(runname, runname_sample, filename=None, regenerate=False, **opts):
     
     ### if it's already made, load it and give it back
     # else, start with the making!
@@ -49,9 +49,18 @@ def collate_data(runname, filename=None, regenerate=False, **opts):
     ancil = []
     allfields = np.unique(field).tolist()
     for f in allfields:
-        ancil.append(td_io.load_ancil_data(runname,f))
+        ancil.append(td_io.load_ancil_data(runname_sample,f))
 
     for i, name in enumerate(basenames):
+
+        ### if H-alpha is not detected, dump and continue
+        objfield = name.split('/')[-2]
+        objnumber = int(name.split('_')[-1])
+        fidx = allfields.index(objfield)
+        oidx = ancil[fidx]['phot_id'] == objnumber
+
+        if (ancil[fidx]['Ha_FLUX'][oidx][0] == -99):
+            continue
 
         #### load input
         # make sure all files exist
@@ -63,7 +72,6 @@ def collate_data(runname, filename=None, regenerate=False, **opts):
         if prosp is None:
             continue
         out['objname'].append(name.split('/')[-1])
-        objfield = out['objname'][-1].split('_')[0]
         objnumber = int(out['objname'][-1].split('_')[1])
 
         # fill in model data
@@ -73,9 +81,6 @@ def collate_data(runname, filename=None, regenerate=False, **opts):
 
         # fill in observed data
         # comes out in observed-frame EW and (10**-17 ergs / s / cm**2)
-        fidx = allfields.index(objfield)
-        oidx = ancil[fidx]['phot_id'] == objnumber
-
         # account for NII / Halpha ratio, distance
         zred = ancil[fidx]['z_best'][oidx][0]
         mass = np.log10(prosp['extras']['stellar_mass']['q50'])
@@ -99,7 +104,7 @@ def collate_data(runname, filename=None, regenerate=False, **opts):
     hickle.dump(out,open(filename, "w"))
     return out
 
-def do_all(runname='td_ha', outfolder=None,**opts):
+def do_all(runname='td_delta',runname_sample='td_new', outfolder=None,**opts):
 
     if outfolder is None:
         outfolder = os.getenv('APPS') + '/prospector_alpha/plots/'+runname+'/fast_plots/'
@@ -107,7 +112,7 @@ def do_all(runname='td_ha', outfolder=None,**opts):
             os.makedirs(outfolder)
             os.makedirs(outfolder+'data/')
 
-    data = collate_data(runname,filename=outfolder+'data/hacomp.h5',**opts)
+    data = collate_data(runname,runname_sample,filename=outfolder+'data/hacomp.h5',**opts)
 
     plot(data,outfolder)
 
@@ -118,7 +123,7 @@ def plot(data, outfolder):
     fs = 18 # font size
     symopts = {'ms':1.2,'alpha':0.6,'color':'#545454','linestyle':' '}
     ebaropts = {'fmt':'o', 'ecolor':'k', 'capthick':0.1, 'elinewidth':0.1, 'alpha':0.3, 'ms':0.0, 'zorder':-2} 
-    sn_limit = 5
+    sn_limit = 10
     sn_mod_limit = 5
 
     # make cuts
@@ -127,9 +132,9 @@ def plot(data, outfolder):
     sn_ew = data['ha_ew_obs']['val'] / data['ha_ew_obs']['err']
     sn_mod_ew = data['ha_ew_mod']['q50'] / ((data['ha_ew_mod']['q84'] - data['ha_ew_mod']['q16'])/2.)
     idx = (sn > sn_limit) & np.isfinite(sn) & \
-          (sn_mod > sn_mod_limit) & \
-          (sn_ew > sn_limit) & np.isfinite(sn_ew) & \
-          (sn_mod_ew > sn_mod_limit)
+          (sn_ew > sn_limit) & np.isfinite(sn_ew) #& \
+          #(sn_mod > sn_mod_limit) & \
+          #(sn_mod_ew > sn_mod_limit)
 
     # grab data
     xplot = data['ha_flux_obs']['val'][idx]

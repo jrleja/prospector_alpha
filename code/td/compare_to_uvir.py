@@ -10,6 +10,7 @@ from fix_ir_sed import mips_to_lir
 from scipy.stats import spearmanr
 from astropy.table import Table
 from astropy.io import ascii
+from scipy.optimize import curve_fit
 
 plt.ioff()
 
@@ -157,7 +158,7 @@ def do_all(runname='td_delta', outfolder=None,**opts):
 
     plot_uvir_comparison(data,outfolder)
     plot_heating_sources(data,outfolder)
-    plot_heating_sources(data,outfolder,old_stars_only=True,outtable=outfolder+'tables/old_stars.dat')
+    plot_heating_sources(data,outfolder,old_stars_only=True,fit_curve=True)
     plot_spearmanr(data, outfolder+'deltasfr_spearman.png')
     plot_spearmanr_vs_ssfr(data, outfolder+'spearmanr_vs_ssfr.png')
 
@@ -201,14 +202,14 @@ def plot_uvir_comparison(data, outfolder):
     plt.savefig(outfolder+'prosp_uvir_to_obs_uvir.png',dpi=dpi)
     plt.close()
 
-def plot_heating_sources(data, outfolder, color_by_fagn=False, color_by_logzsol=True, old_stars_only=False,outtable=None):
+def plot_heating_sources(data, outfolder, color_by_fagn=False, color_by_logzsol=True, old_stars_only=False,outtable=None,fit_curve=False):
 
     fig, ax = plt.subplots(1, 1, figsize = (5,4))
 
     # first plot SFR ratio versus heating by young stars
     # grab quantities
     x = data['young_star_heating_fraction']['q50']
-    y = data['sfr_prosp_30']['q50'] / data['sfr_uvir_truelir_prosp']['q50']
+    y = data['sfr_prosp']['q50'] / data['sfr_uvir_truelir_prosp']['q50']
 
     # add colored points and colorbar
     ax.axis([0,1,0,1.2])
@@ -240,6 +241,7 @@ def plot_heating_sources(data, outfolder, color_by_fagn=False, color_by_logzsol=
         fig2, ax2 = plt.subplots(1, 1, figsize = (4,4))
         ax2 = np.atleast_1d(ax2)
         yvars = [data['old_star_heating_fraction']['q50']]
+        yerrs = [(data['old_star_heating_fraction']['q84']-data['old_star_heating_fraction']['q16'])/2.]
         ylabels = [r'(L$_{\mathrm{IR}}$+L$_{\mathrm{UV}}$)$_{\mathrm{old\/stars}}$/(L$_{\mathrm{IR}}$+L$_{\mathrm{UV}}$)$_{\mathrm{total}}$']
         ax2_outname = 'heating_fraction_vs_ssfr.png'
     else:
@@ -249,17 +251,29 @@ def plot_heating_sources(data, outfolder, color_by_fagn=False, color_by_logzsol=
                    r'(L$_{\mathrm{IR}}$+L$_{\mathrm{UV}}$)$_{\mathrm{old\/stars}}$/(L$_{\mathrm{IR}}$+L$_{\mathrm{UV}}$)$_{\mathrm{total}}$',
                    r'(L$_{\mathrm{IR}}$+L$_{\mathrm{UV}}$)$_{\mathrm{AGN}}$/(L$_{\mathrm{IR}}$+L$_{\mathrm{UV}}$)$_{\mathrm{total}}$']
         ax2_outname = 'heating_fraction_vs_ssfr_all.png'
-    xvar = np.log10(data['ssfr_prosp_30']['q50'])
+    xvar = np.log10(data['ssfr_prosp']['q50'])
     
     # running median
     xlim, nbins = (-13,-7.9), 20
     bins = np.linspace(xlim[0],xlim[1],nbins)
     for i,yvar in enumerate(yvars): 
         ax2[i].errorbar(xvar, yvar, **popts)
-        x, y, bincount = prosp_dutils.running_median(xvar,yvar,avg=False,weights=np.ones_like(xvar),return_bincount=True,bins=bins)
-        x, y = x[bincount > nbin_min], y[bincount > nbin_min]
-        yerr = prosp_dutils.asym_errors(y[:,0], y[:,1], y[:,2])
-        ax2[i].errorbar(x,y[:,0],yerr=yerr, label='running median',**medopts)
+
+        if fit_curve:
+            pars, cov = curve_fit(tanh_fit,xvar,yvar,sigma=None)
+            print pars
+            xr = np.linspace(xlim[0],xlim[1],100)
+            ax2[i].plot(xr,tanh_fit(xr,*pars),**medopts)
+
+            pbins, siglow, sighigh = prosp_dutils.running_sigma(xvar,yvar,bins=bins)
+            pbins[0] = xlim[0]
+            pbins[-1] = xlim[1]
+            ax2[i].fill_between(pbins, siglow, sighigh, alpha=0.2,color=medopts['color'],linewidth=2,zorder=10)
+        else:
+            x, y, bincount = prosp_dutils.running_median(xvar,yvar,avg=False,weights=np.ones_like(xvar),return_bincount=True,bins=bins)
+            x, y = x[bincount > nbin_min], y[bincount > nbin_min]
+            yerr = prosp_dutils.asym_errors(y[:,0], y[:,1], y[:,2])
+            ax2[i].errorbar(x,y[:,0],yerr=yerr, label='running median',**medopts)
 
     # labels and limits
     for i, a in enumerate(ax2): 
@@ -275,13 +289,15 @@ def plot_heating_sources(data, outfolder, color_by_fagn=False, color_by_logzsol=
         ax2[0].set_ylim(-0.05,1)
 
         # De Looze 2014 result
+        """
         dl_color = '#08d80c'
         xarr = np.linspace(xlim[0],-9.9,200)
         logheating = 0.42*xarr+4.14
         yarr = 1-10**logheating
         ax2[0].plot(xarr,yarr,'-',color=dl_color,lw=2.5, label='De Looze+14',zorder=1)
         ax2[0].legend(loc=1,prop={'size':8.5}, scatterpoints=1,fancybox=True)
-
+        """
+        
     # clean up
     fig.tight_layout()
     fig2.tight_layout()
@@ -292,12 +308,15 @@ def plot_heating_sources(data, outfolder, color_by_fagn=False, color_by_logzsol=
     plt.close()
 
     # write table
-    if old_stars_only:
+    if (old_stars_only) & (outtable is not None):
         odat = Table([np.array(x), np.array(y[:,0]), np.array(y[:,1]), y[:,2]], 
                       names=['log(sSFR/Gyr$^{-1}$)', 'P50', 'P84', 'P16'])
         formats = {name: '%1.2f' for name in odat.columns.keys()}
         formats['log(sSFR/Gyr$^{-1}$)'] = '%1.1f'
         ascii.write(odat, outtable, format='aastex',overwrite=True, formats=formats)
+
+def tanh_fit(x,a,b):
+    return 0.5*(np.tanh(a*x-b)+1)
 
 def plot_spearmanr(data, outname):
     """delta(sSFR) versus log(Z/Zsun), stellar age, fagn
@@ -341,7 +360,6 @@ def plot_spearmanr(data, outname):
     plt.tight_layout()
     plt.savefig(outname,dpi=dpi)
     plt.close()
-
 
 def plot_spearmanr_vs_ssfr(data, outname):
     """sSFR versus Spearman R for multiple variables

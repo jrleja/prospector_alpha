@@ -99,6 +99,22 @@ def asym_errors(center, up, down, log=False):
 
     return errarray
 
+def running_sigma(x,y,nbins=10,bins=None):
+
+    if bins is None:
+        bins = np.linspace(x.min(),x.max()*1.001, nbins+1)
+    else:
+        nbins = len(bins)-1
+        
+    idx  = np.digitize(x,bins)
+
+    # RUNNING SIGMA
+    siglow, sighigh = np.empty(nbins), np.empty(nbins)
+    for k in range(nbins): siglow[k], sighigh[k] = np.percentile(y[idx-1==k],[16,84])
+    outbins = (bins[:-1]+bins[1:])/2.
+
+    return outbins,np.array(siglow),np.array(sighigh)
+
 def running_median(x,y,nbins=10,avg=False,weights=None,bins=None,return_bincount=False):
 
     if bins is None:

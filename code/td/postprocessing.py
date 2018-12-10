@@ -171,7 +171,7 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True, measure_
 
         # isolate young star contribution
         nodep_model.params['mass'] = np.zeros_like(res['model'].params['mass'])
-        nodep_model.params['mass'][:1] = res['model'].params['mass'][:1]
+        nodep_model.params['mass'][:2] = res['model'].params['mass'][:2]
         try:
             out = prosp_dutils.measure_restframe_properties(sps, model = nodep_model, thetas = nagn_thetas, measure_ir=True, measure_luv=True)
         except AssertionError: # this fails sometimes if SFR(0-100) Myr is near zero

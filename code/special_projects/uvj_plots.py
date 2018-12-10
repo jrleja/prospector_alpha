@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import uvj_old_params as pfile
+import uvj_dirichlet_params as pfile
 import os, pickle, hickle, td_io, prosp_dutils
 from prospector_io import load_prospector_data
 from scipy.ndimage import gaussian_filter as norm_kde
@@ -41,7 +41,7 @@ def collate_data(runname, prior, filename=None, regenerate=False, **opts):
     ### fill them up
     out['names'] = [str(i+1) for i in range(625)]
     for i, name in enumerate(out['names']):
-        res, _, _, eout = load_prospector_data(None,runname='uvj',objname='uvj_'+name)
+        res, _, _, eout = load_prospector_data(None,runname=runname,objname=runname+'_'+name)
         uv, vj = pfile.return_uvj(int(name))
         out['uv'] += [uv]
         out['vj'] += [vj]
@@ -117,6 +117,10 @@ def make_kl_bins(chain, nbins=10, weights=None):
     when there are empty bins, the KL divergence is undefined 
     this adaptive binning scheme avoids that problem
     """
+    bidx = ~np.isfinite(chain)
+    if (bidx.sum() > 0):
+        chain[bidx] = chain[~bidx].min()
+
     sorted = np.sort(chain)
     nskip = np.floor(chain.shape[0]/float(nbins)).astype(int)-1
     bins = sorted[::nskip]
@@ -126,7 +130,7 @@ def make_kl_bins(chain, nbins=10, weights=None):
 
     return pdf, bins
 
-def do_all(runname='uvj', outfolder=None, regenerate_prior=False, **opts):
+def do_all(runname='uvj_dirichlet', outfolder=None, regenerate_prior=False, **opts):
 
     if outfolder is None:
         outfolder = os.getenv('APPS') + '/prospector_alpha/plots/'+runname+'/uvj_plots/'
@@ -418,6 +422,8 @@ def plot_mock_maps(dat, pars, plabels, lims, outname, smooth=True, priors=None, 
             vmap = np.array(dat['pars'][par])
             if par in ['avg_age','ssfr_100']:
                 vmap = np.log10(vmap)
+            if par is 'ssfr_100':
+                vmap = np.clip(vmap,-13,np.inf)
             ax = axes[i]
 
         vmap[idx_poor] = np.nan
