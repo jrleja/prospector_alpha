@@ -75,7 +75,7 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True, measure_
         eout['thetas'][p] = {'q50': q50, 'q16': q16, 'q84': q84}
 
     # extras
-    extra_parnames = ['avg_age','lwa_rband','lwa_lbol','half_time','sfr_100','ssfr_100','ssfr_30','sfr_30',\
+    extra_parnames = ['avg_age','lwa_rband','lwa_lbol','half_time','sfr_100','ssfr_100','ssfr_30','sfr_30','sfr_300', 'ssfr_300',\
                       'stellar_mass','lir','luv','lmir','lbol','luv_young','lir_young']
     if 'fagn' in parnames:
         extra_parnames += ['l_agn', 'fmir', 'luv_agn', 'lir_agn']
@@ -134,6 +134,8 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True, measure_
         eout['extras']['ssfr_100']['chain'][jj] = eout['extras']['sfr_100']['chain'][jj].squeeze() / eout['extras']['stellar_mass']['chain'][jj].squeeze()
         eout['extras']['sfr_30']['chain'][jj] = prosp_dutils.calculate_sfr(sfh_params, 0.03,  minsfr=-np.inf, maxsfr=np.inf)
         eout['extras']['ssfr_30']['chain'][jj] = eout['extras']['sfr_30']['chain'][jj].squeeze() / eout['extras']['stellar_mass']['chain'][jj].squeeze()
+        eout['extras']['sfr_300']['chain'][jj] = prosp_dutils.calculate_sfr(sfh_params, 0.3,  minsfr=-np.inf, maxsfr=np.inf)
+        eout['extras']['ssfr_300']['chain'][jj] = eout['extras']['sfr_300']['chain'][jj].squeeze() / eout['extras']['stellar_mass']['chain'][jj].squeeze()
 
         # calculate AGN parameters if necessary
         if 'fagn' in parnames:
