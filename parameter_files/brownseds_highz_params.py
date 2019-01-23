@@ -4,6 +4,7 @@ from prospect.models import priors, sedmodel
 from prospect.sources import FastStepBasis
 from sedpy import observate
 from astropy.cosmology import WMAP9
+from astropy import constants
 from scipy.stats import truncnorm
 from astropy.io import ascii
 from astropy.io import fits
@@ -14,7 +15,7 @@ from astropy.io import fits
 APPS = os.getenv('APPS')
 run_params = {'verbose':True,
               'debug': False,
-              'outfile': os.getenv('APPS')+'/prospector_alpha/results/brownseds_highz/brownseds_highz',
+              'outfile': os.getenv('APPS')+'/prospector_alpha/results/brownseds_highz_ha/brownseds_highz_ha',
               'nofork': True,
               # dynesty params
               'nested_bound': 'multi', # bounding method
@@ -48,7 +49,6 @@ def translate_filters(bfilters, full_list = False):
 
     # this is necessary for my code
     # to calculate effective wavelength
-    # in threed_dutils
     translate = {
     'FUV': 'GALEX FUV',
     'UVW2': 'UVOT w2',
@@ -129,7 +129,7 @@ def translate_filters(bfilters, full_list = False):
         return np.array([translate[f] for f in bfilters]), np.array([translate_pfsps[f] for f in bfilters])
 
 
-def load_obs(photname='', extinctname='', herschname='', objname='', **extras):
+def load_obs(photname='', extinctname='', herschname='', objname='', elines=True, errfloor=0.05, **extras):
     """
     let's do this
     """
@@ -213,7 +213,7 @@ def load_obs(photname='', extinctname='', herschname='', objname='', **extras):
     phot_mask = phot_mask[have_definition]
 
     # implement error floor
-    unc = np.clip(unc, flux*0.05, np.inf)
+    unc = np.clip(unc, flux*errfloor, np.inf)
     w3_idx = fsps_filters == 'wise_w3'
     unc[w3_idx] = np.clip(unc[w3_idx], flux[w3_idx]*0.3, np.inf) # for the silicate feature
 
@@ -221,6 +221,23 @@ def load_obs(photname='', extinctname='', herschname='', objname='', **extras):
     filters = observate.load_filters(fsps_filters)
     wave_effective = np.array([filt.wave_effective for filt in filters])
     phot_mask[wave_effective > 12e4] = False
+
+    # add elines
+    # load fsps emission line list for index
+    if elines:
+        loc = os.getenv('SPS_HOME')+'/data/emlines_info.dat'
+        dat = np.loadtxt(loc, delimiter=',', dtype = {'names':('lam','name'),'formats':('f16','S40')})
+        obs['elines_idx'] = dat['name'] == 'H alpha 6563'
+
+        # load h-alpha luminosity list
+        loc = os.getenv('APPS')+'/prospector_alpha/data/brown_optical_info.dat'
+        dat = np.loadtxt(loc, delimiter=' ', comments='#',
+                         dtype = {'names':('name', 'ha_lum', 'ha_lum_errup', 'ha_lum_errdown', 'hb_lum', 'hb_lum_errup', 'hb_lum_errdown', 'dn4000'),
+                                  'formats':('S40','f16','f16','f16','f16','f16','f16','f16')})
+        idx = dat['name'] == objname.replace(' ','_')
+        obs['elines_lum'] = np.atleast_1d(dat['ha_lum'][idx]) / constants.L_sun.cgs.value
+        obs['elines_unc'] = np.atleast_1d((dat['ha_lum_errup'][idx]-dat['ha_lum_errdown'][idx])/2.) / constants.L_sun.cgs.value
+        obs['elines_unc'] = np.clip(obs['elines_unc'] , obs['elines_lum'] *errfloor, np.inf)
 
     # build output dictionary
     obs['filters'] = filters
@@ -420,19 +437,19 @@ model_params.append({'name': 'add_dust_emission', 'N': 1,
                         'prior': None})
 
 model_params.append({'name': 'duste_gamma', 'N': 1,
-                        'isfree': True,
+                        'isfree': False,
                         'init': 0.01,
                         'units': None,
                         'prior': priors.TopHat(mini=0.0, maxi=0.15)})
 
 model_params.append({'name': 'duste_umin', 'N': 1,
-                        'isfree': True,
+                        'isfree': False,
                         'init': 1.0,
                         'units': None,
                         'prior': priors.TopHat(mini=0.1, maxi=15.0)})
 
 model_params.append({'name': 'duste_qpah', 'N': 1,
-                        'isfree': True,
+                        'isfree': False,
                         'init': 2.0,
                         'units': 'percent',
                         'prior': priors.TopHat(mini=0.0, maxi=7.0)})
@@ -510,7 +527,7 @@ model_params.append({'name': 'mass_units', 'N': 1,
 #### resort list of parameters 
 # because we can
 parnames = [m['name'] for m in model_params]
-fit_order = ['massmet','logsfr_ratios', 'dust2', 'dust_index', 'dust1_fraction', 'fagn', 'agn_tau', 'duste_qpah', 'duste_umin', 'duste_gamma']
+fit_order = ['massmet','logsfr_ratios', 'dust2', 'dust_index', 'dust1_fraction', 'fagn', 'agn_tau']
 tparams = [model_params[parnames.index(i)] for i in fit_order]
 for param in model_params: 
     if param['name'] not in fit_order:
