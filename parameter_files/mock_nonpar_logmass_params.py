@@ -29,7 +29,7 @@ run_params = {'verbose':True,
               'nested_walks': 50, # MC walks
               'nested_nlive_batch': 200, # size of live point "batches"
               'nested_nlive_init': 200, # number of initial live points
-              'nested_weight_kwargs': {'pfrac': 0.5,'post_thresh':0.04}, # weight posterior and evidence equally
+              'nested_weight_kwargs': {'pfrac': 0.5,'post_thresh':0.015}, # weight posterior and evidence equally
               'nested_dlogz_init': 0.1,
               # Model info
               'zcontinuous': 2,

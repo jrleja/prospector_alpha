@@ -27,10 +27,10 @@ run_params = {'verbose':True,
               'nested_sample': 'rwalk', # sampling method
               'nested_walks': 50, # MC walks
               'nested_nlive_batch': 200, # size of live point "batches"
-              'nested_nlive_init': 200, # number of initial live points
+              'nested_nlive_init': 400, # number of initial live points
               'nested_weight_kwargs': {'pfrac': 1.0}, # weight posterior over evidence by 100%
-              'nested_dlogz_init': 0.01,
-              'nested_stop_kwargs': {'post_thresh': 0.008, 'n_mc':50}, #higher threshold, more MCMC
+              'nested_dlogz_init': 0.005,
+              'nested_stop_kwargs': {'post_thresh': 0.004, 'n_mc':70}, #higher threshold, more MCMC
               # Model info
               'zcontinuous': 2,
               'compute_vega_mags': False,
@@ -313,7 +313,7 @@ model_params.append({'name': 'dust2', 'N': 1,
                         'init_disp': 0.25,
                         'disp_floor': 0.15,
                         'units': '',
-                        'prior': priors.TopHat(mini=0.0, maxi=3.0)})
+                        'prior': priors.ClippedNormal(mini=0.0, maxi=4.0, mean=0.3, sigma=1)})
 
 model_params.append({'name': 'dust_index', 'N': 1,
                         'isfree': True,
@@ -321,7 +321,7 @@ model_params.append({'name': 'dust_index', 'N': 1,
                         'init_disp': 0.25,
                         'disp_floor': 0.15,
                         'units': '',
-                        'prior': priors.ClippedNormal(mini=-0.8, maxi=0.4, mean=0.0, sigma=0.4)})
+                        'prior': priors.TopHat(mini=-1.0, maxi=0.4)})
 
 model_params.append({'name': 'dust1_index', 'N': 1,
                         'isfree': False,
