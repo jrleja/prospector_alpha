@@ -36,7 +36,7 @@ run_params = {'verbose':True,
               'compute_vega_mags': False,
               'initial_disp':0.1,
               'interp_type': 'logarithmic',
-              'agelims': [0.0,8.0,8.5,9.0,9.5,9.8,10.0],
+              'agelims': [0.0,7.4772,8.0,8.5,9.0,9.5,9.8,10.0],
               # Data info (phot = .cat, dat = .dat, fast = .fout)
               'uvj_key':1
               }

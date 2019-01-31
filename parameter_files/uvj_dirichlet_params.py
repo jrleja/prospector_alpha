@@ -36,7 +36,7 @@ run_params = {'verbose':True,
               'compute_vega_mags': False,
               'initial_disp':0.1,
               'interp_type': 'logarithmic',
-              'agelims': [0.0,8.0,8.5,9.0,9.5,9.8,10.0],
+              'agelims': [0.0,7.4772,8.0,8.5,9.0,9.5,9.8,10.0],
               # Data info (phot = .cat, dat = .dat, fast = .fout)
               'uvj_key':1
               }
@@ -562,22 +562,16 @@ def load_sps(**extras):
     sps = NebSFH(**extras)
     return sps
 
-def load_model(agelims=[], zred=None, alpha_sfh=0.2, **extras):
+def load_model(agelims=[], nbins_sfh=7,zred=None, alpha_sfh=0.2, **extras):
 
     # we'll need this to access specific model parameters
     n = [p['name'] for p in model_params]
 
     # first calculate t_universe at z=1
-    tuniv = WMAP9.age(1.0).value
+    tuniv = WMAP9.age(1.0).value*1e9
 
-    # now construct the nonparametric SFH
-    # current scheme: six bins, four spaced equally in logarithmic 
-    # space AFTER t=100 Myr + BEFORE tuniv-1 Gyr
-    tbinmax = (tuniv-1)*1e9
-    if tbinmax < 0:
-        tbinmax = (tuniv-0.25)*1e9
-
-    agelims = agelims[:1] + np.linspace(agelims[1],np.log10(tbinmax),len(agelims)-2).tolist() + [np.log10(tuniv*1e9)]
+    tbinmax = (tuniv*0.85)
+    agelims = agelims[:2] + np.linspace(agelims[2],np.log10(tbinmax),nbins_sfh-2).tolist() + [np.log10(tuniv)]
     agebins = np.array([agelims[:-1], agelims[1:]])
     ncomp = len(agelims) - 1
 
