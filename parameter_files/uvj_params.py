@@ -204,7 +204,6 @@ model_params.append({'name': 'pmetals', 'N': 1,
                         'prior_function': None,
                         'prior_args': {'mini':-3, 'maxi':-1}})
 
-
 model_params.append({'name': 'logmass', 'N': 1,
                         'isfree': True,
                         'init': 10.0,
@@ -305,7 +304,7 @@ model_params.append({'name': 'dust_tesc', 'N': 1,
 ###### Dust Emission ##############
 model_params.append({'name': 'add_dust_emission', 'N': 1,
                         'isfree': False,
-                        'init': 1,
+                        'init': 0,
                         'units': None,
                         'prior': None})
 

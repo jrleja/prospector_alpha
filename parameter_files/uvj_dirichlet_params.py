@@ -340,7 +340,7 @@ model_params.append({'name': 'dust_tesc', 'N': 1,
 ###### Dust Emission ##############
 model_params.append({'name': 'add_dust_emission', 'N': 1,
                         'isfree': False,
-                        'init': 1,
+                        'init': 0,
                         'units': None,
                         'prior': None})
 
