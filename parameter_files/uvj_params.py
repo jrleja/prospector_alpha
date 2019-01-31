@@ -30,6 +30,7 @@ run_params = {'verbose':True,
               'nested_nlive_init': 400, # number of initial live points
               'nested_weight_kwargs': {'pfrac': 1.0}, # weight posterior over evidence by 100%
               'nested_dlogz_init': 0.005,
+              'nested_maxcall': 4000000,
               'nested_stop_kwargs': {'post_thresh': 0.004, 'n_mc':70}, #higher threshold, more MCMC
               # Model info
               'zcontinuous': 2,
