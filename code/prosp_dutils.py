@@ -39,16 +39,14 @@ def return_lmir(lam,spec,z=None):
     """ returns MIR luminosity (4-20 microns) in erg/s
     input spectrum must be Lsun/Hz, wavelength in \AA
     """
-    botlam = np.atleast_1d(4e4-1)
-    toplam = np.atleast_1d(20e4+1)
-    edgetrans = np.atleast_1d(0)
-    luv_filter =  [[np.concatenate((botlam-1,np.linspace(botlam, toplam, num=100),toplam+1))],
-                   [np.concatenate((edgetrans,np.ones(100),edgetrans))]]
+    botlam, toplam = 4e4-1, 20e4+1
+    lmir_filter = [[np.array([botlam]+np.linspace(botlam+1, toplam-1, num=100).tolist()+[toplam])],
+                  [np.array([0]+np.ones(100).tolist()+[0])]]
 
     # calculate integral
-    _,luv     = integrate_mag(lam,spec,luv_filter, z=z) # comes out in ergs/s
+    _,lmir     = integrate_mag(lam,spec,luv_filter, z=z) # comes out in ergs/s
 
-    return luv
+    return lmir
 
 def sfr_uvir(lir,luv):
     """inputs in Lsun. Calculates UV+IR SFR from Whitaker+14
