@@ -44,7 +44,7 @@ def return_lmir(lam,spec,z=None):
                   [np.array([0]+np.ones(100).tolist()+[0])]]
 
     # calculate integral
-    _,lmir     = integrate_mag(lam,spec,luv_filter, z=z) # comes out in ergs/s
+    _,lmir     = integrate_mag(lam,spec,lmir_filter, z=z) # comes out in ergs/s
 
     return lmir
 
