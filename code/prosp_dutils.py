@@ -25,11 +25,9 @@ def return_luv(lam,spec,z=None):
     """ returns UV luminosity (1216-3000 \AA) in erg/s
     input spectrum must be Lsun/Hz, wavelength in \AA
     """
-    botlam = np.atleast_1d(1216)
-    toplam = np.atleast_1d(3000)
-    edgetrans = np.atleast_1d(0)
-    luv_filter =  [[np.concatenate((botlam-1,np.linspace(botlam, toplam, num=100),toplam+1))],
-                   [np.concatenate((edgetrans,np.ones(100),edgetrans))]]
+
+    luv_filter = [[np.array([1215]+np.linspace(1216, 3000, num=100).tolist()+[3001])],
+                  [np.array([0]+np.ones(100).tolist()+[0])]]
 
     # calculate integral
     _,luv     = integrate_mag(lam,spec,luv_filter, z=z) # comes out in ergs/s
