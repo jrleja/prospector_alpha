@@ -7,6 +7,7 @@ from matplotlib.ticker import MaxNLocator, FormatStrFormatter
 from prospect.models import model_setup
 from magphys_plot_pref import jLogFormatter
 from prospector_io import load_prospector_data
+from dynesty.plotting import _quantile as wquant
 
 plt.ioff() # don't pop up a window for each plot
 
@@ -230,7 +231,7 @@ def add_sfh_plot(exout,fig,ax_loc=None,
         #### load SFH
         t = extra_output['extras']['t_sfh']
         perc = np.zeros(shape=(len(t),3))
-        for jj in xrange(len(t)): perc[jj,:] = np.percentile(extra_output['extras']['sfh'][jj,:],[16.0,50.0,84.0])
+        for jj in xrange(len(t)): perc[jj,:] = wquant(extra_output['extras']['sfh'][jj,:],[0.16,0.5,0.84],weights=extra_output['weights'])
 
         #### plot SFH
         ax_inset.plot(t, perc[:,1],'-',color=main_color[i],lw=lw)
