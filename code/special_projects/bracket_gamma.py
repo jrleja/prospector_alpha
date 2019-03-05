@@ -111,7 +111,7 @@ def calc_new_position(gcoord,pa,r):
         pa += 2*np.pi*u.radian
     ra, dec = gcoord.ra.to(u.radian), gcoord.dec.to(u.radian),
 
-    # let's do this numerically (what the actual fuck)
+    # let's do this numerically
     pa_array = np.linspace(pa-np.pi*u.radian,pa+np.pi*u.radian,20001)
 
     # this is the DISTANCE in the RA direction (NOT the change in RA coordinates)

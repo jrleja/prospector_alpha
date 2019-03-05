@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import os, hickle, td_io, prosp_dutils
+import os, hickle, pickle, td_io, prosp_dutils
 from matplotlib.ticker import FormatStrFormatter
 from prospector_io import load_prospector_data
 from astropy.cosmology import WMAP9
@@ -13,7 +13,6 @@ from astropy.io import ascii
 from astropy.table import Table
 from matplotlib.ticker import MaxNLocator
 from scipy.optimize import curve_fit
-from simulate_sfh_prior import draw_from_prior
 import td_delta_params as pfile
 from scipy.stats import entropy
 
@@ -28,6 +27,9 @@ minssfr = 10**minlogssfr
 minsfr = 0.0001
 
 nbin_min = 10
+
+absolute_mags = np.array([5.11,4.65,4.53])  # http://mips.as.arizona.edu/~cnaw/sun.html
+ml_sun = 1./10**(absolute_mags/-2.5)
 
 def get_cmap(N):
 
@@ -67,34 +69,44 @@ def load_priors(nbins=50):
     zprior = np.linspace(0.5,2.5,21)
     zstr = ["{0:.1f}".format(z) for z in zprior]
 
-    out = {f: {'bins':[],'pdf':[]} for f in ['mwa','ssfr_100']}
-    out['zprior'] = zprior
+    out = {f: {'bins':[],'pdf':[]} for f in ['mwa','ssfr_100','ml_g0','ml_r0','ml_i0']}
     for z in zstr:
-        prior = draw_from_prior(None,os.getenv('APPS')+'/sfh_prior/data/3dhst_'+z+'.hickle')
 
-        pdf, bins = make_kl_bins(np.log10(prior['mwa']),nbins=nbins)
-        out['mwa']['pdf'] += [pdf]
-        out['mwa']['bins'] += [bins]
+        # try to load pickle
+        try:
+            with open(os.getenv('APPS')+'/sfh_prior/data/3dhst_'+z+'.pickle', "r") as f:
+                prior = pickle.load(f)
+        # if this fails, load hickle and convert (VERY SLOW, DON'T KNOW WHY)
+        except:
+            with open(os.getenv('APPS')+'/sfh_prior/data/3dhst_'+z+'.hickle', "r") as f:
+                prior = hickle.load(f)
+            prior['ml_g0'] = np.array([float(p) for p in prior['ml_g0']]) # these are broken  
+            prior['ml_r0'] = np.array([float(p) for p in prior['ml_r0']])  
+            prior['ml_i0'] = np.array([float(p) for p in prior['ml_i0']])
+            pickle.dump(prior,open(os.getenv('APPS')+'/sfh_prior/data/3dhst_'+z+'.pickle', "w"))  
 
-        pdf, bins = make_kl_bins(np.log10(prior['ssfr']),nbins=nbins)
-        out['ssfr_100']['pdf'] += [pdf]
-        out['ssfr_100']['bins'] += [bins]
+        prior['ssfr_100'] = prior['ssfr']
+        for key in out.keys():
+            pdf, bins = make_kl_bins(np.log10(prior[key]),nbins=nbins)
+            out[key]['pdf'] += [pdf]
+            out[key]['bins'] += [bins]
 
+    out['zprior'] = zprior
     return out
 
 def kld(chain,weight,prior,nbins=50,nsample=500000):
     # linked priors are tough to handle
     # sample & marginalize over others...
-    if type(prior) == dict:
+    if type(prior) == dict: # we've sampled the prior in other ways
         pdf_prior, bins = prior['pdf'], prior['bins']
         pdf, _ = np.histogram(chain,bins=bins,weights=weight)
         kld_out = entropy(pdf,qk=pdf_prior) 
-    elif chain.ndim == 1:
+    elif chain.ndim == 1: # we have the prior and it's one-dimensional
         bins = np.linspace(prior.range[0],prior.range[1], nbins+1)
         pdf_prior = prior.distribution.pdf(bins[1:]-(bins[1]-bins[0])/2.,*prior.args,loc=prior.loc, scale=prior.scale)
         pdf, _ = np.histogram(chain,bins=bins,weights=weight)
         kld_out = entropy(pdf,qk=pdf_prior) 
-    else:
+    else: # it's a linked prior. let's do this.
         npar = chain.shape[1]
         kld_out = np.zeros(npar)
         samples = prior.sample(loc=prior.loc, scale=prior.scale, nsample=nsample)
@@ -144,6 +156,38 @@ def calc_uvj_flag(uvj, return_dflag = True):
 
     # dust flag: if True, has very little dust
     if return_dflag:
+        dflag = (u_v < (-1.25*v_j+2.875))
+        return uvj_flag, dflag
+
+    return uvj_flag
+
+def uvj_flag_muzzin(uvj, return_dflag = True):
+    """calculate a UVJ flag as Muzzin et al. 2013b for 1 < z < 4
+    U - V = (V - J)*0.88 + 0.59
+    U-V > 1.3, V-J < 1.5
+    1 = star-forming, 2 = dusty star-forming, 3 = quiescent
+    """
+
+    uvjmag = 25 - 2.5*np.log10(uvj)
+    
+    u_v = uvjmag[:,0]-uvjmag[:,1]
+    v_j = uvjmag[:,1]-uvjmag[:,2]  
+    
+    # initialize flag to 3, for quiescent
+    uvj_flag = np.repeat(3,uvjmag.shape[0])
+    
+    # star-forming
+    sfing = (u_v < 1.3) | (v_j >= 1.5)
+    uvj_flag[sfing] = 1
+    sfing = (v_j >= 0.75) & (v_j <= 1.5) & (u_v <= 0.88*v_j+0.59)
+    uvj_flag[sfing] = 1
+    
+    # dusty star-formers
+    dusty_sf = (uvj_flag == 1) & (u_v >= 1.3)
+    uvj_flag[dusty_sf] = 2
+
+    # dust flag: if True, has very little dust
+    if return_dflag:
         dflag= (u_v < (-1.25*v_j+2.875))
         return uvj_flag, dflag
 
@@ -184,13 +228,13 @@ def collate_data(runname, runname_fast, runname_sample='td_new', filename=None, 
                  r'f$_{\mathrm{AGN}}$', 'dust index', r'f$_{\mathrm{AGN,MIR}}$']
     fnames = ['stellar_mass','sfr_100','dust2','ssfr_100','avg_age','half_time', 'sfr_30','ssfr_30'] # take for fastmimic too
     pnames = fnames+['massmet_2', 'duste_qpah', 'fagn', 'dust_index', 'fmir'] # already calculated in Prospector
-    enames = ['model_uvir_sfr', 'model_uvir_ssfr', 'sfr_ratio','model_uvir_truelir_sfr', 'model_uvir_truelir_ssfr', 'sfr_ratio_truelir'] # must calculate here
+    enames = ['model_uvir_sfr', 'model_uvir_ssfr', 'sfr_ratio','model_uvir_truelir_sfr', 'model_uvir_truelir_ssfr', 'sfr_ratio_truelir','ml_g0','ml_r0','ml_i0','ha_ew'] # must calculate here
 
     outprosp, outprosp_fast, outfast, outlabels = {},{'bfit':{}},{},{}
     sfr_100_uvir, sfr_100_uv, sfr_100_ir, objname = [], [], [], []
     phot_chi, phot_percentile, phot_sn, phot_mag, phot_obslam, phot_restlam, phot_fname, phot_ids = [], [], [], [], [], [], [], []
     outfast['z'] = []
-    outfast['uvj'], outfast['uvj_prosp'], outfast['uvj_dust_prosp'], outfast['uv'], outfast['vj'] = [], [], [], [], []
+    outfast['uvj'], outfast['uvj_prosp'], outfast['uvj_prosp_muzz'], outfast['uvj_dust_prosp'], outfast['uv'], outfast['vj'] = [], [], [], [], [], []
     logpar = ['stellar_mass', 'ssfr_30', 'ssfr_100']
 
     for i,par in enumerate(pnames+enames):
@@ -210,9 +254,9 @@ def collate_data(runname, runname_fast, runname_sample='td_new', filename=None, 
 
     ### KLD stuff
     mod = pfile.load_model(**pfile.run_params)
+    sps = pfile.load_sps(**pfile.run_params)
     outkld = {p: [] for p in mod.theta_labels()}
-    outkld['ssfr_100'] = []
-    outkld['mwa'] = []
+    for key in ['mwa','ssfr_100','ml_g0','ml_r0','ml_i0']: outkld[key] = []
 
     ### define grids
     ngrid_ssfr, ngrid_fast, ngrid_sfr = 100, 25, 30
@@ -268,6 +312,19 @@ def collate_data(runname, runname_fast, runname_sample='td_new', filename=None, 
             print name.split('/')[-1]+' failed to load. skipping.'
             continue
 
+        # do we have rest-frame colors?
+        has_rf = True
+        if prosp is not None:
+            if ('rf' not in prosp['obs'].keys()) & ('rf' not in prosp.keys()):
+                has_rf = False
+
+        if (res is None) | (not has_rf):
+            import postprocessing
+            print name.split('/')[-1]+' not postprocessed, doing it now'
+            param_name = os.getenv('APPS')+'/prospector_alpha/parameter_files/td_delta_params.py'
+            postprocessing.post_processing(param_name, objname=name.split('/')[-1],sps=sps,plot=False)
+            res, _, _, prosp = load_prospector_data(name)
+
         if (prosp is None) or ((prosp_fast is None) & (runname_fast is not None)):
             continue
 
@@ -310,6 +367,7 @@ def collate_data(runname, runname_fast, runname_sample='td_new', filename=None, 
                                                                np.array([float(q[1:])/100.]),weights=prosp['weights'])[0]]
             outprosp['sfr_ratio'][q] += [weighted_quantile(np.log10(prosp['extras']['sfr_30']['chain']/uvir_chain), 
                                                          np.array([float(q[1:])/100.]),weights=prosp['weights'])[0]]
+            outprosp['ha_ew'][q] += [prosp['obs']['elines']['H alpha 6563']['ew'][q]]
 
         # prospector-fast
         if runname_fast is not None:
@@ -361,19 +419,28 @@ def collate_data(runname, runname_fast, runname_sample='td_new', filename=None, 
         aidx = adat['phot_id'] == int(objname[-1].split('_')[-1])
         outfast['uvj'] += [adat['uvj'][aidx][0]]
 
-        try:
-            uvj_flag, uvj_dust_flag = calc_uvj_flag(prosp['obs']['uvj'])
-            outfast['uvj_prosp'] += mode(uvj_flag)[0].tolist()
-            outfast['uvj_dust_prosp'] += mode(uvj_dust_flag)[0].tolist()
-            uv = 2.5*np.log10(prosp['obs']['uvj'][:,1]/prosp['obs']['uvj'][:,0]) 
-            vj = 2.5*np.log10(prosp['obs']['uvj'][:,2]/prosp['obs']['uvj'][:,1])
-            outfast['uv'] += weighted_quantile(uv, 0.5, weights=prosp['weights'])
-            outfast['vj'] += weighted_quantile(vj, 0.5, weights=prosp['weights'])
-        except KeyError:
-            outfast['uvj_prosp'] += [-1]
-            outfast['uvj_dust_prosp'] += [-1]
-            outfast['uv'] += [-1]
-            outfast['vj'] += [-1]
+        uvj_flag, uvj_dust_flag = calc_uvj_flag(prosp['obs']['uvj'])
+        outfast['uvj_prosp'] += mode(uvj_flag)[0].tolist()
+        outfast['uvj_dust_prosp'] += mode(uvj_dust_flag)[0].tolist()
+
+        uvj_muzz, _ = uvj_flag_muzzin(prosp['obs']['uvj'])
+        outfast['uvj_prosp_muzz'] += mode(uvj_muzz)[0].tolist()
+        uv = 2.5*np.log10(prosp['obs']['uvj'][:,1]/prosp['obs']['uvj'][:,0]) 
+        vj = 2.5*np.log10(prosp['obs']['uvj'][:,2]/prosp['obs']['uvj'][:,1])
+        outfast['uv'] += weighted_quantile(uv, 0.5, weights=prosp['weights'])
+        outfast['vj'] += weighted_quantile(vj, 0.5, weights=prosp['weights'])
+
+        # calculate ml
+        for i,filt in enumerate(['sdss_g0','sdss_r0','sdss_i0']): 
+            try: 
+                flux = np.array(prosp['obs']['rf'][:,i])
+            except KeyError: # old reductions...
+                flux = np.array(prosp['rf'][filt])
+            ml_chain = (prosp['extras']['stellar_mass']['chain']/flux)/ml_sun[i]
+            med, eup, edo = weighted_quantile(ml_chain, [0.5,0.84,0.16],weights=prosp['weights'])
+            outprosp['ml_'+filt[5:]]['q50'] += [med]
+            outprosp['ml_'+filt[5:]]['q84'] += [eup]
+            outprosp['ml_'+filt[5:]]['q16'] += [edo]
 
         # fill it up
         outfast['stellar_mass'] += [fast['lmass'][f_idx][0]]
@@ -430,7 +497,7 @@ def collate_data(runname, runname_fast, runname_sample='td_new', filename=None, 
         outg['grids']['logm_logsfr'] += [g3]
         outg['grids']['logm_loguvirsfr'] += [g4]
 
-        # KLD
+        # KLD for free parameters in model
         pfile.run_params['zred'] = prosp['zred']
         mod = pfile.load_model(**pfile.run_params)
         for par in mod.free_params:
@@ -442,9 +509,24 @@ def collate_data(runname, runname_fast, runname_sample='td_new', filename=None, 
                 outkld[par] += [kld_measure]
             else:
                 for i in range(len(kld_measure)): outkld[par+'_'+str(i+1)] += [kld_measure[i]]
+
+        # KLD for derived parameters in model
         pidx = np.abs(priors['zprior']-prosp['zred']).argmin()
-        outkld['mwa'] += [kld(np.log10(prosp['extras']['avg_age']['chain']), prosp['weights'], {'pdf':priors['mwa']['pdf'][pidx], 'bins':priors['mwa']['bins'][pidx]})]
-        outkld['ssfr_100'] += [kld(np.log10(prosp['extras']['ssfr_100']['chain']), prosp['weights'], {'pdf':priors['ssfr_100']['pdf'][pidx], 'bins':priors['ssfr_100']['bins'][pidx]})]
+        dpars = ['ssfr_100','mwa','ml_g0','ml_r0','ml_i0']
+        try:
+            f1,f2,f3 = np.array(prosp['obs']['rf'][:,0]),np.array(prosp['obs']['rf'][:,1]),np.array(prosp['obs']['rf'][:,2])
+        except KeyError: # old reductions...
+            f1,f2,f3 = prosp['rf']['sdss_g0'],prosp['rf']['sdss_r0'],prosp['rf']['sdss_i0']
+
+        chains = [np.log10(prosp['extras']['ssfr_100']['chain']),
+                  np.log10(prosp['extras']['avg_age']['chain']),
+                  prosp['extras']['stellar_mass']['chain']/f1/ml_sun[0],
+                  prosp['extras']['stellar_mass']['chain']/f2/ml_sun[1],
+                  prosp['extras']['stellar_mass']['chain']/f3/ml_sun[2]]
+        for chain, dpar in zip(chains,dpars):
+            sampdict = {'pdf':priors[dpar]['pdf'][pidx], 'bins':priors[dpar]['bins'][pidx]}
+            dpar_kld = kld(chain, prosp['weights'], sampdict)
+            outkld[dpar] += [dpar_kld]
 
     ### turn everything into numpy arrays
     for k1 in outprosp.keys():
@@ -545,6 +627,8 @@ def do_all(runname='td_delta', runname_fast=None,outfolder=None,**opts):
     sfr_m_grid(data, datag, outfolder+'conditional_sfr_m.png',outfile=outfolder+'data/conditional_sfr_fit.h5')
     sfr_m_grid(data, datag, outfolder+'conditional_sfr_m_nofix.png',fix=False,outfile=outfolder+'data/conditional_sfr_fit_nofix.h5')
     dm_dsfr_grid(data, datag, outfolder, outtable)
+    print 1/0
+
     deltam_with_redshift(data['fast'], data['prosp'], data['fast']['z'], outfolder+'deltam_vs_z.png', filename=outfolder+'data/masscomp.h5')
 
     # mass_met_age_z(data, outfolder, outtable, popts) # this is now deprecated
@@ -916,7 +1000,7 @@ def dm_dsfr_grid(data,datag,outfolder,outtable,normalize=True):
 
     dsfropts = {
                'xlim': (-10.8,-8),
-               'ylim': (-1,0.999),
+               'ylim': (-1.5,1.5),
                'xtitle': 'log(sSFR$_{\mathrm{Prospector}}$/yr$^{-1}$)',
                'ytitle': 'log(SFR$_{\mathrm{Prospector}}$/SFR$_{\mathrm{UV+IR}}$)',
                'ytitle2': r'$\sigma$ [dex]',
@@ -1065,7 +1149,7 @@ def deltam_spearman(fast,prosp,outname,popts):
 
         ax[i].set_xlim(xlims[i])
         ax[i].set_ylim(ylim)
-        ax[i].text(0.02,0.05,r'$\rho_{\mathrm{S}}$='+'{:1.2f}'.format(spearmanr(delta_mass,par)[0]),transform=ax[i].transAxes)
+        #ax[i].text(0.02,0.05,r'$\rho_{\mathrm{S}}$='+'{:1.2f}'.format(spearmanr(delta_mass,par)[0]),transform=ax[i].transAxes)
 
         ax[i].axhline(0, linestyle='--', color='k',lw=1,zorder=10)
         ax[i].axvline(0, linestyle='--', color='k',lw=1,zorder=10)

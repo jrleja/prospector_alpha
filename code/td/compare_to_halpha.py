@@ -123,7 +123,7 @@ def plot(data, outfolder):
     fs = 18 # font size
     symopts = {'ms':1.2,'alpha':0.6,'color':'#545454','linestyle':' '}
     ebaropts = {'fmt':'o', 'ecolor':'k', 'capthick':0.1, 'elinewidth':0.1, 'alpha':0.3, 'ms':0.0, 'zorder':-2} 
-    sn_limit = 10
+    sn_limit = 5
     sn_mod_limit = 5
 
     # make cuts
@@ -146,7 +146,7 @@ def plot(data, outfolder):
     ax[0].errorbar(xplot, yplot, xerr=xplot_err, yerr=yplot_err, **ebaropts)
     ax[0].plot(xplot, yplot, 'o', **symopts)
     
-    ax[0].set_xlabel(r'observed L(H$\alpha$) [L$_{\odot}$]',fontsize=fs)
+    ax[0].set_xlabel(r'observed grism L(H$\alpha$) [L$_{\odot}$]',fontsize=fs)
     ax[0].set_ylabel(r'model L(H$\alpha$) [L$_{\odot}$]',fontsize=fs)
     ax[0].set_xscale('log')
     ax[0].set_yscale('log')
@@ -174,7 +174,7 @@ def plot(data, outfolder):
     ax[1].errorbar(xplot, yplot, xerr=xplot_err, yerr=yplot_err, **ebaropts)
     ax[1].plot(xplot, yplot, 'o', **symopts)
     
-    ax[1].set_xlabel(r'observed EW(H$\alpha$)',fontsize=fs)
+    ax[1].set_xlabel(r'observed grism EW(H$\alpha$)',fontsize=fs)
     ax[1].set_ylabel(r'model EW(H$\alpha$)',fontsize=fs)
     ax[1].set_xscale('log')
     ax[1].set_yscale('log')

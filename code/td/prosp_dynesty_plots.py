@@ -499,9 +499,9 @@ def make_all_plots(filebase=None,
     res['chain'], parnames = transform_chain(res['chain'],res['model'])
 
     # mimic dynesty outputs
-    res['logwt'] = np.log(res['weights'])+res['logz'][-1]
-    res['logl'] = res['lnlikelihood']
-    res['samples'] = res['chain']
+    res['logwt'] = (np.log(res['weights'])+res['logz'][-1]).astype(np.float64)
+    res['logl'] = (res['lnlikelihood']).astype(np.float64)
+    res['samples'] = (res['chain']).astype(np.float64)
     res['nlive'] = res['run_params']['nested_nlive_init']
     font_kwargs = {'fontsize': fs}
 

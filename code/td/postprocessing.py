@@ -217,7 +217,7 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True, measure_
     return eout
 
 def post_processing(param_name, objname=None, runname = None, overwrite=True, obj_outfile=None,
-                    plot_outfolder=None, plot=True, **kwargs):
+                    plot_outfolder=None, plot=True, sps=None, **kwargs):
     """Driver. Loads output, runs post-processing routine.
     overwrite=False will return immediately if post-processing file already exists.
     if runname is specified, we can pass in parameter file for run A with outputs at location runname
@@ -262,10 +262,20 @@ def post_processing(param_name, objname=None, runname = None, overwrite=True, ob
         if type(res['run_params'][key]) == unicode:
             if 'prospector_alpha' in res['run_params'][key]:
                 res['run_params'][key] = os.getenv('APPS')+'/prospector_alpha'+res['run_params'][key].split('prospector_alpha')[-1]
-    sps = pfile.load_sps(**res['run_params'])
+    if sps is None:
+        sps = pfile.load_sps(**res['run_params'])
     obs = res['obs']
     if res['model'] is None:
         res['model'] = pfile.load_model(**res['run_params'])
+
+    # recast to float64
+    for key in res.keys():
+        if type(res[key]) == type(np.array([])):
+            if res[key].dtype == np.dtype(np.float128):
+                res[key] = res[key].astype(np.float64)
+
+    # renormalize weights
+    res['weights'] = res['weights'] / res['weights'].sum()
 
     # sample from chain
     extra_output = calc_extra_quantities(res,sps,obs,**kwargs)
@@ -279,8 +289,12 @@ def post_processing(param_name, objname=None, runname = None, overwrite=True, ob
         prosp_dynesty_plots.make_all_plots(filebase=obj_outfile,outfolder=plot_outfolder)
 
 
-def do_all(param_name=None,runname=None,**kwargs):
-    ids = np.genfromtxt('/Users/joel/code/python/prospector_alpha/data/3dhst/'+runname+'.ids',dtype=str)
+def do_all(param_name=None,runname=None,ids=None,**kwargs):
+    try:
+        ids = np.genfromtxt('/Users/joel/code/python/prospector_alpha/data/3dhst/'+runname+'.ids',dtype=str)
+    except:
+        import glob
+        ids = [f.split('/')[-1].split('_')[0] for f in glob.glob('/Users/joel/code/python/prospector_alpha/results/'+runname+'/*h5')]
     for id in ids:
         post_processing(param_name, objname=id, **kwargs)
         

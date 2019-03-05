@@ -5,6 +5,7 @@ from scipy.interpolate import interp1d
 from scipy.integrate import simps
 from astropy import constants
 from dynesty.plotting import _quantile as wquant
+from scipy.stats import entropy
 
 def return_lir(lam,spec,z=None):
     """ returns IR luminosity (8-1000 microns) in erg/s
@@ -386,6 +387,32 @@ def synthetic_halpha(sfr,dust1,dust2,dust1_index,dust2_index,kriek=False):
 
 def bdec_to_ext(bdec):
     return np.log10(bdec/2.86)
+
+def kld(distr_to,weight_to,distr_from,weight_from):
+    """ calculates KLD between two distributions
+    """
+    pdf_from, bins = make_kl_bins(distr_from, weights=weight_from)
+    pdf_to, _ = np.histogram(distr_to,bins=bins,weights=weight_to)
+    kld_out = entropy(pdf_to,qk=pdf_from) 
+    return kld_out
+
+def make_kl_bins(chain, nbins=50, weights=None):
+    """Create bins with an ~equal number of data points in each 
+    when there are empty bins, the KL divergence is undefined 
+    this adaptive binning scheme avoids that problem
+    """
+    bidx = ~np.isfinite(chain)
+    if (bidx.sum() > 0):
+        chain[bidx] = chain[~bidx].min()
+
+    sorted = np.sort(chain)
+    nskip = np.floor(chain.shape[0]/float(nbins)).astype(int)-1
+    bins = sorted[::nskip]
+    bins[-1] = sorted[-1]  # ensure the maximum bin is the maximum of the chain
+    assert bins.shape[0] == nbins+1
+    pdf, bins = np.histogram(chain, bins=bins,weights=weights)
+
+    return pdf, bins
 
 def chev_extinction(tau_v, lam, ebars=False):
     '''

@@ -351,9 +351,8 @@ model_params.append({'name': 'nebemlineinspec', 'N': 1,
                         'prior': None})
 
 model_params.append({'name': 'gas_logz', 'N': 1,
-                        'isfree': False,
+                        'isfree': True,
                         'init': 0.0,
-                        'depends_on': tie_gas_logz,
                         'units': r'log Z/Z_\odot',
                         'prior': priors.TopHat(mini=-2.0, maxi=0.5)})
 
@@ -406,7 +405,7 @@ model_params.append({'name': 'mass_units', 'N': 1,
 #### resort list of parameters 
 # because we can
 parnames = [m['name'] for m in model_params]
-fit_order = ['logmass','logzsol','logsfr_ratios', 'dust2', 'dust_index', 'dust1_fraction']
+fit_order = ['logmass','logzsol','logsfr_ratios', 'dust2', 'dust_index', 'dust1_fraction', 'gas_logz']
 tparams = [model_params[parnames.index(i)] for i in fit_order]
 for param in model_params: 
     if param['name'] not in fit_order:

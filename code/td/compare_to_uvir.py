@@ -11,6 +11,7 @@ from scipy.stats import spearmanr
 from astropy.table import Table
 from astropy.io import ascii
 from scipy.optimize import curve_fit
+from scipy.ndimage.filters import gaussian_filter1d as smooth
 
 plt.ioff()
 
@@ -156,6 +157,15 @@ def do_all(runname='td_delta', outfolder=None,**opts):
 
     data = collate_data(runname,filename=outfolder+'data/uvircomp.h5',**opts)
 
+    # nasty cleaning
+    '''
+    idx = np.array([f.split('_')[0] in ['AEGIS','COSMOS'] for f in data['objname']],dtype=bool)
+    for key in data.keys(): 
+        if (type(data[key]) == list) | (type(data[key]) == type(np.array([]))):
+            data[key] = np.array(data[key])[idx]
+        elif (type(data[key]) == dict):
+            for key2 in data[key].keys(): data[key][key2] = np.array(data[key][key2])[idx]
+    '''
     plot_uvir_comparison(data,outfolder)
     plot_heating_sources(data,outfolder)
     plot_heating_sources(data,outfolder,old_stars_only=True,fit_curve=True)
@@ -222,7 +232,7 @@ def plot_heating_sources(data, outfolder, color_by_fagn=False, color_by_logzsol=
         colorlabel = r'log(Z/Z$_{\odot}$)'
         ax1_outstring = '_logzsol'
     else:
-        colorvar = np.log10(np.clip(data['ssfr_prosp_30']['q50'],minssfr,np.inf))
+        colorvar = np.log10(np.clip(data['ssfr_prosp']['q50'],minssfr,np.inf))
         colorlabel = r'log(sSFR$_{\mathrm{SED}}$)'
         ax1_outstring = '_ssfr'
 
@@ -268,6 +278,7 @@ def plot_heating_sources(data, outfolder, color_by_fagn=False, color_by_logzsol=
             pbins, siglow, sighigh = prosp_dutils.running_sigma(xvar,yvar,bins=bins)
             pbins[0] = xlim[0]
             pbins[-1] = xlim[1]
+            siglow, sighigh = smooth(siglow,1), smooth(sighigh,1)
             ax2[i].fill_between(pbins, siglow, sighigh, alpha=0.2,color=medopts['color'],linewidth=2,zorder=10)
         else:
             x, y, bincount = prosp_dutils.running_median(xvar,yvar,avg=False,weights=np.ones_like(xvar),return_bincount=True,bins=bins)
@@ -285,7 +296,7 @@ def plot_heating_sources(data, outfolder, color_by_fagn=False, color_by_logzsol=
     # add UV+IR assumption
     if old_stars_only:
         ax2[0].axhline(0.0,linestyle=':',zorder=-1,color='blue')
-        ax2[0].text(-12.7,0.02,r'default for 3D-HST SFR$_{\mathrm{UV+IR}}$',fontsize=10,color='blue')
+        ax2[0].text(-12.9,0.02,r'default for SFR$_{\mathrm{UV+IR}}$',fontsize=10,color='blue')
         ax2[0].set_ylim(-0.05,1)
 
         # De Looze 2014 result
@@ -330,7 +341,7 @@ def plot_spearmanr(data, outname):
                r'(L$_{\mathrm{UV+IR}})_{\mathrm{AGN}}$/(L$_{\mathrm{UV+IR}})_{\mathrm{total}}$',
                r'log(Z/Z$_{\odot}$)']#, 'dust2', 'dustindex']
     xlim = [(-0.02,1.02),(-0.02,1.02),(-2,0.2)]#,(0,3.1),(-2.3,0.5)]
-    yvar = np.log10(data['sfr_prosp_30']['q50'] / data['sfr_uvir_lirfrommips_prosp']['q50'])
+    yvar = np.log10(data['sfr_prosp']['q50'] / data['sfr_uvir_lirfrommips_prosp']['q50'])
     ylim = (-3.0, 3.0)
 
     # plot geometry
@@ -347,7 +358,7 @@ def plot_spearmanr(data, outname):
         ax[i].set_ylim(ylim)
 
         rho_spear = spearmanr(xvar,yvar)[0]
-        ax[i].text(0.02,0.92,r'$\rho_{\mathrm{S}}$='+'{:1.2f}'.format(rho_spear),transform=ax[i].transAxes)
+        #ax[i].text(0.02,0.92,r'$\rho_{\mathrm{S}}$='+'{:1.2f}'.format(rho_spear),transform=ax[i].transAxes)
 
         ax[i].axhline(0, linestyle='--', color='k',lw=1,zorder=10)
 
@@ -371,8 +382,8 @@ def plot_spearmanr_vs_ssfr(data, outname):
     labels = [r'(L$_{\mathrm{UV+IR}})_{\mathrm{old\/stars}}$/(L$_{\mathrm{UV+IR}})_{\mathrm{total}}$',
               r'(L$_{\mathrm{UV+IR}})_{\mathrm{AGN}}$/(L$_{\mathrm{UV+IR}})_{\mathrm{total}}$',
               r'log(Z/Z$_{\odot}$)']#, 'dust2', 'dustindex']
-    delta_sfr = np.log10(data['sfr_prosp_30']['q50'] / data['sfr_uvir_lirfrommips_prosp']['q50'])
-    ssfr = np.log10(data['ssfr_prosp_30']['q50'])
+    delta_sfr = np.log10(data['sfr_prosp']['q50'] / data['sfr_uvir_lirfrommips_prosp']['q50'])
+    ssfr = np.log10(data['ssfr_prosp']['q50'])
 
     # set up ssfr bins
     nbins = 4

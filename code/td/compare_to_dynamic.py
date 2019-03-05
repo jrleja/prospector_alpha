@@ -7,7 +7,7 @@ from astropy import units as u
 
 plt.ioff()
 
-def collate_data(runname, filename=None, regenerate=False, nsamp=100, **opts):
+def collate_data(runname, filename=None, regenerate=False, **opts):
     
     ### if it's already made, load it and give it back
     # else, start with the making!
@@ -19,7 +19,7 @@ def collate_data(runname, filename=None, regenerate=False, nsamp=100, **opts):
     ### define output containers and constants
     G = 4.302e-3 # pc Msun**-1 (km/s)**2
     out = {'objname':[]}
-    entries = ['prosp_smass', 'rachel_smass', 'rachel_z', 'fast_smass', 'fast_z', 'dyn_mass', 'dyn_mass_sersic']
+    entries = ['prosp_smass', 'prosp_sfr', 're', 'rachel_smass', 'rachel_z', 'fast_smass', 'fast_z', 'dyn_mass', 'dyn_mass_sersic']
     qvals = ['q50', 'q16', 'q84']
     for e in entries:
         if ('prosp' in e) or ('dyn' in e):
@@ -58,9 +58,9 @@ def collate_data(runname, filename=None, regenerate=False, nsamp=100, **opts):
         number = out['objname'][-1].split('_')[1]
 
         # model data
-        out['prosp_smass']['q50'].append(np.log10(prosp['extras']['stellar_mass']['q50']))
-        out['prosp_smass']['q84'].append(np.log10(prosp['extras']['stellar_mass']['q84']))
-        out['prosp_smass']['q16'].append(np.log10(prosp['extras']['stellar_mass']['q16']))
+        for q in ['q50','q16','q84']: 
+            out['prosp_smass'][q].append(np.log10(prosp['extras']['stellar_mass'][q]))
+            out['prosp_sfr'][q].append(np.log10(prosp['extras']['sfr_100'][q]))
 
         # fast masses
         fidx = allfields.index(field)
@@ -77,6 +77,7 @@ def collate_data(runname, filename=None, regenerate=False, nsamp=100, **opts):
         e_sigmaRe = ancil[fidx][idx]['e_sigmaRe'][0]
         Re      = ancil[fidx][idx]['Re'][0]*1e3
         nserc   = ancil[fidx][idx]['n'][0]
+        out['re']['val'] += [Re]
 
         k              = 5.0
         mdyn_cnst      = k*Re*sigmaRe**2/G
@@ -122,7 +123,22 @@ def add_shading(ax,lim,fs):
     ax.fill_between(y1, y1, lim[1], facecolor='#e60000', alpha=0.1, interpolate=True,zorder=-5)
     ax.text(y1[2],y1[2]+0.15,"'forbidden'",rotation=47,weight='semibold',va='bottom',fontsize=fs)
 
-def plot(data, outfolder, use_rachel_smass=True, **popts):
+def gfrac(logm_fast,z,sfr_uvir):
+    """ estimate gas fractions from Tacconi+18
+    """
+
+    # adopt W14 parameters
+    A,B,Fmu,C,D = 0.16, -3.69, 0.65, 0.52, -0.36
+    beta = 2
+
+    # let's go
+    logmmol_frac = A + \
+                   B*(np.log10(1+z)-Fmu)**beta + \
+                   C*np.log10(ssfr/ssfr_ms) + \
+                   D*(logm-10.7)
+
+
+def plot(data, outfolder, use_rachel_smass=True, gmass=False, **popts):
 
     # set it up
     fig, ax = plt.subplots(1,3, figsize=(15, 5))
@@ -165,6 +181,8 @@ def plot(data, outfolder, use_rachel_smass=True, **popts):
     xplot = data[didx]['q50'][idx]
     xplot_err = prosp_dutils.asym_errors(xplot,data[didx]['q84'][idx],data[didx]['q16'][idx])
     yplot = data[fidx][idx]
+    if gmass:
+        print 1/0
     ax[0].errorbar(xplot, yplot, xerr=xplot_err,
                    **plotopts)
     ax[0].plot(xplot, yplot, 'o', linestyle=' ', 

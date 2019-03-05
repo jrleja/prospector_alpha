@@ -625,7 +625,6 @@ def do_all(runname='td_delta', outfolder=None, regenerate=False, regenerate_stac
                 return data
         stack_fast = stack_sfh_fast(data,regenerate_stack=regenerate_stack, **stack_opts)
         hickle.dump(stack_fast,open(filename_fast, "w"))
-        print 1/0
         stack = stack_sfh(data,regenerate_stack=regenerate_stack, **stack_opts)
         hickle.dump(stack,open(filename, "w"))
 
@@ -900,19 +899,16 @@ def stack_sfh(data,nt=None, **opts):
         for j in range(opts['nbins_horizontal']):
 
             # what galaxies are in this mass bin?
-            # save individual mass and SFR
             in_bin = np.where((stellar_mass[on_ms] >= stack['hor'][zstr]['mass_bins'][j]) & \
                               (stellar_mass[on_ms] <= stack['hor'][zstr]['mass_bins'][j+1]))[0]
-
+            
+            # generate temporary dictionary (and save mass+SFR)
             tdict = {key:[] for key in ['median','err','errup','errdown']}
             tdict['logm'],tdict['logsfr'] = stellar_mass[on_ms][in_bin],logsfr[on_ms][in_bin]
-
-            # interpolate (SFR / M) chains onto regular time grid
-            # we do this with nearest-neighbor interpolation which is precisely correct for step-function SFH
             ngal = in_bin.shape[0]
             print '{0} galaxies in horizontal bin {1}'.format(ngal,j)
 
-            # pull out sSFH and weights without creating a numpy array of the whole thing,which takes forever
+            # pull out sSFH and weights for these objects without creating a numpy array of the whole survey (which takes forever)
             indexes = zidx[on_ms][in_bin]
             ssfr = np.empty(shape=(nsamps,nt,ngal))
             ntime_array = 14
@@ -924,6 +920,8 @@ def stack_sfh(data,nt=None, **opts):
             ssfh[:, :4, :] = (ssfh[:,0,:]*0.3 + ssfh[:,2,:]*0.7)[:,None,:] # weighted average to get ssfr_100 chain
 
             # now loop over each output time to calculate distributions
+            # must interpolate (SFR / M) chains onto regular time grid
+            # we do this with nearest-neighbor interpolation which is precisely correct for step-function SFH
             for i in range(nt):
 
                 # find where each galaxy contributes
