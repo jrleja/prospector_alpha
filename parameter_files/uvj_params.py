@@ -30,7 +30,7 @@ run_params = {'verbose':True,
               'nested_nlive_init': 400, # number of initial live points
               'nested_weight_kwargs': {'pfrac': 1.0}, # weight posterior over evidence by 100%
               'nested_dlogz_init': 0.005,
-              'nested_maxcall': 4000000,
+              'nested_maxcall': 5000000,
               'nested_stop_kwargs': {'post_thresh': 0.004, 'n_mc':70}, #higher threshold, more MCMC
               # Model info
               'zcontinuous': 2,
@@ -365,20 +365,20 @@ model_params.append({'name': 'gas_logu', 'N': 1, # scale with sSFR?
 ##### AGN dust ##############
 model_params.append({'name': 'add_agn_dust', 'N': 1,
                         'isfree': False,
-                        'init': False,
+                        'init': True,
                         'units': '',
                         'prior': None})
 
 model_params.append({'name': 'fagn', 'N': 1,
-                        'isfree': False,
+                        'isfree': True,
                         'init': 0.01,
                         'init_disp': 0.03,
                         'disp_floor': 0.02,
                         'units': '',
-                        'prior': priors.LogUniform(mini=1e-4, maxi=3.0)})
+                        'prior': priors.LogUniform(mini=1e-5, maxi=3.0)})
 
 model_params.append({'name': 'agn_tau', 'N': 1,
-                        'isfree': False,
+                        'isfree': True,
                         'init': 20.0,
                         'init_disp': 5,
                         'disp_floor': 2,
@@ -405,7 +405,7 @@ model_params.append({'name': 'mass_units', 'N': 1,
 #### resort list of parameters 
 # because we can
 parnames = [m['name'] for m in model_params]
-fit_order = ['logmass','logzsol','logsfr_ratios', 'dust2', 'dust_index', 'dust1_fraction', 'gas_logz']
+fit_order = ['logmass','logzsol','logsfr_ratios', 'dust2', 'dust_index', 'dust1_fraction', 'fagn', 'agn_tau', 'gas_logz']
 tparams = [model_params[parnames.index(i)] for i in fit_order]
 for param in model_params: 
     if param['name'] not in fit_order:
