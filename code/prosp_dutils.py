@@ -11,11 +11,8 @@ def return_lir(lam,spec,z=None):
     """ returns IR luminosity (8-1000 microns) in erg/s
     input spectrum must be Lsun/Hz, wavelength in \AA
     """
-    botlam = np.atleast_1d(8e4-1)
-    toplam = np.atleast_1d(1000e4+1)
-    edgetrans = np.atleast_1d(0)
-    lir_filter = [[np.concatenate((botlam,np.linspace(8e4, 1000e4, num=100),toplam))],
-                  [np.concatenate((edgetrans,np.ones(100),edgetrans))]]
+    lir_filter = [[np.array([8e4-1]+np.linspace(8e4, 1000e4, num=100).tolist()+[1000e4+1])],
+                  [np.array([0]+np.ones(100).tolist()+[0])]]
 
     # calculate integral
     _,lir     = integrate_mag(lam,spec,lir_filter, z=z) # comes out in ergs/s
@@ -268,7 +265,7 @@ def find_sfh_params(model,theta,obs,sps,sm=None):
     model.set_parameters(theta)
 
     # find all variables in `str_sfh_parms`
-    str_sfh_params = ['sfh','mass','tau','sf_start','tage','sf_trunc','sf_slope','agebins','sfr_fraction','logsfr']
+    str_sfh_params = ['sfh','mass','tau','sf_start','tage','sf_trunc','sf_slope','agebins','sfr_fraction','logsfr','const']
     sfh_out = []
     for string in str_sfh_params:
         if string in model.params:
@@ -357,6 +354,65 @@ def test_likelihood(sps,model,obs,thetas,param_file):
     lnp_phot = lnlike_phot(phot, obs=obs, phot_noise=phot_noise, **vectors)
 
     return lnp_prior + lnp_phot + lnp_spec
+
+def sfr_ms(z,logm):
+    """ returns the SFR of the star-forming sequence from Whitaker+14
+    as a function of mass and redshift
+    note that this is only valid over 0.5 < z < 2.5.
+    we use the broken power law form (as opposed to the quadratic form)
+    """
+
+    # sanitize logm
+    sfr_out = np.zeros_like(logm)
+    logm = np.atleast_2d(logm).T
+
+    # warn us if we're doing something bad
+    if (z < 0.5).any() | (z > 2.5).any():
+        print "WARNING: outside the intended redshift range (zmin={0}, zmax={1})".format(z.min(),z.max())
+
+    # parameters from whitaker+14
+    zwhit = np.atleast_2d([0.75, 1.25, 1.75, 2.25])
+    alow = np.array([0.94,0.99,1.04,0.91])
+    ahigh = np.array([0.14,0.51,0.62,0.67])
+    b = np.array([1.11, 1.31, 1.49, 1.62])
+
+    # generate SFR(M) at all redshifts 
+    log_sfr = alow*(logm - 10.2) + b
+    high = (logm > 10.2).squeeze()
+    log_sfr[high] = ahigh*(logm[high] - 10.2) + b
+
+    # interpolate to proper redshift
+    for i in range(sfr_out.shape[0]): 
+        tmp = interp1d(zwhit.squeeze(), log_sfr[i,:],fill_value='extrapolate')
+        sfr_out[i] = 10**tmp(z[i])
+
+    return sfr_out
+
+def gas_fraction(zred,logm,sfr):
+    """ from Tacconni+18 eqn 6, using W14 parameters w/ Beta=2 from Table 3b
+    use FAST masses and Whitaker+14 SFRs to calculate the gas fraction
+    and convert into gas mass
+    """
+    ssfr_ms = sfr_ms(zred,logm) / 10**logm
+    ssfr = sfr / 10**logm
+    beta = 2
+    a, ea = 0.16, 0.15
+    b, eb = -3.69, 0.4
+    f, ef = 0.65, 0.1
+    c, ec = 0.52, 0.03
+    d, ed = -0.36, 0.03
+    ssfr_ms = sfr_ms(zred,logm) / (10**logm)
+    mu = a + b*(np.log10(1+zred)-f)**beta + c*np.log10(ssfr/ssfr_ms)+d*(logm-10.7)
+    dmu = np.sqrt(
+                  ea**2 + \
+                  (np.log10(1+zred)-f)**beta * eb**2 + \
+                  np.abs(np.log10(ssfr/ssfr_ms)) * ec**2 + \
+                  np.abs((logm-10.7)) * ed**2 + \
+                  np.abs(2*b*(np.log10(1+zred)+f)) * ef**2
+                  )
+    return mu, dmu
+
+
 
 def synthetic_halpha(sfr,dust1,dust2,dust1_index,dust2_index,kriek=False):
 
@@ -1025,8 +1081,13 @@ def integrate_sfh(t1,t2,sfh_params):
         t1 = np.clip(t1,0,float(sfh['tage']-sfh['sf_start']))
         t2 = np.clip(t2,0,float(sfh['tage']-sfh['sf_start']))
 
+        # if we're using a constant SFH
+        if (sfh['const'] == 1):
+
+            intsfr = (t2-t1)/sfh['tage']
+
         # if we're using normal tau
-        if (sfh['sfh'] == 1):
+        elif (sfh['sfh'] == 1):
 
             # add tau model
             intsfr = integrate_exp_tau(t1,t2,sfh)

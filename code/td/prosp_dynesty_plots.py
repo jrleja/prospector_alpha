@@ -15,7 +15,7 @@ fs, tick_fs = 28, 22
 obs_color = '#545454'
 truth_color = 'blue'
 
-def subcorner(res, eout, parnames, outname=None, maxprob=False, truth_dict=None, truths=None):
+def subcorner(res, eout, parnames, outname=None, maxprob=False, truth_dict=None, truths=None, **opts):
     """ wrapper around dyplot.cornerplot()
     adds in a star formation history and marginalized parameters
     for some key outputs (stellar mass, SFR, sSFR, half-mass time)
@@ -55,9 +55,14 @@ def subcorner(res, eout, parnames, outname=None, maxprob=False, truth_dict=None,
     # either we create a new figure for extra parameters
     # or add to old figure
     # depending on dimensionality of model (and thus of the plot)
-    if (axes.shape[0] < 6):
+    #if axes.shape[0] <= 10:
+    #    label_kwargs['fontsize'] *= 0.7
+    #    title_kwargs['fontsize'] *= 0.7
 
-        # we usually don't have emission lines
+
+    if (axes.shape[0] <= 6):
+
+        # only plot a subset of parameters
         eout_toplot, ptitle = eout_toplot[:4], ptitle[:4]
 
         # generate fake results file for dynesty
@@ -78,7 +83,7 @@ def subcorner(res, eout, parnames, outname=None, maxprob=False, truth_dict=None,
                      main_color = ['black'],
                      ax_inset=sfh_ax,
                      text_size=1.5,lw=2,truth_dict=truth_dict)
-        fig2.savefig('{0}.corner.extra.png'.format(outname))
+        fig2.savefig('{0}.corner.extra.pdf'.format(outname))
         plt.close(fig2)
 
     else:
@@ -89,8 +94,8 @@ def subcorner(res, eout, parnames, outname=None, maxprob=False, truth_dict=None,
 
         # create extra parameters
         axis_size = fig.get_axes()[0].get_position().size
-        xs, ys = 0.44, 0.89
-        xdelta, ydelta = axis_size[0]*1.6, axis_size[1]*2
+        xs, ys = 0.4, 1.0-axis_size[1]*1.3
+        xdelta, ydelta = axis_size[0]*1.2, axis_size[1]*1.8
         plotloc = 0
         for jj, ename in enumerate(eout_toplot):
 
@@ -126,7 +131,7 @@ def subcorner(res, eout, parnames, outname=None, maxprob=False, truth_dict=None,
                 pchain[infty] = pchain[~infty].min()
 
             # total obfuscated way to add in axis
-            ax = fig.add_axes([xs+(jj%3)*xdelta, ys-(jj%2)*ydelta, axis_size[0], axis_size[1]])
+            ax = fig.add_axes([xs+(jj%4)*xdelta, ys-int(jj/4)*ydelta, axis_size[0], axis_size[1]])
 
             # complex smoothing routine to match dynesty
             bins = int(round(10. / 0.02))
@@ -145,12 +150,12 @@ def subcorner(res, eout, parnames, outname=None, maxprob=False, truth_dict=None,
             fmt = "{{0:{0}}}".format(".2f").format
             title = r"${{{0}}}_{{-{1}}}^{{+{2}}}$"
             title = title.format(fmt(float(qvalues[1])), fmt(float(q_m)), fmt(float(q_p)))
-            title = "{0}\n={1}".format(ptitle[jj], title)
+            #title = "{0}\n={1}".format(ptitle[jj], title)
             ax.set_title(title, va='bottom',**title_kwargs)
             ax.set_xlabel(ptitle[jj],**label_kwargs)
 
             # look for truth
-            min, max = pchain.min(), pchain.max()
+            min, max = np.percentile(pchain,0.5), np.percentile(pchain,99.5)
             if truth_dict is not None:
                 if ename in truth_dict.keys():
                     if ename not in not_log:
@@ -174,9 +179,9 @@ def subcorner(res, eout, parnames, outname=None, maxprob=False, truth_dict=None,
             ax.set_yticklabels([])
             ax.xaxis.set_major_locator(MaxNLocator(5))
             [l.set_rotation(45) for l in ax.get_xticklabels()]
-            ax.xaxis.set_tick_params(labelsize=tick_fs*.7)
+            ax.xaxis.set_tick_params(labelsize=label_kwargs['fontsize'])
 
-    fig.savefig('{0}.corner.png'.format(outname))
+    fig.savefig('{0}.corner.pdf'.format(outname))
     plt.close(fig)
 
 def transform_chain(flatchain, model):
@@ -226,7 +231,7 @@ def add_sfh_plot(eout,fig,ax_loc=None,
     for i, eout in enumerate(eout):
         
         # create master time bin
-        min_time = eout['sfh']['t'].min()
+        min_time = np.max([eout['sfh']['t'].min(),0.01])
         max_time = eout['sfh']['t'].max()
         tvec = 10**np.linspace(np.log10(min_time),np.log10(max_time),num=50)
 
@@ -298,8 +303,8 @@ def sed_figure(outname = None,
     """
 
     # set up plot
-    ms, alpha, fs, ticksize = 5, 0.8, 16, 12
-    textx, texty, deltay = 0.02, .95, .05
+    ms, alpha, fs, ticksize = 5, 0.8, kwargs.get('fs',16), kwargs.get('ticksize',12)
+    textx, texty, deltay = kwargs.get('textx',0.02), kwargs.get('texty',.95), .05
     fig = plt.figure()
     gs = gridspec.GridSpec(2,1, height_ratios=[3,1])
     gs.update(hspace=0)
@@ -329,7 +334,6 @@ def sed_figure(outname = None,
             spec_pdf = np.stack((eout[i]['obs']['spec']['q16'],eout[i]['obs']['spec']['q50'],eout[i]['obs']['spec']['q84']),axis=1)
 
         # units
-        zred = res['model'].params['zred'][0]
         factor = 3e18
         if ergs_s_cm:
             factor *= 3631*1e-23
@@ -342,6 +346,7 @@ def sed_figure(outname = None,
         phot_wave_eff /= 1e4
 
         # spectra
+        zred = res['model'].params['zred'][0]
         spec_pdf *= (factor/modspec_lam/(1+zred)).reshape(nspec,1)
         modspec_lam = modspec_lam*(1+zred)/1e4
         
@@ -349,19 +354,18 @@ def sed_figure(outname = None,
         if model_photometry:
             phot.plot(phot_wave_eff, modmags_bfit, color=colors[i], 
                       marker='o', ms=ms, linestyle=' ', label = 'photometry, best-fit', alpha=alpha, 
-                      markeredgecolor='k',**kwargs)
+                      markeredgecolor='k')
         
         resid.plot(phot_wave_eff, photchi, color=colors[i],
                  marker='o', linestyle=' ', label=labels[i], 
-                 ms=ms,alpha=alpha,markeredgewidth=0.7,markeredgecolor='k',
-                 **kwargs)        
+                 ms=ms,alpha=alpha,markeredgewidth=0.7,markeredgecolor='k')        
 
         # model spectra
         yplt = spec_pdf[:,1]
         pspec = smooth_spectrum(modspec_lam*1e4,yplt,200,minlam=1e3,maxlam=1e5)
         nz = pspec > 0
         phot.plot(modspec_lam[nz], pspec[nz], linestyle='-',
-                  color=colors[i], alpha=0.9,zorder=-1,label = labels[i],**kwargs)  
+                  color=colors[i], alpha=0.9,zorder=-1,label = labels[i])  
         phot.fill_between(modspec_lam[nz], spec_pdf[nz,0], spec_pdf[nz,2],
                           color=colors[i], alpha=0.3,zorder=-1)
 
@@ -400,15 +404,16 @@ def sed_figure(outname = None,
     resid.set_ylim(-resid_ymax,resid_ymax)
 
     # redshift text
-    phot.text(textx, texty, 'z='+"{:.2f}".format(zred),
-              fontsize=10, ha='left',transform = phot.transAxes)
+    if 'zred' not in sresults[0]['theta_labels']:
+        phot.text(textx, texty, 'z='+"{:.2f}".format(zred),
+                  fontsize=10, ha='left',transform = phot.transAxes)
     
     # extra line
     resid.axhline(0, linestyle=':', color='grey')
     resid.yaxis.set_major_locator(MaxNLocator(5))
 
     # legend
-    phot.legend(loc=1, prop={'size':8},
+    phot.legend(loc=kwargs.get('legend_loc',0), prop={'size':8},
                 scatterpoints=1,fancybox=True)
                 
     # set labels
@@ -431,17 +436,18 @@ def sed_figure(outname = None,
     fig.add_subplot(resid)
     
     # set second x-axis (rest-frame wavelength)
-    y1, y2=phot.get_ylim()
-    x1, x2=phot.get_xlim()
-    ax2=phot.twiny()
-    ax2.set_xticks(np.arange(0,10,0.2))
-    ax2.set_xlim(x1/(1+zred), x2/(1+zred))
-    ax2.set_xlabel(r'$\lambda_{\mathrm{rest}}$ [$\mu$m]',fontsize=fs)
-    ax2.set_ylim(y1, y2)
-    ax2.set_xscale('log',nonposx='clip',subsx=(2,5))
-    ax2.xaxis.set_minor_formatter(FormatStrFormatter('%2.4g'))
-    ax2.xaxis.set_major_formatter(FormatStrFormatter('%2.4g'))
-    ax2.tick_params('both', pad=2.5, size=3.5, width=1.0, which='both',labelsize=ticksize)
+    if 'zred' not in sresults[0]['theta_labels']:
+        y1, y2=phot.get_ylim()
+        x1, x2=phot.get_xlim()
+        ax2=phot.twiny()
+        ax2.set_xticks(np.arange(0,10,0.2))
+        ax2.set_xlim(x1/(1+zred), x2/(1+zred))
+        ax2.set_xlabel(r'$\lambda_{\mathrm{rest}}$ [$\mu$m]',fontsize=fs)
+        ax2.set_ylim(y1, y2)
+        ax2.set_xscale('log',nonposx='clip',subsx=(2,5))
+        ax2.xaxis.set_minor_formatter(FormatStrFormatter('%2.4g'))
+        ax2.xaxis.set_major_formatter(FormatStrFormatter('%2.4g'))
+        ax2.tick_params('both', pad=2.5, size=3.5, width=1.0, which='both',labelsize=ticksize)
 
     # remove ticks
     phot.set_xticklabels([])
@@ -514,7 +520,7 @@ def make_all_plots(filebase=None,
             ax.yaxis.set_tick_params(labelsize=tick_fs)
             ax.yaxis.get_offset_text().set_size(fs)
         rfig.tight_layout()
-        rfig.savefig(outfolder+objname+'_dynesty_summary.png',dpi=150)
+        rfig.savefig(outfolder+objname+'_dynesty_summary.pdf',dpi=200)
 
     # Plot traces and 1-D marginalized posteriors.
     if plt_trace:
@@ -524,7 +530,7 @@ def make_all_plots(filebase=None,
             ax.xaxis.set_tick_params(labelsize=tick_fs)
             ax.yaxis.set_tick_params(labelsize=tick_fs)
         tfig.tight_layout()
-        tfig.savefig(outfolder+objname+'_dynesty_trace.png',dpi=130)
+        tfig.savefig(outfolder+objname+'_dynesty_trace.pdf',dpi=200)
 
     # corner plot
     if plt_corner: 
@@ -535,7 +541,7 @@ def make_all_plots(filebase=None,
     if plt_sed:
         print 'making SED plot'
         pfig = sed_figure(sresults = [res], eout=[eout],
-                          outname=outfolder+objname+'.sed.png')
+                          outname=outfolder+objname+'.sed.pdf',**opts)
         
 def do_all(runname=None,nobase=True,**extras):
     """for a list of galaxies, make all plots

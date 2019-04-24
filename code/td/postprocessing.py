@@ -8,15 +8,14 @@ import prosp_dynesty_plots
 from dynesty.plotting import _quantile as weighted_quantile
 from prospect.models import sedmodel
 
-def set_sfh_time_vector(theta,model):
+def set_sfh_time_vector(chain,model):
     """if parameterized, calculate linearly in 100 steps from t=0 to t=tage
     if nonparameterized, calculate at bin edges.
     """
 
-    model.set_parameters(theta)
+    nt = 100
     if 'tage' in model.theta_labels():
-        nt = 100
-        tage = theta[model.theta_index['tage']]
+        tage = chain[model.theta_index['tage'],:].max()
         t = np.linspace(0,tage,num=nt)
     elif 'agebins' in model.params:
         in_years = 10**model.params['agebins']/1e9
@@ -82,7 +81,7 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True, measure_
     for p in extra_parnames: eout['extras'][p] = deepcopy(fmt)
 
     # sfh
-    tvec = set_sfh_time_vector(res['model'].initial_theta,res['model'])
+    tvec = set_sfh_time_vector(res['chain'],res['model'])
     eout['sfh']['t'] = np.zeros(shape=(ncalc,tvec.shape[0]))
     eout['sfh']['sfh'] = np.zeros(shape=(ncalc,tvec.shape[0]))
 
@@ -123,6 +122,9 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True, measure_
         # model call
         thetas = res['chain'][sidx,:]
         eout['obs']['spec'][jj,:],eout['obs']['mags'][jj,:],sm = res['model'].mean_model(thetas, res['obs'], sps=sps)
+
+        # interpolate spectrum from rest-frame to observed wavelength, and add (1+z) factor
+        #eout['obs']['spec'][jj,:] = np.interp(sps.wavelengths, sps.wavelengths*(1+res['model'].params['zred']), spec)
 
         # calculate SFH-based quantities
         sfh_params = prosp_dutils.find_sfh_params(res['model'],thetas,res['obs'],sps,sm=sm)
@@ -168,10 +170,12 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True, measure_
             props = prosp_dutils.measure_restframe_properties(sps, thetas=nagn_thetas, model=res['model'], 
                                                               measure_mir=True,measure_ir = True, measure_luv = True)
             eout['extras']['fmir']['chain'][jj] = (eout['extras']['lmir']['chain'][jj]-props['lmir'])/eout['extras']['lmir']['chain'][jj]
+            #eout['extras']['fmir']['chain'][jj] = (eout['extras']['lir']['chain'][jj] - props['lir']) / eout['extras']['lir']['chain'][jj]
             eout['extras']['luv_agn']['chain'][jj] = props['luv']
             eout['extras']['lir_agn']['chain'][jj] = props['lir']
 
         # isolate young star contribution
+        """
         nodep_model.params['mass'] = np.zeros_like(res['model'].params['mass'])
         nodep_model.params['mass'][:2] = res['model'].params['mass'][:2]
         try:
@@ -180,6 +184,7 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True, measure_
             out = {'luv': 0.0, 'lir': 0.0}
         eout['extras']['luv_young']['chain'][jj] = out['luv']
         eout['extras']['lir_young']['chain'][jj] = out['lir']
+        """
 
         # ages
         eout['extras']['avg_age']['chain'][jj], eout['extras']['lwa_lbol']['chain'][jj], \
@@ -249,6 +254,7 @@ def post_processing(param_name, objname=None, runname = None, overwrite=True, ob
 
     # I/O
     res, powell_results, _, eout = load_prospector_data(obj_outfile,hdf5=True,load_extra_output=True,postprocessing=True)
+
     if res is None:
         print 'there are no sampling results! returning.'
         return
