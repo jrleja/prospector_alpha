@@ -610,7 +610,9 @@ def load_model(objname=None, datloc=None, agelims=[0.0,7.4772,8.0,8.5,9.0,9.5,9.
     # current scheme: six bins, four spaced equally in logarithmic 
     # last bin is 15% age of the Universe, first two are 0-30, 30-100
     tbinmax = (tuniv*0.85)*1e9
-    agelims = agelims[:2] + np.linspace(agelims[2],np.log10(tbinmax),len(agelims)-3).tolist() + [np.log10(tuniv*1e9)]
+    agelims = agelims[:2] + np.linspace(agelims[2],np.log10(tbinmax),len(agelims)-3).tolist() + [float(np.log10(tuniv*1e9))]
+    if type(agelims[-3]) == type([]): # workaround for odyssey numpy
+        agelims = [np.atleast_1d(x)[0] for x in agelims]
     agebins = np.array([agelims[:-1], agelims[1:]])
     ncomp = len(agelims) - 1
 
