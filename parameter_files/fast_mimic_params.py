@@ -259,10 +259,32 @@ model_params.append({'name': 'add_dust_emission', 'N': 1,
 ###### Nebular Emission ###########
 model_params.append({'name': 'add_neb_emission', 'N': 1,
                         'isfree': False,
-                        'init': False,
+                        'init': True,
                         'units': r'log Z/Z_\odot',
-                        'prior_function_name': None,
-                        'prior_args': None})
+                        'prior': None})
+
+model_params.append({'name': 'add_neb_continuum', 'N': 1,
+                        'isfree': False,
+                        'init': True,
+                        'units': r'log Z/Z_\odot',
+                        'prior': None})
+
+model_params.append({'name': 'nebemlineinspec', 'N': 1,
+                        'isfree': False,
+                        'init': False,
+                        'prior': None})
+
+model_params.append({'name': 'gas_logz', 'N': 1,
+                        'isfree': True,
+                        'init': 0.0,
+                        'units': r'log Z/Z_\odot',
+                        'prior': priors.TopHat(mini=-2.0, maxi=0.5)})
+
+model_params.append({'name': 'gas_logu', 'N': 1, # scale with sSFR?
+                        'isfree': False,
+                        'init': -1.0,
+                        'units': '',
+                        'prior': priors.TopHat(mini=-4.0, maxi=-1.0)})
 
 
 ####### Calibration ##########
@@ -290,45 +312,23 @@ def load_sps(**extras):
     sps = CSPSpecBasis(**extras)
     return sps
 
-def load_model(objname=None, datdir=None, agelims=[], **extras):
+def load_model(objname=None, datdir=None, agelims=[], runname=None, zred=None, **extras):
 
     ###### REDSHIFT ######
-    ### open file, load data
-    '''
-    with open(datname, 'r') as f:
-        hdr = f.readline().split()
-    dtype = np.dtype([(hdr[1],'S20')] + [(n, np.float) for n in hdr[2:]])
-    dat = np.loadtxt(datname, comments = '#', delimiter=' ',
-                     dtype = dtype)
-    '''
-    fastname = datdir + objname.split('_')[0] + '_td_new.fout'
-
-    with open(fastname, 'r') as f:
-        hdr = f.readline().split()
-    dtype = np.dtype([(hdr[1],'S20')] + [(n, np.float) for n in hdr[2:]])
-    fast = np.loadtxt(fastname, comments = '#', delimiter=' ', dtype = dtype)
-    idx = fast['id'] == objname.split('_')[-1]
-    zred = fast['z'][idx][0]
-
-    #### INITIAL VALUES
-    logtau = np.log10(10**fast['ltau'][idx][0]/1e9)
-    tage = 10**fast['lage'][idx][0]/1e9
-    logmass = fast['lmass'][idx][0]
-    dust2 = fast['Av'][idx][0]/1.086
-
-    n = [p['name'] for p in model_params]
-    model_params[n.index('logtau')]['init'] = logtau
-    model_params[n.index('tage')]['init'] = tage
-    model_params[n.index('logmass')]['init'] = logmass
-    model_params[n.index('dust2')]['init'] = dust2
-
-    #### CALCULATE TUNIV #####
+    # first calculate redshift and corresponding t_universe
+    # if no redshift is specified, read from file
+    if zred is None:
+        datname = datdir + objname.split('_')[0] + '_' + runname + '.dat'
+        dat = ascii.read(datname)
+        idx = dat['phot_id'] == int(objname.split('_')[-1])
+        zred = float(dat['z_best'][idx])
     tuniv = WMAP9.age(zred).value
-    model_params[n.index('tage')]['prior'].update(maxi=tuniv)
 
-    #### INSERT REDSHIFT INTO MODEL PARAMETER DICTIONARY ####
-    zind = n.index('zred')
-    model_params[zind]['init'] = zred
+
+    # Update parameters
+    n = [p['name'] for p in model_params]
+    model_params[n.index('tage')]['prior'].update(maxi=tuniv)
+    model_params[n.index('zred')]['init'] = zred
 
     #### CREATE MODEL
     model = sedmodel.SedModel(model_params)
