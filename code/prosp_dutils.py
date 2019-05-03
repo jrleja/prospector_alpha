@@ -280,30 +280,21 @@ def find_sfh_params(model,theta,obs,sps,sm=None):
     # if we pass stellar mass from a prior model call,
     # we don't have to calculate it here
     if sm is None and out['mass'].shape[0] == 1:
-        _,_,sm_new=model.sed(theta, obs, sps=sps)
+        _,_,sm_new = model.sed(theta, obs, sps=sps)
         try:
             sm = sps.csp.stellar_mass
         except AttributeError as e: 
             sm = sm_new
 
     ### create mass fractions for nonparametric SFHs
-    # first old-style
-    if (out['sfr_fraction'].shape[0] != 0):
-        out['sfr_fraction_full'] = np.concatenate((out['sfr_fraction'],np.atleast_1d(1-out['sfr_fraction'].sum())))
-        time_per_bin = []
-        for (t1, t2) in sps.params['agebins']: time_per_bin.append(10**t2-10**t1)
-        out['mass_fraction'] = out['sfr_fraction_full']*np.array(time_per_bin)
-        out['mass_fraction'] /= out['mass_fraction'].sum()
-        out['mformed'] = copy.copy(out['mass'])
-        out['mass'] *= sm
-    # now new-style nonparametric
-    elif out['mass'].shape[0] > 1:
+    if out['mass'].shape[0] > 1:
         out['mass_fraction'] = out['mass']/out['mass'].sum()
         out['mformed'] = out['mass'].sum()
         out['mass'] = out['mass'].sum()*sm
+    elif (model.params['mass_units'] == 'mstar'):
+        # If we're fitting in mstar units, swap definitions !
+        out['mformed'] = out['mass'] / sm
     else:
-        # Need this because mass is 
-        # current mass, not total mass formed!
         out['mformed'] = out['mass']
         out['mass'] *= sm
 
