@@ -82,7 +82,7 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True, measure_
 
     # sfh
     tvec = set_sfh_time_vector(res['chain'],res['model'])
-    eout['sfh']['t'] = np.zeros(shape=(ncalc,tvec.shape[0]))
+    eout['sfh']['t'] = tvec
     eout['sfh']['sfh'] = np.zeros(shape=(ncalc,tvec.shape[0]))
 
     # observables
@@ -129,8 +129,7 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True, measure_
         # calculate SFH-based quantities
         sfh_params = prosp_dutils.find_sfh_params(res['model'],thetas,res['obs'],sps,sm=sm)
         eout['extras']['stellar_mass']['chain'][jj] = sfh_params['mass']
-        eout['sfh']['t'][jj,:] = set_sfh_time_vector(thetas,res['model'])
-        eout['sfh']['sfh'][jj,:] = prosp_dutils.return_full_sfh(eout['sfh']['t'][jj,:], sfh_params)
+        eout['sfh']['sfh'][jj,:] = prosp_dutils.return_full_sfh(eout['sfh']['t'], sfh_params)
         eout['extras']['half_time']['chain'][jj] = prosp_dutils.halfmass_assembly_time(sfh_params)
         eout['extras']['sfr_100']['chain'][jj] = prosp_dutils.calculate_sfr(sfh_params, 0.1,  minsfr=-np.inf, maxsfr=np.inf)
         eout['extras']['ssfr_100']['chain'][jj] = eout['extras']['sfr_100']['chain'][jj].squeeze() / eout['extras']['stellar_mass']['chain'][jj].squeeze()
