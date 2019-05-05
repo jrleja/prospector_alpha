@@ -170,12 +170,10 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True, measure_
             props = prosp_dutils.measure_restframe_properties(sps, thetas=nagn_thetas, model=res['model'], 
                                                               measure_mir=True,measure_ir = True, measure_luv = True)
             eout['extras']['fmir']['chain'][jj] = (eout['extras']['lmir']['chain'][jj]-props['lmir'])/eout['extras']['lmir']['chain'][jj]
-            #eout['extras']['fmir']['chain'][jj] = (eout['extras']['lir']['chain'][jj] - props['lir']) / eout['extras']['lir']['chain'][jj]
             eout['extras']['luv_agn']['chain'][jj] = props['luv']
             eout['extras']['lir_agn']['chain'][jj] = props['lir']
 
         # isolate young star contribution
-        """
         nodep_model.params['mass'] = np.zeros_like(res['model'].params['mass'])
         nodep_model.params['mass'][:2] = res['model'].params['mass'][:2]
         try:
@@ -184,7 +182,6 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True, measure_
             out = {'luv': 0.0, 'lir': 0.0}
         eout['extras']['luv_young']['chain'][jj] = out['luv']
         eout['extras']['lir_young']['chain'][jj] = out['lir']
-        """
 
         # ages
         eout['extras']['avg_age']['chain'][jj], eout['extras']['lwa_lbol']['chain'][jj], \
