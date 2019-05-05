@@ -137,6 +137,9 @@ def load_obs(objname=None, datdir=None, runname=None, err_floor=0.05, zperr=True
 def transform_logmass_to_mass(mass=None, logmass=None, **extras):
     return 10**logmass
 
+def to_dust1(dust1_fraction=None, dust1=None, dust2=None, **extras):
+    return dust1_fraction*dust2
+
 def load_gp(**extras):
     return None, None
 
