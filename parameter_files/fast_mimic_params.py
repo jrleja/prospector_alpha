@@ -259,33 +259,10 @@ model_params.append({'name': 'add_dust_emission', 'N': 1,
 ###### Nebular Emission ###########
 model_params.append({'name': 'add_neb_emission', 'N': 1,
                         'isfree': False,
-                        'init': True,
-                        'units': r'log Z/Z_\odot',
-                        'prior': None})
-
-model_params.append({'name': 'add_neb_continuum', 'N': 1,
-                        'isfree': False,
-                        'init': True,
-                        'units': r'log Z/Z_\odot',
-                        'prior': None})
-
-model_params.append({'name': 'nebemlineinspec', 'N': 1,
-                        'isfree': False,
                         'init': False,
-                        'prior': None})
-
-model_params.append({'name': 'gas_logz', 'N': 1,
-                        'isfree': True,
-                        'init': 0.0,
                         'units': r'log Z/Z_\odot',
-                        'prior': priors.TopHat(mini=-2.0, maxi=0.5)})
-
-model_params.append({'name': 'gas_logu', 'N': 1, # scale with sSFR?
-                        'isfree': False,
-                        'init': -1.0,
-                        'units': '',
-                        'prior': priors.TopHat(mini=-4.0, maxi=-1.0)})
-
+                        'prior_function_name': None,
+                        'prior_args': None})
 
 ####### Calibration ##########
 model_params.append({'name': 'peraa', 'N': 1,
