@@ -316,7 +316,7 @@ model_params.append({'name': 'peraa', 'N': 1,
 
 model_params.append({'name': 'mass_units', 'N': 1,
                      'isfree': False,
-                     'init': 'mstar'})
+                     'init': 'mformed'})
 
 #### resort list of parameters 
 
