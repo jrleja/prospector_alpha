@@ -11,19 +11,14 @@
 ### memory per cpu, in MB
 #SBATCH --mem-per-cpu=4000
 ### Job name
-#SBATCH -J 'fast_nonpar_sec'
+#SBATCH -J 'mock_perturb_noise_sec'
 ### output and error logs
-#SBATCH -o fast_nonpar_sec_%a.out
-#SBATCH -e fast_nonpar_sec_%a.err
 ### mail
 #SBATCH --mail-type=END
 #SBATCH --mail-user=joel.leja@gmail.com
-IDFILE=$APPS"/prospector_alpha/data/3dhst/td_new.ids"
-OBJID=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$IDFILE")
-
 srun -n 1 --mpi=pmi2 python $APPS/prospector_alpha/code/td/postprocessing.py \
-$APPS/prospector_alpha/parameter_files/fast_mimic_nonpar_params.py \
---objname="$OBJID" \
+$APPS/prospector_alpha/parameter_files/mock_perturb_noise_params.py \
+--objname="${SLURM_ARRAY_TASK_ID}" \
 --overwrite=True \
---plot=False \
---shorten_spec=True
+--plot=True \
+--shorten_spec=False

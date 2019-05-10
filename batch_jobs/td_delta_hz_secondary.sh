@@ -7,23 +7,24 @@
 ### Requested computing time in minutes
 #SBATCH -t 960
 ### Partition or queue name
-#SBATCH -p conroy,shared,serial_requeue,itc_cluster
+#SBATCH -p conroy,shared,serial_requeue,itc_cluster,conroy-intel
 ### memory per cpu, in MB
 #SBATCH --mem-per-cpu=4000
 ### Job name
-#SBATCH -J 'fast_nonpar_sec'
+#SBATCH -J 'td_delta_hz_sec'
 ### output and error logs
-#SBATCH -o fast_nonpar_sec_%a.out
-#SBATCH -e fast_nonpar_sec_%a.err
+#SBATCH -o td_delta_hz_sec_%a.out
+#SBATCH -e td_delta_hz_sec_%a.err
 ### mail
 #SBATCH --mail-type=END
 #SBATCH --mail-user=joel.leja@gmail.com
-IDFILE=$APPS"/prospector_alpha/data/3dhst/td_new.ids"
+IDFILE=$APPS"/prospector_alpha/data/3dhst/td_new_hz.ids"
 OBJID=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$IDFILE")
 
 srun -n 1 --mpi=pmi2 python $APPS/prospector_alpha/code/td/postprocessing.py \
-$APPS/prospector_alpha/parameter_files/fast_mimic_nonpar_params.py \
+$APPS/prospector_alpha/parameter_files/td_delta_params.py \
 --objname="$OBJID" \
 --overwrite=True \
 --plot=False \
---shorten_spec=True
+--shorten_spec=True \
+--obj_outfile="$APPS"/prospector_alpha/results/td_delta_hz/"$OBJID"

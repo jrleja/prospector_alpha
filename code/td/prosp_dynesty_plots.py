@@ -241,7 +241,7 @@ def add_sfh_plot(eout,fig,ax_loc=None,
             # nearest-neighbor 'interpolation'
             # exact answer for binned SFHs
             idx = np.abs(eout['sfh']['t'] - tvec[jj]).argmin(axis=-1)
-            perc[jj,:] = dyplot._quantile(eout['sfh']['sfh'][np.arange(idx.shape[0]),idx],[0.16,0.50,0.84],weights=eout['weights'])
+            perc[jj,:] = dyplot._quantile(eout['sfh']['sfh'][:,idx],[0.16,0.50,0.84],weights=eout['weights'])
 
         if smooth_sfh:
             for j in range(3):

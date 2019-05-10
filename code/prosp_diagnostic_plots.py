@@ -574,9 +574,10 @@ def sed_figure(outname = None,
     ### plot truths
 
     #### TEXT, FORMATTING, LABELS
-    z_txt = sresults[0]['model'].params['zred'][0]
-    phot.text(textx, texty, 'z='+"{:.2f}".format(z_txt),
-              fontsize=10, ha='left',transform = phot.transAxes)
+    if zred not in sresults[0].theta_labels():
+        z_txt = sresults[0]['model'].params['zred'][0]
+        phot.text(textx, texty, 'z='+"{:.2f}".format(z_txt),
+                  fontsize=10, ha='left',transform = phot.transAxes)
 
     # extra line
     res.axhline(0, linestyle=':', color='grey')
@@ -613,17 +614,18 @@ def sed_figure(outname = None,
     fig.add_subplot(res)
     
     # set second x-axis
-    y1, y2=phot.get_ylim()
-    x1, x2=phot.get_xlim()
-    ax2=phot.twiny()
-    ax2.set_xticks(np.arange(0,10,0.2))
-    ax2.set_xlim(x1/(1+z_txt), x2/(1+z_txt))
-    ax2.set_xlabel(r'$\lambda_{\mathrm{rest}}$ [$\mu$m]',fontsize=fs)
-    ax2.set_ylim(y1, y2)
-    res.set_xscale('log',nonposx='clip',subsx=(2,5))
-    res.xaxis.set_minor_formatter(FormatStrFormatter('%2.2g'))
-    res.xaxis.set_major_formatter(FormatStrFormatter('%2.2g'))
-    res.tick_params('both', pad=3.5, size=3.5, width=1.0, which='both',labelsize=ls)
+    if zred not in sresults[0].theta_labels():
+        y1, y2=phot.get_ylim()
+        x1, x2=phot.get_xlim()
+        ax2=phot.twiny()
+        ax2.set_xticks(np.arange(0,10,0.2))
+        ax2.set_xlim(x1/(1+z_txt), x2/(1+z_txt))
+        ax2.set_xlabel(r'$\lambda_{\mathrm{rest}}$ [$\mu$m]',fontsize=fs)
+        ax2.set_ylim(y1, y2)
+        res.set_xscale('log',nonposx='clip',subsx=(2,5))
+        res.xaxis.set_minor_formatter(FormatStrFormatter('%2.2g'))
+        res.xaxis.set_major_formatter(FormatStrFormatter('%2.2g'))
+        res.tick_params('both', pad=3.5, size=3.5, width=1.0, which='both',labelsize=ls)
     
     # remove ticks
     phot.set_xticklabels([])

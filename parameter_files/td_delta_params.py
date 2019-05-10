@@ -412,7 +412,6 @@ for param in model_params:
         tparams.append(param)
 model_params = tparams
 
-
 ##### Mass-metallicity prior ######
 class MassMet(priors.Prior):
     """A Gaussian prior designed to approximate the Gallazzi et al. 2005 
@@ -422,6 +421,11 @@ class MassMet(priors.Prior):
     prior_params = ['mass_mini', 'mass_maxi', 'z_mini', 'z_maxi']
     distribution = truncnorm
     massmet = np.loadtxt(os.getenv('APPS')+'/prospector_alpha/data/gallazzi_05_massmet.txt')
+
+    def __len__(self):
+        """ Hack to work with PRospector 0.3
+        """
+        return 2
 
     def scale(self,mass):
         upper_84 = np.interp(mass, self.massmet[:,0], self.massmet[:,3]) 

@@ -291,7 +291,7 @@ def find_sfh_params(model,theta,obs,sps,sm=None):
         out['mass_fraction'] = out['mass']/out['mass'].sum()
         out['mformed'] = out['mass'].sum()
         out['mass'] = out['mass'].sum()*sm
-    elif (model.params['mass_units'] == 'mstar'):
+    elif (model.params.get('mass_units','mformed') == 'mstar'):
         # If we're fitting in mstar units, swap definitions !
         out['mformed'] = out['mass'] / sm
     else:
