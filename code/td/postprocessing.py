@@ -221,7 +221,7 @@ def post_processing(param_name, objname=None, runname = None, overwrite=True, ob
                     plot_outfolder=None, plot=True, sps=None, **kwargs):
     """Driver. Loads output, runs post-processing routine.
     overwrite=False will return immediately if post-processing file already exists.
-    if runname is specified, we can pass in parameter file for run A with outputs at location runname
+    if runname is specified, we can pass in parameter file for run with outputs at location runname
     kwargs are passed to calc_extra_quantities
     """
 
@@ -240,6 +240,9 @@ def post_processing(param_name, objname=None, runname = None, overwrite=True, ob
         if (runname == 'td_huge') | (runname == 'td_new') | (runname == 'td_delta'):
             field = obj_outfile.split('/')[-1].split('_')[0]
             obj_outfile = "/".join(obj_outfile.split('/')[:-1])+'/'+field+'/'+obj_outfile.split('/')[-1]  
+
+    if runname is None:
+        runname = obj_outfile.split('/')[-2]
 
     if plot_outfolder is None:
         plot_outfolder = os.getenv('APPS')+'/prospector_alpha/plots/'+runname+'/'
