@@ -547,6 +547,11 @@ class MassMet(priors.Prior):
     distribution = truncnorm
     massmet = np.loadtxt(os.getenv('APPS')+'/prospector_alpha/data/gallazzi_05_massmet.txt')
 
+    def __len__(self):
+        """ Hack to work with Prospector 0.3
+        """
+        return 2
+
     def scale(self,mass):
         upper_84 = np.interp(mass, self.massmet[:,0], self.massmet[:,3]) 
         lower_16 = np.interp(mass, self.massmet[:,0], self.massmet[:,2])
