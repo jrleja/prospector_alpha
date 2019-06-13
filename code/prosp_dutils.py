@@ -300,7 +300,7 @@ def find_sfh_params(model,theta,obs,sps,sm=None):
 
     return out
 
-def test_likelihood(sps,model,obs,thetas,param_file):
+def test_likelihood(sps,model,obs,thetas,param_file,run_params):
 
     '''
     skeleton:
@@ -310,8 +310,6 @@ def test_likelihood(sps,model,obs,thetas,param_file):
     '''
 
     from prospect.likelihood import lnlike_spec,lnlike_phot
-
-    run_params = model_setup.get_run_params(param_file=param_file)
 
     if sps is None:
         sps = model_setup.load_sps(**run_params)
@@ -548,36 +546,6 @@ def exp_decl_sfh_half_time(tage,tau):
     so a larger half-mass time is an OLDER galaxy
     '''
     return tage-tau*np.log(2./(1+np.exp(-tage/tau)))
-
-def g05_prior(size=1000):
-
-    from prosp_dutils import exp_decl_sfh_avg_age_with_burst as avg_age
-
-    # random tage
-    tmin, tmax = 1, 13.5
-    tage = (tmax - tmin) * np.random.random_sample(size) + tmin
-
-    # random tau
-    gmin, gmax = 0.0, 1
-    gamma = (gmax-gmin) * np.random.random_sample(size) + gmin
-    tau = 1./gamma
-
-    # random burst amplitude (Mburst / Mnotburst)
-    amin, amax = 0.03,4
-    aburst = (amax-amin) * np.random.random_sample(size) + amin
-
-    # random burst duration
-    #dtburst_min, dtburst_max = 0.03,0.3
-    # dtburst = (dtburst_max-dtburst_min) * np.random.random_sample(size) + dtburst_min
-
-    # each 2 Gyr has a 10% chance of a burst happening
-    # so assume a random burst happened in the last 20 gyr
-    # if burst > tage, then it does NOT happen
-    tburst = np.random.random_sample(size)*20
-
-    tavg = np.array([avg_age(tage[i],tau[i],aburst[i],tburst[i]) for i in range(size)])
-
-    return tavg
 
 def exp_decl_sfh_avg_age(tage,tau):
     ''' this is done numerically
@@ -979,7 +947,7 @@ def calculate_sfr(sfh_params, timescale, tcalc = None,
 
     '''
 
-    if sfh_params['sfh'] > 0:
+    if (sfh_params['sfh'] != 0) & (sfh_params['sfh'] != 3):
         tage = sfh_params['tage']
     else:
         tage = np.max(10**sfh_params['agebins']/1e9)
@@ -1046,7 +1014,7 @@ def integrate_sfh(t1,t2,sfh_params):
     sfh = sfh_params.copy()
 
     # if we're using a parameterized SFH
-    if sfh_params['sfh'] > 0:
+    if (sfh_params['sfh'] != 0) & (sfh_params['sfh'] != 3):
 
         # make sure we have an sf_start
         if (sfh['sf_start'].shape[0] == 0):
@@ -1261,7 +1229,7 @@ def measure_restframe_properties(sps, model = None, thetas = None, emlines = Fal
 
     ### if we want restframe optical photometry, generate fake obs file
     ### else generate NO obs file (don't do extra filter convolutions if not necessary)
-    obs = {'filters': [], 'wavelength': None}
+    obs = {'filters': [], 'wavelength': None, 'spectrum': None}
     if measure_uvj:
         from sedpy.observate import load_filters
         filters = ['bessell_U','bessell_V','twomass_J']# ,'bessell_B','bessell_R','twomass_Ks']
