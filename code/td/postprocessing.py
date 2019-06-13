@@ -37,11 +37,11 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True, measure_
     # calculate maxprob
     # and ensure that maxprob stored is the same as calculated now 
     # don't recalculate lnprobability after we fix MassMet
-    res['lnprobability'] = res['lnlikelihood'] + res['model'].prior_product(res['chain'])
     amax = res['lnprobability'].argmax()
     current_maxprob = prosp_dutils.test_likelihood(sps, res['model'], res['obs'], 
                                                    res['chain'][amax], 
-                                                   res['run_params']['param_file'])
+                                                   res['run_params']['param_file'],
+                                                   res['run_params'])
     print 'Best-fit lnprob currently: {0}'.format(float(current_maxprob))
     print 'Best-fit lnprob during sampling: {0}'.format(res['lnprobability'][amax])
 
@@ -86,11 +86,13 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True, measure_
     eout['sfh']['sfh'] = np.zeros(shape=(ncalc,tvec.shape[0]))
 
     # observables
-    eout['obs']['spec'] = np.zeros(shape=(ncalc,sps.wavelengths.shape[0]))
+    eout['obs']['lam_obs'] = sps.wavelengths
+    if res['obs'].get('wavelength',None) is not None:
+        eout['obs']['lam_obs'] = res['obs']['wavelength']
+    eout['obs']['spec'] = np.zeros(shape=(ncalc,eout['obs']['lam_obs'].shape[0]))
     eout['obs']['mags'] = np.zeros(shape=(ncalc,len(res['obs']['filters'])))
     eout['obs']['uvj'] = np.zeros(shape=(ncalc,3))
     eout['obs']['rf'] = np.zeros(shape=(ncalc,3))
-    eout['obs']['lam_obs'] = sps.wavelengths
     elines = ['H beta 4861', 'H alpha 6563','Br gamma 21657','Pa alpha 18752']
     eout['obs']['elines'] = {key: {'ew': deepcopy(fmt), 'flux': deepcopy(fmt)} for key in elines}
     eout['obs']['dn4000'] = deepcopy(fmt)
@@ -112,6 +114,10 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True, measure_
             print model_params[j]['name']
             model_params[j].pop('depends_on', None)
     nodep_model = sedmodel.SedModel(model_params)
+
+    # flush the model
+    #for jj in range(2): _, _, _ = res['model'].mean_model(res['chain'][sample_idx[jj],:], res['obs'], sps=sps)
+
 
     # sample in the posterior
     for jj,sidx in enumerate(sample_idx):
@@ -210,12 +216,68 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True, measure_
             q50, q16, q84 = weighted_quantile(eout['obs']['abslines'][key]['chain'], np.array([0.5, 0.16, 0.84]), weights=eout['weights'])
             for q,qstr in zip([q50,q16,q84],['q50','q16','q84']): eout['obs']['abslines'][key][qstr] = q
 
+    # for storage purposes
     if shorten_spec:
-        spec_pdf = np.zeros(shape=(len(sps.wavelengths),3))
+        spec_pdf = np.zeros(shape=(eout['obs']['lam_obs'].shape[0],3))
         for jj in xrange(spec_pdf.shape[0]): spec_pdf[jj,:] = weighted_quantile(eout['obs']['spec'][:,jj], np.array([0.5, 0.16, 0.84]), weights=eout['weights'])
         eout['obs']['spec'] = {'q50':spec_pdf[:,0],'q16':spec_pdf[:,1],'q84':spec_pdf[:,2]}
 
     return eout
+
+def pprocessing_new(param_name, outfile, plot_outfolder=None, plot=True, sps=None, overwrite=True,
+                    shorten_spec=False,**kwargs):
+    
+
+    # load parameter file, results
+    pfile = model_setup.import_module_from_file(param_name)
+    res, _, _, eout = load_prospector_data(outfile, postprocessing=True)
+
+    # if we don't specify a plot destination, make one up
+    if plot_outfolder is None:
+        plot_outfolder = os.getenv('APPS')+'/prospector_alpha/plots/'+outfile.split('/')[-2]+'/'
+    if not os.path.isdir(plot_outfolder):
+        os.makedirs(plot_outfolder)
+
+    # catch exceptions
+    if res is None:
+        print 'there are no sampling results! returning.'
+        return
+    if (not overwrite) & (eout is not None):
+        print 'post-processing file already exists! returning.'
+        return
+
+    # make filenames local...
+    objname = outfile.split('/')[-1]
+    print 'Performing post-processing on ' + objname
+    for key in res['run_params']:
+        if type(res['run_params'][key]) == unicode:
+            if 'prospector_alpha' in res['run_params'][key]:
+                res['run_params'][key] = os.getenv('APPS')+'/prospector_alpha'+res['run_params'][key].split('prospector_alpha')[-1]
+    if sps is None:
+        sps = pfile.build_sps(**res['run_params'])
+    obs = res['obs']
+    res['model'] = pfile.build_model(**res['run_params'])
+
+    # recast to float64
+    for key in res.keys():
+        if type(res[key]) == type(np.array([])):
+            if res[key].dtype == np.dtype(np.float128):
+                res[key] = res[key].astype(np.float64)
+
+    # renormalize weights
+    res['weights'] = res['weights'] / res['weights'].sum()
+
+    # sample from chain
+    extra_output = calc_extra_quantities(res,sps,obs,shorten_spec=shorten_spec,**kwargs)
+    
+    # create post-processing name, dump info
+    _, postname = create_prosp_filename(outfile,postprocessing=True)
+    hickle.dump(extra_output,open(postname, "w"))
+
+    # make standard plots
+    if plot:
+        prosp_dynesty_plots.make_all_plots(filebase=outfile,outfolder=plot_outfolder)
+
 
 def post_processing(param_name, objname=None, runname = None, overwrite=True, obj_outfile=None,
                     plot_outfolder=None, plot=True, sps=None, **kwargs):
@@ -252,7 +314,7 @@ def post_processing(param_name, objname=None, runname = None, overwrite=True, ob
         os.makedirs(plot_outfolder)
 
     # I/O
-    res, powell_results, _, eout = load_prospector_data(obj_outfile,hdf5=True,load_extra_output=True,postprocessing=True)
+    res, powell_results, _, eout = load_prospector_data(obj_outfile,hdf5=True,postprocessing=True)
 
     if res is None:
         print 'there are no sampling results! returning.'
@@ -270,8 +332,7 @@ def post_processing(param_name, objname=None, runname = None, overwrite=True, ob
     if sps is None:
         sps = pfile.load_sps(**res['run_params'])
     obs = res['obs']
-    if res['model'] is None:
-        res['model'] = pfile.load_model(**res['run_params'])
+    res['model'] = pfile.load_model(**res['run_params'])
 
     # recast to float64
     for key in res.keys():
