@@ -17,7 +17,7 @@ from scipy.optimize import minimize
 
 # plotting conventions
 minlogssfr, maxlogssfr = -13, -8
-ssfr_lim = -10.5 # previous definition of quiescent, now defunct
+ssfr_lim = -10. # defining quiescent
 uv_lim, vj_lim = (0,2.5), (0,2.5)
 ms_threesig = 0.9
 minmass, maxmass = 10, np.inf
@@ -32,7 +32,7 @@ ml_sun = 1./10**(absolute_mags/-2.5)
 # global colors
 interloper_colors = ['#cc0000', '#3a76ff']
 
-def do_all(runname='uvj_dirichlet', outfolder=None, make_legacy_plots=False, use_muzzin=False, use_masscut=True, smooth=1, ssfr_cut=True, **opts):
+def do_all(runname='uvj', outfolder=None, make_legacy_plots=False, use_muzzin=False, use_masscut=True, smooth=1, ssfr_cut=True, **opts):
 
     if outfolder is None:
         outfolder = os.getenv('APPS') + '/prospector_alpha/plots/'+runname+'/uvj_plots/'
@@ -54,14 +54,13 @@ def do_all(runname='uvj_dirichlet', outfolder=None, make_legacy_plots=False, use
     # global plotting parameters
     pars = ['ml_g0','dust2','ssfr_100','avg_age','massmet_2']# ,'dust_index','ml_r0','ml_i0'
     plabels = [r'log(M/L$_{\mathrm{g}}$)', r'$\tau_{\mathrm{dust}}$',r'log(sSFR/yr$^{-1}$)', r'log(stellar age/Gyr)',r'log(Z/Z$_{\odot}$)'] # 'dust index'
-    lims = [(-1,0.5),(0,1.8),(-11.5,-8.6),(0,0.6),(-0.8,0.1)] # (-2.2,0.4)
+    lims = [(-1,0.8),(0,1.8),(-11.5,-8.6),(0,0.6),(-0.8,0.1)] # (-2.2,0.4)
 
     # grab data from 3dhst
     with open('/Users/joel/code/python/prospector_alpha/plots/td_delta/fast_plots/data/fastcomp.h5', "r") as f:
         threedhst_data = hickle.load(f)
 
-    if use_muzzin:
-        threedhst_data['uvj_prosp'] = threedhst_data['fast']['uvj_prosp_muzz']
+    if use_muzzin: threedhst_data['uvj_prosp'] = threedhst_data['fast']['uvj_prosp_muzz']
 
     # define some useful quantities
     threedhst_data = add_extra_quantities(threedhst_data,use_muzzin=use_muzzin)
@@ -74,14 +73,32 @@ def do_all(runname='uvj_dirichlet', outfolder=None, make_legacy_plots=False, use
     priors = load_priors(mock_pars+['ml_r0','ml_i0'], prior_file)
     uvj_mock = collate_data(runname,priors,filename=outfolder+'data/dat.h5',**opts)
 
+    # code to compare sSFR posteriors for UVJ-selected galaxies
+    '''
+    idx_sf, idx_samp = 181, 189
+    ssfr_prior = np.clip(np.log10(priors['ssfr_100']),-14,-8)
+    ssfr_obj = np.clip(np.log10(uvj_mock['chains']['ssfr_100'][idx_samp]), -14, -8)
+    ssfr_sf = np.clip(np.log10(uvj_mock['chains']['ssfr_100'][idx_sf]), -14, -8)  
+    plt.hist(ssfr_prior, color='k', lw=2, density=True, histtype='step',label='prior',bins=15)
+    plt.hist(ssfr_obj, weights=uvj_mock['weights'][idx_samp], color='red', lw=2, density=True, histtype='step',label='UV,VJ=(0.75,1.45)',bins=15) 
+    plt.hist(ssfr_sf, weights=uvj_mock['weights'][idx_sf], color='blue', lw=2, density=True, histtype='step',label='UV,VJ=(0.75,0.65)',bins=8) 
+
+    plt.xlabel(r'log(sSFR/yr$^{-1}$)',fontsize=16)
+    plt.ylabel('density',fontsize=16)
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+    '''
+
     # fancy SFH plot
-    fancy_sfh_plot(uvj_mock,runname,outfolder+'UVJ_sfh_dust.png',use_muzzin=use_muzzin)
+    #fancy_sfh_plot(uvj_mock,runname,outfolder+'UVJ_sfh_dust.pdf',use_muzzin=use_muzzin)
 
     # alternate UVJ plots
-    alternate_uvj(threedhst_data,outfolder+'alternate_UVJ.png',use_muzzin=use_muzzin,use_masscut=use_masscut,ssfr_cut=ssfr_cut,**opts)
-
+    alternate_uvj(threedhst_data,outfolder+'alternate_UVJ.pdf',use_muzzin=use_muzzin,use_masscut=use_masscut,ssfr_cut=ssfr_cut,**opts)
+    print 1/0
     # additional color cuts?
-    additional_color_cuts(threedhst_data,outfolder+'additional_color_cuts.png',use_masscut=use_masscut,ssfr_cut=ssfr_cut)
+    additional_color_cuts(threedhst_data,outfolder+'additional_color_cuts.pdf',use_masscut=use_masscut,ssfr_cut=ssfr_cut)
+
     #os.system('open '+outfolder+'additional_color_cuts.png')
 
     # parameter maps
@@ -91,9 +108,9 @@ def do_all(runname='uvj_dirichlet', outfolder=None, make_legacy_plots=False, use
     pidx = plot_3d_maps(threedhst_data,pars,plabels,lims=lims,fig=fig,axes=axes[1,:],uv_range=uvj_mock['uv'],vj_range=uvj_mock['vj'],use_muzzin=use_muzzin,smooth=smooth)
     plot_mock_maps(uvj_mock, mock_pars, plabels, lims=lims, fig=fig, axes=axes[0,:],smooth=smooth,pidx=pidx,use_muzzin=use_muzzin)
     apos1,apos2 = axes[0,0].get_position(), axes[1,0].get_position()
-    fig.text(apos1.x0-0.07,apos1.y0+apos1.height/2.,'UVJ fluxes\nalone',rotation=90,fontsize=14,weight='bold',ha='center',va='center',ma='center')
+    fig.text(apos1.x0-0.07,apos1.y0+apos1.height/2.,'UVJ photometry\nalone',rotation=90,fontsize=14,weight='bold',ha='center',va='center',ma='center')
     fig.text(apos1.x0-0.055,apos2.y0+apos1.height/2.,'19-45 bands\nof photometry',rotation=90,fontsize=14,weight='bold',ha='right',va='center',ma='center')
-    plt.savefig(outfolder+'parameter_maps.png', dpi=150)
+    plt.savefig(outfolder+'parameter_maps.pdf', dpi=250)
     plt.close()
 
     # KLD maps
@@ -103,9 +120,9 @@ def do_all(runname='uvj_dirichlet', outfolder=None, make_legacy_plots=False, use
     pidx = plot_3d_maps(threedhst_data,pars,plabels,fig=fig,axes=axes[1,:],kld=True,cmap='Reds',uv_range=uvj_mock['uv'],vj_range=uvj_mock['vj'],use_muzzin=use_muzzin,smooth=smooth)
     plot_mock_maps(uvj_mock, mock_pars, plabels, priors=priors, cmap='Reds', fig=fig,axes=axes[0,:],pidx=pidx,use_muzzin=use_muzzin,smooth=smooth)
     apos1,apos2 = axes[0,0].get_position(), axes[1,0].get_position()
-    fig.text(apos1.x0-0.07,apos1.y0+apos1.height/2.,'UVJ fluxes\nalone',rotation=90,fontsize=14,weight='bold',ha='center',va='center')
+    fig.text(apos1.x0-0.07,apos1.y0+apos1.height/2.,'UVJ photometry\nalone',rotation=90,fontsize=14,weight='bold',ha='center',va='center')
     fig.text(apos1.x0-0.055,apos2.y0+apos1.height/2.,'19-45 bands\nof photometry',rotation=90,fontsize=14,weight='bold',ha='right',va='center',ma='center')
-    plt.savefig(outfolder+'kld_maps.png', dpi=150)
+    plt.savefig(outfolder+'kld_maps.pdf', dpi=250)
     plt.close()
 
     ### EVERYTHING BELOW THIS COMMENT IS DEPRECATED BUT STILL RUNS
@@ -127,7 +144,7 @@ def do_all(runname='uvj_dirichlet', outfolder=None, make_legacy_plots=False, use
         age_color(threedhst_data,outfolder+'3dhst_age_color.png',**opts)
         plot_quiescent_sfhs(outfolder+'3dhst_interloper_sfhs.png',ax,use_masscut=use_masscut,**opts)
 
-def additional_color_cuts(dat,outname,add_uv=True,use_masscut=False,ssfr_cut=False,**opts):
+def additional_color_cuts(dat,outname,add_uv=True,use_masscut=False,ssfr_cut=False,plot_ssfr_med=True,**opts):
 
     # defining indexes of 'true' quiescent and 'star-forming' quiescent
     # then project into color-space
@@ -139,12 +156,12 @@ def additional_color_cuts(dat,outname,add_uv=True,use_masscut=False,ssfr_cut=Fal
     mcut_idx = np.where((dat['prosp']['stellar_mass']['q50'] > minmass) & (dat['prosp']['stellar_mass']['q50'] < maxmass))[0]
 
     # plot options
-    popts = {'ms':0.5,'color':'0.5','alpha':0.4,'zorder':-1}
-    quopts = {'ms':0.5,'color':'red','alpha':0.4,'zorder':-1}
+    popts = {'ms':0.5,'color':'0.5','alpha':0.4,'zorder':-1,'rasterized':True}
+    quopts = {'ms':0.5,'color':'red','alpha':0.4,'zorder':-1,'rasterized':True}
 
     if ssfr_lim:
         lim = ssfr_lim
-        ylim = (-13,-8)
+        ylim = (-14,-7.5)
         yplot = dat['prosp']['ssfr_100']['q50']
         dytxt = 0.1
         ylabel = r'log(sSFR/yr$^{-1}$)'
@@ -169,12 +186,12 @@ def additional_color_cuts(dat,outname,add_uv=True,use_masscut=False,ssfr_cut=Fal
         uv_ax.set_title('Optical color',fontsize=12,weight='bold')
         ax[0].set_title('FUV-Optical color',fontsize=12,weight='bold')
         ax[1].set_title('Optical-MIR color',fontsize=12,weight='bold')
-        plot_dlogsfr_uv(dat,yplot,uv_ax,popts,quopts,use_masscut=use_masscut,**opts)
+        plot_dlogsfr_uv(dat,yplot,uv_ax,popts,quopts,use_masscut=use_masscut,plot_ssfr_med=plot_ssfr_med,**opts)
     else:
         fig, ax = plt.subplots(1,2,figsize=(9,6))
         fig.subplots_adjust(top=0.48,bottom=0.08,left=0.2,right=0.8)
         cq_ax = fig.add_axes([0.37, 0.6, 0.26, 0.39])
-    plot_dlogsfr_cq(dat,yplot,cq_ax,popts,quopts,use_masscut=use_masscut,**opts)
+    plot_dlogsfr_cq(dat,yplot,cq_ax,popts,quopts,use_masscut=use_masscut,plot_ssfr_med=plot_ssfr_med,**opts)
     fs = 9
 
     # measure deltaSFR, grab indices
@@ -184,7 +201,7 @@ def additional_color_cuts(dat,outname,add_uv=True,use_masscut=False,ssfr_cut=Fal
     sf_all_idx = define_starformers(dat,use_masscut=use_masscut,ssfr_cut=ssfr_cut)
 
     # things to plot
-    colors = [dat['new_colors']['FUV-U'], dat['new_colors']['V-W3']] #dat['prosp']['ha_ew']['q50']]
+    colors = [dat['new_colors']['FUV-V'], dat['new_colors']['V-W3']] #dat['prosp']['ha_ew']['q50']]
 
     for i, a in enumerate(ax):
 
@@ -192,6 +209,16 @@ def additional_color_cuts(dat,outname,add_uv=True,use_masscut=False,ssfr_cut=Fal
         color = np.array(colors[i])
         a.plot(color[all_idx],yplot[qu_all_idx],'o',**quopts)#linestyle=' ',color='k',alpha=0.4,ms=1.5)
         a.plot(color[sf_mcut_idx],yplot[sf_all_idx],'o',**popts)#linestyle=' ',color='k',alpha=0.4,ms=1.5)
+
+        # color-code by F_MIR
+        #a.scatter(color,yplot[mcut_idx],marker='o',c=dat['prosp']['fmir']['q50'][mcut_idx],cmap=plt.cm.plasma,s=2,alpha=0.6)
+
+        # plot <sSFR>(x)
+        if plot_ssfr_med:
+            y,x,bcount = prosp_dutils.running_median(yplot[mcut_idx],color,nbins=25,avg=False,return_bincount=True)
+            ok = (bcount > 20)
+            a.plot(x[ok],y[ok],'-',lw=2,color='k')
+
         # pearson coefficient
         coeff = np.corrcoef(color[all_idx],yplot[qu_all_idx])[0,1]
         coeff = np.corrcoef(color,yplot[mcut_idx])[0,1]
@@ -203,7 +230,7 @@ def additional_color_cuts(dat,outname,add_uv=True,use_masscut=False,ssfr_cut=Fal
 
 
     # labels and ticklabels
-    ax[0].set_xlabel(r'FUV$-$U',fontsize=fs+4)
+    ax[0].set_xlabel(r'FUV$-$V',fontsize=fs+4)
     ax[1].set_xlabel(r'V$-$W3',fontsize=fs+4)
     #ax[2].set_xlabel(r'H$_{\alpha}$ EW [$\AA]',fontsize=fs+4)
     for a in axes.ravel(): 
@@ -211,14 +238,16 @@ def additional_color_cuts(dat,outname,add_uv=True,use_masscut=False,ssfr_cut=Fal
         #a.axhline(lim,linestyle='--',color='blue',lw=1.5,zorder=2)
         a.set_ylim(ylim)
     #axes[0,0].text(0.0,lim+dytxt,'"star\nforming"',fontsize=fs*1.1,ha='left',va='bottom',ma='center',color='blue')
-    ax[0].set_xlim(-0.1,9)
+    ax[0].set_xlim(0.,10)
+    ax[0].errorbar(7.,-13.8,xerr=0.5,lw=1.7,color='k',ms=0,capsize=4,capthick=1.7)
+    ax[0].text(6.7,-13.7,'colors of local\nellipticals',ma='center',va='center',ha='right',weight='bold',fontsize=6.8,color='black')
 
     #for a in ax[1:]:         
     #    for tl in a.get_yticklabels():tl.set_visible(False)
 
     plt.tight_layout()
     #fig.subplots_adjust(wspace=0.0,hspace=0.0)
-    plt.savefig(outname,dpi=200)
+    plt.savefig(outname,dpi=300)
     plt.close()
 
 def ha_ew_distr(data_3dhst,ax,use_masscut=False,ssfr_cut=False,fs=12):
@@ -354,6 +383,9 @@ def fancy_sfh_plot(dat,runname,outname,navg=1,add_dust=True,use_muzzin=False):
                                 ),
                     bbox=dict(boxstyle="square", fc="w"),zorder=2)
 
+    uvj_ax.text(0.05,1.35,"'quiescent'",fontsize=fs-5)
+    uvj_ax.text(0.05,1.18,"'star-forming'",fontsize=fs-5)
+
     # labels, limits
     uvj_ax.set_xlim(vj_lim)
     uvj_ax.set_ylim(uv_lim)
@@ -434,7 +466,7 @@ def fancy_sfh_plot(dat,runname,outname,navg=1,add_dust=True,use_muzzin=False):
     if add_dust:
         dax[0].set_ylabel('dust posterior\nprobability density')
 
-    plt.savefig(outname,dpi=200)
+    plt.savefig(outname,dpi=300)
     plt.close()
 
 def calculate_new_colors(dat, filename=None, regenerate_fuv=False, use_masscut=False, **opts):
@@ -457,7 +489,9 @@ def calculate_new_colors(dat, filename=None, regenerate_fuv=False, use_masscut=F
     nsamp = 100
 
     colors = ['FUV-U', 'NUV-U', 'FUV-V', 'NUV-V','V-W3','J-W3']
-    out = {color:[] for color in colors}
+    colors = ['FUV-V','V-W3','U-V','V-J'] # narrow down range
+    out = {'median': {color:[] for color in colors},
+           'chain': {color:np.zeros(shape=(nsamp,idxs.shape[0])) for color in colors}}
     for j, idx in enumerate(idxs):
 
         # load output
@@ -489,12 +523,20 @@ def calculate_new_colors(dat, filename=None, regenerate_fuv=False, use_masscut=F
 
         # calculate colors
         weights = res['weights'][eout['sample_idx']][:nsamp]
-        out['FUV-U'] += wquantile(fuv-uband,[0.5],weights=weights)
-        out['NUV-U'] += wquantile(nuv-uband,[0.5],weights=weights)
-        out['FUV-V'] += wquantile(fuv-vband,[0.5],weights=weights)
-        out['NUV-V'] += wquantile(nuv-vband,[0.5],weights=weights)
-        out['V-W3'] += wquantile(vband-w3,[0.5],weights=weights)
-        out['J-W3'] += wquantile(jband-w3,[0.5],weights=weights)
+        #out['FUV-U'] += wquantile(fuv-uband,[0.5],weights=weights)
+        #out['NUV-U'] += wquantile(nuv-uband,[0.5],weights=weights)
+        out['median']['FUV-V'] += wquantile(fuv-vband,[0.5],weights=weights)
+        #out['NUV-V'] += wquantile(nuv-vband,[0.5],weights=weights)
+        out['median']['V-W3'] += wquantile(vband-w3,[0.5],weights=weights)
+        #out['J-W3'] += wquantile(jband-w3,[0.5],weights=weights)
+        out['median']['V-J'] += wquantile(vband-jband,[0.5],weights=weights)
+        out['median']['U-V'] += wquantile(uband-vband,[0.5],weights=weights)
+
+        # include distributions
+        out['chain']['FUV-V'][:,j] = fuv-vband
+        out['chain']['V-W3'][:,j] = vband-w3
+        out['chain']['V-J'][:,j] = vband-jband
+        out['chain']['U-V'][:,j] = uband-vband
 
         print 'done '+str(j)
 
@@ -845,7 +887,7 @@ def age_color(dat,outname,redshift_cut=True,**opts):
     plt.savefig(outname,dpi=150)
     plt.close()
 
-def plot_dlogsfr_uv(dat,yplot,ax,popts,quopts,fs=9,lw=2,use_muzzin=False,use_masscut=False,**opts):
+def plot_dlogsfr_uv(dat,yplot,ax,popts,quopts,fs=9,lw=2,use_muzzin=False,use_masscut=False,plot_ssfr_med=False,**opts):
     """ C_Q versus deltalogSFR
     indicate "UVJ-quiescent" with vertical line
     and "MS-quiescent" with horizontal line
@@ -863,17 +905,28 @@ def plot_dlogsfr_uv(dat,yplot,ax,popts,quopts,fs=9,lw=2,use_muzzin=False,use_mas
     ax.plot(dat['fast']['uv'][uvj_qu_idx],yplot[uvj_qu_idx],'o',label='UVJ\nquiescent',**quopts)
     ax.plot(dat['fast']['uv'][uvj_sf_idx],yplot[uvj_sf_idx],'o',label='UVJ\nstarforming',**popts)
 
+    if plot_ssfr_med:
+        y,x,bcount = prosp_dutils.running_median(yplot[mcut],dat['fast']['uv'][mcut],nbins=25,avg=False,return_bincount=True)
+        ok = (bcount > 20)
+        ax.plot(x[ok],y[ok],'-',lw=2,color='k',label='median sSFR(x)')
+
     ax.set_xlabel(r'U$-$V',fontsize=fs*1.3)
 
     # corr coef
     coeff = np.corrcoef(dat['fast']['uv'][uvj_qu_idx],yplot[uvj_qu_idx])[0,1]
     ax.text(0.97,0.04,r'|R$_{x,y}$|='+"{:.2f}".format(np.abs(coeff)),fontsize=fs*1.1,transform=ax.transAxes,ha='right',weight='bold')
 
-    # text
-    ax.text(0.03,0.16,'UVJ\nstar-forming',transform=ax.transAxes,color=popts['color'],fontsize=fs+1,ha='left',ma='left',weight='bold')
-    ax.text(0.03,0.04,'UVJ\nquiescent',transform=ax.transAxes,color=quopts['color'],fontsize=fs+1,ha='left',ma='left',weight='bold')
+    # legend hax
+    legend = ax.legend(loc=3,prop={'size':7},frameon=True)
+    for leg in legend.legendHandles: 
+        leg._legmarker.set_markersize(4)
+        leg._legmarker.set_alpha(0.9)
 
-def plot_dlogsfr_cq(dat,yplot,ax,popts,quopts, fs=9,lw=2,use_muzzin=False,use_masscut=False,**opts):
+    # text
+    #ax.text(0.03,0.16,'UVJ\nstar-forming',transform=ax.transAxes,color=popts['color'],fontsize=fs+1,ha='left',ma='left',weight='bold')
+    #ax.text(0.03,0.04,'UVJ\nquiescent',transform=ax.transAxes,color=quopts['color'],fontsize=fs+1,ha='left',ma='left',weight='bold')
+
+def plot_dlogsfr_cq(dat,yplot,ax,popts,quopts, fs=9,lw=2,use_muzzin=False,use_masscut=False,plot_ssfr_med=False,**opts):
     """ C_Q versus deltalogSFR
     indicate "UVJ-quiescent" with vertical line
     and "MS-quiescent" with horizontal line
@@ -889,6 +942,11 @@ def plot_dlogsfr_cq(dat,yplot,ax,popts,quopts, fs=9,lw=2,use_muzzin=False,use_ma
         uvj_sf_idx = uvj_sf_idx & mcut
     ax.plot(dat['cq_color'][uvj_qu_idx],yplot[uvj_qu_idx],'o',**quopts)
     ax.plot(dat['cq_color'][uvj_sf_idx],yplot[uvj_sf_idx],'o',**popts)
+
+    if plot_ssfr_med:
+        y,x,bcount = prosp_dutils.running_median(yplot[mcut],dat['cq_color'][mcut],nbins=25,avg=False,return_bincount=True)
+        ok = (bcount > 20)
+        ax.plot(x[ok],y[ok],'-',lw=2,color='k')
 
     ax.set_xlabel(r'sSFR direction in UVJ-space',fontsize=fs*1.3)
 
@@ -1142,7 +1200,7 @@ def discretize(data, nbins):
     cutoffs = [x[-1] for x in split]
     return cutoffs
 
-def alternate_uvj(dat,outloc,use_muzzin=False,use_masscut=False,pure=1,ssfr_cut=False,**opts):
+def alternate_uvj(dat,outloc,use_muzzin=False,use_masscut=False,selection='pure',ssfr_cut=False,**opts):
 
     # use mass-cut (or not) to define sample
     idx = np.ones_like(dat['prosp']['stellar_mass']['q50'])
@@ -1150,7 +1208,7 @@ def alternate_uvj(dat,outloc,use_muzzin=False,use_masscut=False,pure=1,ssfr_cut=
         idx = dat['prosp']['stellar_mass']['q50'] > minmass
 
     # define color-coding
-    popts = {'marker':'o','cmap':'RdYlBu','s':0.5,'alpha':0.35}
+    popts = {'marker':'o','cmap':'RdYlBu','s':0.5,'alpha':0.35,'rasterized':True}
 
     # define plot
     xleft = 0.88
@@ -1174,18 +1232,21 @@ def alternate_uvj(dat,outloc,use_muzzin=False,use_masscut=False,pure=1,ssfr_cut=
 
     pvars = {'xlabel': ['V$-$J','V$-$J','V$-$W3'],
              'ylabel': ['U$-$V','FUV$-$V','FUV$-$V'],
-             'xvar': [dat['fast']['vj'][idx],dat['fast']['vj'][idx],np.array(dat['new_colors']['V-W3'])],
-             'yvar': [dat['fast']['uv'][idx],np.array(dat['new_colors']['FUV-V']),np.array(dat['new_colors']['FUV-V'])]
+             'xvar': [np.array(dat['new_colors']['median']['V-J']),np.array(dat['new_colors']['median']['V-J']),np.array(dat['new_colors']['median']['V-W3'])],
+             'yvar': [np.array(dat['new_colors']['median']['U-V']),np.array(dat['new_colors']['median']['FUV-V']),np.array(dat['new_colors']['median']['FUV-V'])],
+             'xvar_samps': [np.array(dat['new_colors']['chain']['V-J']),np.array(dat['new_colors']['chain']['V-J']),np.array(dat['new_colors']['chain']['V-W3'])],
+             'yvar_samps': [np.array(dat['new_colors']['chain']['U-V']),np.array(dat['new_colors']['chain']['FUV-V']),np.array(dat['new_colors']['chain']['FUV-V'])]
              }
 
-    if pure:
+    if selection == 'pure':
         tstr = 'pure'
-    else:
+    elif selection == 'complete':
         tstr = 'complete'
+    else:
+        tsfr = 'both'
 
     # our minimization function + starting points
-    #pstart = [[1.5,2,2.5,1.5],[1.3,3.5,2.2,2]]
-    pstart = [[1.5,-2,1.2,1.5],[1.3,3.5,2.2,2]]
+    pstart = [[0.92,0.75,1.49,1.46], [3.89, 0.8, 4.6, 1.38],[2.91,2.77,3.01,1.32]]
     def min_fnct(x,args):
         """fit a line with a special objective function
            x is an array of (SLOPE,INTERCEPT,YSTOP,XSTOP)
@@ -1201,15 +1262,25 @@ def alternate_uvj(dat,outloc,use_muzzin=False,use_masscut=False,pure=1,ssfr_cut=
         y_expected = slope*xcolor + intercept
         sfing_color = (y_expected > ycolor) | (ycolor < ystop) | (xcolor > xstop)
 
-        if pure:
+        if selection == 'pure':
             n_sf = float(sfing_color.sum())
             n_qu = float((~sfing_color).sum())
+            eff = ((~sfing_color) & (~sfing)).sum()/n_qu + (sfing_color & sfing).sum()/n_sf
+        elif selection == 'complete':
+            n_sf = n_sf_tot
+            n_qu = n_qu_tot
+            eff = ((~sfing_color) & (~sfing)).sum()/n_qu + (sfing_color & sfing).sum()/n_sf 
         else:
             n_sf = n_sf_tot
             n_qu = n_qu_tot
+            eff =  ((~sfing_color) & (~sfing)).sum()/n_qu + (sfing_color & sfing).sum()/n_sf
+            n_sf = float(sfing_color.sum())
+            n_qu = float((~sfing_color).sum())
+            eff += ((~sfing_color) & (~sfing)).sum()/n_qu + (sfing_color & sfing).sum()/n_sf
 
-        # calculate efficiency
-        eff = (sfing_color & sfing).sum()/n_sf + ((~sfing_color) & (~sfing)).sum()/n_qu
+        # hack to avoid n_qu = 0!
+        if np.isnan(eff):
+            return np.inf 
 
         return -eff
 
@@ -1220,34 +1291,42 @@ def alternate_uvj(dat,outloc,use_muzzin=False,use_masscut=False,pure=1,ssfr_cut=
         a.set_ylabel(pvars['ylabel'][i],fontsize=fs)
 
         # add divisions
-        if (i == 0): # UVJ
+        if False: # UVJ, but now we optimize so never do this
             plot_uvj_box(a,use_muzzin=use_muzzin,lw=lw)
 
             # calculate success rates
             sf_uvj = (dat['fast']['uvj_prosp'][idx] == 1) | (dat['fast']['uvj_prosp'][idx] == 2)
             qu_uvj = (dat['fast']['uvj_prosp'][idx] == 3)
-            if pure:
-                n_sf, n_qu = float(sf_uvj.sum()), float(qu_uvj.sum())
-            else:
-                n_sf, n_qu = n_sf_tot, n_qu_tot
 
-            sf_eff = (sf_uvj & sfing).sum() / n_sf * 100
-            qu_eff = (qu_uvj & (~sfing)).sum() / n_qu * 100
+            sf_pure = (sf_uvj & sfing).sum() / float(sf_uvj.sum()) * 100
+            qu_pure = (qu_uvj & (~sfing)).sum() / float(qu_uvj.sum()) * 100
+
+            sf_complete = (sf_uvj & sfing).sum() / n_sf_tot * 100
+            qu_complete = ((qu_uvj) & (~sfing)).sum() / n_qu_tot * 100
 
         else: # we make our own
-            res = minimize(min_fnct, pstart[i-1], method='powell', options={'xtol': 1e-8, 'disp': True, 'maxiter':1000}, args=[pvars['xvar'][i],pvars['yvar'][i],cpar])
+            res = minimize(min_fnct, pstart[i], method='Nelder-Mead', options={'xtol': 1e-8, 'disp': True, 'maxiter':1000}, args=[pvars['xvar'][i],pvars['yvar'][i],cpar])
 
-            # calculate success rates
+            # print best-fit
             print res.x
-            y_expected = res.x[0]*pvars['xvar'][i] + res.x[1]
-            sfing_color = (y_expected > pvars['yvar'][i]) | (pvars['yvar'][i] < res.x[2]) | (pvars['xvar'][i] > res.x[3])
-            if pure:
-                n_sf, n_qu = float(sfing_color.sum()), float((~sfing_color).sum())
-            else:
-                n_sf, n_qu = n_sf_tot, n_qu_tot
 
-            sf_eff = (sfing_color & sfing).sum() / n_sf * 100
-            qu_eff = ((~sfing_color) & (~sfing)).sum() / n_qu * 100
+            # calculate success rates, drawing from posterior to simulate 'noise'
+            sf_pure, qu_pure, sf_complete, qu_complete = [[] for k in range(4)]
+            for j in range(100):
+                xsamp, ysamp = pvars['xvar_samps'][i][j,:], pvars['yvar_samps'][i][j,:]
+                y_expected = res.x[0]*xsamp + res.x[1]
+                sfing_color = (y_expected > ysamp) | (ysamp < res.x[2]) | (xsamp > res.x[3])
+
+                sf_pure += [(sfing_color & sfing).sum() / float(sfing_color.sum()) * 100]
+                qu_pure += [((~sfing_color) & (~sfing)).sum() / float((~sfing_color).sum()) * 100]
+
+                sf_complete += [(sfing_color & sfing).sum() / n_sf_tot * 100]
+                qu_complete += [((~sfing_color) & (~sfing)).sum() / n_qu_tot * 100]
+
+            sf_pure = np.median(sf_pure)
+            sf_complete = np.median(sf_complete)
+            qu_pure = np.median(qu_pure)
+            qu_complete = np.median(qu_complete)
 
             # plot line
             xlim, ylim = np.array(a.get_xlim()), np.array(a.get_ylim())
@@ -1260,8 +1339,15 @@ def alternate_uvj(dat,outloc,use_muzzin=False,use_masscut=False,pure=1,ssfr_cut=
             a.set_ylim(ylim)
 
         # note efficiency
-        a.text(0.97,0.05,'{0}% SF '.format(int(np.round(sf_eff)))+tstr,fontsize=fs-2,transform=a.transAxes,ha='right')
-        a.text(0.97,0.1,'{0}% QU '.format(int(np.round(qu_eff)))+tstr,fontsize=fs-2,transform=a.transAxes,ha='right')
+        if selection == 'pure':
+            a.text(0.97,0.05,'SF: {0}% pure'.format(int(np.round(sf_pure))),fontsize=fs-2,transform=a.transAxes,ha='right')
+            a.text(0.97,0.1,'QU: {0}% pure'.format(int(np.round(qu_pure))),fontsize=fs-2,transform=a.transAxes,ha='right')
+        elif selection == 'complete':
+            a.text(0.97,0.05,'SF: {0}% complete'.format(int(np.round(sf_complete))),fontsize=fs-2,transform=a.transAxes,ha='right')
+            a.text(0.97,0.1,'QU: {0}% complete'.format(int(np.round(qu_complete))),fontsize=fs-2,transform=a.transAxes,ha='right')
+        else:
+            a.text(0.97,0.05,'SF: {0}% pure/{1}% complete'.format(int(np.round(sf_pure)), int(np.round(sf_complete))),fontsize=fs-2,transform=a.transAxes,ha='right')
+            a.text(0.97,0.1,'QU: {0}% pure/{1}% complete'.format(int(np.round(qu_pure)), int(np.round(qu_complete))),fontsize=fs-2,transform=a.transAxes,ha='right')
 
     # colorbar
     fig.tight_layout(rect=(0,0,xleft,1)) # adjust first for better results
@@ -1283,7 +1369,7 @@ def alternate_uvj(dat,outloc,use_muzzin=False,use_masscut=False,pure=1,ssfr_cut=
     ax[1].set_ylim(-0.1,9)
     ax[2].set_ylim(-0.1,9)
 
-    plt.savefig(outloc,dpi=250)
+    plt.savefig(outloc,dpi=300)
     plt.close()
 
 def plot_3dhst_qfrac(dat, ax,use_muzzin=False):  
@@ -1413,27 +1499,33 @@ def plot_mock_maps(dat, pars, plabels, lims=None, smooth=True, priors=None, cmap
             vmin, vmax = kl_vmin, kl_vmax
         else:
             vmin, vmax = lims[i]
+            print vmin, vmax
+            print np.nanmin(valmap), np.nanmax(valmap)
 
         # show map
         img = axes[i].imshow(valmap, origin='lower', cmap=cmap,
                              extent=(0,2.5,0,2.5),vmin=vmin,vmax=vmax)
         axes[i].tick_params('both', labelsize=ts)
 
+        #if i == (len(pars)-1):
+        #    print 1/0
+
         # colorbar
         if priors is None:
             pos = axes[i].get_position()
             ypad, y_width = 0.005, 0.03
-            cax = fig.add_axes([pos.x0, pos.y1+ypad, pos.width, y_width]) 
+            xpad = 0.01
+            cax = fig.add_axes([pos.x0+xpad, pos.y1+ypad, pos.width-xpad*2, y_width]) 
 
-            cbar = fig.colorbar(img, cax=cax, aspect=10,orientation='horizontal')
+            ticks = np.linspace(vmin,vmax,5)
+            cbar = fig.colorbar(img, cax=cax, aspect=10,orientation='horizontal',ticks=ticks)
             cbar.solids.set_rasterized(True)
             cbar.solids.set_edgecolor("face")
             cax.xaxis.set_ticks_position('top')
             cax.set_title(plabels[i],pad=20,fontsize=fs)
-            cax.xaxis.set_major_locator(MaxNLocator(6))
-            cbar.ax.tick_params(labelsize=ts)
-            if i != (len(pars)-1):
-                plt.setp(cax.get_xticklabels()[-1], visible=False)
+            cbar.ax.tick_params(labelsize=ts-2)
+            cbar.ax.set_xticklabels(["{:.1f}".format(x) for x in ticks])
+            #if i != (len(pars)-1): plt.setp(cax.get_xticklabels()[-1], visible=False)
 
         else:
             axes[i].set_title(plabels[i],fontsize=fs)
@@ -1557,7 +1649,7 @@ def plot_3d_maps(dat,pars,plabels,lims=None,kld=False,smooth=True,density=False,
                 cbar = fig.colorbar(img, cax=cax, aspect=10)
                 cbar.solids.set_rasterized(True)
                 cbar.solids.set_edgecolor("face")
-                cbar.set_label(r'information content (D$_{\mathrm{KL}}$)',size=fs)
+                cbar.set_label(r'information gained (D$_{\mathrm{KL}}$)',size=fs)
                 cbar.ax.tick_params(labelsize=ts)
 
                 # add limits
