@@ -6,7 +6,7 @@ from sedpy import observate
 from astropy.cosmology import WMAP9
 from td_io import load_zp_offsets
 from scipy.stats import truncnorm
-from astropy.io import ascii
+from astropy.io import fits
 
 lsun = 3.846e33
 pc = 3.085677581467192e18  # in cm
@@ -21,7 +21,7 @@ jansky_mks = 1e-26
 APPS = os.getenv('APPS')
 run_params = {'verbose':True,
               'debug': False,
-              'outfile': APPS+'/prospector_alpha/results/td_delta/AEGIS_13',
+              'outfile': APPS+'/prospector_alpha/results/laigle_xmatch/575118',
               'nofork': True,
               # dynesty params
               'nested_bound': 'multi', # bounding method
@@ -41,85 +41,144 @@ run_params = {'verbose':True,
               'df': 2,
               'agelims': [0.0,7.4772,8.0,8.5,9.0,9.5,9.8,10.0],
               # Data info (phot = .cat, dat = .dat, fast = .fout)
-              'datdir':APPS+'/prospector_alpha/data/3dhst/',
-              'runname': 'td_new',
-              'objname':'AEGIS_13'
+              'datdir':APPS+'/prospector_alpha/data/cosmos/',
+              'runname': 'laigle_xmatch',
+              'objname': 575118
               }
 ############
 # OBS
 #############
+# from Table 3 of Laigle+16
+# 'offset' is offset in AB magnitudes from photo-z's
+# 'extinct' == galactic extinction, factor to multiply by E(B-V) and subtract from magnitudes
+ftrans = {
+    '100': {'name': 'herschel_pacs_100', 'offset': 0.0,'extinct': 0.0},
+    '160': {'name': 'herschel_pacs_160', 'offset': 0.0,'extinct': 0.0},
+    '24': {'name': 'mips_24um_cosmos', 'offset': 0.0,'extinct': 0.0},
+    '250': {'name': 'herschel_spire_250', 'offset': 0.0,'extinct': 0.0},
+    '350': {'name': 'herschel_spire_350', 'offset': 0.0,'extinct': 0.0},
+    '500': {'name': 'herschel_spire_500', 'offset': 0.0,'extinct': 0.0},
+    '814W': {'name': 'f814w_cosmos', 'offset': np.nan,'extinct': np.nan}, # no extinction provided
+    'B': {'name': 'b_cosmos', 'offset': 0.146,'extinct': 4.020},
+    'GALEX_FUV': {'name': 'galex_FUV', 'offset': np.nan,'extinct': np.nan}, # no extinction provided
+    'GALEX_NUV': {'name': 'galex_NUV', 'offset': 0.128,'extinct': 8.621},
+    'H': {'name': 'uvista_h_cosmos', 'offset': 0.055,'extinct': 0.563},
+    'Hw': {'name': 'wircam_H', 'offset': -0.031,'extinct': 0.563},
+    'IA484': {'name': 'ia484_cosmos', 'offset': -0.002,'extinct': 3.621},
+    'IA527': {'name': 'ia527_cosmos', 'offset': 0.025,'extinct': 3.264},
+    'IA624': {'name': 'ia624_cosmos', 'offset': -0.010,'extinct': 2.694},
+    'IA679': {'name': 'ia679_cosmos', 'offset': -0.194,'extinct': 2.430},
+    'IA738': {'name': 'ia738_cosmos', 'offset': 0.020,'extinct': 2.150},
+    'IA767': {'name': 'ia767_cosmos', 'offset': 0.024,'extinct': 1.996},
+    'IB427': {'name': 'ia427_cosmos', 'offset': 0.050,'extinct': 4.260},
+    'IB464': {'name': 'ia464_cosmos', 'offset': -0.014,'extinct': 3.843},
+    'IB505': {'name': 'ia505_cosmos', 'offset': -0.013,'extinct': 3.425},
+    'IB574': {'name': 'ia574_cosmos', 'offset': 0.065,'extinct': 2.937},
+    'IB709': {'name': 'ia709_cosmos', 'offset': 0.017,'extinct': 2.289},
+    'IB827': {'name': 'ia827_cosmos', 'offset': -0.005,'extinct': 1.747},
+    'J': {'name': 'uvista_j_cosmos', 'offset': 0.017,'extinct': 0.871},
+    'Ks': {'name': 'uvista_ks_cosmos', 'offset': -0.001,'extinct': 0.364},
+    'Ksw': {'name': 'wircam_Ks', 'offset': 0.068,'extinct': 0.364},
+    'NB711': {'name': 'NB711.SuprimeCam', 'offset': 0.040,'extinct': 2.268},
+    'NB816': {'name': 'NB816.SuprimeCam', 'offset': -0.035,'extinct': 1.787},
+    'V': {'name': 'v_cosmos', 'offset': -0.117,'extinct': 3.117},
+    'Y': {'name': 'uvista_y_cosmos', 'offset': 0.001,'extinct': 1.211},
+    'ip': {'name': 'ip_cosmos', 'offset': 0.020,'extinct': 1.991},
+    'r': {'name': 'r_cosmos', 'offset': -0.012,'extinct': 2.660},
+    'u': {'name': 'u_cosmos', 'offset': 0.010,'extinct': 4.660},
+    'yHSC': {'name': 'hsc_y', 'offset': -0.014,'extinct': 1.298},
+    'zp': {'name': 'zp', 'offset': -0.084,'extinct': 1.461},
+    'zpp': {'name': 'zpp', 'offset': -0.084,'extinct': 1.461},
+    'SPLASH_1': {'name': 'irac1_cosmos', 'offset': -0.025,'extinct': 0.162},
+    'SPLASH_2': {'name': 'irac2_cosmos', 'offset': -0.005,'extinct': 0.111},
+    'SPLASH_3': {'name': 'irac3_cosmos', 'offset': -0.061,'extinct': 0.075},
+    'SPLASH_4': {'name': 'irac4_cosmos', 'offset': -0.025,'extinct': 0.045}
+}
 
 def load_obs(objname=None, datdir=None, runname=None, err_floor=0.05, zperr=True, no_zp_corrs=False, **extras):
+    """
+    -- load catalog, match object name
+    -- pull out 3" aperture fluxes + errors and full correction, 'total' fluxes + errors
+    -- calculate fluxes & errors, accounting for:
+        -- galactic extinction
+        -- aperture to total correction
+        -- inflate errors by zero-point offsets
+    -- connect to filter definitions from Laigle
+    -- convert to maggies
+    -- phot_mask
+    -- error floor
+    -- Ly-a masking
+    """
 
-    ''' 
-    objname: number of object in the 3D-HST COSMOS photometric catalog
-    err_floor: the fractional error floor (0.05 = 5% floor)
-    zp_err: inflate the errors by the zeropoint offsets from Skelton+14
-    '''
+    # load data, find object
+    hdu = fits.open(datdir + 'laigle_catalog.fits')[1]
+    oidx = (hdu.data['NUMBER'] == int(objname))
 
-    ### open file, load data
-    photname = datdir + objname.split('_')[0] + '_' + runname + '.cat'
-    with open(photname, 'r') as f:
-        hdr = f.readline().split()
-    dtype = np.dtype([(hdr[1],'S20')] + [(n, np.float) for n in hdr[2:]])
-    dat = np.loadtxt(photname, comments = '#', delimiter=' ', dtype = dtype)
+    # pull out filters (sigh @ lack of convention)
+    names = hdu.data.dtype.names
+    fnames = []
+    for name in names:
+        split_name = name.split('_')
+        if (len(split_name) == 1): continue
+        if split_name[1] == 'FLUX':
+            fnames += [split_name[0]]
+        elif (split_name[0] == 'FLUX') & (split_name[1] not in ['RADIUS','CHANDRA','XMM','NUSTAR']):
+            fnames += ['_'.join(split_name[1:])]
+        elif (split_name[0] == 'SPLASH'):
+            fnames += ['_'.join(split_name[:2])]
+    
+    # throw out duplicates + filters w/ missing info
+    fnames = np.unique(fnames)
+    fidx = np.array([True if np.isfinite(ftrans[f]['offset']) else False for f in fnames],dtype=bool) 
+    fnames = fnames[fidx]
 
-    ### extract filters, fluxes, errors for object
-    # from ReadMe: "All fluxes are normalized to an AB zeropoint of 25, such that: magAB = 25.0-2.5*log10(flux)
-    obj_idx = (dat['id'] == objname.split('_')[-1])
-    filters = np.array([f[2:] for f in dat.dtype.names if f[0:2] == 'f_'])
-    flux = np.squeeze([dat[obj_idx]['f_'+f] for f in filters])
-    unc = np.squeeze([dat[obj_idx]['e_'+f] for f in filters])
+    # pull out fluxes + errors, correcting for aperture
+    # we INFLATE errors by zero-point corrections & do not apply!
+    flux, unc = [], []
+    aper_to_tot = hdu.data['OFFSET_MAG'][oidx]
+    ebv = hdu.data['EBV'][oidx]
+    for fname in fnames:
+        dmag = -ebv*ftrans[fname]['extinct']
+        ecorr = 10**(ftrans[fname]['offset']/-2.5)
+        if (fname+'_FLUX_APER3' in names):
+            dmag += aper_to_tot 
+            corr = 10**(dmag[0]/-2.5)
+            flux += [hdu.data[fname+'_FLUX_APER3'][oidx][0]*corr]
+            unc  += [hdu.data[fname+'_FLUXERR_APER3'][oidx][0]*corr*ecorr]
+        elif 'SPLASH' in fname:
+            corr = 10**(dmag[0]/-2.5)
+            flux += [hdu.data[fname+'_FLUX'][oidx][0]*corr]
+            unc  += [hdu.data[fname+'_FLUX_ERR'][oidx][0]*corr*ecorr]
+        else:
+            corr = 10**(dmag[0]/-2.5)
+            flux += [hdu.data['FLUX_'+fname][oidx][0]*corr]
+            unc  += [hdu.data['FLUXERR_'+fname][oidx][0]*corr*ecorr]
+
+    # convert to standard filter names & load filters
+    filters = np.array([ftrans[f]['name'] for f in fnames])
+    ofilters = observate.load_filters(filters)
+
+    # convert to maggies
+    fconv = 1e-6 / 3631
+    flux = np.array(flux)*fconv
+    unc = np.array(unc)*fconv
 
     ### add correction to MIPS magnitudes (only MIPS 24 right now!)
     # due to weird MIPS filter conventions
     dAB_mips_corr = np.array([-0.03542,-0.07669,-0.03807]) # 24, 70, 160, in AB magnitudes
     dflux = 10**(-dAB_mips_corr/2.5)
-
     mips_idx = np.array(['mips_24um' in f for f in filters],dtype=bool)
     flux[mips_idx] *= dflux[0]
     unc[mips_idx] *= dflux[0]
 
-    ### define photometric mask, convert to maggies
-    phot_mask = (flux != unc) & (flux != -99.0) & (unc > 0)
-    maggies = flux/(1e10)
-    maggies_unc = unc/(1e10)
-
-    # deal with the zeropoint errors
-    # ~5% to ~20% effect
-    # either REMOVE them or INFLATE THE ERRORS by them
-    # in general, we don't inflate errors of space-based bands
-    # if use_zp is set, RE-APPLY these offsets
-    if (zperr) or (no_zp_corrs):
-        no_zp_correction = ['f435w','f606w','f606wcand','f775w','f814w',
-                            'f814wcand','f850lp','f850lpcand','f125w','f140w','f160w']
-        zp_offsets = load_zp_offsets(None)
-        band_names = np.array([x['Band'].lower()+'_'+x['Field'].lower() for x in zp_offsets])
-        for ii,f in enumerate(filters):
-            match = band_names == f
-            if match.sum():
-                in_exempt = len([s for s in no_zp_correction if s in f])
-                if (no_zp_corrs) & (not in_exempt):
-                    maggies[ii] /= zp_offsets[match]['Flux-Correction'][0]
-                    maggies_unc[ii] /= zp_offsets[match]['Flux-Correction'][0]
-                if zperr & (not in_exempt):
-                    maggies_unc[ii] = ( (maggies_unc[ii]**2) + (maggies[ii]*(1-zp_offsets[match]['Flux-Correction'][0]))**2 ) **0.5
+    ### define photometric mask
+    phot_mask = np.isfinite(flux)
 
     ### implement error floor
-    maggies_unc = np.clip(maggies_unc, maggies*err_floor, np.inf)
-
-    ### if we have super negative flux, then mask it !
-    ### where super negative is <0 with 95% certainty
-    neg = (maggies < 0) & (np.abs(maggies/maggies_unc) > 2)
-    phot_mask[neg] = False
+    unc = np.clip(unc, flux*err_floor, np.inf)
 
     ### mask anything touching or bluewards of Ly-a
-    datname = datdir + objname.split('_')[0] + '_' + runname + '.dat'
-    dat = ascii.read(datname)
-    idx = dat['phot_id'] == int(objname.split('_')[-1])
-    zred = float(dat['z_best'][idx])
-    ofilters = observate.load_filters(filters)
-
+    zred = float(hdu.data['zpdf'][oidx])
     wavemax = np.array([f.wavelength[f.transmission > (f.transmission.max()*0.1)].max() for f in ofilters]) / (1+zred)
     wavemin = np.array([f.wavelength[f.transmission > (f.transmission.max()*0.1)].min() for f in ofilters]) / (1+zred)
     filtered = [1230]
@@ -131,11 +190,10 @@ def load_obs(objname=None, datdir=None, runname=None, err_floor=0.05, zperr=True
     obs['filters'] = ofilters
     obs['wave_effective'] = np.array([filt.wave_effective for filt in obs['filters']])
     obs['phot_mask'] = phot_mask
-    obs['maggies'] = maggies
-    obs['maggies_unc'] =  maggies_unc
+    obs['maggies'] = flux
+    obs['maggies_unc'] =  unc
     obs['wavelength'] = None
     obs['spectrum'] = None
-    obs['logify_spectrum'] = False
 
     return obs
 
@@ -627,10 +685,9 @@ def load_model(nbins_sfh=7, sigma=0.3, df=2, agelims=[], objname=None, datdir=No
     # first calculate redshift and corresponding t_universe
     # if no redshift is specified, read from file
     if zred is None:
-        datname = datdir + objname.split('_')[0] + '_' + runname + '.dat'
-        dat = ascii.read(datname)
-        idx = dat['phot_id'] == int(objname.split('_')[-1])
-        zred = float(dat['z_best'][idx])
+        hdu = fits.open(datdir + 'laigle_catalog.fits')[1]
+        oidx = (hdu.data['NUMBER'] == int(objname))
+        zred = float(hdu.data['zpdf'][oidx])
     tuniv = WMAP9.age(zred).value*1e9
 
     # now construct the nonparametric SFH
