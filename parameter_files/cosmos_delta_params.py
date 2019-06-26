@@ -21,7 +21,7 @@ jansky_mks = 1e-26
 APPS = os.getenv('APPS')
 run_params = {'verbose':True,
               'debug': False,
-              'outfile': APPS+'/prospector_alpha/results/laigle_xmatch/575118',
+              'outfile': APPS+'/prospector_alpha/results/cosmos_delta/575118',
               'nofork': True,
               # dynesty params
               'nested_bound': 'multi', # bounding method
@@ -42,7 +42,6 @@ run_params = {'verbose':True,
               'agelims': [0.0,7.4772,8.0,8.5,9.0,9.5,9.8,10.0],
               # Data info (phot = .cat, dat = .dat, fast = .fout)
               'datdir':APPS+'/prospector_alpha/data/cosmos/',
-              'runname': 'laigle_xmatch',
               'objname': 575118
               }
 ############
@@ -95,7 +94,7 @@ ftrans = {
     'SPLASH_4': {'name': 'irac4_cosmos', 'offset': -0.025,'extinct': 0.045}
 }
 
-def load_obs(objname=None, datdir=None, runname=None, err_floor=0.05, zperr=True, no_zp_corrs=False, **extras):
+def load_obs(objname=None, datdir=None, err_floor=0.05, zperr=True, no_zp_corrs=False, **extras):
     """
     -- load catalog, match object name
     -- pull out 3" aperture fluxes + errors and full correction, 'total' fluxes + errors
@@ -152,16 +151,25 @@ def load_obs(objname=None, datdir=None, runname=None, err_floor=0.05, zperr=True
         else:
             corr = 10**(dmag[0]/-2.5)
             flux += [hdu.data['FLUX_'+fname][oidx][0]*corr]
-            unc  += [hdu.data['FLUXERR_'+fname][oidx][0]*corr*ecorr]
+            try:
+                unc  += [hdu.data['FLUXERRTOT_'+fname][oidx][0]*corr*ecorr]
+            except KeyError:
+                unc  += [hdu.data['FLUXERR_'+fname][oidx][0]*corr*ecorr]
 
     # convert to standard filter names & load filters
     filters = np.array([ftrans[f]['name'] for f in fnames])
     ofilters = observate.load_filters(filters)
 
     # convert to maggies
+    # the MIR / FIR fluxes are in mJy; special conversion here...
     fconv = 1e-6 / 3631
     flux = np.array(flux)*fconv
     unc = np.array(unc)*fconv
+    diff_units = ['herschel_pacs_100', 'herschel_pacs_160', 'mips_24um_cosmos',\
+                  'herschel_spire_250', 'herschel_spire_350', 'herschel_spire_500']
+    tidx = np.in1d(filters,diff_units)
+    flux[tidx] *= 1e3
+    unc[tidx] *= 1e3
 
     ### add correction to MIPS magnitudes (only MIPS 24 right now!)
     # due to weird MIPS filter conventions
@@ -677,7 +685,7 @@ def load_sps(**extras):
     sps = NebSFH(**extras)
     return sps
 
-def load_model(nbins_sfh=7, sigma=0.3, df=2, agelims=[], objname=None, datdir=None, runname=None, zred=None, **extras):
+def load_model(nbins_sfh=7, sigma=0.3, df=2, agelims=[], objname=None, datdir=None, zred=None, **extras):
 
     # we'll need this to access specific model parameters
     n = [p['name'] for p in model_params]
