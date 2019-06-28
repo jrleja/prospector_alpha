@@ -18,7 +18,7 @@
 ### mail
 #SBATCH --mail-type=END
 #SBATCH --mail-user=joel.leja@gmail.com
-IDFILE=$APPS"/prospector_alpha/data/cosmos/laigle_xmatch.ids"
+IDFILE=$APPS"/prospector_alpha/data/cosmos/cosmos_catalog.ids"
 OBJID=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$IDFILE")
 srun -n 1 --mpi=pmi2 python $APPS/prospector_alpha/code/td/postprocessing.py \
 $APPS/prospector_alpha/parameter_files/cosmos_delta_params.py \
