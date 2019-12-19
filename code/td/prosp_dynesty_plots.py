@@ -41,6 +41,7 @@ def subcorner(res, eout, parnames, outname=None, maxprob=False, truth_dict=None,
     fig, axes = dyplot.cornerplot(res, show_titles=True, labels=parnames, truths=truths,
                                   truth_color=truth_color,
                                   label_kwargs=label_kwargs, title_kwargs=title_kwargs)
+
     for ax in axes.ravel():
         ax.xaxis.set_tick_params(labelsize=tick_fs*.7)
         ax.yaxis.set_tick_params(labelsize=tick_fs*.7)
@@ -55,11 +56,6 @@ def subcorner(res, eout, parnames, outname=None, maxprob=False, truth_dict=None,
     # either we create a new figure for extra parameters
     # or add to old figure
     # depending on dimensionality of model (and thus of the plot)
-    #if axes.shape[0] <= 10:
-    #    label_kwargs['fontsize'] *= 0.7
-    #    title_kwargs['fontsize'] *= 0.7
-
-
     if (axes.shape[0] <= 6):
 
         # only plot a subset of parameters
@@ -240,7 +236,10 @@ def add_sfh_plot(eout,fig,ax_loc=None,
         for jj in range(len(tvec)): 
             # nearest-neighbor 'interpolation'
             # exact answer for binned SFHs
-            idx = np.abs(eout['sfh']['t'] - tvec[jj]).argmin(axis=-1)
+            if len(eout['sfh']['t'].shape) == 2:
+                idx = np.abs(eout['sfh']['t'][0,:] - tvec[jj]).argmin(axis=-1)
+            else:
+                idx = np.abs(eout['sfh']['t'] - tvec[jj]).argmin(axis=-1)
             perc[jj,:] = dyplot._quantile(eout['sfh']['sfh'][:,idx],[0.16,0.50,0.84],weights=eout['weights'])
 
         if smooth_sfh:
@@ -288,12 +287,112 @@ def add_sfh_plot(eout,fig,ax_loc=None,
     ax_inset.xaxis.set_major_formatter(FormatStrFormatter('%2.5g'))
     ax_inset.yaxis.set_major_formatter(FormatStrFormatter('%2.5g'))
 
+def spec_figure(sresults = None, eout = None,
+                labels = ['model spectrum'],
+                plot_maxprob=True,
+                fig=None, spec=None, resid=None,
+                **kwargs):
+    """Plot the spectroscopy for the model and data (with error bars), and
+    plot residuals
+        -- pass in a list of [res], can iterate over them to plot multiple results
+    good complimentary color for the default one is '#FF420E', a light red
+    """
+
+    # set up plot
+    lw, alpha, fs, ticksize = 0.5, 0.8, kwargs.get('fs',16), kwargs.get('ticksize',12)
+    textx, texty, deltay = kwargs.get('textx',0.02), kwargs.get('texty',.95), .05
+    maxprob_color = 'red'
+    posterior_median_color = '#1974D2'
+
+    # iterate over results to plot
+    for i,res in enumerate(sresults):
+
+        # pull out data
+        mask = res['obs']['mask']
+        wave = res['obs']['wavelength'][mask] / 1e4
+        specobs = res['obs']['spectrum'][mask]
+        specobs_unc = res['obs']['unc'][mask]
+
+        # model information
+        modspec_lam = eout[i]['obs']['lam_obs'] / 1e4
+        spec_pdf = np.zeros(shape=(modspec_lam.shape[0],3))
+        for jj in range(spec_pdf.shape[0]): spec_pdf[jj,:] = np.percentile(eout[i]['obs']['spec'][:,jj],[16.0,50.0,84.0])
+        modspec_lam = modspec_lam[mask]
+        spec_pdf = spec_pdf[mask,:]
+
+        # plot observations
+        if i == 0:
+            spec.errorbar(wave, specobs, #yerr=specobs_unc,
+                         color=obs_color, label='observed', alpha=alpha, linestyle='-',lw=lw)
+
+        # posterior median spectra
+        spec.plot(modspec_lam, spec_pdf[:,1], linestyle='-',
+                  color=posterior_median_color, alpha=alpha,label = 'posterior median', lw=lw)  
+        spec.fill_between(modspec_lam, spec_pdf[:,0], spec_pdf[:,2],
+                          color=posterior_median_color, alpha=0.3)
+        resid.fill_between(modspec_lam, (specobs - spec_pdf[:,0]) / specobs_unc, (specobs - spec_pdf[:,2]) / specobs_unc,
+                          color=posterior_median_color, alpha=0.3)
+
+        # plot maximum probability model
+        if plot_maxprob:
+            spec_bfit = eout[i]['obs']['spec'][0,mask]
+            spec.plot(modspec_lam, spec_bfit, color=maxprob_color, 
+                      linestyle='-', label = 'best-fit', alpha=alpha, lw=lw)
+            specchi = (specobs - spec_bfit) / specobs_unc
+            resid.plot(modspec_lam, specchi, color=maxprob_color,
+                       linestyle='-', lw=lw, alpha=alpha)        
+
+        # calculate and show reduced chi-squared
+        chisq = np.sum(specchi**2)
+        ndof = mask.sum()
+        reduced_chisq = chisq/(ndof)
+
+        spec.text(textx, texty-deltay*(i+1), r'best-fit $\chi^2$/N$_{\mathrm{spec}}$='+"{:.2f}".format(reduced_chisq),
+                  fontsize=10, ha='left',transform = spec.transAxes,color='black')
+
+    # limits
+    xlim = (wave.min()*0.95,wave.max()*1.05)
+    for ax in [spec,resid]: ax.set_xlim(xlim)
+    ymin, ymax = specobs.min()*0.9, specobs.max()*1.1
+    spec.set_ylim(ymin, ymax)
+    resid_ymax = np.min([np.abs(resid.get_ylim()).max(),5])
+    resid.set_ylim(-resid_ymax,resid_ymax)
+
+    # extra line
+    resid.axhline(0, linestyle=':', color='grey')
+    resid.yaxis.set_major_locator(MaxNLocator(5))
+
+    # legend
+    spec.legend(loc=4, prop={'size':8},
+                scatterpoints=1,fancybox=True)
+                
+    # set labels
+    resid.set_ylabel( r'$\chi$',fontsize=fs)
+    spec.set_ylabel(r'$f_{\nu}$ [maggies]',fontsize=fs)
+    resid.set_xlabel(r'$\lambda_{\mathrm{obs}}$ [$\mu$m]',fontsize=fs)
+    resid.tick_params('both', pad=3.5, size=3.5, width=1.0, which='both',labelsize=ticksize)
+    spec.tick_params('y', which='major', labelsize=ticksize)
+    
+    # set second x-axis (rest-frame wavelength)
+    zred = eout[0]['thetas']['zred']['q50']
+    y1, y2 = spec.get_ylim()
+    x1, x2 = spec.get_xlim()
+    ax2 = spec.twiny()
+    ax2.set_xlim(x1/(1+zred), x2/(1+zred))
+    ax2.set_xlabel(r'$\lambda_{\mathrm{rest}}$ [$\mu$m]',fontsize=fs)
+    ax2.set_ylim(y1, y2)
+    ax2.tick_params('both', pad=2.5, size=3.5, width=1.0, which='both',labelsize=ticksize)
+
+    # remove ticks
+    spec.set_xticklabels([])
+
 def sed_figure(outname = None,
                colors = ['#1974D2'], sresults = None, eout = None,
-               labels = ['spectrum (50th percentile)'],
+               labels = ['model spectrum'],
                model_photometry = True, main_color=['black'],
                transcurves=False,
                ergs_s_cm=True, add_sfh=False,
+               fig=None, phot=None, resid=None,
                **kwargs):
     """Plot the photometry for the model and data (with error bars), and
     plot residuals
@@ -304,11 +403,7 @@ def sed_figure(outname = None,
 
     # set up plot
     ms, alpha, fs, ticksize = 5, 0.8, kwargs.get('fs',16), kwargs.get('ticksize',12)
-    textx, texty, deltay = kwargs.get('textx',0.02), kwargs.get('texty',.95), .05
-    fig = plt.figure()
-    gs = gridspec.GridSpec(2,1, height_ratios=[3,1])
-    gs.update(hspace=0)
-    phot, resid = plt.Subplot(fig, gs[0]), plt.Subplot(fig, gs[1])
+    textx, texty, deltay = kwargs.get('textx',0.02), kwargs.get('texty',.925), .05
 
     # if we have multiple parts, color ancillary data appropriately
     if len(colors) > 1:
@@ -324,11 +419,17 @@ def sed_figure(outname = None,
         obsmags_unc = res['obs']['maggies_unc'][mask]
 
         # model information
+        zred = res['model'].params['zred'][0]
         modmags_bfit = eout[i]['obs']['mags'][0,mask]
         modspec_lam = eout[i]['obs']['lam_obs']
+        if (res['obs'].get('spectrum',None) != None):
+            modspec_lam /= (1+zred)
         nspec = modspec_lam.shape[0]
         try:
             spec_pdf = np.zeros(shape=(nspec,3))
+            if 'zred' in res['theta_labels']: # renormalize if we're fitting redshift
+                zred_draw = res['chain'][eout[i]['sample_idx'],res['theta_labels'].index('zred')]
+                #eout[i]['obs']['spec'] *= (1+zred_draw)[:,None]
             for jj in range(spec_pdf.shape[0]): spec_pdf[jj,:] = np.percentile(eout[i]['obs']['spec'][:,jj],[16.0,50.0,84.0])
         except:
             spec_pdf = np.stack((eout[i]['obs']['spec']['q16'],eout[i]['obs']['spec']['q50'],eout[i]['obs']['spec']['q84']),axis=1)
@@ -337,7 +438,7 @@ def sed_figure(outname = None,
         factor = 3e18
         if ergs_s_cm:
             factor *= 3631*1e-23
-        
+
         # photometry
         modmags_bfit *= factor/phot_wave_eff
         obsmags *= factor/phot_wave_eff
@@ -346,14 +447,15 @@ def sed_figure(outname = None,
         phot_wave_eff /= 1e4
 
         # spectra
-        zred = res['model'].params['zred'][0]
         spec_pdf *= (factor/modspec_lam/(1+zred)).reshape(nspec,1)
         modspec_lam = modspec_lam*(1+zred)/1e4
-        
+        spec_pdf /= (1+zred) # added for special case
+        modspec_lam *= (1+zred) # added for special case
+
         # plot maximum probability model
         if model_photometry:
             phot.plot(phot_wave_eff, modmags_bfit, color=colors[i], 
-                      marker='o', ms=ms, linestyle=' ', label = 'photometry, best-fit', alpha=alpha, 
+                      marker='o', ms=ms, linestyle=' ', label = 'model photometry', alpha=alpha, 
                       markeredgecolor='k')
         
         resid.plot(phot_wave_eff, photchi, color=colors[i],
@@ -374,7 +476,7 @@ def sed_figure(outname = None,
         ndof = mask.sum()
         reduced_chisq = chisq/(ndof)
 
-        phot.text(textx, texty-deltay*(i+1), r'best-fit $\chi^2$/N$_{\mathrm{phot}}$='+"{:.2f}".format(reduced_chisq),
+        phot.text(textx, texty-deltay*i, r'best-fit $\chi^2$/N$_{\mathrm{phot}}$='+"{:.2f}".format(reduced_chisq),
                   fontsize=10, ha='left',transform = phot.transAxes,color=main_color[i])
 
     # plot observations
@@ -405,7 +507,7 @@ def sed_figure(outname = None,
 
     # redshift text
     if 'zred' not in sresults[0]['theta_labels']:
-        phot.text(textx, texty, 'z='+"{:.2f}".format(zred),
+        phot.text(textx, texty-deltay, 'z='+"{:.2f}".format(zred),
                   fontsize=10, ha='left',transform = phot.transAxes)
     
     # extra line
@@ -413,9 +515,9 @@ def sed_figure(outname = None,
     resid.yaxis.set_major_locator(MaxNLocator(5))
 
     # legend
-    phot.legend(loc=kwargs.get('legend_loc',0), prop={'size':8},
-                scatterpoints=1,fancybox=True)
-                
+    leg = phot.legend(loc=kwargs.get('legend_loc',0), prop={'size':8},
+                      scatterpoints=1,fancybox=True)
+
     # set labels
     resid.set_ylabel( r'$\chi$',fontsize=fs)
     if ergs_s_cm:
@@ -430,10 +532,6 @@ def sed_figure(outname = None,
     resid.xaxis.set_major_formatter(FormatStrFormatter('%2.4g'))
     resid.tick_params('both', pad=3.5, size=3.5, width=1.0, which='both',labelsize=ticksize)
     phot.tick_params('y', which='major', labelsize=ticksize)
-
-    # add figures
-    fig.add_subplot(phot)
-    fig.add_subplot(resid)
     
     # set second x-axis (rest-frame wavelength)
     if 'zred' not in sresults[0]['theta_labels']:
@@ -463,6 +561,28 @@ def sed_figure(outname = None,
     if outname is not None:
         fig.savefig(outname, bbox_inches='tight', dpi=180)
         plt.close()
+
+def plt_chisq_comp(res,eout):
+
+    # pull out information
+    spec_jitter = res['chain'][eout['sample_idx'],res['theta_labels'].index('spec_jitter')]
+    obsspec = res['obs']['spectrum']
+    obsunc = spec_jitter[:,None] * res['obs']['unc'][None,:]
+    obsunc = res['obs']['unc']
+    obslam = res['obs']['wavelength']
+    modspec = eout['obs']['spec']
+
+    # pull out photometric information
+    mask = res['obs']['phot_mask']
+    obsmags = res['obs']['maggies'][mask]
+    obsmags_unc = res['obs']['maggies_unc'][mask]
+    modmags = eout['obs']['mags'][:,mask]
+    photchi = (((obsmags-modmags)/obsmags_unc)**2).sum(axis=1)
+
+
+    # calculate chi^2_spec, chi^2_phot
+    chi2 = (((obsspec-modspec)/obsunc)**2)
+    print 1/0
 
 def make_all_plots(filebase=None,
                    outfolder=os.getenv('APPS')+'/prospector_alpha/plots/',
@@ -500,6 +620,8 @@ def make_all_plots(filebase=None,
         pfile = model_setup.import_module_from_file(res['run_params']['param_file'])
         res['model'] = pfile.load_model(**res['run_params'])
         pfile = None
+
+    for key in res['obs'].keys(): res['obs'][key] = np.array(res['obs'][key])
     
     # transform to preferred model variables
     res['chain'], parnames = transform_chain(res['chain'],res['model'])
@@ -511,16 +633,19 @@ def make_all_plots(filebase=None,
     res['nlive'] = res['run_params']['nested_nlive_init']
     font_kwargs = {'fontsize': fs}
 
+    if False:
+        plt_chisq_comp(res,eout)
+
     # Plot a summary of the run.
     if plt_summary:
         print 'making SUMMARY plot'
-        rfig, raxes = dyplot.runplot(res, mark_final_live=False, label_kwargs=font_kwargs)
+        rfig, raxes = dyplot.runplot(res, mark_final_live=False, label_kwargs=font_kwargs, span=[0.00001,0.00001,0.00001,(1e7,1e8)])
         for ax in raxes:
             ax.xaxis.set_tick_params(labelsize=tick_fs)
             ax.yaxis.set_tick_params(labelsize=tick_fs)
             ax.yaxis.get_offset_text().set_size(fs)
         rfig.tight_layout()
-        rfig.savefig(outfolder+objname+'_dynesty_summary.pdf',dpi=200)
+        rfig.savefig(outfolder+objname+'_dynesty_summary.pdf',dpi=100)
 
     # Plot traces and 1-D marginalized posteriors.
     if plt_trace:
@@ -530,7 +655,7 @@ def make_all_plots(filebase=None,
             ax.xaxis.set_tick_params(labelsize=tick_fs)
             ax.yaxis.set_tick_params(labelsize=tick_fs)
         tfig.tight_layout()
-        tfig.savefig(outfolder+objname+'_dynesty_trace.pdf',dpi=200)
+        tfig.savefig(outfolder+objname+'_dynesty_trace.pdf',dpi=100)
 
     # corner plot
     if plt_corner: 
@@ -540,8 +665,30 @@ def make_all_plots(filebase=None,
     # sed plot
     if plt_sed:
         print 'making SED plot'
-        pfig = sed_figure(sresults = [res], eout=[eout],
-                          outname=outfolder+objname+'.sed.pdf',**opts)
+
+        # plot geometry based on whether
+        # spectra are being fit or not
+        if (res['obs'].get('spectrum',None) != None):
+            fig = plt.figure(figsize=(15,5))
+            gs = gridspec.GridSpec(2,2, height_ratios=[3,1],width_ratios=[1,2])
+            gs.update(hspace=0)
+            phot, spec, resid, sresid = [plt.Subplot(fig, gs[i]) for i in range(4)]
+            for ax in [phot, spec, resid, sresid]: fig.add_subplot(ax)
+
+            spec_figure(sresults = [res], eout=[eout],
+                        fig=fig, spec=spec, resid=sresid, **opts)
+
+        else:
+            fig = plt.figure()
+            gs = gridspec.GridSpec(2,1, height_ratios=[3,1])
+            gs.update(hspace=0)
+            phot, resid = plt.Subplot(fig, gs[0]), plt.Subplot(fig, gs[1])
+            fig.add_subplot(phot)
+            fig.add_subplot(resid)
+
+        _ = sed_figure(sresults = [res], eout=[eout],
+                       outname=outfolder+objname+'.sed.pdf',
+                       fig=fig, phot=phot, resid=resid, **opts)
         
 def do_all(runname=None,nobase=True,**extras):
     """for a list of galaxies, make all plots

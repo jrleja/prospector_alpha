@@ -28,8 +28,8 @@ def set_sfh_time_vector(chain,model):
         sys.exit('ERROR: not sure how to set up the time array here!')
     return t
 
-def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True, measure_abslines=False,
-                          measure_herschel=False,**kwargs):
+def calc_extra_quantities(res, sps, obs, noise=None,ncalc=3000, shorten_spec=True, measure_abslines=False,
+                          measure_herschel=False,measure_restframe_properties=True,**kwargs):
     """calculate extra quantities: star formation history, stellar mass, spectra, photometry, etc
     shorten_spec: if on, return only the 50th / 84th / 16th percentiles. else return all spectra.
     """
@@ -38,7 +38,7 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True, measure_
     # and ensure that maxprob stored is the same as calculated now 
     # don't recalculate lnprobability after we fix MassMet
     amax = res['lnprobability'].argmax()
-    current_maxprob = prosp_dutils.test_likelihood(sps, res['model'], res['obs'], 
+    current_maxprob = prosp_dutils.test_likelihood(sps, res['model'], res['obs'], noise,
                                                    res['chain'][amax], 
                                                    res['run_params']['param_file'],
                                                    res['run_params'])
@@ -49,6 +49,8 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True, measure_
     # make sure the first one is the maximum probability model (so we're cheating a bit!)
     # don't do replacement, we can use weights to rebuild PDFs
     nsample = res['chain'].shape[0]
+    #res['weights'][-2] = 0.000001
+    #res['weights'] = res['weights']/res['weights'].sum()
     sample_idx = np.random.choice(np.arange(nsample), size=ncalc, p=res['weights'], replace=False)
     if amax in sample_idx:
         sample_idx[sample_idx == amax] = sample_idx[0]
@@ -93,19 +95,20 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True, measure_
     eout['obs']['mags'] = np.zeros(shape=(ncalc,len(res['obs']['filters'])))
     eout['obs']['uvj'] = np.zeros(shape=(ncalc,3))
     eout['obs']['rf'] = np.zeros(shape=(ncalc,3))
-    elines = ['H beta 4861', 'H alpha 6563','Br gamma 21657','Pa alpha 18752']
+    elines = ['H beta 4861', 'H alpha 6563','Br gamma 21657','Pa alpha 18752','Pa beta 12819']
     eout['obs']['elines'] = {key: {'ew': deepcopy(fmt), 'flux': deepcopy(fmt)} for key in elines}
     eout['obs']['dn4000'] = deepcopy(fmt)
-    res['model'].params['nebemlineinspec'] = True
+    if not res['model'].params.get('marginalize_elines',False):
+        res['model'].params['nebemlineinspec'] = True
     if measure_abslines:
         abslines = ['halpha_wide', 'halpha_narrow', 'hbeta', 'hdelta_wide', 'hdelta_narrow']
         eout['obs']['abslines'] = {key+'_ew': deepcopy(fmt) for key in abslines}
 
     if measure_herschel:
-        eout['obs']['herschel'] = {'mags':np.zeros(shape=(ncalc,5))}
+        hfilters = ['herschel_pacs_70','herschel_pacs_100','herschel_pacs_160','herschel_spire_250','herschel_spire_350','herschel_spire_500']
+        eout['obs']['herschel'] = {'mags':np.zeros(shape=(ncalc,6)),'filter_names':hfilters}
         from sedpy.observate import load_filters
-        filters = ['herschel_pacs_100','herschel_pacs_160','herschel_spire_250','herschel_spire_350','herschel_spire_500']
-        fobs = {'filters': load_filters(filters), 'wavelength': None}
+        fobs = {'filters': load_filters(hfilters), 'wavelength': None}
 
     # generate model w/o dependencies for young star contribution
     model_params = deepcopy(res['model'].config_list)
@@ -115,19 +118,49 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True, measure_
             model_params[j].pop('depends_on', None)
     nodep_model = sedmodel.SedModel(model_params)
 
-    # flush the model
-    #for jj in range(2): _, _, _ = res['model'].mean_model(res['chain'][sample_idx[jj],:], res['obs'], sps=sps)
-
-
+    '''
+    # rohan special
+    eout['obs']['lyc'] = {'mags':np.zeros(shape=(ncalc,3))} 
+    eout['obs']['lyc_dusty'] = {'mags':np.zeros(shape=(ncalc,3))} #this one isolates the effect of IGM on L1500, L900 keeping dust+neb emission
+    from sedpy.observate import load_filters
+    filters = ['wfc3_uvis_f275w','wfc3_uvis_f336w','wfc3_uvis_f606w'] #throw in F275W because we have z~2.4 sources for whom LyC is in F275W
+    fobs = {'filters': load_filters(filters), 'wavelength': None}
+    '''
     # sample in the posterior
     for jj,sidx in enumerate(sample_idx):
 
         # bookkeepping
         t1 = time.time()
 
-        # model call
         thetas = res['chain'][sidx,:]
-        eout['obs']['spec'][jj,:],eout['obs']['mags'][jj,:],sm = res['model'].mean_model(thetas, res['obs'], sps=sps)
+        eout['obs']['spec'][jj,:],eout['obs']['mags'][jj,:],sm = res['model'].mean_model(thetas, res['obs'], sps=sps, sigma=sigma)
+
+        '''
+        import matplotlib.pyplot as plt
+        plt.plot(res['model']._outwave, res['obs']['spectrum'],color='red',lw=2)
+        for i in range(1,5):
+
+            # model call
+            thetas = res['chain'][-i,:]
+
+            # no bullshit here
+            if noise is not None:
+                res['model'].set_parameters(thetas)
+                noise[0].update(**res['model'].params)
+                vectors = {"unc": obs['unc']}
+                sigma = noise[0].construct_covariance(**vectors)
+            else:
+                sigma = None
+            print res['model']._ln_eline_penalty
+            current_maxprob = prosp_dutils.test_likelihood(sps, res['model'], res['obs'], noise, thetas, 
+                                                           res['run_params']['param_file'],
+                                                           res['run_params'])
+            print current_maxprob, res['lnlikelihood'][-i]
+            plt.plot(res['model']._outwave, eout['obs']['spec'][jj,:])
+
+        import pdb
+        pdb.set_trace()
+        '''
 
         # interpolate spectrum from rest-frame to observed wavelength, and add (1+z) factor
         #eout['obs']['spec'][jj,:] = np.interp(sps.wavelengths, sps.wavelengths*(1+res['model'].params['zred']), spec)
@@ -153,44 +186,58 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True, measure_
 
         # measure from rest-frame spectrum
         t2 = time.time()
-        props = prosp_dutils.measure_restframe_properties(sps, thetas = thetas, model=res['model'], measure_uvj=True, abslines=measure_abslines, 
-                                                          measure_ir=True, measure_luv=True, measure_mir=True, emlines=elines,measure_rf=True)
-        eout['extras']['lir']['chain'][jj] = props['lir']
-        eout['extras']['luv']['chain'][jj] = props['luv']
-        eout['extras']['lmir']['chain'][jj] = props['lmir']
-        eout['obs']['dn4000']['chain'][jj] = props['dn4000']
-        eout['obs']['uvj'][jj,:] = props['uvj']
-        eout['obs']['rf'][jj,:] = props['rf']
+        if measure_restframe_properties:
+            props = prosp_dutils.measure_restframe_properties(sps, thetas=thetas, model=res['model'], measure_uvj=True, abslines=measure_abslines, 
+                                                              measure_ir=True, measure_luv=True, measure_mir=True, emlines=elines,measure_rf=True,
+                                                              obs=obs)
+            eout['extras']['lir']['chain'][jj] = props['lir']
+            eout['extras']['luv']['chain'][jj] = props['luv']
+            eout['extras']['lmir']['chain'][jj] = props['lmir']
+            eout['obs']['dn4000']['chain'][jj] = props['dn4000']
+            eout['obs']['uvj'][jj,:] = props['uvj']
+            eout['obs']['rf'][jj,:] = props['rf']
 
-        for e in elines: 
-            eout['obs']['elines'][e]['flux']['chain'][jj] = props['emlines'][e]['flux']
-            eout['obs']['elines'][e]['ew']['chain'][jj] = props['emlines'][e]['eqw']
+            for e in elines: 
+                eout['obs']['elines'][e]['flux']['chain'][jj] = props['emlines'][e]['flux']
+                eout['obs']['elines'][e]['ew']['chain'][jj] = props['emlines'][e]['eqw']
 
-        if measure_abslines:
-            for a in abslines: eout['obs']['abslines'][a+'_ew']['chain'][jj] = props['abslines'][a]['eqw']
+            if measure_abslines:
+                for a in abslines: eout['obs']['abslines'][a+'_ew']['chain'][jj] = props['abslines'][a]['eqw']
 
-        nagn_thetas = deepcopy(thetas)
-        if 'fagn' in parnames:
-            nagn_thetas[parnames.index('fagn')] = 0.0
-            props = prosp_dutils.measure_restframe_properties(sps, thetas=nagn_thetas, model=res['model'], 
-                                                              measure_mir=True,measure_ir = True, measure_luv = True)
-            eout['extras']['fmir']['chain'][jj] = (eout['extras']['lmir']['chain'][jj]-props['lmir'])/eout['extras']['lmir']['chain'][jj]
-            eout['extras']['luv_agn']['chain'][jj] = props['luv']
-            eout['extras']['lir_agn']['chain'][jj] = props['lir']
+            nagn_thetas = deepcopy(thetas)
+            if 'fagn' in parnames:
+                nagn_thetas[parnames.index('fagn')] = 0.0
+                props = prosp_dutils.measure_restframe_properties(sps, thetas=nagn_thetas, model=res['model'], 
+                                                                  measure_mir=True,measure_ir = True, measure_luv = True)
+                eout['extras']['fmir']['chain'][jj] = (eout['extras']['lmir']['chain'][jj]-props['lmir'])/eout['extras']['lmir']['chain'][jj]
+                eout['extras']['luv_agn']['chain'][jj] = props['luv']
+                eout['extras']['lir_agn']['chain'][jj] = props['lir']
 
-        # isolate young star contribution
-        nodep_model.params['mass'] = np.zeros_like(res['model'].params['mass'])
-        nodep_model.params['mass'][:2] = res['model'].params['mass'][:2]
-        try:
-            out = prosp_dutils.measure_restframe_properties(sps, model = nodep_model, thetas = nagn_thetas, measure_ir=True, measure_luv=True)
-        except AssertionError: # this fails sometimes if SFR(0-100) Myr is near zero
-            out = {'luv': 0.0, 'lir': 0.0}
-        eout['extras']['luv_young']['chain'][jj] = out['luv']
-        eout['extras']['lir_young']['chain'][jj] = out['lir']
+            # isolate young star contribution
+            nodep_model.params['mass'] = np.zeros_like(res['model'].params['mass'])
+            nodep_model.params['mass'][:2] = res['model'].params['mass'][:2]
+            try:
+                out = prosp_dutils.measure_restframe_properties(sps, model = nodep_model, thetas = nagn_thetas, measure_ir=True, measure_luv=True)
+            except AssertionError: # this fails sometimes if SFR(0-100) Myr is near zero
+                out = {'luv': 0.0, 'lir': 0.0}
+            eout['extras']['luv_young']['chain'][jj] = out['luv']
+            eout['extras']['lir_young']['chain'][jj] = out['lir']
 
+        '''
+        # rohan special
+        # returns mags w/o IGM absorption keeping all else same
+        ndust_thetas = deepcopy(thetas)
+        res['model'].params['add_igm_absorption'] = np.array([False])
+        _,eout['obs']['lyc_dusty']['mags'][jj,:],_ = res['model'].mean_model(ndust_thetas, fobs, sps=sps)
+        ndust_thetas[parnames.index('dust1_fraction')] = 0.0 
+        ndust_thetas[parnames.index('dust2')] = 0.0 
+        res['model'].params['add_neb_emission'] = np.array([False])
+        res['model'].params['add_neb_continuum'] = np.array([False])
+        _,eout['obs']['lyc']['mags'][jj,:],_ = res['model'].mean_model(ndust_thetas, fobs, sps=sps)
+        '''
         # ages
         eout['extras']['avg_age']['chain'][jj], eout['extras']['lwa_lbol']['chain'][jj], \
-        eout['extras']['lwa_rband']['chain'][jj] = prosp_dutils.all_ages(thetas,res['model'],sps)
+        eout['extras']['lwa_rband']['chain'][jj] = prosp_dutils.all_ages(thetas,res['model'],sps,obs)
 
         if measure_herschel:
             _,eout['obs']['herschel']['mags'][jj,:],__ = res['model'].mean_model(thetas, fobs, sps=sps)
@@ -216,6 +263,14 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True, measure_
             q50, q16, q84 = weighted_quantile(eout['obs']['abslines'][key]['chain'], np.array([0.5, 0.16, 0.84]), weights=eout['weights'])
             for q,qstr in zip([q50,q16,q84],['q50','q16','q84']): eout['obs']['abslines'][key][qstr] = q
 
+    if measure_herschel:
+        nfilts = eout['obs']['herschel']['mags'].shape[1]
+        qtiles = ['q50','q16','q84','q02.5','q97.5']
+        for quant in qtiles: eout['obs']['herschel'][quant] = np.zeros(nfilts)
+        for i in range(nfilts):
+            for q in qtiles: 
+                eout['obs']['herschel'][q][i] = weighted_quantile(eout['obs']['herschel']['mags'][:,i], \
+                                                    np.array([float(q[1:])/100]), weights=eout['weights'])[0]
     # for storage purposes
     if shorten_spec:
         spec_pdf = np.zeros(shape=(eout['obs']['lam_obs'].shape[0],3))
@@ -227,7 +282,6 @@ def calc_extra_quantities(res, sps, obs, ncalc=3000, shorten_spec=True, measure_
 def pprocessing_new(param_name, outfile, plot_outfolder=None, plot=True, sps=None, overwrite=True,
                     shorten_spec=False,**kwargs):
     
-
     # load parameter file, results
     pfile = model_setup.import_module_from_file(param_name)
     res, _, _, eout = load_prospector_data(outfile, postprocessing=True)
@@ -257,6 +311,7 @@ def pprocessing_new(param_name, outfile, plot_outfolder=None, plot=True, sps=Non
         sps = pfile.build_sps(**res['run_params'])
     obs = res['obs']
     res['model'] = pfile.build_model(**res['run_params'])
+    noise = pfile.build_noise(**res['run_params'])
 
     # recast to float64
     for key in res.keys():
@@ -268,7 +323,7 @@ def pprocessing_new(param_name, outfile, plot_outfolder=None, plot=True, sps=Non
     res['weights'] = res['weights'] / res['weights'].sum()
 
     # sample from chain
-    extra_output = calc_extra_quantities(res,sps,obs,shorten_spec=shorten_spec,**kwargs)
+    extra_output = calc_extra_quantities(res,sps,obs,noise=noise,shorten_spec=shorten_spec,**kwargs)
     
     # create post-processing name, dump info
     _, postname = create_prosp_filename(outfile,postprocessing=True)
@@ -345,7 +400,7 @@ def post_processing(param_name, objname=None, runname = None, overwrite=True, ob
 
     # sample from chain
     extra_output = calc_extra_quantities(res,sps,obs,**kwargs)
-    
+
     # create post-processing name, dump info
     _, extra_filename = create_prosp_filename(obj_outfile,postprocessing=True)
     hickle.dump(extra_output,open(extra_filename, "w"))
@@ -383,11 +438,16 @@ if __name__ == "__main__":
     parser.add_argument('--obj_outfile', type=str)
     parser.add_argument('--plot',type=str2bool)
     parser.add_argument('--measure_herschel',type=str2bool)
+    parser.add_argument('--measure_abslines',type=str2bool)
+    parser.add_argument('--new_prosp',type=str2bool)
 
     args = vars(parser.parse_args())
     kwargs = {}
     for key in args.keys(): kwargs[key] = args[key]
 
     print kwargs
-    post_processing(kwargs['parfile'],**kwargs)
+    if kwargs.get('new_prosp',False):
+        pprocessing_new(kwargs['parfile'], kwargs['obj_outfile'],**kwargs)
+    else:
+        post_processing(kwargs['parfile'],**kwargs)
 

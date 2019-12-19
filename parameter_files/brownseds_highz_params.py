@@ -15,7 +15,7 @@ from astropy.io import fits
 APPS = os.getenv('APPS')
 run_params = {'verbose':True,
               'debug': False,
-              'outfile': os.getenv('APPS')+'/prospector_alpha/results/brownseds_highz_ha/brownseds_highz_ha',
+              'outfile': os.getenv('APPS')+'/prospector_alpha/results/brownseds_highz/brownseds_highz',
               'nofork': True,
               # dynesty params
               'nested_bound': 'multi', # bounding method
@@ -129,7 +129,8 @@ def translate_filters(bfilters, full_list = False):
         return np.array([translate[f] for f in bfilters]), np.array([translate_pfsps[f] for f in bfilters])
 
 
-def load_obs(photname='', extinctname='', herschname='', objname='', elines=True, errfloor=0.05, **extras):
+def load_obs(photname='', extinctname='', herschname='', objname='', mask_ir=True, 
+             elines=False, errfloor=0.05, **extras):
     """
     let's do this
     """
@@ -220,7 +221,9 @@ def load_obs(photname='', extinctname='', herschname='', objname='', elines=True
     # mask filters redwards of 12 um
     filters = observate.load_filters(fsps_filters)
     wave_effective = np.array([filt.wave_effective for filt in filters])
-    phot_mask[wave_effective > 12e4] = False
+    if mask_ir:
+        print 'masking IR data'
+        phot_mask[wave_effective > 12e4] = False
 
     # add elines
     # load fsps emission line list for index
@@ -751,7 +754,7 @@ def load_sps(**extras):
     sps = NebSFH(**extras)
     return sps
 
-def load_model(objname='',datname='', agelims=[], nbins_sfh=7, sigma=0.3, df=2, **extras):
+def load_model(objname='',datname='', agelims=[], nbins_sfh=7, sigma=0.3, df=2, free_ir_sed=False, **extras):
 
     # we'll need this to access specific model parameters
     n = [p['name'] for p in model_params]
@@ -780,6 +783,11 @@ def load_model(objname='',datname='', agelims=[], nbins_sfh=7, sigma=0.3, df=2, 
     model_params[n.index('logsfr_ratios')]['prior'] = priors.StudentT(mean=np.full(nbins_sfh-1,0.0),
                                                                       scale=np.full(nbins_sfh-1,sigma),
                                                                       df=np.full(nbins_sfh-1,df))
+
+    if free_ir_sed:
+        model_params[n.index('duste_gamma')]['isfree'] = True
+        model_params[n.index('duste_qpah')]['isfree'] = True
+        model_params[n.index('duste_umin')]['isfree'] = True
 
     # set mass-metallicity prior
     # insert redshift into model dictionary

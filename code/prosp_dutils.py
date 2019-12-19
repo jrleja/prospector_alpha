@@ -300,7 +300,7 @@ def find_sfh_params(model,theta,obs,sps,sm=None):
 
     return out
 
-def test_likelihood(sps,model,obs,thetas,param_file,run_params):
+def test_likelihood(sps,model,obs,noise,thetas,param_file,run_params):
 
     '''
     skeleton:
@@ -309,7 +309,7 @@ def test_likelihood(sps,model,obs,thetas,param_file,run_params):
     can be run in different environments as a test
     '''
 
-    from prospect.likelihood import lnlike_spec,lnlike_phot
+    from prospect.fitting import fit_model, lnprobfn
 
     if sps is None:
         sps = model_setup.load_sps(**run_params)
@@ -323,8 +323,12 @@ def test_likelihood(sps,model,obs,thetas,param_file,run_params):
     if thetas is None:
         thetas = np.array(model.initial_theta)
 
-    spec_noise, phot_noise = model_setup.load_gp(**run_params)
+    if noise is None:
+        noise = model_setup.load_noise(**run_params)
 
+    
+    return lnprobfn(thetas,model=model,obs=obs,sps=sps,noise=noise)
+    '''
     # generate photometry
     mu, phot, x = model.mean_model(thetas, obs, sps=sps)
 
@@ -343,7 +347,7 @@ def test_likelihood(sps,model,obs,thetas,param_file,run_params):
     lnp_phot = lnlike_phot(phot, obs=obs, phot_noise=phot_noise, **vectors)
 
     return lnp_prior + lnp_phot + lnp_spec
-
+    '''
 def sfr_ms(z,logm):
     """ returns the SFR of the star-forming sequence from Whitaker+14
     as a function of mass and redshift
@@ -499,11 +503,11 @@ def charlot_and_fall_extinction(lam,dust1,dust2,dust1_index,dust2_index, kriek=F
     lam = np.atleast_1d(lam)
 
     # are we using Kriek & Conroy 13?
-    if kriek == True:
-        dd63=6300.00
-        lamv=5500.0
-        dlam=350.0
-        lamuvb=2175.0
+    if kriek:
+        dd63 = 6300.00
+        lamv = 5500.0
+        dlam = 350.0
+        lamuvb = 2175.0
 
         #Calzetti curve, below 6300 Angstroms, else no addition
         cal00 = np.zeros_like(lam)
@@ -572,7 +576,7 @@ def sfh_half_time(x,sfh_params,c):
         sf_start = sfh_params['sf_start']
     return integrate_sfh(sf_start,x,sfh_params)-c
 
-def all_ages(theta,mod,sps):
+def all_ages(theta,mod,sps,obs):
     """calculates light-weighted (L_bol and r-band) ages and mass-weighted ages
     all in Gyr
     """
@@ -586,12 +590,11 @@ def all_ages(theta,mod,sps):
         if par in mod.theta_labels():
             ndust_thetas[mod.theta_index[par]] = 0.0
 
-    # fake obs
-    fake_obs = {'maggies': None, 'phot_mask': None, 'wavelength': None,  'filters': []}
-
     # Lbol light-weighted and mass-weighted ages
+    fobs = obs.copy()
+    fobs['filters'] = []
     sps.ssp.params['compute_light_ages'] = True
-    spec, mags, sm = mod.mean_model(ndust_thetas, fake_obs, sps=sps)
+    spec, mags, sm = mod.mean_model(ndust_thetas, fobs, sps=sps)
     lwa_lbol = sps.ssp.log_lbol
     mwa = sps.ssp.stellar_mass
 
@@ -1201,7 +1204,7 @@ def estimate_xray_lum(sfr):
     sfr_chabrier = 10**(np.log10(sfr)+0.24)
     return 4e39*sfr_chabrier
 
-def measure_restframe_properties(sps, model = None, thetas = None, emlines = False,
+def measure_restframe_properties(sps, model = None, thetas = None, emlines = False, obs = None,
                                  measure_ir = False, measure_luv = False, measure_mir = False,
                                  abslines = False, measure_rf = False, measure_uvj=False):
     """measures a variety of rest-frame properties: total IR luminosity,
@@ -1224,12 +1227,15 @@ def measure_restframe_properties(sps, model = None, thetas = None, emlines = Fal
     model.params['zred'] = np.array(0.0)
     if lumdist:
         model.params['lumdist'] = np.array(1e-5)
-    if nebinspec == False:
+    if (nebinspec == False) & (model.params.get('marginalize_elines',False) == False):
         model.params['nebemlineinspec'] = True
 
     ### if we want restframe optical photometry, generate fake obs file
     ### else generate NO obs file (don't do extra filter convolutions if not necessary)
-    obs = {'filters': [], 'wavelength': None, 'spectrum': None}
+    if obs is None:
+        obs = {'filters': [], 'wavelength': None, 'spectrum': None}
+    else:
+        obs['filters'] = []
     if measure_uvj:
         from sedpy.observate import load_filters
         filters = ['bessell_U','bessell_V','twomass_J']# ,'bessell_B','bessell_R','twomass_Ks']
@@ -1245,7 +1251,7 @@ def measure_restframe_properties(sps, model = None, thetas = None, emlines = Fal
     model.params['zred'] = z
     if lumdist:
         model.params['lumdist'] = lumdist
-    if nebinspec == False:
+    if (nebinspec == False) & (model.params.get('marginalize_elines',False) == False):
         model.params['nebemlineinspec'] = False
 
     ### convert to Lsun / hz

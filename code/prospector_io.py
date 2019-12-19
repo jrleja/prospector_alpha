@@ -53,10 +53,12 @@ def find_all_prospector_results(runname):
     files = glob.glob(folder+'*h5')
     objnames = [f.split('/')[0].split('_')[0] for f in files]
     basenames = ["_".join(f.split('_')[:-2]) for f in files]
+    if (len("".join(objnames)) == 0): # if we don't find any 'old-style' Prospector outputs
+        basenames = ["_".join(f.split('_')[:-1]) for f in files]
 
     return np.unique(basenames)
 
-def load_prospector_data(filebase,objname=None,runname=None,hdf5=True,load_extra_output=True,postprocessing=False):
+def load_prospector_data(filebase,objname=None,runname=None,hdf5=True,postprocessing=False):
     """loads Prospector results
     filebase: string describing the location + objname. automatically finds 
     no_sample_results: only load the Powell results and the model
@@ -76,7 +78,7 @@ def load_prospector_data(filebase,objname=None,runname=None,hdf5=True,load_extra
         mcmc_filename = mcmc_filename[-3:]
 
     extra_output = None
-    if load_extra_output:
+    if not postprocessing:
         extra_output = load_prospector_extra(filebase,postprocessing=postprocessing)
 
     try:
@@ -105,6 +107,15 @@ def load_prospector_extra(filebase,objname=None,runname=None,postprocessing=Fals
 
 def create_prosp_filename(filebase,postprocessing=False):
 
+    # first check new direct method
+    mname = filebase+'_mcmc.h5'
+    pname = filebase+'_post'
+    if postprocessing:
+        if os.path.exists(mname):
+            return mname, pname
+    if os.path.exists(mname) & os.path.exists(pname):
+        return mname, pname
+
     # find most recent output file
     # with the objname
     folder = "/".join(filebase.split('/')[:-1])
@@ -124,7 +135,6 @@ def create_prosp_filename(filebase,postprocessing=False):
         print 'Failed to find any files to extract times in ' + folder + ' of form ' + filename
         return None,None
     fbase = files[np.array(times).astype(float).argmax()]
-
 
     # generate output
     mcmc_filename = "/".join(filebase.split('/')[:-1])+'/'+"_".join(fbase.split('_')[:-1])+'_mcmc.h5'
